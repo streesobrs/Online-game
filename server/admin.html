@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <title>多棋种联机大厅 - 后台管理</title>
+  <style>
+    /* 全局重置+基础样式 */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+      font-family: 'Microsoft Yahei', Arial, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* 顶部导航栏 */
+    .admin-header {
+      background: #2d3748;
+      color: white;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      font-size: 24px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo::before {
+      content: "⚙️";
+      font-size: 28px;
+    }
+
+    .server-status {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    .status-online {
+      color: #48bb78;
+    }
+
+    /* 主内容区 */
+    .admin-container {
+      flex: 1;
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 0 20px;
+    }
+
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .dashboard-card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      padding: 20px;
+      border-left: 4px solid #4299e1;
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: bold;
+      color: #2d3748;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+
+    .stat-item {
+      padding: 12px;
+      background: #f7fafc;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #4299e1;
+      margin-bottom: 5px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      color: #718096;
+    }
+
+    /* 表格样式 */
+    .data-table {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      margin-bottom: 30px;
+      overflow: hidden;
+    }
+
+    .table-header {
+      background: #f7fafc;
+      padding: 15px 20px;
+      border-bottom: 1px solid #e2e8f0;
+      font-weight: bold;
+      color: #2d3748;
+      font-size: 16px;
+    }
+
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    th {
+      background: #f7fafc;
+      font-weight: 600;
+      color: #4a5568;
+      font-size: 14px;
+    }
+
+    tr:hover {
+      background: #f7fafc;
+    }
+
+    .status-badge {
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .badge-online {
+      background: #e8f5e9;
+      color: #27ae60;
+    }
+
+    .badge-waiting {
+      background: #fff8e1;
+      color: #f39c12;
+    }
+
+    .badge-playing {
+      background: #e3f2fd;
+      color: #3498db;
+    }
+
+    .badge-offline {
+      background: #ffebee;
+      color: #e74c3c;
+    }
+
+    /* 游戏类型标签 */
+    .game-tag {
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .tag-gobang {
+      background: #ffebef;
+      color: #e53e3e;
+    }
+
+    .tag-go {
+      background: #e6fffa;
+      color: #38b2ac;
+    }
+
+    .tag-chess {
+      background: #e6f7ff;
+      color: #1976d2;
+    }
+
+    /* 操作按钮 */
+    .action-btn {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: bold;
+      transition: all 0.2s;
+      margin-right: 5px;
+    }
+
+    .btn-danger {
+      background: #e53e3e;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #c53030;
+    }
+
+    .btn-primary {
+      background: #4299e1;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #3182ce;
+    }
+
+    /* 响应式设计 */
+    @media (max-width: 768px) {
+      .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+      }
+
+      .server-status {
+        flex-wrap: wrap;
+      }
+
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .stat-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- 顶部导航栏 -->
+  <div class="admin-header">
+    <div class="header-content">
+      <div class="logo">多棋种联机大厅 - 后台管理</div>
+      <div class="server-status">
+        <div class="status-item">
+          <span>🚀</span>
+          <span id="server-status">运行中</span>
+        </div>
+        <div class="status-item">
+          <span>🕒</span>
+          <span id="server-time"></span>
+        </div>
+        <div class="status-item">
+          <span>🌐</span>
+          <span id="server-ip">localhost:3000</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主内容区 -->
+  <div class="admin-container">
+    <!-- 统计卡片 -->
+    <div class="dashboard-grid">
+      <div class="dashboard-card">
+        <div class="card-title">📊 系统概览</div>
+        <div class="stat-grid">
+          <div class="stat-item">
+            <div class="stat-value" id="total-users">0</div>
+            <div class="stat-label">总用户数</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="online-users">0</div>
+            <div class="stat-label">在线用户</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="playing-users">0</div>
+            <div class="stat-label">游戏中用户</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="waiting-users">0</div>
+            <div class="stat-label">等待中用户</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dashboard-card">
+        <div class="card-title">🎮 游戏统计</div>
+        <div class="stat-grid">
+          <div class="stat-item">
+            <div class="stat-value" id="total-games">0</div>
+            <div class="stat-label">总游戏数</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="active-games">0</div>
+            <div class="stat-label">活跃游戏</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="gobang-games">0</div>
+            <div class="stat-label">五子棋</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="go-games">0</div>
+            <div class="stat-label">围棋</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dashboard-card">
+        <div class="card-title">⚡ 系统资源</div>
+        <div class="stat-grid">
+          <div class="stat-item">
+            <div class="stat-value" id="cpu-usage">0%</div>
+            <div class="stat-label">CPU使用率</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="memory-usage">0%</div>
+            <div class="stat-label">内存使用率</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="uptime">0</div>
+            <div class="stat-label">运行时间(小时)</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="response-time">0ms</div>
+            <div class="stat-label">响应时间</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 在线用户表格 -->
+    <div class="data-table">
+      <div class="table-header">👥 在线用户列表</div>
+      <div class="table-container">
+        <table id="users-table">
+          <thead>
+            <tr>
+              <th>用户ID</th>
+              <th>状态</th>
+              <th>棋种</th>
+              <th>最后更新</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="users-table-body">
+            <tr>
+              <td colspan="5" style="text-align: center; color: #718096;">暂无在线用户</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 游戏列表表格 -->
+    <div class="data-table">
+      <div class="table-header">🎮 游戏列表</div>
+      <div class="table-container">
+        <table id="games-table">
+          <thead>
+            <tr>
+              <th>游戏ID</th>
+              <th>棋种</th>
+              <th>玩家1</th>
+              <th>玩家2</th>
+              <th>开始时间</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="games-table-body">
+            <tr>
+              <td colspan="7" style="text-align: center; color: #718096;">暂无游戏</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 全局变量
+    let socket = null;
+    let serverStats = {
+      totalUsers: 0,
+      onlineUsers: 0,
+      playingUsers: 0,
+      waitingUsers: 0,
+      totalGames: 0,
+      activeGames: 0,
+      gameStats: {
+        gobang: 0,
+        go: 0,
+        chess: 0
+      }
+    };
+
+    // 初始化
+    function init() {
+      // 更新服务器时间
+      updateServerTime();
+      setInterval(updateServerTime, 1000);
+
+      // 连接到服务器
+      connectToServer();
+
+      // 模拟系统资源数据
+      updateSystemResources();
+      setInterval(updateSystemResources, 5000);
+    }
+
+    // 更新服务器时间
+    function updateServerTime() {
+      const now = new Date();
+      const timeString = now.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      document.getElementById('server-time').textContent = timeString;
+    }
+
+    // 连接到服务器
+    function connectToServer() {
+      // 使用Socket.io客户端连接到/admin命名空间
+      socket = io('http://localhost:9999/admin');
+
+      socket.on('connect', function() {
+        console.log('Socket.io连接成功');
+        document.getElementById('server-status').textContent = '运行中';
+        document.getElementById('server-status').className = 'status-online';
+      });
+
+      socket.on('admin_update', function(data) {
+        updateAdminData(data);
+      });
+
+      socket.on('disconnect', function() {
+        console.log('Socket.io连接关闭');
+        document.getElementById('server-status').textContent = '已断开';
+        document.getElementById('server-status').className = '';
+        // 尝试重连
+        setTimeout(connectToServer, 3000);
+      });
+
+      socket.on('error', function(error) {
+        console.error('Socket.io错误:', error);
+      });
+    }
+
+    // 更新管理数据
+    function updateAdminData(data) {
+      // 更新统计数据
+      serverStats = data.stats;
+      updateStatsDisplay();
+
+      // 更新用户列表
+      updateUsersTable(data.users);
+
+      // 更新游戏列表
+      updateGamesTable(data.games);
+    }
+
+    // 更新统计显示
+    function updateStatsDisplay() {
+      document.getElementById('total-users').textContent = serverStats.totalUsers;
+      document.getElementById('online-users').textContent = serverStats.onlineUsers;
+      document.getElementById('playing-users').textContent = serverStats.playingUsers;
+      document.getElementById('waiting-users').textContent = serverStats.waitingUsers;
+      document.getElementById('total-games').textContent = serverStats.totalGames;
+      document.getElementById('active-games').textContent = serverStats.activeGames;
+      document.getElementById('gobang-games').textContent = serverStats.gameStats.gobang;
+      document.getElementById('go-games').textContent = serverStats.gameStats.go;
+    }
+
+    // 更新用户表格
+    function updateUsersTable(users) {
+      const tbody = document.getElementById('users-table-body');
+      if (users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #718096;">暂无在线用户</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = '';
+      users.forEach(user => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${user.userId}</td>
+          <td><span class="status-badge badge-${user.status}">${getStatusText(user.status)}</span></td>
+          <td><span class="game-tag tag-${user.game}">${getGameText(user.game)}</span></td>
+          <td>${new Date(user.lastUpdate).toLocaleString('zh-CN')}</td>
+          <td>
+            <button class="action-btn btn-primary" onclick="kickUser('${user.userId}')">踢出</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // 更新游戏表格
+    function updateGamesTable(games) {
+      const tbody = document.getElementById('games-table-body');
+      if (games.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #718096;">暂无游戏</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = '';
+      games.forEach(game => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${game.gameId}</td>
+          <td><span class="game-tag tag-${game.gameType}">${getGameText(game.gameType)}</span></td>
+          <td>${game.player1}</td>
+          <td>${game.player2}</td>
+          <td>${new Date(game.startTime).toLocaleString('zh-CN')}</td>
+          <td><span class="status-badge badge-playing">${game.status}</span></td>
+          <td>
+            <button class="action-btn btn-danger" onclick="endGame('${game.gameId}')">结束</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // 获取状态文本
+    function getStatusText(status) {
+      const statusMap = {
+        online: '在线',
+        waiting: '等待中',
+        playing: '游戏中',
+        offline: '离线'
+      };
+      return statusMap[status] || status;
+    }
+
+    // 获取游戏文本
+    function getGameText(game) {
+      const gameMap = {
+        gobang: '五子棋',
+        go: '围棋',
+        chess: '象棋'
+      };
+      return gameMap[game] || game;
+    }
+
+    // 踢出用户
+    function kickUser(userId) {
+      if (confirm(`确定要踢出用户 ${userId} 吗？`)) {
+        if (socket && socket.connected) {
+          socket.emit('kick_user', {
+            userId: userId
+          });
+        }
+      }
+    }
+
+    // 结束游戏
+    function endGame(gameId) {
+      if (confirm(`确定要结束游戏 ${gameId} 吗？`)) {
+        if (socket && socket.connected) {
+          socket.emit('end_game', {
+            gameId: gameId
+          });
+        }
+      }
+    }
+
+    // 模拟系统资源数据
+    function updateSystemResources() {
+      // 模拟CPU使用率 (0-100%)
+      const cpuUsage = Math.floor(Math.random() * 30) + 10;
+      document.getElementById('cpu-usage').textContent = `${cpuUsage}%`;
+
+      // 模拟内存使用率 (0-100%)
+      const memoryUsage = Math.floor(Math.random() * 40) + 30;
+      document.getElementById('memory-usage').textContent = `${memoryUsage}%`;
+
+      // 模拟运行时间 (小时)
+      const uptime = Math.floor(Math.random() * 100) + 10;
+      document.getElementById('uptime').textContent = uptime;
+
+      // 模拟响应时间 (ms)
+      const responseTime = Math.floor(Math.random() * 50) + 10;
+      document.getElementById('response-time').textContent = `${responseTime}ms`;
+    }
+
+    // 页面加载完成后初始化
+    window.onload = init;
+  </script>
+</body>
+
+</html>
