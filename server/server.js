@@ -85,8 +85,8 @@ app.get('/api/spectate/games', (req, res) => {
 // 初始化管理器
 const userManager = new UserManager();
 const gameManager = new GameManager(userManager);
-const adminManager = new AdminManager(userManager, gameManager);
 const chatManager = new ChatManager(userManager, gameManager);
+const adminManager = new AdminManager(userManager, gameManager, chatManager);
 const versionManager = new VersionManager();
 
 const serverStartTime = Date.now();
@@ -375,25 +375,13 @@ adminNamespace.on('connection', (socket) => {
   // 禁言用户
   socket.on('mute_user', (data) => {
     const { userId, duration } = data;
-    chatManager.muteUser(userId, duration);
-    socket.emit('admin_action_result', {
-      action: 'mute_user',
-      success: true,
-      userId,
-      message: `用户 ${userId} 已被禁言`
-    });
+    adminManager.muteUser(socket, userId, duration);
   });
 
   // 解除禁言
   socket.on('unmute_user', (data) => {
     const { userId } = data;
-    chatManager.unmuteUser(userId);
-    socket.emit('admin_action_result', {
-      action: 'unmute_user',
-      success: true,
-      userId,
-      message: `用户 ${userId} 已解除禁言`
-    });
+    adminManager.unmuteUser(socket, userId);
   });
 
   // 断开连接

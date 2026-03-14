@@ -29,11 +29,13 @@
     }
 
     .header-content {
-      max-width: 1200px;
+      max-width: 1400px;
       margin: 0 auto;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 15px;
     }
 
     .logo {
@@ -53,6 +55,7 @@
       display: flex;
       gap: 20px;
       align-items: center;
+      flex-wrap: wrap;
     }
 
     .status-item {
@@ -72,16 +75,101 @@
     /* 主内容区 */
     .admin-container {
       flex: 1;
-      max-width: 1200px;
+      max-width: 1400px;
       margin: 20px auto;
       padding: 0 20px;
+      width: 100%;
     }
 
+    /* 认证表单 */
+    .auth-container {
+      max-width: 400px;
+      margin: 100px auto;
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    }
+
+    .auth-title {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 20px;
+      text-align: center;
+      color: #2d3748;
+    }
+
+    .auth-input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+
+    .auth-input:focus {
+      outline: none;
+      border-color: #4299e1;
+    }
+
+    .auth-btn {
+      width: 100%;
+      padding: 12px;
+      background: #4299e1;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .auth-btn:hover {
+      background: #3182ce;
+    }
+
+    /* 操作面板 */
+    .action-panel {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .action-panel-title {
+      font-size: 16px;
+      font-weight: bold;
+      color: #2d3748;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .action-input {
+      flex: 1;
+      min-width: 200px;
+      padding: 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    /* 统计卡片 */
     .dashboard-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
       gap: 20px;
-      margin-bottom: 30px;
+      margin-bottom: 20px;
     }
 
     .dashboard-card {
@@ -132,7 +220,7 @@
       background: white;
       border-radius: 12px;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-      margin-bottom: 30px;
+      margin-bottom: 20px;
       overflow: hidden;
     }
 
@@ -143,6 +231,9 @@
       font-weight: bold;
       color: #2d3748;
       font-size: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     .table-container {
@@ -154,7 +245,8 @@
       border-collapse: collapse;
     }
 
-    th, td {
+    th,
+    td {
       padding: 12px 16px;
       text-align: left;
       border-bottom: 1px solid #e2e8f0;
@@ -251,12 +343,197 @@
       background: #3182ce;
     }
 
+    .btn-success {
+      background: #48bb78;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #38a169;
+    }
+
+    .btn-warning {
+      background: #ed8936;
+      color: white;
+    }
+
+    .btn-warning:hover {
+      background: #dd6b20;
+    }
+
+    .btn-info {
+      background: #9f7aea;
+      color: white;
+    }
+
+    .btn-info:hover {
+      background: #805ad5;
+    }
+
+    /* 排行榜 */
+    .leaderboard-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .leaderboard-rank {
+      font-weight: bold;
+      color: #4299e1;
+      min-width: 30px;
+    }
+
+    .rank-1 {
+      color: #ffd700;
+    }
+
+    .rank-2 {
+      color: #c0c0c0;
+    }
+
+    .rank-3 {
+      color: #cd7f32;
+    }
+
+    /* 消息提示 */
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px 25px;
+      border-radius: 8px;
+      color: white;
+      font-weight: bold;
+      z-index: 1000;
+      animation: slideIn 0.3s ease;
+    }
+
+    .toast-success {
+      background: #48bb78;
+    }
+
+    .toast-error {
+      background: #e53e3e;
+    }
+
+    .toast-info {
+      background: #4299e1;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    /* 隐藏元素 */
+    .hidden {
+      display: none !important;
+    }
+
+    /* 模态框 */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+    }
+
+    .modal {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    }
+
+    .modal-title {
+      font-size: 20px;
+      font-weight: bold;
+      color: #2d3748;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #718096;
+    }
+
+    .modal-close:hover {
+      color: #2d3748;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: #4299e1;
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .checkbox-group input {
+      width: 18px;
+      height: 18px;
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
     /* 响应式设计 */
     @media (max-width: 768px) {
       .header-content {
         flex-direction: column;
         align-items: flex-start;
-        gap: 10px;
       }
 
       .server-status {
@@ -275,8 +552,15 @@
 </head>
 
 <body>
+  <!-- 认证表单 -->
+  <div id="auth-container" class="auth-container">
+    <div class="auth-title">🔐 管理员登录</div>
+    <input type="password" id="admin-token" class="auth-input" placeholder="请输入管理员Token">
+    <button class="auth-btn" onclick="login()">登录</button>
+  </div>
+
   <!-- 顶部导航栏 -->
-  <div class="admin-header">
+  <div id="admin-header" class="admin-header hidden">
     <div class="header-content">
       <div class="logo">多棋种联机大厅 - 后台管理</div>
       <div class="server-status">
@@ -290,22 +574,39 @@
         </div>
         <div class="status-item">
           <span>🌐</span>
-          <span id="server-ip">localhost:3000</span>
+          <span id="server-ip">localhost:8080</span>
         </div>
       </div>
     </div>
   </div>
 
   <!-- 主内容区 -->
-  <div class="admin-container">
+  <div id="admin-container" class="admin-container hidden">
+    <!-- 操作面板 -->
+    <div class="action-panel">
+      <div class="action-panel-title">🎛️ 快捷操作</div>
+      <div class="action-row" style="margin-bottom: 15px;">
+        <input type="text" id="broadcast-message" class="action-input" placeholder="输入广播消息...">
+        <button class="action-btn btn-primary" onclick="broadcastMessage()">📢 广播消息</button>
+        <button class="action-btn btn-warning" onclick="enterMaintenanceMode()">🔧 进入维护</button>
+        <button class="action-btn btn-success" onclick="exitMaintenanceMode()">✅ 退出维护</button>
+        <button class="action-btn btn-info" onclick="refreshData()">🔄 刷新数据</button>
+      </div>
+      <div class="action-row">
+        <button class="action-btn btn-warning" onclick="loadGameHistory()">📜 游戏历史</button>
+        <button class="action-btn btn-info" onclick="loadSystemConfig()">⚙️ 系统配置</button>
+        <button class="action-btn btn-danger" onclick="showCleanupModal()">🧹 清理数据</button>
+      </div>
+    </div>
+
     <!-- 统计卡片 -->
     <div class="dashboard-grid">
       <div class="dashboard-card">
         <div class="card-title">📊 系统概览</div>
         <div class="stat-grid">
           <div class="stat-item">
-            <div class="stat-value" id="total-users">0</div>
-            <div class="stat-label">总用户数</div>
+            <div class="stat-value" id="total-registered">0</div>
+            <div class="stat-label">总注册用户</div>
           </div>
           <div class="stat-item">
             <div class="stat-value" id="online-users">0</div>
@@ -341,6 +642,14 @@
             <div class="stat-value" id="go-games">0</div>
             <div class="stat-label">围棋</div>
           </div>
+          <div class="stat-item">
+            <div class="stat-value" id="chess-games">0</div>
+            <div class="stat-label">象棋</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="total-connections">0</div>
+            <div class="stat-label">总连接数</div>
+          </div>
         </div>
       </div>
 
@@ -348,22 +657,48 @@
         <div class="card-title">⚡ 系统资源</div>
         <div class="stat-grid">
           <div class="stat-item">
-            <div class="stat-value" id="cpu-usage">0%</div>
-            <div class="stat-label">CPU使用率</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-value" id="memory-usage">0%</div>
-            <div class="stat-label">内存使用率</div>
-          </div>
-          <div class="stat-item">
             <div class="stat-value" id="uptime">0</div>
             <div class="stat-label">运行时间(小时)</div>
           </div>
           <div class="stat-item">
-            <div class="stat-value" id="response-time">0ms</div>
-            <div class="stat-label">响应时间</div>
+            <div class="stat-value" id="peak-online">0</div>
+            <div class="stat-label">峰值在线</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="node-version">-</div>
+            <div class="stat-label">Node版本</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="platform">-</div>
+            <div class="stat-label">系统平台</div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- 排行榜 -->
+    <div class="data-table">
+      <div class="table-header">🏆 排行榜 (Top 10)</div>
+      <div class="table-container">
+        <table id="leaderboard-table">
+          <thead>
+            <tr>
+              <th>排名</th>
+              <th>用户ID</th>
+              <th>昵称</th>
+              <th>胜</th>
+              <th>负</th>
+              <th>平</th>
+              <th>总场次</th>
+              <th>胜率</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboard-table-body">
+            <tr>
+              <td colspan="8" style="text-align: center; color: #718096;">暂无数据</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -375,15 +710,17 @@
           <thead>
             <tr>
               <th>用户ID</th>
+              <th>昵称</th>
               <th>状态</th>
               <th>棋种</th>
-              <th>最后更新</th>
+              <th>连接时间</th>
+              <th>最后活动</th>
               <th>操作</th>
             </tr>
           </thead>
           <tbody id="users-table-body">
             <tr>
-              <td colspan="5" style="text-align: center; color: #718096;">暂无在线用户</td>
+              <td colspan="7" style="text-align: center; color: #718096;">暂无在线用户</td>
             </tr>
           </tbody>
         </table>
@@ -402,13 +739,14 @@
               <th>玩家1</th>
               <th>玩家2</th>
               <th>开始时间</th>
+              <th>落子数</th>
               <th>状态</th>
               <th>操作</th>
             </tr>
           </thead>
           <tbody id="games-table-body">
             <tr>
-              <td colspan="7" style="text-align: center; color: #718096;">暂无游戏</td>
+              <td colspan="8" style="text-align: center; color: #718096;">暂无游戏</td>
             </tr>
           </tbody>
         </table>
@@ -416,35 +754,137 @@
     </div>
   </div>
 
+  <script src="/socket.io/socket.io.js"></script>
   <script>
     // 全局变量
     let socket = null;
-    let serverStats = {
-      totalUsers: 0,
-      onlineUsers: 0,
-      playingUsers: 0,
-      waitingUsers: 0,
-      totalGames: 0,
-      activeGames: 0,
-      gameStats: {
-        gobang: 0,
-        go: 0,
-        chess: 0
-      }
-    };
+    let adminData = {};
 
-    // 初始化
-    function init() {
+    // 显示消息提示
+    function showToast(message, type = 'info') {
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+
+    // 登录
+    function login() {
+      const token = document.getElementById('admin-token').value.trim();
+      if (!token) {
+        showToast('请输入Token', 'error');
+        return;
+      }
+
+      // 连接到/admin命名空间
+      socket = io('/admin', {
+        query: { token }
+      });
+
+      socket.on('connect', function () {
+        console.log('Socket.io连接成功');
+        document.getElementById('auth-container').classList.add('hidden');
+        document.getElementById('admin-header').classList.remove('hidden');
+        document.getElementById('admin-container').classList.remove('hidden');
+        showToast('登录成功！', 'success');
+        initAdmin();
+      });
+
+      socket.on('auth_error', function (data) {
+        console.error('认证失败:', data);
+        showToast(data.message || '认证失败', 'error');
+        socket.disconnect();
+      });
+
+      socket.on('disconnect', function () {
+        console.log('Socket.io连接关闭');
+        if (!document.getElementById('auth-container').classList.contains('hidden')) {
+          return;
+        }
+        showToast('连接已断开，正在重连...', 'error');
+      });
+
+      socket.on('error', function (error) {
+        console.error('Socket.io错误:', error);
+        showToast('连接错误: ' + error, 'error');
+      });
+    }
+
+    // 初始化管理后台
+    function initAdmin() {
       // 更新服务器时间
       updateServerTime();
       setInterval(updateServerTime, 1000);
 
-      // 连接到服务器
-      connectToServer();
+      // 监听管理数据更新
+      socket.on('admin_update', function (data) {
+        adminData = data;
+        updateAdminData(data);
+      });
 
-      // 模拟系统资源数据
-      updateSystemResources();
-      setInterval(updateSystemResources, 5000);
+      // 监听操作结果
+      socket.on('admin_action_result', function (data) {
+        console.log('操作结果:', data);
+        if (data.success) {
+          showToast(data.message, 'success');
+        } else {
+          showToast(data.message, 'error');
+        }
+      });
+
+      // 监听排行榜数据
+      socket.on('admin_leaderboard', function (data) {
+        updateLeaderboardTable(data.leaderboard);
+      });
+
+      // 监听游戏历史数据
+      socket.on('admin_game_history', function (data) {
+        const tbody = document.getElementById('game-history-table-body');
+        if (tbody) {
+          if (!data.games || data.games.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">暂无数据</td></tr>';
+          } else {
+            tbody.innerHTML = '';
+            data.games.forEach(game => {
+              const tr = document.createElement('tr');
+              tr.innerHTML = `
+                <td>${game.gameId}</td>
+                <td><span class="game-tag tag-${game.gameType}">${getGameText(game.gameType)}</span></td>
+                <td>${game.player1 || '-'}</td>
+                <td>${game.player2 || '-'}</td>
+                <td>${game.winner || '-'}</td>
+                <td>${game.startTime ? new Date(game.startTime).toLocaleString('zh-CN') : '-'}</td>
+              `;
+              tbody.appendChild(tr);
+            });
+          }
+        }
+      });
+
+      // 监听系统配置数据
+      socket.on('admin_config', function (data) {
+        const configContent = document.getElementById('config-content');
+        if (configContent) {
+          configContent.innerHTML = `
+            <div class="form-group">
+              <label class="form-label">服务器端口</label>
+              <input type="text" class="form-input" value="${data.config.server.port}" disabled>
+            </div>
+            <div class="form-group">
+              <label class="form-label">环境</label>
+              <input type="text" class="form-input" value="${data.config.server.env}" disabled>
+            </div>
+            <div class="form-group">
+              <label class="form-label">更新间隔 (ms)</label>
+              <input type="number" class="form-input" value="${data.config.admin.updateInterval}">
+            </div>
+          `;
+        }
+      });
+
+      // 获取初始数据
+      socket.emit('get_leaderboard', { limit: 10 });
     }
 
     // 更新服务器时间
@@ -458,80 +898,71 @@
         minute: '2-digit',
         second: '2-digit'
       });
-      document.getElementById('server-time').textContent = timeString;
-    }
-
-    // 连接到服务器
-    function connectToServer() {
-      // 使用Socket.io客户端连接到/admin命名空间
-      socket = io('http://localhost:9999/admin');
-
-      socket.on('connect', function() {
-        console.log('Socket.io连接成功');
-        document.getElementById('server-status').textContent = '运行中';
-        document.getElementById('server-status').className = 'status-online';
-      });
-
-      socket.on('admin_update', function(data) {
-        updateAdminData(data);
-      });
-
-      socket.on('disconnect', function() {
-        console.log('Socket.io连接关闭');
-        document.getElementById('server-status').textContent = '已断开';
-        document.getElementById('server-status').className = '';
-        // 尝试重连
-        setTimeout(connectToServer, 3000);
-      });
-
-      socket.on('error', function(error) {
-        console.error('Socket.io错误:', error);
-      });
+      const timeEl = document.getElementById('server-time');
+      if (timeEl) timeEl.textContent = timeString;
     }
 
     // 更新管理数据
     function updateAdminData(data) {
       // 更新统计数据
-      serverStats = data.stats;
-      updateStatsDisplay();
-
+      updateStatsDisplay(data.stats);
       // 更新用户列表
       updateUsersTable(data.users);
-
       // 更新游戏列表
       updateGamesTable(data.games);
     }
 
     // 更新统计显示
-    function updateStatsDisplay() {
-      document.getElementById('total-users').textContent = serverStats.totalUsers;
-      document.getElementById('online-users').textContent = serverStats.onlineUsers;
-      document.getElementById('playing-users').textContent = serverStats.playingUsers;
-      document.getElementById('waiting-users').textContent = serverStats.waitingUsers;
-      document.getElementById('total-games').textContent = serverStats.totalGames;
-      document.getElementById('active-games').textContent = serverStats.activeGames;
-      document.getElementById('gobang-games').textContent = serverStats.gameStats.gobang;
-      document.getElementById('go-games').textContent = serverStats.gameStats.go;
+    function updateStatsDisplay(stats) {
+      if (!stats) return;
+
+      const users = stats.users || {};
+      const games = stats.games || {};
+      const system = stats.system || {};
+
+      document.getElementById('total-registered').textContent = users.total || 0;
+      document.getElementById('online-users').textContent = users.online || 0;
+      document.getElementById('playing-users').textContent = users.playing || 0;
+      document.getElementById('waiting-users').textContent = users.waiting || 0;
+
+      document.getElementById('total-games').textContent = games.total || 0;
+      document.getElementById('active-games').textContent = games.active || 0;
+      document.getElementById('gobang-games').textContent = games.byType?.gobang || 0;
+      document.getElementById('go-games').textContent = games.byType?.go || 0;
+      document.getElementById('chess-games').textContent = games.byType?.chess || 0;
+      document.getElementById('total-connections').textContent = stats.totalConnections || 0;
+      document.getElementById('peak-online').textContent = stats.peakOnline || 0;
+
+      if (system.uptime) {
+        const uptimeHours = Math.round(system.uptime / (1000 * 60 * 60) * 10) / 10;
+        document.getElementById('uptime').textContent = uptimeHours;
+      }
+      document.getElementById('node-version').textContent = system.nodeVersion || '-';
+      document.getElementById('platform').textContent = system.platform || '-';
     }
 
     // 更新用户表格
     function updateUsersTable(users) {
       const tbody = document.getElementById('users-table-body');
-      if (users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #718096;">暂无在线用户</td></tr>';
+      if (!users || users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #718096;">暂无在线用户</td></tr>';
         return;
       }
 
       tbody.innerHTML = '';
       users.forEach(user => {
         const tr = document.createElement('tr');
+        const isMuted = user.muted || false;
         tr.innerHTML = `
           <td>${user.userId}</td>
+          <td>${user.nickname || '-'}
           <td><span class="status-badge badge-${user.status}">${getStatusText(user.status)}</span></td>
-          <td><span class="game-tag tag-${user.game}">${getGameText(user.game)}</span></td>
-          <td>${new Date(user.lastUpdate).toLocaleString('zh-CN')}</td>
+          <td>${user.gameType ? '<span class="game-tag tag-' + user.gameType + '">' + getGameText(user.gameType) + '</span>' : '-'}</td>
+          <td>${user.connectedAt ? new Date(user.connectedAt).toLocaleString('zh-CN') : '-'}</td>
+          <td>${user.lastActivity ? new Date(user.lastActivity).toLocaleString('zh-CN') : '-'}</td>
           <td>
-            <button class="action-btn btn-primary" onclick="kickUser('${user.userId}')">踢出</button>
+            <button class="action-btn ${isMuted ? 'btn-success' : 'btn-warning'}" onclick="${isMuted ? 'unmuteUser' : 'muteUser'}('${user.userId}')">${isMuted ? '解除禁言' : '禁言'}</button>
+            <button class="action-btn btn-danger" onclick="kickUser('${user.userId}')">踢出</button>
           </td>
         `;
         tbody.appendChild(tr);
@@ -541,8 +972,8 @@
     // 更新游戏表格
     function updateGamesTable(games) {
       const tbody = document.getElementById('games-table-body');
-      if (games.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #718096;">暂无游戏</td></tr>';
+      if (!games || games.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #718096;">暂无游戏</td></tr>';
         return;
       }
 
@@ -552,13 +983,40 @@
         tr.innerHTML = `
           <td>${game.gameId}</td>
           <td><span class="game-tag tag-${game.gameType}">${getGameText(game.gameType)}</span></td>
-          <td>${game.player1}</td>
-          <td>${game.player2}</td>
-          <td>${new Date(game.startTime).toLocaleString('zh-CN')}</td>
-          <td><span class="status-badge badge-playing">${game.status}</span></td>
+          <td>${game.player1 || '-'}</td>
+          <td>${game.player2 || '-'}</td>
+          <td>${game.startTime ? new Date(game.startTime).toLocaleString('zh-CN') : '-'}</td>
+          <td>${game.moveCount || 0}</td>
+          <td><span class="status-badge badge-${game.status}">${game.status || '未知'}</span></td>
           <td>
-            <button class="action-btn btn-danger" onclick="endGame('${game.gameId}')">结束</button>
+            ${game.status === 'playing' ? '<button class="action-btn btn-danger" onclick="endGame(\'' + game.gameId + '\')">结束</button>' : '-'}
           </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // 更新排行榜表格
+    function updateLeaderboardTable(leaderboard) {
+      const tbody = document.getElementById('leaderboard-table-body');
+      if (!leaderboard || leaderboard.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #718096;">暂无数据</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = '';
+      leaderboard.forEach((player, index) => {
+        const tr = document.createElement('tr');
+        const rankClass = index < 3 ? `rank-${index + 1}` : '';
+        tr.innerHTML = `
+          <td><span class="leaderboard-rank ${rankClass}">#${player.rank}</span></td>
+          <td>${player.userId}</td>
+          <td>${player.nickname || '-'}</td>
+          <td>${player.wins || 0}</td>
+          <td>${player.losses || 0}</td>
+          <td>${player.draws || 0}</td>
+          <td>${player.totalGames || 0}</td>
+          <td>${player.winRate || 0}%</td>
         `;
         tbody.appendChild(tr);
       });
@@ -590,7 +1048,8 @@
       if (confirm(`确定要踢出用户 ${userId} 吗？`)) {
         if (socket && socket.connected) {
           socket.emit('kick_user', {
-            userId: userId
+            userId: userId,
+            reason: '管理员操作'
           });
         }
       }
@@ -607,27 +1066,200 @@
       }
     }
 
-    // 模拟系统资源数据
-    function updateSystemResources() {
-      // 模拟CPU使用率 (0-100%)
-      const cpuUsage = Math.floor(Math.random() * 30) + 10;
-      document.getElementById('cpu-usage').textContent = `${cpuUsage}%`;
+    // 广播消息
+    function broadcastMessage() {
+      const message = document.getElementById('broadcast-message').value.trim();
+      if (!message) {
+        showToast('请输入消息内容', 'error');
+        return;
+      }
 
-      // 模拟内存使用率 (0-100%)
-      const memoryUsage = Math.floor(Math.random() * 40) + 30;
-      document.getElementById('memory-usage').textContent = `${memoryUsage}%`;
-
-      // 模拟运行时间 (小时)
-      const uptime = Math.floor(Math.random() * 100) + 10;
-      document.getElementById('uptime').textContent = uptime;
-
-      // 模拟响应时间 (ms)
-      const responseTime = Math.floor(Math.random() * 50) + 10;
-      document.getElementById('response-time').textContent = `${responseTime}ms`;
+      if (socket && socket.connected) {
+        socket.emit('broadcast', {
+          message: message
+        });
+        document.getElementById('broadcast-message').value = '';
+      }
     }
 
-    // 页面加载完成后初始化
-    window.onload = init;
+    // 进入维护模式
+    function enterMaintenanceMode() {
+      if (!confirm('确定要进入维护模式吗？')) {
+        return;
+      }
+
+      const message = '系统维护中，请稍后再试';
+
+      if (socket && socket.connected) {
+        socket.emit('maintenance_mode', {
+          enabled: true,
+          message: message
+        });
+      }
+    }
+
+    // 退出维护模式
+    function exitMaintenanceMode() {
+      if (!confirm('确定要退出维护模式吗？')) {
+        return;
+      }
+
+      if (socket && socket.connected) {
+        socket.emit('maintenance_mode', {
+          enabled: false,
+          message: ''
+        });
+      }
+    }
+
+    // 禁言用户
+    function muteUser(userId) {
+      const duration = prompt('请输入禁言时长（分钟，0表示永久）：', '10');
+      if (duration !== null) {
+        const durationMinutes = parseInt(duration) || 10;
+        if (socket && socket.connected) {
+          socket.emit('mute_user', {
+            userId: userId,
+            duration: durationMinutes
+          });
+        }
+      }
+    }
+
+    // 解除禁言
+    function unmuteUser(userId) {
+      if (confirm(`确定要解除用户 ${userId} 的禁言吗？`)) {
+        if (socket && socket.connected) {
+          socket.emit('unmute_user', {
+            userId: userId
+          });
+        }
+      }
+    }
+
+    // 显示游戏历史
+    function loadGameHistory() {
+      if (socket && socket.connected) {
+        socket.emit('get_game_history', { limit: 50 });
+        showGameHistoryModal();
+      }
+    }
+
+    // 显示游戏历史模态框
+    function showGameHistoryModal() {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.id = 'game-history-modal';
+      modal.innerHTML = `
+        <div class="modal">
+          <div class="modal-title">
+            <span>📜 游戏历史</span>
+            <button class="modal-close" onclick="closeModal('game-history-modal')">&times;</button>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>游戏ID</th>
+                  <th>棋种</th>
+                  <th>玩家1</th>
+                  <th>玩家2</th>
+                  <th>胜者</th>
+                  <th>开始时间</th>
+                </tr>
+              </thead>
+              <tbody id="game-history-table-body">
+                <tr><td colspan="6" style="text-align: center;">加载中...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    // 显示系统配置模态框
+    function loadSystemConfig() {
+      if (socket && socket.connected) {
+        socket.emit('get_config');
+        showConfigModal();
+      }
+    }
+
+    function showConfigModal() {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.id = 'config-modal';
+      modal.innerHTML = `
+        <div class="modal">
+          <div class="modal-title">
+            <span>⚙️ 系统配置</span>
+            <button class="modal-close" onclick="closeModal('config-modal')">&times;</button>
+          </div>
+          <div id="config-content">
+            <p style="text-align: center;">加载中...</p>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    // 显示数据清理模态框
+    function showCleanupModal() {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.id = 'cleanup-modal';
+      modal.innerHTML = `
+        <div class="modal">
+          <div class="modal-title">
+            <span>🧹 数据清理</span>
+            <button class="modal-close" onclick="closeModal('cleanup-modal')">&times;</button>
+          </div>
+          <div class="checkbox-group">
+            <input type="checkbox" id="cleanup-old-games">
+            <label for="cleanup-old-games">清理30天前的游戏记录</label>
+          </div>
+          <div class="modal-footer">
+            <button class="action-btn" onclick="closeModal('cleanup-modal')">取消</button>
+            <button class="action-btn btn-danger" onclick="executeCleanup()">执行清理</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    // 执行数据清理
+    function executeCleanup() {
+      const oldGames = document.getElementById('cleanup-old-games').checked;
+
+      if (!oldGames) {
+        showToast('请选择要清理的项', 'error');
+        return;
+      }
+
+      if (socket && socket.connected) {
+        socket.emit('cleanup_data', {
+          oldGames: oldGames
+        });
+        closeModal('cleanup-modal');
+      }
+    }
+
+    // 关闭模态框
+    function closeModal(modalId) {
+      const modal = document.getElementById(modalId);
+      if (modal) {
+        modal.remove();
+      }
+    }
+
+    // 刷新数据
+    function refreshData() {
+      if (socket && socket.connected) {
+        socket.emit('get_leaderboard', { limit: 10 });
+        showToast('数据已刷新', 'success');
+      }
+    }
   </script>
 </body>
 

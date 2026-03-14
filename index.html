@@ -940,6 +940,80 @@
       color: #64748b;
     }
 
+    /* 系统广播样式 */
+    .system-broadcast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px 30px;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(102, 126, 234, 0.4);
+      z-index: 1000;
+      max-width: 600px;
+      width: 90%;
+      display: none;
+      animation: broadcastSlide 0.5s ease-out;
+    }
+
+    .system-broadcast.show {
+      display: block;
+    }
+
+    @keyframes broadcastSlide {
+      0% {
+        transform: translateX(-50%) translateY(-100px);
+        opacity: 0;
+      }
+
+      100% {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .broadcast-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    .broadcast-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .broadcast-close {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 20px;
+      cursor: pointer;
+      opacity: 0.8;
+      transition: opacity 0.2s;
+    }
+
+    .broadcast-close:hover {
+      opacity: 1;
+    }
+
+    .broadcast-content {
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    .broadcast-time {
+      font-size: 12px;
+      opacity: 0.8;
+      margin-top: 8px;
+    }
+
     /* 游戏和聊天容器 */
     .game-and-chat-container {
       display: flex;
@@ -1348,6 +1422,19 @@
     ⚠️ 注意：只有当前回合方可以落子，匹配成功后自动进入对局 | 点击"💡 游戏规则"查看各棋种玩法说明
   </div>
 
+  <!-- 系统广播通知 -->
+  <div class="system-broadcast" id="system-broadcast">
+    <div class="broadcast-header">
+      <div class="broadcast-title">
+        <span>📢</span>
+        <span>系统公告</span>
+      </div>
+      <button class="broadcast-close" onclick="hideBroadcast()">&times;</button>
+    </div>
+    <div class="broadcast-content" id="broadcast-content"></div>
+    <div class="broadcast-time" id="broadcast-time"></div>
+  </div>
+
   <!-- 版本信息 -->
   <div class="version-info">
     版本说明：多棋种联机大厅版 - 支持五子棋/围棋/象棋 | 智能提示系统 | 性能优化版 v<span id="client-version-display">1.0.0</span>
@@ -1463,6 +1550,9 @@
     const chatMessages = document.getElementById('chat-messages');
     const chatInput = document.getElementById('chat-input');
     const clientVersionDisplay = document.getElementById('client-version-display');
+    const systemBroadcast = document.getElementById('system-broadcast');
+    const broadcastContent = document.getElementById('broadcast-content');
+    const broadcastTime = document.getElementById('broadcast-time');
 
     // 大厅相关DOM
     const lobbyContainer = document.getElementById('lobby-container');
@@ -1747,10 +1837,42 @@
         alert('错误: ' + data.message);
       });
 
+      // 系统广播
+      socket.on('system_broadcast', (data) => {
+        console.log('收到系统广播:', data);
+        showBroadcast(data.message, data.from, data.timestamp);
+      });
+
+      // 维护模式通知
+      socket.on('maintenance_notice', (data) => {
+        console.log('维护模式通知:', data);
+        if (data.enabled) {
+          showBroadcast(data.message, '系统维护', data.timestamp);
+        }
+      });
+
       socket.on('game_warning', (data) => {
         console.warn('游戏警告:', data);
         updateStatus('⚠️ ' + data.message);
       });
+    }
+
+    // 显示系统广播
+    function showBroadcast(message, from = '管理员', timestamp = Date.now()) {
+      broadcastContent.textContent = message;
+      const time = new Date(timestamp);
+      broadcastTime.textContent = time.toLocaleString('zh-CN');
+      systemBroadcast.classList.add('show');
+
+      // 30秒后自动隐藏
+      setTimeout(() => {
+        hideBroadcast();
+      }, 30000);
+    }
+
+    // 隐藏系统广播
+    function hideBroadcast() {
+      systemBroadcast.classList.remove('show');
     }
 
     // 初始化所有棋盘

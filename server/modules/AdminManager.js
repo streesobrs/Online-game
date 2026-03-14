@@ -4,9 +4,10 @@ const logger = require('../utils/logger');
 const dataStore = require('../utils/dataStore');
 
 class AdminManager {
-  constructor(userManager, gameManager) {
+  constructor(userManager, gameManager, chatManager) {
     this.userManager = userManager;
     this.gameManager = gameManager;
+    this.chatManager = chatManager;
     this.adminSockets = new Map(); // socketId -> admin信息
     this.systemStats = {
       serverStartTime: Date.now(),
@@ -31,7 +32,8 @@ class AdminManager {
     const adminInfo = {
       socketId: socket.id,
       connectedAt: Date.now(),
-      ip: socket.handshake.address
+      ip: socket.handshake.address,
+      io
     };
 
     this.adminSockets.set(socket.id, adminInfo);
@@ -116,7 +118,8 @@ class AdminManager {
         connectedAt: u.connectedAt,
         lastActivity: u.lastActivity,
         stats: u.stats,
-        ip: u.ip
+        ip: u.ip,
+        muted: this.chatManager ? this.chatManager.muteList.has(u.userId) : false
       })),
       games: games.map(g => ({
         gameId: g.gameId,
@@ -136,7 +139,7 @@ class AdminManager {
   // 踢出用户
   kickUser(socket, userId, reason = '管理员操作') {
     const success = this.userManager.kickUser(userId, reason);
-    
+
     if (success) {
       logger.info('管理员踢出用户', { adminSocket: socket.id, userId, reason });
       socket.emit('admin_action_result', {
@@ -157,8 +160,10 @@ class AdminManager {
 
   // 结束游戏
   endGame(socket, gameId) {
-    const success = this.gameManager.adminEndGame(gameId, io);
-    
+    const adminInfo = this.adminSockets.get(socket.id);
+    const io = adminInfo ? adminInfo.io : null;
+    const success = io ? this.gameManager.adminEndGame(gameId, io) : false;
+
     if (success) {
       logger.info('管理员结束游戏', { adminSocket: socket.id, gameId });
       socket.emit('admin_action_result', {
@@ -208,11 +213,11 @@ class AdminManager {
   async getSystemLogs(socket, options = {}) {
     try {
       const { level = 'all', limit = 100, startTime, endTime } = options;
-      
+
       // 这里可以从日志文件读取
       // 简化版本：返回最近的系统事件
       const logs = [];
-      
+
       socket.emit('admin_logs', {
         logs,
         total: logs.length
@@ -231,7 +236,7 @@ class AdminManager {
   async getLeaderboard(socket, limit = 10) {
     try {
       const leaderboard = await this.userManager.getLeaderboard(limit);
-      
+
       socket.emit('admin_leaderboard', {
         leaderboard,
         timestamp: Date.now()
@@ -250,9 +255,9 @@ class AdminManager {
   async getGameHistory(socket, options = {}) {
     try {
       const { limit = 50, gameType, startDate, endDate } = options;
-      
+
       let games = await dataStore.read('games');
-      
+
       // 筛选
       if (gameType) {
         games = games.filter(g => g.gameType === gameType);
@@ -263,12 +268,12 @@ class AdminManager {
       if (endDate) {
         games = games.filter(g => g.endTime <= endDate);
       }
-      
+
       // 排序和限制
       games = games
         .sort((a, b) => b.endTime - a.endTime)
         .slice(0, limit);
-      
+
       socket.emit('admin_game_history', {
         games,
         total: games.length
@@ -300,9 +305,9 @@ class AdminManager {
   updateSystemConfig(socket, updates) {
     // 这里可以实现配置热更新
     // 注意：某些配置需要重启服务器才能生效
-    
+
     logger.info('管理员更新配置', { adminSocket: socket.id, updates });
-    
+
     socket.emit('admin_action_result', {
       action: 'update_config',
       success: true,
@@ -319,14 +324,14 @@ class AdminManager {
         message,
         timestamp: Date.now()
       });
-      
+
       logger.info('系统进入维护模式', { adminSocket: socket.id, message });
     } else {
       io.emit('maintenance_notice', {
         enabled: false,
         timestamp: Date.now()
       });
-      
+
       logger.info('系统退出维护模式', { adminSocket: socket.id });
     }
 
@@ -336,6 +341,69 @@ class AdminManager {
       enabled,
       message: enabled ? '系统已进入维护模式' : '系统已退出维护模式'
     });
+  }
+
+  // 禁言用户
+  muteUser(socket, userId, duration = 10) {
+    if (!this.chatManager) {
+      socket.emit('admin_action_result', {
+        action: 'mute_user',
+        success: false,
+        message: '聊天管理器不可用'
+      });
+      return;
+    }
+
+    const durationMs = duration === 0 ? 24 * 60 * 60 * 1000 * 365 : duration * 60 * 1000;
+    const success = this.chatManager.muteUser(userId, durationMs);
+
+    if (success) {
+      logger.info('管理员禁言用户', { adminSocket: socket.id, userId, duration });
+      socket.emit('admin_action_result', {
+        action: 'mute_user',
+        success: true,
+        userId,
+        message: `用户 ${userId} 已被禁言 ${duration} 分钟`
+      });
+    } else {
+      socket.emit('admin_action_result', {
+        action: 'mute_user',
+        success: false,
+        userId,
+        message: '禁言失败'
+      });
+    }
+  }
+
+  // 解除禁言
+  unmuteUser(socket, userId) {
+    if (!this.chatManager) {
+      socket.emit('admin_action_result', {
+        action: 'unmute_user',
+        success: false,
+        message: '聊天管理器不可用'
+      });
+      return;
+    }
+
+    const success = this.chatManager.unmuteUser(userId);
+
+    if (success) {
+      logger.info('管理员解除禁言', { adminSocket: socket.id, userId });
+      socket.emit('admin_action_result', {
+        action: 'unmute_user',
+        success: true,
+        userId,
+        message: `用户 ${userId} 已解除禁言`
+      });
+    } else {
+      socket.emit('admin_action_result', {
+        action: 'unmute_user',
+        success: false,
+        userId,
+        message: '解除禁言失败'
+      });
+    }
   }
 
   // 清理数据
@@ -349,9 +417,9 @@ class AdminManager {
         const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
         const games = await dataStore.read('games');
         const oldGameIds = games
-          .filter(g => g.endTime < thirtyDaysAgo)
+          .filter(g => g.endTime && g.endTime < thirtyDaysAgo)
           .map(g => g.gameId);
-        
+
         for (const gameId of oldGameIds) {
           await dataStore.delete('games', gameId);
           cleaned++;
@@ -381,7 +449,7 @@ class AdminManager {
     try {
       const users = await dataStore.read('users');
       const games = await dataStore.read('games');
-      
+
       const stats = {
         totalRegisteredUsers: users.length,
         totalGamesPlayed: games.length,
@@ -414,7 +482,7 @@ class AdminManager {
     if (socket.adminInterval) {
       clearInterval(socket.adminInterval);
     }
-    
+
     this.adminSockets.delete(socket.id);
     logger.info('管理员断开连接', { socketId: socket.id });
   }
