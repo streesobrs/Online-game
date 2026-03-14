@@ -1350,14 +1350,47 @@
 
   <!-- 版本信息 -->
   <div class="version-info">
-    版本说明：多棋种联机大厅版 - 支持五子棋/围棋/象棋 | 智能提示系统 | 性能优化版 v4.0
+    版本说明：多棋种联机大厅版 - 支持五子棋/围棋/象棋 | 智能提示系统 | 性能优化版 v<span id="client-version-display">1.0.0</span>
   </div>
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>
+    // 版本号 (语义化版本: MAJOR.MINOR.PATCH)
+    const CLIENT_VERSION = '1.0.0';
+
     // 全局游戏变量
     let currentGame = 'gobang'; // 当前选择的棋种：gobang, go, chess
     let userId = null; // 由服务器分配
+
+    // 从localStorage获取或生成用户ID
+    function getSavedUserId() {
+      try {
+        let saved = localStorage.getItem('gameUserId');
+        if (!saved) {
+          // 生成新的用户ID并保存
+          saved = generateClientUserId();
+          localStorage.setItem('gameUserId', saved);
+        }
+        return saved;
+      } catch (e) {
+        console.warn('无法访问localStorage:', e);
+        return generateClientUserId();
+      }
+    }
+
+    // 生成客户端用户ID
+    function generateClientUserId() {
+      return 'user_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    // 保存用户ID
+    function saveUserId(id) {
+      try {
+        localStorage.setItem('gameUserId', id);
+      } catch (e) {
+        console.warn('无法保存用户ID:', e);
+      }
+    }
 
     // 大厅和匹配相关变量
     let isMatching = false;
@@ -1426,9 +1459,10 @@
     const tipPopup = document.getElementById('tip-popup');
     const tipPopupTitle = document.getElementById('tip-popup-title');
     const tipPopupContent = document.getElementById('tip-popup-content');
-    const chatContainer = document.getElementById('chat-container');
+    const tipPopupClose = document.getElementById('tip-popup-close');
     const chatMessages = document.getElementById('chat-messages');
     const chatInput = document.getElementById('chat-input');
+    const clientVersionDisplay = document.getElementById('client-version-display');
 
     // 大厅相关DOM
     const lobbyContainer = document.getElementById('lobby-container');
@@ -1544,6 +1578,10 @@
     function init() {
       // 初始化缓存
       moveLogEl.dataset.lastIndex = "-1";
+      // 更新客户端版本显示
+      if (clientVersionDisplay) {
+        clientVersionDisplay.textContent = CLIENT_VERSION;
+      }
       // 初始更新高级统计
       updateAdvancedStats();
       // 初始化当前棋种显示
@@ -1561,6 +1599,12 @@
         console.log('Socket.io连接成功');
         connectStatusEl.textContent = '已连接';
         connectStatusEl.className = 'info-value value-connected';
+
+        // 发送客户端连接请求（包含版本号和savedUserId）
+        socket.emit('client_connect', {
+          clientVersion: CLIENT_VERSION,
+          savedUserId: getSavedUserId()
+        });
       });
 
       socket.on('disconnect', () => {
@@ -1569,9 +1613,21 @@
         connectStatusEl.className = 'info-value value-danger';
       });
 
+      // 处理版本检查结果
+      socket.on('version_check', (data) => {
+        console.log('版本检查结果:', data);
+        if (!data.compatible) {
+          alert('版本不兼容：' + data.reason + '\n请更新您的客户端或服务端');
+        } else if (data.warning) {
+          console.warn('版本警告：', data.warning);
+        }
+      });
+
       socket.on('user_connected', (data) => {
         userId = data.userId;
         console.log('获得用户ID:', userId);
+        // 保存用户ID到localStorage
+        saveUserId(userId);
         initUserStatus();
       });
 

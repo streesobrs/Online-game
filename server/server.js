@@ -13,6 +13,7 @@ const UserManager = require('./modules/UserManager');
 const GameManager = require('./modules/GameManager');
 const AdminManager = require('./modules/AdminManager');
 const ChatManager = require('./modules/ChatManager');
+const VersionManager = require('./modules/VersionManager');
 
 // 初始化Express应用
 const app = express();
@@ -86,6 +87,7 @@ const userManager = new UserManager();
 const gameManager = new GameManager(userManager);
 const adminManager = new AdminManager(userManager, gameManager);
 const chatManager = new ChatManager(userManager, gameManager);
+const versionManager = new VersionManager();
 
 const serverStartTime = Date.now();
 
@@ -95,9 +97,21 @@ const serverStartTime = Date.now();
 io.on('connection', (socket) => {
   logger.info('新用户连接', { socketId: socket.id, ip: socket.handshake.address });
 
-  // 处理用户连接
-  userManager.handleUserConnection(socket, io).catch(err => {
-    logger.error('用户连接处理错误', { socketId: socket.id, error: err.message });
+  // 处理客户端连接事件（包含版本号和savedUserId）
+  socket.on('client_connect', async (data) => {
+    logger.info('收到客户端连接请求', {
+      socketId: socket.id,
+      clientVersion: data?.clientVersion
+    });
+
+    // 检查版本兼容性
+    const versionCheck = versionManager.checkCompatibility(data?.clientVersion || '1.0.0');
+    socket.emit('version_check', versionCheck);
+
+    // 处理用户连接
+    await userManager.handleUserConnection(socket, data, io).catch(err => {
+      logger.error('用户连接处理错误', { socketId: socket.id, error: err.message });
+    });
   });
 
   // ========== 用户相关事件 ==========

@@ -46,11 +46,18 @@ class UserManager {
   }
 
   // 处理用户连接
-  async handleUserConnection(socket, io) {
+  async handleUserConnection(socket, data, io) {
     this.stats.totalConnections++;
     
-    const userId = this.generateUserId();
+    // 检查客户端是否提供了已保存的userId
+    let userId = data && data.savedUserId ? data.savedUserId : this.generateUserId();
     const token = this.generateToken();
+    
+    // 检查这个userId是否已经在线
+    if (this.userSockets.has(userId)) {
+      // 如果在线，生成新的userId
+      userId = this.generateUserId();
+    }
     
     const user = {
       userId,
@@ -71,6 +78,17 @@ class UserManager {
       ip: socket.handshake.address,
       userAgent: socket.handshake.headers['user-agent']
     };
+
+    // 尝试从数据库加载现有用户数据
+    try {
+      const existingUser = await dataStore.findOne('users', { userId });
+      if (existingUser) {
+        user.nickname = existingUser.nickname || user.nickname;
+        user.stats = existingUser.stats || user.stats;
+      }
+    } catch (err) {
+      logger.warn('加载用户数据失败', { userId, error: err.message });
+    }
 
     // 存储用户数据
     this.users.set(socket.id, user);
