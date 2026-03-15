@@ -66,7 +66,7 @@ class AdminManager {
     // 用户统计
     const userStats = {
       total: users.length,
-      online: users.filter(u => u.status === 'online').length,
+      online: users.length,  // 所有连接的用户都算在线
       waiting: users.filter(u => u.status === 'waiting').length,
       playing: users.filter(u => u.status === 'playing').length,
       spectating: users.filter(u => u.status === 'spectating').length
