@@ -95,7 +95,7 @@ const serverStartTime = Date.now();
 
 // 主命名空间
 io.on('connection', (socket) => {
-  logger.info('新用户连接', { socketId: socket.id, ip: socket.handshake.address });
+  logger.connectEvent(socket.id, { ip: socket.handshake.address });
 
   // 处理客户端连接事件（包含版本号和savedUserId）
   socket.on('client_connect', async (data) => {
@@ -247,6 +247,14 @@ io.on('connection', (socket) => {
     const result = chatManager.handleGlobalChat(socket.id, data, io);
     if (!result.success) {
       socket.emit('chat_error', { message: result.message });
+      // 如果是被禁言，发送广播通知
+      if (result.message && result.message.includes('禁言')) {
+        socket.emit('system_broadcast', {
+          message: result.message,
+          timestamp: Date.now(),
+          from: '系统'
+        });
+      }
     }
   });
 
@@ -255,6 +263,14 @@ io.on('connection', (socket) => {
     const result = chatManager.handleGameChat(socket.id, data, io);
     if (!result.success) {
       socket.emit('chat_error', { message: result.message });
+      // 如果是被禁言，发送广播通知
+      if (result.message && result.message.includes('禁言')) {
+        socket.emit('system_broadcast', {
+          message: result.message,
+          timestamp: Date.now(),
+          from: '系统'
+        });
+      }
     }
   });
 
@@ -289,7 +305,7 @@ io.on('connection', (socket) => {
   // ========== 断开连接 ==========
 
   socket.on('disconnect', (reason) => {
-    logger.info('用户断开连接', { socketId: socket.id, reason });
+    logger.disconnectEvent(socket.id, { reason });
 
     // 处理游戏断开
     gameManager.handleUserDisconnect(socket.id, io);
@@ -374,14 +390,43 @@ adminNamespace.on('connection', (socket) => {
 
   // 禁言用户
   socket.on('mute_user', (data) => {
-    const { userId, duration } = data;
-    adminManager.muteUser(socket, userId, duration);
+    const { userId, duration, reason } = data;
+    adminManager.muteUser(socket, userId, duration, reason);
   });
 
   // 解除禁言
   socket.on('unmute_user', (data) => {
     const { userId } = data;
     adminManager.unmuteUser(socket, userId);
+  });
+
+  // 获取用户详情
+  socket.on('get_user_detail', (data) => {
+    const { userId } = data;
+    adminManager.getUserDetail(socket, userId);
+  });
+
+  // 获取用户游戏历史
+  socket.on('get_user_game_history', (data) => {
+    const { userId, limit } = data;
+    adminManager.getUserGameHistory(socket, userId, limit);
+  });
+
+  // 获取聊天记录
+  socket.on('get_chat_history_admin', (data) => {
+    adminManager.getChatHistory(socket, data);
+  });
+
+  // 给特定用户发送消息
+  socket.on('send_user_message', (data) => {
+    const { userId, message } = data;
+    adminManager.sendUserMessage(socket, userId, message);
+  });
+
+  // 重置游戏
+  socket.on('reset_game', (data) => {
+    const { gameId } = data;
+    adminManager.resetGame(socket, gameId);
   });
 
   // 断开连接

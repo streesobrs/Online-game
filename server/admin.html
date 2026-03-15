@@ -595,6 +595,7 @@
       <div class="action-row">
         <button class="action-btn btn-warning" onclick="loadGameHistory()">📜 游戏历史</button>
         <button class="action-btn btn-info" onclick="loadSystemConfig()">⚙️ 系统配置</button>
+        <button class="action-btn btn-info" onclick="loadChatHistory()">💬 聊天记录</button>
         <button class="action-btn btn-danger" onclick="showCleanupModal()">🧹 清理数据</button>
       </div>
     </div>
@@ -883,6 +884,21 @@
         }
       });
 
+      // 监听用户详情数据
+      socket.on('admin_user_detail', function (data) {
+        updateUserDetailModal(data);
+      });
+
+      // 监听用户游戏历史
+      socket.on('admin_user_game_history', function (data) {
+        updateUserGameHistoryModal(data);
+      });
+
+      // 监听聊天记录
+      socket.on('admin_chat_history', function (data) {
+        updateChatHistoryModal(data);
+      });
+
       // 获取初始数据
       socket.emit('get_leaderboard', { limit: 10 });
     }
@@ -953,14 +969,29 @@
       users.forEach(user => {
         const tr = document.createElement('tr');
         const isMuted = user.muted || false;
+        let muteInfoText = '';
+        if (isMuted && user.muteInfo) {
+          const parts = [];
+          if (user.muteInfo.remainingMinutes !== null && user.muteInfo.remainingMinutes > 0 && user.muteInfo.remainingMinutes < 365 * 24 * 60) {
+            parts.push(`剩余${user.muteInfo.remainingMinutes}分钟`);
+          }
+          if (user.muteInfo.reason) {
+            parts.push(user.muteInfo.reason);
+          }
+          if (parts.length > 0) {
+            muteInfoText = `<br><small style="color: #e53e3e;">[${parts.join(' - ')}]</small>`;
+          }
+        }
         tr.innerHTML = `
           <td>${user.userId}</td>
-          <td>${user.nickname || '-'}
+          <td>${user.nickname || '-'}${muteInfoText}
           <td><span class="status-badge badge-${user.status}">${getStatusText(user.status)}</span></td>
           <td>${user.gameType ? '<span class="game-tag tag-' + user.gameType + '">' + getGameText(user.gameType) + '</span>' : '-'}</td>
           <td>${user.connectedAt ? new Date(user.connectedAt).toLocaleString('zh-CN') : '-'}</td>
           <td>${user.lastActivity ? new Date(user.lastActivity).toLocaleString('zh-CN') : '-'}</td>
           <td>
+            <button class="action-btn btn-info" onclick="viewUserDetail('${user.userId}')">详情</button>
+            <button class="action-btn btn-primary" onclick="sendMessageToUser('${user.userId}', '${user.nickname || ''}')">消息</button>
             <button class="action-btn ${isMuted ? 'btn-success' : 'btn-warning'}" onclick="${isMuted ? 'unmuteUser' : 'muteUser'}('${user.userId}')">${isMuted ? '解除禁言' : '禁言'}</button>
             <button class="action-btn btn-danger" onclick="kickUser('${user.userId}')">踢出</button>
           </td>
@@ -989,7 +1020,8 @@
           <td>${game.moveCount || 0}</td>
           <td><span class="status-badge badge-${game.status}">${game.status || '未知'}</span></td>
           <td>
-            ${game.status === 'playing' ? '<button class="action-btn btn-danger" onclick="endGame(\'' + game.gameId + '\')">结束</button>' : '-'}
+            ${game.status === 'playing' ? '<button class="action-btn btn-danger" onclick="endGame(\'' + game.gameId + '\')">结束</button>' : ''}
+            ${game.status === 'playing' ? '<button class="action-btn btn-warning" onclick="resetGame(\'' + game.gameId + '\')">重置</button>' : '-'}
           </td>
         `;
         tbody.appendChild(tr);
@@ -1045,25 +1077,25 @@
 
     // 踢出用户
     function kickUser(userId) {
-      if (confirm(`确定要踢出用户 ${userId} 吗？`)) {
+      showConfirmModal(`确定要踢出用户 ${userId} 吗？`, () => {
         if (socket && socket.connected) {
           socket.emit('kick_user', {
             userId: userId,
             reason: '管理员操作'
           });
         }
-      }
+      });
     }
 
     // 结束游戏
     function endGame(gameId) {
-      if (confirm(`确定要结束游戏 ${gameId} 吗？`)) {
+      showConfirmModal(`确定要结束游戏 ${gameId} 吗？`, () => {
         if (socket && socket.connected) {
           socket.emit('end_game', {
             gameId: gameId
           });
         }
-      }
+      });
     }
 
     // 广播消息
@@ -1084,57 +1116,116 @@
 
     // 进入维护模式
     function enterMaintenanceMode() {
-      if (!confirm('确定要进入维护模式吗？')) {
-        return;
-      }
-
-      const message = '系统维护中，请稍后再试';
-
-      if (socket && socket.connected) {
-        socket.emit('maintenance_mode', {
-          enabled: true,
-          message: message
-        });
-      }
+      showConfirmModal('确定要进入维护模式吗？', () => {
+        const message = '系统维护中，请稍后再试';
+        if (socket && socket.connected) {
+          socket.emit('maintenance_mode', {
+            enabled: true,
+            message: message
+          });
+        }
+      });
     }
 
     // 退出维护模式
     function exitMaintenanceMode() {
-      if (!confirm('确定要退出维护模式吗？')) {
-        return;
-      }
-
-      if (socket && socket.connected) {
-        socket.emit('maintenance_mode', {
-          enabled: false,
-          message: ''
-        });
-      }
+      showConfirmModal('确定要退出维护模式吗？', () => {
+        if (socket && socket.connected) {
+          socket.emit('maintenance_mode', {
+            enabled: false,
+            message: ''
+          });
+        }
+      });
     }
 
     // 禁言用户
     function muteUser(userId) {
-      const duration = prompt('请输入禁言时长（分钟，0表示永久）：', '10');
-      if (duration !== null) {
-        const durationMinutes = parseInt(duration) || 10;
-        if (socket && socket.connected) {
-          socket.emit('mute_user', {
-            userId: userId,
-            duration: durationMinutes
-          });
-        }
+      showMuteUserModal(userId);
+    }
+
+    // 显示禁言用户模态框
+    function showMuteUserModal(userId) {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.id = 'mute-user-modal';
+      modal.innerHTML = `
+        <div class="modal" style="max-width: 450px;">
+          <div class="modal-title">
+            <span>🔇 禁言用户</span>
+            <button class="modal-close" onclick="closeModal('mute-user-modal')">&times;</button>
+          </div>
+          <div class="form-group">
+            <label class="form-label">禁言时长（分钟）</label>
+            <input type="number" class="form-input" id="mute-duration-input" value="10" min="0">
+            <small style="color: #718096;">输入 0 表示永久禁言</small>
+          </div>
+          <div class="form-group">
+            <label class="form-label">禁言原因</label>
+            <textarea class="form-input" id="mute-reason-input" rows="2" placeholder="请输入禁言原因（可选）"></textarea>
+          </div>
+          <div class="modal-footer">
+            <button class="action-btn" onclick="closeModal('mute-user-modal')">取消</button>
+            <button class="action-btn btn-warning" onclick="doMuteUser('${userId}')">确认禁言</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    // 执行禁言用户
+    function doMuteUser(userId) {
+      const durationInput = document.getElementById('mute-duration-input');
+      const reasonInput = document.getElementById('mute-reason-input');
+      const duration = parseInt(durationInput.value) || 10;
+      const reason = reasonInput.value.trim();
+
+      if (socket && socket.connected) {
+        socket.emit('mute_user', {
+          userId: userId,
+          duration: duration,
+          reason: reason
+        });
       }
+      closeModal('mute-user-modal');
     }
 
     // 解除禁言
     function unmuteUser(userId) {
-      if (confirm(`确定要解除用户 ${userId} 的禁言吗？`)) {
+      showConfirmModal(`确定要解除用户 ${userId} 的禁言吗？`, () => {
         if (socket && socket.connected) {
           socket.emit('unmute_user', {
             userId: userId
           });
         }
-      }
+      });
+    }
+
+    // 显示确认模态框
+    function showConfirmModal(message, onConfirm) {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.id = 'confirm-modal';
+      modal.innerHTML = `
+        <div class="modal" style="max-width: 400px;">
+          <div class="modal-title">
+            <span>⚠️ 确认</span>
+            <button class="modal-close" onclick="closeModal('confirm-modal')">&times;</button>
+          </div>
+          <p style="margin-bottom: 20px;">${message}</p>
+          <div class="modal-footer">
+            <button class="action-btn" onclick="closeModal('confirm-modal')">取消</button>
+            <button class="action-btn btn-primary" id="confirm-action-btn">确认</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      const confirmBtn = document.getElementById('confirm-action-btn');
+      confirmBtn.onclick = () => {
+        onConfirm();
+        closeModal('confirm-modal');
+      };
     }
 
     // 显示游戏历史
@@ -1259,6 +1350,279 @@
         socket.emit('get_leaderboard', { limit: 10 });
         showToast('数据已刷新', 'success');
       }
+    }
+
+    // 查看用户详情
+    function viewUserDetail(userId) {
+      if (socket && socket.connected) {
+        socket.emit('get_user_detail', { userId });
+        socket.emit('get_user_game_history', { userId, limit: 20 });
+        showUserDetailModal(userId);
+      }
+    }
+
+    // 显示用户详情模态框
+    function showUserDetailModal(userId) {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.id = 'user-detail-modal';
+      modal.innerHTML = `
+        <div class="modal" style="max-width: 800px;">
+          <div class="modal-title">
+            <span>👤 用户详情</span>
+            <button class="modal-close" onclick="closeModal('user-detail-modal')">&times;</button>
+          </div>
+          <div id="user-detail-content">
+            <p style="text-align: center;">加载中...</p>
+          </div>
+          <div class="modal-title" style="margin-top: 20px;">
+            <span>🎮 最近游戏</span>
+          </div>
+          <div id="user-game-history-content">
+            <p style="text-align: center;">加载中...</p>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    // 更新用户详情模态框
+    function updateUserDetailModal(data) {
+      const content = document.getElementById('user-detail-content');
+      if (content) {
+        content.innerHTML = `
+          <div class="stat-grid">
+            <div class="stat-item">
+              <div class="stat-value">${data.userId}</div>
+              <div class="stat-label">用户ID</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">${data.nickname || '-'}</div>
+              <div class="stat-label">昵称</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">${getStatusText(data.status)}</div>
+              <div class="stat-label">状态</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">${data.gameType ? getGameText(data.gameType) : '-'}</div>
+              <div class="stat-label">当前棋种</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">${data.stats?.wins || 0}</div>
+              <div class="stat-label">胜</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">${data.stats?.losses || 0}</div>
+              <div class="stat-label">负</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">${data.stats?.draws || 0}</div>
+              <div class="stat-label">平</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">${(data.stats?.wins || 0) + (data.stats?.losses || 0) + (data.stats?.draws || 0)}</div>
+              <div class="stat-label">总场次</div>
+            </div>
+          </div>
+          <div style="margin-top: 15px;">
+            <p><strong>连接时间:</strong> ${data.connectedAt ? new Date(data.connectedAt).toLocaleString('zh-CN') : '-'}</p>
+            <p><strong>最后活动:</strong> ${data.lastActivity ? new Date(data.lastActivity).toLocaleString('zh-CN') : '-'}</p>
+            <p><strong>IP地址:</strong> ${data.ip || '-'}</p>
+            <p><strong>是否禁言:</strong> ${data.muted ? '是' : '否'}</p>
+            ${data.muted && data.muteInfo ? `
+            <div style="background: #fff5f5; border: 1px solid #fed7d7; border-radius: 8px; padding: 15px; margin-top: 10px;">
+              <p style="margin: 5px 0; font-weight: bold; color: #c53030;">🔇 禁言详情</p>
+              <p style="margin: 5px 0;"><strong>原因:</strong> ${data.muteInfo.reason || '未填写'}</p>
+              <p style="margin: 5px 0;"><strong>到期时间:</strong> ${data.muteInfo.expiresAt ? new Date(data.muteInfo.expiresAt).toLocaleString('zh-CN') : '-'}</p>
+              ${data.muteInfo.remainingMinutes !== null ? `<p style="margin: 5px 0;"><strong>剩余时间:</strong> ${data.muteInfo.remainingMinutes > 0 && data.muteInfo.remainingMinutes < 365 * 24 * 60 ? data.muteInfo.remainingMinutes + ' 分钟' : '永久'}</p>` : ''}
+            </div>
+            ` : ''}
+          </div>
+        `;
+      }
+    }
+
+    // 更新用户游戏历史
+    function updateUserGameHistoryModal(data) {
+      const content = document.getElementById('user-game-history-content');
+      if (content) {
+        if (!data.games || data.games.length === 0) {
+          content.innerHTML = '<p style="text-align: center; color: #718096;">暂无游戏记录</p>';
+          return;
+        }
+        content.innerHTML = `
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>游戏ID</th>
+                  <th>棋种</th>
+                  <th>对手</th>
+                  <th>结果</th>
+                  <th>时间</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.games.map(game => {
+          const isWinner = game.winner === data.userId;
+          const result = game.winner ? (isWinner ? '胜利' : '失败') : '平局';
+          const resultClass = game.winner ? (isWinner ? 'badge-online' : 'badge-offline') : 'badge-waiting';
+          return `
+                    <tr>
+                      <td>${game.gameId}</td>
+                      <td><span class="game-tag tag-${game.gameType}">${getGameText(game.gameType)}</span></td>
+                      <td>${game.player1 === data.userId ? (game.player2Nickname || game.player2) : (game.player1Nickname || game.player1)}</td>
+                      <td><span class="status-badge ${resultClass}">${result}</span></td>
+                      <td>${game.endTime ? new Date(game.endTime).toLocaleString('zh-CN') : '-'}</td>
+                    </tr>
+                  `;
+        }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+    }
+
+    // 给用户发送消息
+    function sendMessageToUser(userId, nickname) {
+      showSendMessageModal(userId, nickname);
+    }
+
+    // 显示发送消息模态框
+    function showSendMessageModal(userId, nickname) {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.id = 'send-message-modal';
+      modal.innerHTML = `
+        <div class="modal" style="max-width: 500px;">
+          <div class="modal-title">
+            <span>📨 发送消息</span>
+            <button class="modal-close" onclick="closeModal('send-message-modal')">&times;</button>
+          </div>
+          <div class="form-group">
+            <label class="form-label">发送给：${nickname || userId}</label>
+          </div>
+          <div class="form-group">
+            <label class="form-label">消息内容</label>
+            <textarea class="form-input" id="user-message-input" rows="4" placeholder="请输入消息内容..."></textarea>
+          </div>
+          <div class="modal-footer">
+            <button class="action-btn" onclick="closeModal('send-message-modal')">取消</button>
+            <button class="action-btn btn-primary" onclick="doSendMessage('${userId}')">发送</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      document.getElementById('user-message-input').focus();
+    }
+
+    // 执行发送消息
+    function doSendMessage(userId) {
+      const messageInput = document.getElementById('user-message-input');
+      const message = messageInput.value.trim();
+
+      if (!message) {
+        showToast('请输入消息内容', 'error');
+        return;
+      }
+
+      if (socket && socket.connected) {
+        socket.emit('send_user_message', {
+          userId,
+          message
+        });
+      }
+      closeModal('send-message-modal');
+    }
+
+    // 加载聊天记录
+    function loadChatHistory() {
+      if (socket && socket.connected) {
+        socket.emit('get_chat_history_admin', { scope: 'global', limit: 50 });
+        showChatHistoryModal();
+      }
+    }
+
+    // 显示聊天记录模态框
+    function showChatHistoryModal() {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.id = 'chat-history-modal';
+      modal.innerHTML = `
+        <div class="modal" style="max-width: 900px;">
+          <div class="modal-title">
+            <span>💬 聊天记录</span>
+            <button class="modal-close" onclick="closeModal('chat-history-modal')">&times;</button>
+          </div>
+          <div class="form-group">
+            <label class="form-label">频道</label>
+            <select class="form-input" id="chat-history-scope" onchange="switchChatHistoryScope()">
+              <option value="global">大厅</option>
+              <option value="game">局内</option>
+            </select>
+          </div>
+          <div class="form-group" id="game-id-input" style="display: none;">
+            <label class="form-label">游戏ID</label>
+            <input type="text" class="form-input" id="chat-history-game-id" placeholder="请输入游戏ID">
+          </div>
+          <button class="action-btn btn-primary" onclick="loadChatHistoryByScope()">加载</button>
+          <div id="chat-history-content" style="margin-top: 20px;">
+            <p style="text-align: center;">加载中...</p>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    // 切换聊天历史频道
+    function switchChatHistoryScope() {
+      const scope = document.getElementById('chat-history-scope').value;
+      const gameIdInput = document.getElementById('game-id-input');
+      gameIdInput.style.display = scope === 'game' ? 'block' : 'none';
+    }
+
+    // 按频道加载聊天历史
+    function loadChatHistoryByScope() {
+      const scope = document.getElementById('chat-history-scope').value;
+      const gameId = document.getElementById('chat-history-game-id').value;
+      if (socket && socket.connected) {
+        socket.emit('get_chat_history_admin', { scope, gameId: scope === 'game' ? gameId : null, limit: 50 });
+      }
+    }
+
+    // 更新聊天历史模态框
+    function updateChatHistoryModal(data) {
+      const content = document.getElementById('chat-history-content');
+      if (content) {
+        if (!data.messages || data.messages.length === 0) {
+          content.innerHTML = '<p style="text-align: center; color: #718096;">暂无聊天记录</p>';
+          return;
+        }
+        content.innerHTML = `
+          <div style="max-height: 400px; overflow-y: auto;">
+            ${data.messages.map(msg => `
+              <div style="padding: 10px; border-bottom: 1px solid #e2e8f0;">
+                <div style="display: flex; justify-content: space-between;">
+                  <strong>${msg.nickname || msg.userId}</strong>
+                  <span style="color: #718096; font-size: 12px;">${new Date(msg.timestamp).toLocaleString('zh-CN')}</span>
+                </div>
+                <div style="margin-top: 5px;">${msg.message}</div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+    }
+
+    // 重置游戏
+    function resetGame(gameId) {
+      showConfirmModal(`确定要重置游戏 ${gameId} 吗？这将结束游戏并让玩家返回大厅。`, () => {
+        if (socket && socket.connected) {
+          socket.emit('reset_game', { gameId });
+        }
+      });
     }
   </script>
 </body>

@@ -8,7 +8,7 @@ class ChatManager {
     this.globalChatHistory = []; // 全局聊天记录
     this.gameChatHistory = new Map(); // gameId -> 聊天记录
     this.maxHistoryLength = 100; // 最大保存消息数
-    this.muteList = new Set(); // 被禁言用户列表
+    this.muteList = new Map(); // 被禁言用户列表 -> { reason, expiresAt, timeoutId }
     this.messageRateLimit = new Map(); // 用户消息频率限制
   }
 
@@ -18,8 +18,17 @@ class ChatManager {
     if (!user) return { success: false, message: '用户不存在' };
 
     // 检查是否被禁言
-    if (this.muteList.has(user.userId)) {
-      return { success: false, message: '您已被禁言' };
+    const muteInfo = this.muteList.get(user.userId);
+    if (muteInfo) {
+      const remaining = Math.max(0, Math.ceil((muteInfo.expiresAt - Date.now()) / 1000 / 60));
+      let message = '您已被禁言';
+      if (remaining > 0 && remaining < 365 * 24 * 60) {
+        message += `，剩余 ${remaining} 分钟`;
+      }
+      if (muteInfo.reason) {
+        message += `，原因：${muteInfo.reason}`;
+      }
+      return { success: false, message };
     }
 
     // 检查消息频率
@@ -28,7 +37,7 @@ class ChatManager {
     }
 
     const { message, type = 'text' } = data;
-    
+
     // 验证消息
     if (!this.validateMessage(message)) {
       return { success: false, message: '消息内容无效' };
@@ -55,7 +64,7 @@ class ChatManager {
       ...chatMessage
     });
 
-    logger.userAction(user.userId, '发送全局消息', { messageLength: message.length });
+    logger.chatEvent(user.userId, '大厅', { messageLength: message.length });
 
     return { success: true };
   }
@@ -70,13 +79,27 @@ class ChatManager {
       return { success: false, message: '您不在游戏中' };
     }
 
+    // 检查是否被禁言
+    const muteInfo = this.muteList.get(user.userId);
+    if (muteInfo) {
+      const remaining = Math.max(0, Math.ceil((muteInfo.expiresAt - Date.now()) / 1000 / 60));
+      let message = '您已被禁言';
+      if (remaining > 0 && remaining < 365 * 24 * 60) {
+        message += `，剩余 ${remaining} 分钟`;
+      }
+      if (muteInfo.reason) {
+        message += `，原因：${muteInfo.reason}`;
+      }
+      return { success: false, message };
+    }
+
     const game = this.gameManager.getGameById(user.game);
     if (!game) {
       return { success: false, message: '游戏不存在' };
     }
 
     const { message, type = 'text' } = data;
-    
+
     // 验证消息
     if (!this.validateMessage(message)) {
       return { success: false, message: '消息内容无效' };
@@ -104,7 +127,7 @@ class ChatManager {
     // 发送给游戏内玩家和观战者
     const socket1 = this.userManager.getSocketByUserId(game.player1);
     const socket2 = this.userManager.getSocketByUserId(game.player2);
-    
+
     if (socket1) {
       socket1.emit('chat_message', {
         scope: 'game',
@@ -127,6 +150,8 @@ class ChatManager {
       ...chatMessage
     }, io);
 
+    logger.chatEvent(user.userId, '局内', { gameId: game.gameId, messageLength: message.length });
+
     return { success: true };
   }
 
@@ -136,7 +161,7 @@ class ChatManager {
     if (!user) return { success: false, message: '用户不存在' };
 
     const { targetUserId, message } = data;
-    
+
     // 验证消息
     if (!this.validateMessage(message)) {
       return { success: false, message: '消息内容无效' };
@@ -182,20 +207,36 @@ class ChatManager {
   }
 
   // 禁言用户
-  muteUser(userId, duration = 3600000) { // 默认1小时
-    this.muteList.add(userId);
-    
+  muteUser(userId, duration = 3600000, reason = '') { // 默认1小时
+    // 如果用户已被禁言，先清理之前的定时器
+    const existingMute = this.muteList.get(userId);
+    if (existingMute && existingMute.timeoutId) {
+      clearTimeout(existingMute.timeoutId);
+    }
+
+    const expiresAt = Date.now() + duration;
+
     // 定时解除禁言
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       this.muteList.delete(userId);
     }, duration);
 
-    logger.info('用户被禁言', { userId, duration });
+    this.muteList.set(userId, {
+      reason: reason,
+      expiresAt: expiresAt,
+      timeoutId: timeoutId
+    });
+
+    logger.info('用户被禁言', { userId, duration, reason });
     return true;
   }
 
   // 解除禁言
   unmuteUser(userId) {
+    const muteInfo = this.muteList.get(userId);
+    if (muteInfo && muteInfo.timeoutId) {
+      clearTimeout(muteInfo.timeoutId);
+    }
     this.muteList.delete(userId);
     logger.info('用户解除禁言', { userId });
     return true;
@@ -205,7 +246,7 @@ class ChatManager {
   checkRateLimit(userId) {
     const now = Date.now();
     const userLimit = this.messageRateLimit.get(userId);
-    
+
     if (!userLimit) {
       this.messageRateLimit.set(userId, { count: 1, lastTime: now });
       return true;

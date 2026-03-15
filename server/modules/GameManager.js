@@ -50,7 +50,7 @@ class GameManager {
     }
     this.waitingUsers.get(gameType).add(user.userId);
 
-    logger.userAction(user.userId, '开始匹配', { gameType });
+    logger.matchEvent(user.userId, '开始匹配', { gameType });
 
     // 广播用户状态
     this.userManager.broadcastUserStatus(user.userId, 'waiting', io);
@@ -70,7 +70,7 @@ class GameManager {
       // 从等待列表移除
       if (this.waitingUsers.has(user.gameType)) {
         this.waitingUsers.get(user.gameType).delete(user.userId);
-        
+
         // 清理空集合
         if (this.waitingUsers.get(user.gameType).size === 0) {
           this.waitingUsers.delete(user.gameType);
@@ -81,7 +81,7 @@ class GameManager {
       user.status = 'online';
       user.lastActivity = Date.now();
 
-      logger.userAction(user.userId, '取消匹配', { gameType: user.gameType });
+      logger.matchEvent(user.userId, '取消匹配', { gameType: user.gameType });
 
       // 广播用户状态
       this.userManager.broadcastUserStatus(user.userId, 'online', io);
@@ -218,7 +218,7 @@ class GameManager {
         // 通知玩家
         const socket1 = this.userManager.getSocketByUserId(game.player1);
         const socket2 = this.userManager.getSocketByUserId(game.player2);
-        
+
         if (socket1) socket1.emit('game_warning', { message: '长时间未移动，游戏即将结束' });
         if (socket2) socket2.emit('game_warning', { message: '长时间未移动，游戏即将结束' });
       }
@@ -251,9 +251,9 @@ class GameManager {
     // 验证是否是当前玩家
     const isPlayer1 = game.player1 === user.userId;
     const isPlayer2 = game.player2 === user.userId;
-    
-    if ((game.currentPlayer === 1 && !isPlayer1) || 
-        (game.currentPlayer === 2 && !isPlayer2)) {
+
+    if ((game.currentPlayer === 1 && !isPlayer1) ||
+      (game.currentPlayer === 2 && !isPlayer2)) {
       return false;
     }
 
@@ -317,7 +317,7 @@ class GameManager {
     // 转发给对手
     const opponentId = game.player1 === user.userId ? game.player2 : game.player1;
     const opponentSocket = this.userManager.getSocketByUserId(opponentId);
-    
+
     if (opponentSocket) {
       opponentSocket.emit('reset_request', {
         from: user.userId,
@@ -341,7 +341,7 @@ class GameManager {
     }
 
     const { result, reason } = data;
-    
+
     // 验证结果
     if (!['win', 'draw', 'resign'].includes(result)) {
       return false;
@@ -532,7 +532,7 @@ class GameManager {
       const game = this.games.get(user.game);
       if (game && game.status === 'playing') {
         const opponentId = game.player1 === user.userId ? game.player2 : game.player1;
-        
+
         // 延迟结束游戏（给用户重新连接的机会）
         setTimeout(() => {
           const currentGame = this.games.get(game.gameId);
@@ -540,7 +540,7 @@ class GameManager {
             // 检查玩家是否重新连接
             const user1 = this.userManager.getUserByUserId(game.player1);
             const user2 = this.userManager.getUserByUserId(game.player2);
-            
+
             if (!user1 || !user2) {
               // 有玩家离线，结束游戏
               const winner = user1 ? game.player1 : game.player2;
@@ -567,7 +567,7 @@ class GameManager {
     const spectators = this.spectators.get(gameId);
     if (spectators) {
       spectators.add(userId);
-      
+
       const user = this.userManager.getUserByUserId(userId);
       if (user) {
         user.status = 'spectating';
@@ -598,7 +598,7 @@ class GameManager {
     const spectators = this.spectators.get(gameId);
     if (spectators) {
       spectators.delete(userId);
-      
+
       const user = this.userManager.getUserByUserId(userId);
       if (user) {
         user.status = 'online';
@@ -700,6 +700,51 @@ class GameManager {
       return true;
     }
     return false;
+  }
+
+  // 管理员强制重置游戏
+  adminResetGame(gameId, io) {
+    const game = this.games.get(gameId);
+    if (!game) {
+      return false;
+    }
+
+    const player1Socket = this.userManager.getSocketByUserId(game.player1);
+    const player2Socket = this.userManager.getSocketByUserId(game.player2);
+
+    if (player1Socket) {
+      player1Socket.emit('game_reset', {
+        message: '游戏已被管理员重置'
+      });
+    }
+    if (player2Socket) {
+      player2Socket.emit('game_reset', {
+        message: '游戏已被管理员重置'
+      });
+    }
+
+    this.broadcastToSpectators(gameId, 'game_reset', {
+      message: '游戏已被管理员重置'
+    }, io);
+
+    this.games.delete(gameId);
+    this.spectators.delete(gameId);
+
+    const user1 = this.userManager.getUserByUserId(game.player1);
+    const user2 = this.userManager.getUserByUserId(game.player2);
+
+    if (user1) {
+      user1.status = 'online';
+      user1.game = null;
+      this.userManager.broadcastUserStatus(game.player1, 'online', io);
+    }
+    if (user2) {
+      user2.status = 'online';
+      user2.game = null;
+      this.userManager.broadcastUserStatus(game.player2, 'online', io);
+    }
+
+    return true;
   }
 }
 

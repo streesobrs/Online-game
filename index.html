@@ -1897,6 +1897,10 @@
           }
         } else if (data.result === 'timeout') {
           winMsg = '⏰ 游戏超时！';
+        } else if (data.result === 'admin') {
+          winMsg = '🛑 ' + (data.reason || '游戏已结束');
+        } else {
+          winMsg = '🛑 游戏已结束';
         }
 
         winnerEl.textContent = data.winner === userId ? '你' : '对手';
@@ -1942,6 +1946,10 @@
       socket.on('chat_error', (data) => {
         console.error('聊天错误:', data);
         updateStatus('⚠️ ' + data.message);
+        // 如果是被禁言，显示广播通知
+        if (data.message && data.message.includes('禁言')) {
+          showBroadcast(data.message, '系统', Date.now());
+        }
       });
 
       socket.on('error', (data) => {
@@ -1961,6 +1969,20 @@
         if (data.enabled) {
           showBroadcast(data.message, '系统维护', data.timestamp);
         }
+      });
+
+      // 管理员消息
+      socket.on('admin_message', (data) => {
+        console.log('收到管理员消息:', data);
+        showBroadcast(data.message, data.from || '管理员', data.timestamp);
+      });
+
+      // 游戏被重置
+      socket.on('game_reset', (data) => {
+        console.log('游戏被重置:', data);
+        gameState.gameOver = true;
+        showBroadcast(data.message || '游戏已被管理员重置', '系统', Date.now());
+        returnToLobby();
       });
 
       socket.on('game_warning', (data) => {
@@ -3456,6 +3478,8 @@
       if (gameState.gameTimer) clearInterval(gameState.gameTimer);
 
       resetGame(false);
+      // 确保游戏状态保持为结束状态
+      gameState.gameOver = true;
 
       socket.emit('user_status', {
         status: 'online',
