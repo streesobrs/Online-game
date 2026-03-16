@@ -4,10 +4,11 @@ const logger = require('../utils/logger');
 const dataStore = require('../utils/dataStore');
 
 class AdminManager {
-  constructor(userManager, gameManager, chatManager) {
+  constructor(userManager, gameManager, chatManager, accountManager = null) {
     this.userManager = userManager;
     this.gameManager = gameManager;
     this.chatManager = chatManager;
+    this.accountManager = accountManager;
     this.adminSockets = new Map(); // socketId -> admin信息
     this.systemStats = {
       serverStartTime: Date.now(),
@@ -637,6 +638,44 @@ class AdminManager {
         message: '重置游戏失败，游戏可能不存在'
       });
     }
+  }
+
+  // ========== 账号管理 ==========
+
+  // 获取所有账号列表
+  async getAllAccounts(socket) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'get_all_accounts',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+
+    const accounts = await this.accountManager.getAllAccounts();
+    socket.emit('admin_accounts_list', { accounts });
+  }
+
+  // 删除账号
+  async deleteAccount(socket, accountId) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'delete_account',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+
+    const result = await this.accountManager.deleteAccount(accountId);
+    if (result.success) {
+      logger.info('管理员删除账号', { adminSocket: socket.id, accountId });
+    }
+    socket.emit('admin_action_result', {
+      action: 'delete_account',
+      ...result
+    });
   }
 
   // 获取在线管理员数量

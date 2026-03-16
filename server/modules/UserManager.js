@@ -5,11 +5,14 @@ const logger = require('../utils/logger');
 const dataStore = require('../utils/dataStore');
 
 class UserManager {
-  constructor() {
+  constructor(accountManager = null) {
+    this.accountManager = accountManager;
     this.users = new Map(); // socketId -> user对象
     this.userSockets = new Map(); // userId -> socket
     this.userIdToSocketId = new Map(); // userId -> socketId
     this.onlineUsers = new Map(); // userId -> user数据
+    this.userIdToAccountId = new Map(); // userId -> accountId
+    this.accountIdToUserId = new Map(); // accountId -> userId
     this.stats = {
       totalConnections: 0,
       peakOnline: 0,
@@ -48,17 +51,17 @@ class UserManager {
   // 处理用户连接
   async handleUserConnection(socket, data, io) {
     this.stats.totalConnections++;
-    
+
     // 检查客户端是否提供了已保存的userId
     let userId = data && data.savedUserId ? data.savedUserId : this.generateUserId();
     const token = this.generateToken();
-    
+
     // 检查这个userId是否已经在线
     if (this.userSockets.has(userId)) {
       // 如果在线，生成新的userId
       userId = this.generateUserId();
     }
-    
+
     const user = {
       userId,
       token,
@@ -115,10 +118,10 @@ class UserManager {
 
     // 广播用户上线
     this.broadcastUserStatus(userId, 'online', io);
-    
+
     // 发送在线用户列表
     this.sendOnlineUsers(socket, io);
-    
+
     // 发送系统统计
     socket.emit('system_stats', {
       onlineUsers: this.onlineUsers.size,
@@ -132,7 +135,7 @@ class UserManager {
   // 处理用户登录（使用token恢复会话）
   async handleUserLogin(socket, data, io) {
     const { token, nickname } = data;
-    
+
     // 这里可以实现基于token的用户识别
     // 简化版本：更新昵称
     const user = this.users.get(socket.id);
@@ -140,14 +143,14 @@ class UserManager {
       const oldNickname = user.nickname;
       user.nickname = nickname.trim().substring(0, 20); // 限制长度
       user.lastActivity = Date.now();
-      
+
       logger.userAction(user.userId, '更新昵称', { oldNickname, newNickname: user.nickname });
-      
+
       socket.emit('user_updated', {
         userId: user.userId,
         nickname: user.nickname
       });
-      
+
       // 广播更新
       this.broadcastUserStatus(user.userId, user.status, io);
     }
@@ -174,17 +177,47 @@ class UserManager {
   }
 
   // 更新用户统计
-  updateUserStats(userId, result) {
+  async updateUserStats(userId, result, gameType = null, isAI = false, aiDifficulty = null, duration = null) {
     const user = this.onlineUsers.get(userId);
     if (user) {
       user.stats.totalGames++;
       if (result === 'win') user.stats.wins++;
       else if (result === 'loss') user.stats.losses++;
       else if (result === 'draw') user.stats.draws++;
-      
+
       // 异步保存到数据库
       this.saveUserToDB(user);
     }
+
+    // 同时更新账号统计（如果有账号关联）
+    const accountId = this.userIdToAccountId.get(userId);
+    if (accountId && this.accountManager) {
+      const result = await this.accountManager.updateGameStats(accountId, result, gameType, isAI, aiDifficulty, duration);
+
+      // 获取更新后的账号信息并发送给客户端
+      const updatedAccount = await this.accountManager.getAccount(accountId);
+      if (updatedAccount) {
+        const socket = this.getSocketByUserId(userId);
+        if (socket) {
+          socket.emit('account_updated', { account: updatedAccount });
+        }
+      }
+
+      return result;
+    }
+
+    return { success: false };
+  }
+
+  // 关联用户ID和账号ID
+  setUserAccount(userId, accountId) {
+    this.userIdToAccountId.set(userId, accountId);
+    this.accountIdToUserId.set(accountId, userId);
+  }
+
+  // 根据用户ID获取账号ID
+  getAccountIdByUserId(userId) {
+    return this.userIdToAccountId.get(userId);
   }
 
   // 保存用户到数据库
@@ -235,7 +268,7 @@ class UserManager {
       gameType: user.gameType,
       stats: user.stats
     }));
-    
+
     socket.emit('online_users', onlineUsers);
   }
 
@@ -243,8 +276,8 @@ class UserManager {
   handleUserDisconnect(socketId, io) {
     const user = this.users.get(socketId);
     if (user) {
-      logger.userAction(user.userId, '断开连接', { 
-        onlineDuration: Date.now() - user.connectedAt 
+      logger.userAction(user.userId, '断开连接', {
+        onlineDuration: Date.now() - user.connectedAt
       });
 
       // 广播离线状态
@@ -329,20 +362,20 @@ class UserManager {
   checkInactiveUsers(io, timeout = config.game.inactivityTimeout) {
     const now = Date.now();
     const inactiveUsers = [];
-    
+
     for (const [userId, user] of this.onlineUsers) {
       if (user.status === 'online' && now - user.lastActivity > timeout) {
         inactiveUsers.push(userId);
       }
     }
-    
+
     for (const userId of inactiveUsers) {
       const socket = this.userSockets.get(userId);
       if (socket) {
-        socket.emit('inactive_warning', { 
-          message: '您已长时间未活动，即将断开连接' 
+        socket.emit('inactive_warning', {
+          message: '您已长时间未活动，即将断开连接'
         });
-        
+
         // 5分钟后断开
         setTimeout(() => {
           const user = this.onlineUsers.get(userId);
@@ -352,29 +385,50 @@ class UserManager {
         }, 300000);
       }
     }
-    
+
     return inactiveUsers.length;
   }
 
   // 获取排行榜
   async getLeaderboard(limit = 10) {
     try {
-      const users = await dataStore.read('users');
-      return users
-        .sort((a, b) => (b.stats?.wins || 0) - (a.stats?.wins || 0))
-        .slice(0, limit)
-        .map((user, index) => ({
-          rank: index + 1,
-          userId: user.userId,
-          nickname: user.nickname,
-          wins: user.stats?.wins || 0,
-          losses: user.stats?.losses || 0,
-          draws: user.stats?.draws || 0,
-          totalGames: user.stats?.totalGames || 0,
-          winRate: user.stats?.totalGames > 0 
-            ? Math.round((user.stats.wins / user.stats.totalGames) * 100) 
-            : 0
-        }));
+      if (this.accountManager) {
+        const accounts = await this.accountManager.getAllAccounts();
+        return accounts
+          .sort((a, b) => (b.stats?.wins || 0) - (a.stats?.wins || 0))
+          .slice(0, limit)
+          .map((account, index) => ({
+            rank: index + 1,
+            accountId: account.accountId,
+            username: account.username,
+            nickname: account.nickname,
+            level: account.profile?.level || 1,
+            wins: account.stats?.wins || 0,
+            losses: account.stats?.losses || 0,
+            draws: account.stats?.draws || 0,
+            totalGames: account.stats?.totalGames || 0,
+            winRate: account.stats?.totalGames > 0
+              ? Math.round((account.stats.wins / account.stats.totalGames) * 100)
+              : 0
+          }));
+      } else {
+        const users = await dataStore.read('users');
+        return users
+          .sort((a, b) => (b.stats?.wins || 0) - (a.stats?.wins || 0))
+          .slice(0, limit)
+          .map((user, index) => ({
+            rank: index + 1,
+            userId: user.userId,
+            nickname: user.nickname,
+            wins: user.stats?.wins || 0,
+            losses: user.stats?.losses || 0,
+            draws: user.stats?.draws || 0,
+            totalGames: user.stats?.totalGames || 0,
+            winRate: user.stats?.totalGames > 0
+              ? Math.round((user.stats.wins / user.stats.totalGames) * 100)
+              : 0
+          }));
+      }
     } catch (err) {
       logger.error('获取排行榜失败', { error: err.message });
       return [];

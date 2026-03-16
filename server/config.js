@@ -3,7 +3,7 @@ const path = require('path');
 
 module.exports = {
   // 版本号 (语义化版本: MAJOR.MINOR.PATCH)
-  version: '1.0.0',
+  version: '1.1.0',
 
   // 服务器配置
   server: {

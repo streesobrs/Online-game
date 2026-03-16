@@ -5,8 +5,11 @@ const logger = require('../utils/logger');
 const dataStore = require('../utils/dataStore');
 
 class GameManager {
-  constructor(userManager) {
+  constructor(userManager, accountManager = null, achievementManager = null, aiManager = null) {
     this.userManager = userManager;
+    this.accountManager = accountManager;
+    this.achievementManager = achievementManager;
+    this.aiManager = aiManager;
     this.waitingUsers = new Map(); // gameType -> Set(userId)
     this.games = new Map(); // gameId -> game对象
     this.spectators = new Map(); // gameId -> Set(userId)
@@ -305,7 +308,7 @@ class GameManager {
   // 处理游戏重置请求
   handleReset(socketId, data, io) {
     const user = this.userManager.getUserBySocketId(socketId);
-    if (!user || user.status !== 'playing') {
+    if (!user) {
       return false;
     }
 
@@ -324,6 +327,58 @@ class GameManager {
         message: data.message || '对方请求重置棋盘'
       });
     }
+
+    return true;
+  }
+
+  // 处理重置确认
+  handleResetConfirm(socketId, io) {
+    const user = this.userManager.getUserBySocketId(socketId);
+    if (!user) {
+      return false;
+    }
+
+    const game = this.games.get(user.game);
+    if (!game) {
+      return false;
+    }
+
+    const gameId = game.gameId;
+
+    // 重置游戏状态
+    game.status = 'playing';
+    game.moves = [];
+    game.currentPlayer = 1;
+    game.lastMoveTime = Date.now();
+    game.result = null;
+    game.endTime = null;
+    game.endReason = null;
+    game.winner = null;
+
+    // 重置移动历史
+    this.moveHistory.set(gameId, []);
+    const user1 = this.userManager.getUserByUserId(game.player1);
+    const user2 = this.userManager.getUserByUserId(game.player2);
+
+    if (user1) {
+      user1.status = 'playing';
+    }
+    if (user2) {
+      user2.status = 'playing';
+    }
+
+    // 通知双方重置游戏
+    const player1Socket = this.userManager.getSocketByUserId(game.player1);
+    const player2Socket = this.userManager.getSocketByUserId(game.player2);
+
+    if (player1Socket) {
+      player1Socket.emit('reset');
+    }
+    if (player2Socket) {
+      player2Socket.emit('reset');
+    }
+
+    logger.gameEvent(game.gameId, '游戏重置', {});
 
     return true;
   }
@@ -390,16 +445,40 @@ class GameManager {
 
     // 更新用户统计
     if (result === 'win' || result === 'resign') {
-      this.userManager.updateUserStats(winner, 'win');
+      const duration = game.endTime - game.startTime;
+
+      await this.userManager.updateUserStats(winner, 'win', game.gameType, false, null, duration);
       const loser = winner === game.player1 ? game.player2 : game.player1;
-      this.userManager.updateUserStats(loser, 'loss');
+      await this.userManager.updateUserStats(loser, 'loss', game.gameType, false, null, duration);
+
+      // 检查成就
+      const winnerAccountId = this.userManager.userIdToAccountId.get(winner);
+      if (winnerAccountId && this.accountManager) {
+        const account = await this.accountManager.getAccount(winnerAccountId);
+        if (account) {
+          const stats = {
+            ...account.stats,
+            level: account.profile ? account.profile.level : 1,
+            result: 'win'
+          };
+          const unlockedAchievements = await this.achievementManager.checkAchievements(winnerAccountId, stats);
+          if (unlockedAchievements.length > 0) {
+            const socket = this.userManager.getSocketByUserId(winner);
+            if (socket) {
+              socket.emit('achievements_unlocked', { achievements: unlockedAchievements });
+            }
+          }
+        }
+      }
     } else if (result === 'draw') {
-      this.userManager.updateUserStats(game.player1, 'draw');
-      this.userManager.updateUserStats(game.player2, 'draw');
+      const duration = game.endTime - game.startTime;
+
+      await this.userManager.updateUserStats(game.player1, 'draw', game.gameType, false, null, duration);
+      await this.userManager.updateUserStats(game.player2, 'draw', game.gameType, false, null, duration);
     } else if (result === 'timeout') {
       // 超时判负
-      this.userManager.updateUserStats(game.player1, 'loss');
-      this.userManager.updateUserStats(game.player2, 'loss');
+      await this.userManager.updateUserStats(game.player1, 'loss', game.gameType);
+      await this.userManager.updateUserStats(game.player2, 'loss', game.gameType);
     }
 
     // 通知玩家
@@ -421,21 +500,8 @@ class GameManager {
     // 通知观战者
     this.broadcastToSpectators(gameId, 'game_ended', endData, io);
 
-    // 更新用户状态
-    const user1 = this.userManager.getUserByUserId(game.player1);
-    const user2 = this.userManager.getUserByUserId(game.player2);
-
-    if (user1) {
-      user1.status = 'online';
-      user1.game = null;
-      this.userManager.broadcastUserStatus(game.player1, 'online', io);
-    }
-
-    if (user2) {
-      user2.status = 'online';
-      user2.game = null;
-      this.userManager.broadcastUserStatus(game.player2, 'online', io);
-    }
+    // 暂时不更新用户状态，让用户可以选择"再来一把"
+    // 用户状态和游戏关联将在返回大厅或确认再来一局时更新
 
     // 保存游戏记录
     await this.saveGameRecord(game);

@@ -753,6 +753,33 @@
         </table>
       </div>
     </div>
+
+    <!-- 账号管理表格 -->
+    <div class="data-table">
+      <div class="table-header">👤 账号管理</div>
+      <div class="action-row" style="margin-bottom: 10px;">
+        <button class="action-btn btn-info" onclick="loadAccountsList()">🔄 刷新账号列表</button>
+      </div>
+      <div class="table-container">
+        <table id="accounts-table">
+          <thead>
+            <tr>
+              <th>账号ID</th>
+              <th>用户名</th>
+              <th>昵称</th>
+              <th>注册时间</th>
+              <th>最后登录</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="accounts-table-body">
+            <tr>
+              <td colspan="6" style="text-align: center; color: #718096;">暂无数据，点击刷新加载</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -829,9 +856,18 @@
         console.log('操作结果:', data);
         if (data.success) {
           showToast(data.message, 'success');
+          if (data.action === 'delete_account') {
+            loadAccountsList();
+          }
         } else {
           showToast(data.message, 'error');
         }
+      });
+
+      // 监听账号列表
+      socket.on('admin_accounts_list', function (data) {
+        console.log('账号列表:', data);
+        updateAccountsTable(data.accounts);
       });
 
       // 监听排行榜数据
@@ -1621,6 +1657,48 @@
       showConfirmModal(`确定要重置游戏 ${gameId} 吗？这将结束游戏并让玩家返回大厅。`, () => {
         if (socket && socket.connected) {
           socket.emit('reset_game', { gameId });
+        }
+      });
+    }
+
+    // ========== 账号管理 ==========
+
+    // 加载账号列表
+    function loadAccountsList() {
+      if (socket && socket.connected) {
+        socket.emit('get_all_accounts');
+      }
+    }
+
+    // 更新账号列表表格
+    function updateAccountsTable(accounts) {
+      const tbody = document.getElementById('accounts-table-body');
+      if (!tbody) return;
+
+      if (!accounts || accounts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #718096;">暂无账号</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = accounts.map(account => `
+        <tr>
+          <td>${account.accountId || '-'}</td>
+          <td>${account.username}</td>
+          <td>${account.nickname || '-'}</td>
+          <td>${account.createdAt ? new Date(account.createdAt).toLocaleString('zh-CN') : '-'}</td>
+          <td>${account.lastLoginAt ? new Date(account.lastLoginAt).toLocaleString('zh-CN') : '-'}</td>
+          <td>
+            <button class="action-btn btn-danger" style="padding: 5px 10px; font-size: 12px;" onclick="deleteAccount('${account.accountId}')">删除</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // 删除账号
+    function deleteAccount(accountId) {
+      showConfirmModal(`确定要删除账号 ${accountId} 吗？此操作不可恢复！`, () => {
+        if (socket && socket.connected) {
+          socket.emit('delete_account', { accountId });
         }
       });
     }

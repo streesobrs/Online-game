@@ -2,9 +2,10 @@
 const logger = require('../utils/logger');
 
 class ChatManager {
-  constructor(userManager, gameManager) {
+  constructor(userManager, gameManager, accountManager) {
     this.userManager = userManager;
     this.gameManager = gameManager;
+    this.accountManager = accountManager;
     this.globalChatHistory = []; // 全局聊天记录
     this.gameChatHistory = new Map(); // gameId -> 聊天记录
     this.maxHistoryLength = 100; // 最大保存消息数
@@ -66,7 +67,22 @@ class ChatManager {
 
     logger.chatEvent(user.userId, '大厅', { messageLength: message.length });
 
+    // 更新聊天消息统计
+    this.updateChatMessageCount(user.userId);
+
     return { success: true };
+  }
+
+  // 更新用户聊天消息统计
+  async updateChatMessageCount(userId) {
+    try {
+      const accountId = this.userManager.userIdToAccountId.get(userId);
+      if (accountId && this.accountManager) {
+        await this.accountManager.updateChatMessages(accountId);
+      }
+    } catch (err) {
+      logger.error('更新聊天消息统计失败', { userId, error: err.message });
+    }
   }
 
   // 处理游戏内聊天
@@ -151,6 +167,9 @@ class ChatManager {
     }, io);
 
     logger.chatEvent(user.userId, '局内', { gameId: game.gameId, messageLength: message.length });
+
+    // 更新聊天消息统计
+    this.updateChatMessageCount(user.userId);
 
     return { success: true };
   }

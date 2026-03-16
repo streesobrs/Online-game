@@ -14,6 +14,9 @@ const GameManager = require('./modules/GameManager');
 const AdminManager = require('./modules/AdminManager');
 const ChatManager = require('./modules/ChatManager');
 const VersionManager = require('./modules/VersionManager');
+const AccountManager = require('./modules/AccountManager');
+const AchievementManager = require('./modules/AchievementManager');
+const AIManager = require('./modules/AIManager');
 
 // 初始化Express应用
 const app = express();
@@ -83,10 +86,13 @@ app.get('/api/spectate/games', (req, res) => {
 });
 
 // 初始化管理器
-const userManager = new UserManager();
-const gameManager = new GameManager(userManager);
-const chatManager = new ChatManager(userManager, gameManager);
-const adminManager = new AdminManager(userManager, gameManager, chatManager);
+const accountManager = new AccountManager();
+const achievementManager = new AchievementManager(accountManager);
+const aiManager = new AIManager();
+const userManager = new UserManager(accountManager);
+const gameManager = new GameManager(userManager, accountManager, achievementManager, aiManager);
+const chatManager = new ChatManager(userManager, gameManager, accountManager);
+const adminManager = new AdminManager(userManager, gameManager, chatManager, accountManager);
 const versionManager = new VersionManager();
 
 const serverStartTime = Date.now();
@@ -101,7 +107,8 @@ io.on('connection', (socket) => {
   socket.on('client_connect', async (data) => {
     logger.info('收到客户端连接请求', {
       socketId: socket.id,
-      clientVersion: data?.clientVersion
+      clientVersion: data?.clientVersion,
+      accountId: data?.accountId
     });
 
     // 检查版本兼容性
@@ -111,6 +118,73 @@ io.on('connection', (socket) => {
     // 处理用户连接
     await userManager.handleUserConnection(socket, data, io).catch(err => {
       logger.error('用户连接处理错误', { socketId: socket.id, error: err.message });
+    });
+
+    // 如果有账号ID，关联用户和账号
+    if (data?.accountId) {
+      const user = userManager.getUserBySocketId(socket.id);
+      if (user) {
+        userManager.setUserAccount(user.userId, data.accountId);
+        logger.info('自动关联账号成功', {
+          socketId: socket.id,
+          userId: user.userId,
+          accountId: data.accountId
+        });
+      }
+    }
+  });
+
+  // ========== 账号相关事件 ==========
+
+  // 注册账号
+  socket.on('account_register', async (data) => {
+    const { username, password, nickname } = data;
+    const result = await accountManager.register(username, password, nickname);
+    socket.emit('account_action_result', {
+      action: 'register',
+      ...result
+    });
+  });
+
+  // 登录账号
+  socket.on('account_login', async (data) => {
+    const { username, password } = data;
+    const result = await accountManager.login(username, password);
+
+    if (result.success && result.account) {
+      const user = userManager.getUserBySocketId(socket.id);
+      if (user) {
+        userManager.setUserAccount(user.userId, result.account.accountId);
+      }
+    }
+
+    socket.emit('account_action_result', {
+      action: 'login',
+      ...result
+    });
+  });
+
+  // 更新账号资料
+  socket.on('account_update_profile', async (data) => {
+    const { accountId, nickname, profile } = data;
+    const result = await accountManager.updateProfile(accountId, { nickname, profile });
+    if (result.success) {
+      const account = await accountManager.getAccount(accountId);
+      result.account = account;
+    }
+    socket.emit('account_action_result', {
+      action: 'update_profile',
+      ...result
+    });
+  });
+
+  // 修改密码
+  socket.on('account_change_password', async (data) => {
+    const { accountId, oldPassword, newPassword } = data;
+    const result = await accountManager.changePassword(accountId, oldPassword, newPassword);
+    socket.emit('account_action_result', {
+      action: 'change_password',
+      ...result
     });
   });
 
@@ -193,11 +267,61 @@ io.on('connection', (socket) => {
     gameManager.handleReset(socket.id, data, io);
   });
 
+  // 游戏重置确认
+  socket.on('reset_confirm', () => {
+    gameManager.handleResetConfirm(socket.id, io);
+  });
+
   // 游戏结果
   socket.on('game_result', (data) => {
     const success = gameManager.handleGameResult(socket.id, data, io);
     if (!success) {
       socket.emit('error', { message: '无法结束游戏' });
+    }
+  });
+
+  // AI游戏结果
+  socket.on('ai_game_result', async (data) => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user) {
+      socket.emit('error', { message: '用户不存在' });
+      return;
+    }
+
+    const { result, gameType, difficulty, duration } = data;
+    const isWin = result === 'win';
+    const isAI = true;
+
+    try {
+      // 更新用户统计
+      const statsResult = await userManager.updateUserStats(user.userId, isWin ? 'win' : 'loss', gameType, isAI, difficulty, duration);
+
+      // 检查成就
+      const accountId = userManager.userIdToAccountId.get(user.userId);
+      if (accountId && accountManager && achievementManager) {
+        const account = await accountManager.getAccount(accountId);
+        if (account) {
+          const stats = {
+            ...account.stats,
+            level: account.profile ? account.profile.level : 1,
+            result: isWin ? 'win' : 'loss'
+          };
+          const unlockedAchievements = await achievementManager.checkAchievements(accountId, stats);
+          if (unlockedAchievements.length > 0) {
+            socket.emit('achievements_unlocked', { achievements: unlockedAchievements });
+          }
+        }
+      }
+
+      logger.info('AI游戏结束', {
+        userId: user.userId,
+        result,
+        gameType,
+        difficulty
+      });
+
+    } catch (err) {
+      logger.error('处理AI游戏结果失败', { error: err.message });
     }
   });
 
@@ -427,6 +551,19 @@ adminNamespace.on('connection', (socket) => {
   socket.on('reset_game', (data) => {
     const { gameId } = data;
     adminManager.resetGame(socket, gameId);
+  });
+
+  // ========== 账号管理 ==========
+
+  // 获取所有账号
+  socket.on('get_all_accounts', () => {
+    adminManager.getAllAccounts(socket);
+  });
+
+  // 删除账号
+  socket.on('delete_account', (data) => {
+    const { accountId } = data;
+    adminManager.deleteAccount(socket, accountId);
   });
 
   // 断开连接
