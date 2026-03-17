@@ -12,11 +12,49 @@
       padding: 0;
     }
 
+    /* 赛博朋克动画效果 */
+    @keyframes scanline {
+      0% { transform: translateY(-100vh); }
+      100% { transform: translateY(100vh); }
+    }
+    
+    @keyframes neon-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    
+    @keyframes glitch {
+      0% { transform: translate(0); }
+      20% { transform: translate(-2px, 2px); }
+      40% { transform: translate(-2px, -2px); }
+      60% { transform: translate(2px, 2px); }
+      80% { transform: translate(2px, -2px); }
+      100% { transform: translate(0); }
+    }
+
+    @keyframes piece-scan-glow {
+      0% {
+        box-shadow: 0 0 0 rgba(0, 255, 255, 0);
+        transform: translateZ(0) scale(1);
+      }
+      40% {
+        box-shadow: 0 0 12px rgba(0, 255, 255, 0.9), 0 0 18px rgba(255, 0, 255, 0.7);
+        transform: translateZ(0) scale(1.06);
+      }
+      100% {
+        box-shadow: 0 0 0 rgba(0, 255, 255, 0);
+        transform: translateZ(0) scale(1);
+      }
+    }
+
+    .scan-glow {
+      animation: piece-scan-glow 0.35s ease-out;
+    }
+
     body {
       display: flex;
       flex-direction: column;
       align-items: center;
-      background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
       font-family: 'Microsoft Yahei', Arial, sans-serif;
       padding: 20px;
       min-height: 100vh;
@@ -181,6 +219,28 @@
       display: flex;
       align-items: center;
       gap: 5px;
+      position: relative; /* For challenge button positioning */
+    }
+
+    .challenge-btn {
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 3px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      margin-left: 8px;
+      transition: background 0.2s;
+    }
+
+    .challenge-btn:hover {
+      background: #2980b9;
+    }
+
+    .challenge-btn:disabled {
+      background: #bdc3c7;
+      cursor: not-allowed;
     }
 
     .user-item.waiting {
@@ -294,6 +354,77 @@
 
     .leaderboard-winrate {
       color: #4299e1;
+    }
+
+    #lucy-panel {
+      position: fixed;
+      right: 40px;
+      bottom: 80px;
+      width: 220px;
+      padding: 14px 14px 12px 14px;
+      border-radius: 18px;
+      background: linear-gradient(145deg, rgba(10, 10, 26, 0.95), rgba(25, 25, 70, 0.95));
+      box-shadow: 0 0 18px rgba(0, 212, 255, 0.6), 0 0 32px rgba(255, 0, 255, 0.4);
+      border: 1px solid rgba(0, 212, 255, 0.8);
+      display: none;
+      z-index: 9000;
+      backdrop-filter: blur(10px);
+    }
+
+    .lucy-avatar {
+      width: 100%;
+      height: 120px;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 0 14px rgba(0, 212, 255, 0.7), 0 0 22px rgba(255, 0, 255, 0.6);
+    }
+
+    .lucy-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      border-radius: 14px;
+    }
+
+    .lucy-info {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      color: #e2e8f0;
+    }
+
+    .lucy-name {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #f9fafb;
+      text-shadow: 0 0 6px rgba(0, 212, 255, 0.9), 0 0 10px rgba(255, 0, 255, 0.7);
+    }
+
+    .lucy-desc {
+      font-size: 12px;
+      color: #cbd5f5;
+      opacity: 0.9;
+    }
+
+    #lucy-bg {
+      position: fixed;
+      inset: 0;
+      background-position: center center;
+      background-repeat: no-repeat;
+      background-size: cover;
+      filter: saturate(1.2) contrast(1.1) brightness(0.75);
+      opacity: 0;
+      transition: opacity 0.6s ease-out;
+      z-index: -1;
+      pointer-events: none;
+      transform: translateY(0);
+    }
+
+    #lucy-bg.visible {
+      opacity: 1;
     }
 
     /* 核心信息面板 */
@@ -481,7 +612,6 @@
       /* 默认隐藏，匹配成功后显示 */
     }
 
-    /* 五子棋棋盘样式 */
     .gobang-board {
       display: grid;
       grid-template-columns: repeat(15, 32px);
@@ -494,7 +624,20 @@
       transform: translateZ(0);
       will-change: contents;
       display: none;
-      /* 默认隐藏 */
+    }
+
+    .gobang-board.cyberpunk-gobang {
+      background: radial-gradient(circle at 20% 20%, rgba(0, 212, 255, 0.12) 0, transparent 55%),
+        radial-gradient(circle at 80% 80%, rgba(255, 0, 255, 0.12) 0, transparent 55%),
+        #1e0030;
+      border: 2px solid #00d4ff;
+      box-shadow: 0 0 20px rgba(0, 212, 255, 0.7), 0 0 40px rgba(255, 0, 255, 0.6);
+      animation: neon-pulse 2.4s ease-in-out infinite;
+    }
+
+    .gobang-board.cyberpunk-gobang .gobang-cell::after,
+    .gobang-board.cyberpunk-gobang .gobang-cell::before {
+      background: rgba(0, 255, 255, 0.3);
     }
 
     .gobang-cell {
@@ -1505,6 +1648,7 @@
 </head>
 
 <body>
+  <div id="lucy-bg"></div>
   <!-- 账号栏 -->
   <div class="account-bar" id="account-bar">
     <button class="account-btn btn-primary" onclick="showLoginModal()">登录</button>
@@ -1529,6 +1673,9 @@
     </button>
     <button class="nav-btn" onclick="showAIGame()">
       🤖 AI对战
+    </button>
+    <button class="nav-btn" onclick="showThemeModal()">
+      🎨 主题
     </button>
   </div>
 
@@ -1704,7 +1851,16 @@
     状态：请选择棋种并开始匹配
   </div>
 
-  <!-- 棋盘和聊天容器 -->
+  <div id="lucy-panel">
+    <div class="lucy-avatar">
+      <img src="/lucy.png" alt="Lucy" class="lucy-img">
+    </div>
+    <div class="lucy-info">
+      <div class="lucy-name">Lucy</div>
+      <div class="lucy-desc">夜之城边缘行者</div>
+    </div>
+  </div>
+
   <div class="game-and-chat-container">
     <!-- 左侧面板 - 落子记录 -->
     <div class="left-panels-container">
@@ -1916,6 +2072,7 @@
     let currentResetRequest = null;
 
     // DOM 元素
+    const lucyBg = document.getElementById('lucy-bg');
     const winAlert = document.getElementById('win-alert');
     const winText = document.getElementById('win-text');
     const roleEl = document.getElementById('role');
@@ -1961,7 +2118,15 @@
     const channelGlobalBtn = document.getElementById('channel-global');
     const channelGameBtn = document.getElementById('channel-game');
 
-    // 大厅相关DOM
+    // 挑战相关DOM
+    const challengeModal = document.getElementById('challenge-modal');
+    const challengeTitle = document.getElementById('challenge-title');
+    const challengeMessage = document.getElementById('challenge-message');
+    const challengeAcceptBtn = document.getElementById('challenge-accept');
+    const challengeRejectBtn = document.getElementById('challenge-reject');
+
+    const lucyPanel = document.getElementById('lucy-panel');
+
     const lobbyContainer = document.getElementById('lobby-container');
     const infoContainer = document.getElementById('info-container');
     const gameControls = document.getElementById('game-controls');
@@ -1971,6 +2136,12 @@
     const matchBtn = document.getElementById('match-btn');
     const cancelBtn = document.getElementById('cancel-btn');
     const userList = document.getElementById('user-list');
+    const lobbyTitle = document.querySelector('.lobby-title');
+    const onlineUsersElement = document.querySelector('.online-users');
+    const onlineUsersTitle = document.querySelector('.online-users-title');
+    const leaderboardContainer = document.querySelector('.leaderboard-container');
+    const leaderboardTitle = document.querySelector('.leaderboard-title');
+    const leaderboardList = document.getElementById('leaderboard-list');
 
     // 棋盘DOM
     const gobangBoard = document.getElementById('gobang-board');
@@ -2398,6 +2569,37 @@
         returnToLobby();
       });
 
+      // ========== 挑战相关事件 ==========
+      let currentChallenge = null; // 存储当前收到的挑战信息
+
+      socket.on('challenge_received', (data) => {
+        console.log('收到挑战请求:', data);
+        currentChallenge = data;
+        showChallengeModal(data.fromNickname, data.game);
+      });
+
+      socket.on('challenge_sent', (data) => {
+        console.log('挑战请求已发送:', data);
+        if (data.success) {
+          updateStatus(data.message);
+        } else {
+          updateStatus('❌ ' + data.message);
+        }
+      });
+
+      socket.on('challenge_accepted', (data) => {
+        console.log('挑战被接受:', data);
+        hideChallengeModal();
+        updateStatus(`✅ 玩家 ${data.fromNickname || data.toNickname} 接受了你的挑战！游戏开始！`);
+        // 游戏开始逻辑由 match_success 处理
+      });
+
+      socket.on('challenge_rejected', (data) => {
+        console.log('挑战被拒绝:', data);
+        hideChallengeModal();
+        updateStatus(`❌ 玩家 ${data.fromNickname || data.toNickname} 拒绝了你的挑战。`);
+      });
+
       // ========== 账号系统事件 ==========
 
       socket.on('account_action_result', (data) => {
@@ -2517,6 +2719,36 @@
           </div>
         `;
       }).join('');
+      applyThemeToLeaderboard();
+    }
+
+    function applyThemeToLeaderboard() {
+      if (!leaderboardList) return;
+      const theme = themes[currentTheme];
+      const leaderboardItems = leaderboardList.querySelectorAll('.leaderboard-item');
+      leaderboardItems.forEach(item => {
+        item.style.background = theme.uiColors.leaderboardItemBg;
+        const rankEl = item.querySelector('.leaderboard-rank');
+        if (rankEl) {
+          rankEl.style.color = theme.uiColors.rankColor;
+        }
+        const nameEl = item.querySelector('.leaderboard-name');
+        if (nameEl) {
+          nameEl.style.color = theme.uiColors.nameColor;
+        }
+        const levelEl = item.querySelector('.leaderboard-level');
+        if (levelEl) {
+          levelEl.style.color = theme.uiColors.levelColor;
+        }
+        const winsEl = item.querySelector('.leaderboard-wins');
+        if (winsEl) {
+          winsEl.style.color = theme.uiColors.winsColor;
+        }
+        const winrateEl = item.querySelector('.leaderboard-winrate');
+        if (winrateEl) {
+          winrateEl.style.color = theme.uiColors.winrateColor;
+        }
+      });
     }
 
     // 显示系统广播
@@ -3869,10 +4101,44 @@
             user.status === 'playing' ? '游戏中' : '';
 
         html += `<div class="user-item ${statusClass} ${gameClass}">
-          ${isMe ? '👤' : '👥'} ${isMe ? '我' : '玩家' + uid.substring(0, 4)} - ${statusText}
+          ${isMe ? '👤' : '👥'} ${isMe ? '我' : '玩家' + uid.substring(0, 4)}
+          <span style="font-size: 11px; color: #718096;">胜: ${user.stats?.wins || 0}</span> - ${statusText}
+          ${!isMe && user.status === 'online' ? `<button class="challenge-btn" onclick="sendChallenge('${uid}')">挑战</button>` : ''}
         </div>`;
       });
       userList.innerHTML = html;
+      applyThemeToUserList();
+    }
+
+    function applyThemeToUserList() {
+      if (!userList) return;
+      const theme = themes[currentTheme];
+      const userItems = userList.querySelectorAll('.user-item');
+      userItems.forEach(item => {
+        item.style.background = theme.uiColors.userItemBg;
+        item.style.color = theme.uiColors.userItemColor;
+      });
+    }
+
+    function sendChallenge(opponentId) {
+      if (matchedOpponentId) {
+        updateStatus('❌ 正在游戏中，无法发起挑战');
+        return;
+      }
+      if (isMatching) {
+        updateStatus('❌ 正在匹配中，无法发起挑战');
+        return;
+      }
+      if (opponentId === userId) {
+        updateStatus('❌ 不能挑战自己');
+        return;
+      }
+
+      updateStatus(`⏳ 正在向玩家 ${opponentId.substring(0, 4)}**** 发起挑战...`);
+      socket.emit('challenge_request', {
+        to: opponentId,
+        game: currentGame
+      });
     }
 
     function startMatching() {
@@ -5282,6 +5548,427 @@
       });
     }
 
+    // 显示挑战请求模态框
+    function showChallengeModal(fromNickname, gameType) {
+      const gameTypeName = gameConfigs[gameType] ? gameConfigs[gameType].emoji + ' ' + (gameType === 'gobang' ? '五子棋' : gameType === 'go' ? '围棋' : '象棋') : gameType;
+      challengeMessage.innerHTML = `玩家 <strong>${fromNickname}</strong> 邀请您进行一场 <strong>${gameTypeName}</strong> 对战！`;
+      challengeModal.style.display = 'flex';
+    }
+
+    // 隐藏挑战请求模态框
+    function hideChallengeModal() {
+      challengeModal.style.display = 'none';
+      currentChallenge = null;
+    }
+
+    // 挑战请求模态框事件处理
+    document.addEventListener('DOMContentLoaded', () => {
+      challengeAcceptBtn.addEventListener('click', () => {
+        if (currentChallenge) {
+          socket.emit('challenge_response', {
+            from: currentChallenge.from,
+            accept: true
+          });
+          hideChallengeModal();
+        }
+      });
+
+      challengeRejectBtn.addEventListener('click', () => {
+        if (currentChallenge) {
+          socket.emit('challenge_response', {
+            from: currentChallenge.from,
+            accept: false
+          });
+          hideChallengeModal();
+        }
+      });
+
+      challengeModal.addEventListener('click', (e) => {
+        if (e.target === challengeModal) {
+          // 点击背景默认拒绝
+          if (currentChallenge) {
+            socket.emit('challenge_response', {
+              from: currentChallenge.from,
+              accept: false
+            });
+          }
+          hideChallengeModal();
+        }
+      });
+    });
+
+    // ========== 主题系统 ==========
+    const themes = {
+      'default': {
+        name: '默认',
+        background: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
+        primaryColor: '#007bff',
+        secondaryColor: '#6c757d',
+        accentColor: '#27ae60',
+        boardBackground: {
+          gobang: '#bb9a7b',
+          go: '#d4a76a',
+          chess: '#f0d9b5'
+        },
+        pieceColor: {
+          gobangBlack: '#000',
+          gobangWhite: '#fff',
+          goBlack: '#000',
+          goWhite: '#fff',
+          chessRed: '#c0392b',
+          chessBlack: '#2c3e50'
+        },
+        uiColors: {
+          containerBg: '#ffffff',
+          titleColor: '#2c3e50',
+          statusColor: '#4a5568',
+          statusBg: '#f7fafc',
+          usersBg: '#f8f9fa',
+          usersTitleColor: '#2d3748',
+          userItemBg: '#e3f2fd',
+          userItemColor: '#2d3748',
+          leaderboardBg: '#f8f9fa',
+          leaderboardTitleColor: '#2d3748',
+          leaderboardItemBg: '#ffffff',
+          rankColor: '#4a5568',
+          nameColor: '#2d3748',
+          levelColor: '#718096',
+          winsColor: '#38a169',
+          winrateColor: '#4299e1'
+        }
+      },
+      'cyberpunk': {
+        name: '赛博朋克：边缘行者',
+        background: 'linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 50%, #2a2a5a 100%)',
+        primaryColor: '#00d4ff',
+        secondaryColor: '#ff00ff',
+        accentColor: '#8a2be2',
+        boardBackground: {
+          gobang: '#1e0030',
+          go: '#2a0040',
+          chess: '#150025'
+        },
+        pieceColor: {
+          gobangBlack: '#00ffff',
+          gobangWhite: '#ff00ff',
+          goBlack: '#00ffff',
+          goWhite: '#ff00ff',
+          chessRed: '#ff00ff',
+          chessBlack: '#00ffff'
+        },
+        uiColors: {
+          containerBg: 'rgba(20, 20, 40, 0.9)',
+          titleColor: '#ffffff',
+          statusColor: '#e0f2fe',
+          statusBg: 'rgba(0, 212, 255, 0.1)',
+          usersBg: 'rgba(0, 212, 255, 0.05)',
+          usersTitleColor: '#00d4ff',
+          userItemBg: 'rgba(0, 212, 255, 0.2)',
+          userItemColor: '#ffffff',
+          leaderboardBg: 'rgba(0, 212, 255, 0.05)',
+          leaderboardTitleColor: '#00d4ff',
+          leaderboardItemBg: 'rgba(0, 212, 255, 0.1)',
+          rankColor: '#ffffff',
+          nameColor: '#e0f2fe',
+          levelColor: '#90cdfd',
+          winsColor: '#48bb78',
+          winrateColor: '#4299e1'
+        }
+      },
+      'high-contrast': {
+        name: '高对比度',
+        background: '#000000',
+        primaryColor: '#ffffff',
+        secondaryColor: '#cccccc',
+        accentColor: '#ffff00',
+        boardBackground: {
+          gobang: '#1a1a1a',
+          go: '#111111',
+          chess: '#0a0a0a'
+        },
+        pieceColor: {
+          gobangBlack: '#ffffff',
+          gobangWhite: '#000000',
+          goBlack: '#ffffff',
+          goWhite: '#000000',
+          chessRed: '#ff0000',
+          chessBlack: '#ffffff'
+        },
+        uiColors: {
+          containerBg: '#1a1a1a',
+          titleColor: '#ffffff',
+          statusColor: '#ffffff',
+          statusBg: '#333333',
+          usersBg: '#222222',
+          usersTitleColor: '#ffffff',
+          userItemBg: '#333333',
+          userItemColor: '#ffffff',
+          leaderboardBg: '#222222',
+          leaderboardTitleColor: '#ffffff',
+          leaderboardItemBg: '#333333',
+          rankColor: '#ffffff',
+          nameColor: '#ffffff',
+          levelColor: '#cccccc',
+          winsColor: '#00ff00',
+          winrateColor: '#00ffff'
+        }
+      }
+    };
+
+    let currentTheme = 'default';
+
+    function showThemeModal() {
+      const themeListEl = document.getElementById('theme-list');
+      themeListEl.innerHTML = ''; // 清空现有列表
+
+      for (const themeKey in themes) {
+        const theme = themes[themeKey];
+        const themeItem = document.createElement('div');
+        themeItem.className = 'theme-item';
+        themeItem.style.background = theme.background;
+        themeItem.style.border = `2px solid ${currentTheme === themeKey ? theme.primaryColor : 'transparent'}`;
+        themeItem.style.borderRadius = '8px';
+        themeItem.style.padding = '10px';
+        themeItem.style.cursor = 'pointer';
+        themeItem.style.transition = 'all 0.2s';
+        themeItem.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+        themeItem.dataset.theme = themeKey;
+        themeItem.onclick = () => applyTheme(themeKey);
+
+        themeItem.innerHTML = `
+          <div style="font-weight: bold; color: ${themeKey === 'default' ? '#2d3748' : 'white'}; margin-bottom: 5px;">${theme.name}</div>
+          <div style="width: 100%; height: 50px; background: ${theme.primaryColor}; border-radius: 4px;"></div>
+        `;
+        themeListEl.appendChild(themeItem);
+      }
+
+      document.getElementById('theme-modal').style.display = 'flex';
+    }
+
+    window.showThemeModal = showThemeModal;
+
+    function hideThemeModal() {
+      document.getElementById('theme-modal').style.display = 'none';
+    }
+
+    window.hideThemeModal = hideThemeModal;
+
+    function applyTheme(themeKey) {
+      currentTheme = themeKey;
+      const theme = themes[themeKey];
+
+      document.querySelectorAll('.cyberpunk-glow, .cyberpunk-scanline').forEach(el => el.remove());
+      document.body.style.background = theme.background;
+
+      if (lucyBg) {
+        lucyBg.classList.remove('visible');
+        lucyBg.style.backgroundImage = '';
+        lucyBg.style.transform = 'translateY(0px)';
+      }
+
+      gobangBoard.classList.remove('cyberpunk-gobang');
+      if (lucyPanel) {
+        lucyPanel.style.display = 'none';
+      }
+
+      if (themeKey === 'cyberpunk') {
+        const glowEffect = document.createElement('div');
+        glowEffect.className = 'cyberpunk-glow';
+        glowEffect.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: radial-gradient(circle at 20% 50%, rgba(0, 212, 255, 0.1) 0%, transparent 50%),
+                     radial-gradient(circle at 80% 20%, rgba(255, 0, 255, 0.1) 0%, transparent 50%);
+          pointer-events: none;
+          z-index: 9998;
+          mix-blend-mode: screen;
+        `;
+        document.body.appendChild(glowEffect);
+
+        const scanline = document.createElement('div');
+        scanline.className = 'cyberpunk-scanline';
+        scanline.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 2px;
+          background: linear-gradient(to right, transparent, #00ffff, transparent);
+          box-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff;
+          animation: scanline 3s linear infinite;
+          pointer-events: none;
+          z-index: 9999;
+        `;
+
+        const triggerPieceScanGlow = () => {
+          const anyPiece = document.querySelector('.gobang-black, .gobang-white, .go-black, .go-white, .chess-red, .chess-black');
+          if (!anyPiece) return;
+          document.querySelectorAll('.gobang-black, .gobang-white, .go-black, .go-white, .chess-red, .chess-black')
+            .forEach(piece => {
+              piece.classList.remove('scan-glow');
+              void piece.offsetWidth;
+              piece.classList.add('scan-glow');
+            });
+        };
+
+        scanline.addEventListener('animationiteration', triggerPieceScanGlow);
+        document.body.appendChild(scanline);
+
+        if (lucyBg) {
+          lucyBg.style.backgroundImage = "url('/lucy.png')";
+          lucyBg.classList.add('visible');
+        }
+
+        document.querySelectorAll('h1, h2, h3, .nav-btn, .lobby-btn').forEach(el => {
+          el.style.textShadow = `0 0 5px ${theme.primaryColor}, 0 0 10px ${theme.primaryColor}, 0 0 15px ${theme.secondaryColor}`;
+        });
+
+        document.querySelectorAll('.nav-btn, .match-btn, .cancel-btn, .lobby-btn').forEach(btn => {
+          btn.style.boxShadow = `0 0 10px ${theme.primaryColor}, 0 0 20px ${theme.secondaryColor}, inset 0 0 10px rgba(255, 255, 255, 0.1)`;
+          btn.style.border = `1px solid ${theme.primaryColor}`;
+        });
+
+        gobangBoard.classList.add('cyberpunk-gobang');
+        if (lucyPanel) {
+          lucyPanel.style.display = 'block';
+        }
+      }
+
+      // 更新按钮颜色等
+      document.querySelectorAll('.nav-btn.active').forEach(btn => {
+        btn.style.background = theme.primaryColor;
+      });
+      document.querySelectorAll('.match-btn').forEach(btn => {
+        btn.style.background = theme.accentColor;
+      });
+      document.querySelectorAll('.cancel-btn').forEach(btn => {
+        btn.style.background = theme.secondaryColor;
+      });
+      document.querySelectorAll('.lobby-btn').forEach(btn => {
+        btn.style.boxShadow = `0 3px 6px ${theme.primaryColor}33`;
+      });
+
+      // 更新大厅UI元素样式
+      if (lobbyContainer) {
+        lobbyContainer.style.background = theme.uiColors.containerBg;
+      }
+      if (lobbyTitle) {
+        lobbyTitle.style.color = theme.uiColors.titleColor;
+      }
+      if (lobbyStatus) {
+        lobbyStatus.style.color = theme.uiColors.statusColor;
+        lobbyStatus.style.background = theme.uiColors.statusBg;
+      }
+      if (onlineUsersElement) {
+        onlineUsersElement.style.background = theme.uiColors.usersBg;
+      }
+      if (onlineUsersTitle) {
+        onlineUsersTitle.style.color = theme.uiColors.usersTitleColor;
+      }
+      if (userList) {
+        const userItems = userList.querySelectorAll('.user-item');
+        userItems.forEach(item => {
+          item.style.background = theme.uiColors.userItemBg;
+          item.style.color = theme.uiColors.userItemColor;
+        });
+      }
+
+      // 更新排行榜UI元素样式
+      if (leaderboardContainer) {
+        leaderboardContainer.style.background = theme.uiColors.leaderboardBg;
+      }
+      if (leaderboardTitle) {
+        leaderboardTitle.style.color = theme.uiColors.leaderboardTitleColor;
+      }
+      if (leaderboardList) {
+        const leaderboardItems = leaderboardList.querySelectorAll('.leaderboard-item');
+        leaderboardItems.forEach(item => {
+          item.style.background = theme.uiColors.leaderboardItemBg;
+          const rankEl = item.querySelector('.leaderboard-rank');
+          if (rankEl) {
+            rankEl.style.color = theme.uiColors.rankColor;
+          }
+          const nameEl = item.querySelector('.leaderboard-name');
+          if (nameEl) {
+            nameEl.style.color = theme.uiColors.nameColor;
+          }
+          const levelEl = item.querySelector('.leaderboard-level');
+          if (levelEl) {
+            levelEl.style.color = theme.uiColors.levelColor;
+          }
+          const winsEl = item.querySelector('.leaderboard-wins');
+          if (winsEl) {
+            winsEl.style.color = theme.uiColors.winsColor;
+          }
+          const winrateEl = item.querySelector('.leaderboard-winrate');
+          if (winrateEl) {
+            winrateEl.style.color = theme.uiColors.winrateColor;
+          }
+        });
+      }
+
+      // 更新棋盘颜色
+      gobangBoard.style.background = theme.boardBackground.gobang;
+      goBoard.style.background = theme.boardBackground.go;
+      chessBoard.style.background = theme.boardBackground.chess;
+
+      // 更新棋子颜色 (需要更细致的DOM操作)
+      // 示例：五子棋黑白子
+      document.querySelectorAll('.gobang-black').forEach(piece => {
+        piece.style.background = theme.pieceColor.gobangBlack;
+      });
+      document.querySelectorAll('.gobang-white').forEach(piece => {
+        piece.style.background = theme.pieceColor.gobangWhite;
+      });
+      // 围棋黑白子
+      document.querySelectorAll('.go-black').forEach(piece => {
+        piece.style.background = theme.pieceColor.goBlack;
+      });
+      document.querySelectorAll('.go-white').forEach(piece => {
+        piece.style.background = theme.pieceColor.goWhite;
+      });
+      // 象棋红黑子
+      document.querySelectorAll('.chess-red').forEach(piece => {
+        piece.style.background = theme.pieceColor.chessRed;
+      });
+      document.querySelectorAll('.chess-black').forEach(piece => {
+        piece.style.background = theme.pieceColor.chessBlack;
+      });
+
+      // 重新渲染主题列表，更新选中状态
+      showThemeModal();
+    }
+
+    window.applyTheme = applyTheme;
+
+    // 初始化时加载默认主题
+    document.addEventListener('DOMContentLoaded', () => {
+      applyTheme(currentTheme);
+
+      if (lucyBg) {
+        let lastScrollY = 0;
+        let ticking = false;
+
+        const updateLucyBg = () => {
+          const y = lastScrollY || window.scrollY || window.pageYOffset || 0;
+          const offset = Math.min(y * 0.12, 60);
+          lucyBg.style.transform = `translateY(${offset * -1}px)`;
+          ticking = false;
+        };
+
+        window.addEventListener('scroll', () => {
+          lastScrollY = window.scrollY || window.pageYOffset || 0;
+          if (!ticking) {
+            window.requestAnimationFrame(updateLucyBg);
+            ticking = true;
+          }
+        });
+      }
+    });
+
     // ========== 页面清理 ==========
     window.onunload = () => {
       if (gameState.gameTimer) clearInterval(gameState.gameTimer);
@@ -5356,6 +6043,36 @@
         <button id="confirm-no"
           style="padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">拒绝</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 挑战请求模态框 -->
+  <div id="challenge-modal"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 9999;">
+    <div
+      style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 20px rgba(0, 0, 0, 0.3); text-align: center;">
+      <h3 id="challenge-title" style="margin-top: 0; color: #333;">收到挑战请求！</h3>
+      <p id="challenge-message" style="font-size: 18px; margin: 20px 0; color: #666;"></p>
+      <div style="display: flex; gap: 15px; justify-content: center;">
+        <button id="challenge-accept"
+          style="padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">接受</button>
+        <button id="challenge-reject"
+          style="padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">拒绝</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主题选择模态框 -->
+  <div id="theme-modal"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 9999;">
+    <div
+      style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 20px rgba(0, 0, 0, 0.3); text-align: center; max-width: 600px; width: 90%;">
+      <h3 style="margin-top: 0; color: #333;">选择主题</h3>
+      <div id="theme-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 20px;">
+        <!-- 主题选项将在这里动态加载 -->
+      </div>
+      <button onclick="hideThemeModal()"
+        style="margin-top: 20px; padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">关闭</button>
     </div>
   </div>
 

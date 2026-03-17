@@ -247,6 +247,16 @@ io.on('connection', (socket) => {
     }
   });
 
+  // 挑战请求
+  socket.on('challenge_request', (data) => {
+    gameManager.handleChallengeRequest(socket.id, data, io);
+  });
+
+  // 挑战响应
+  socket.on('challenge_response', (data) => {
+    gameManager.handleChallengeResponse(socket.id, data, io);
+  });
+
   // 取消匹配
   socket.on('cancel_match', () => {
     gameManager.handleCancelMatch(socket.id, io);

@@ -11,6 +11,7 @@ class GameManager {
     this.achievementManager = achievementManager;
     this.aiManager = aiManager;
     this.waitingUsers = new Map(); // gameType -> Set(userId)
+    this.challengeRequests = new Map(); // challengerId -> { challengedId, gameType, timestamp }
     this.games = new Map(); // gameId -> game对象
     this.spectators = new Map(); // gameId -> Set(userId)
     this.gameTimers = new Map(); // gameId -> timer
@@ -93,6 +94,124 @@ class GameManager {
     }
 
     return false;
+  }
+
+  // 处理挑战请求
+  handleChallengeRequest(socketId, data, io) {
+    const challenger = this.userManager.getUserBySocketId(socketId);
+    if (!challenger) {
+      io.to(socketId).emit('error', { message: '挑战失败：您的用户状态异常' });
+      return;
+    }
+
+    const { to: challengedUserId, game: gameType } = data;
+    const challenged = this.userManager.getUserByUserId(challengedUserId);
+
+    if (!challenged) {
+      io.to(socketId).emit('error', { message: '挑战失败：对方不在线或用户不存在' });
+      return;
+    }
+
+    if (challenger.userId === challenged.userId) {
+      io.to(socketId).emit('error', { message: '挑战失败：不能挑战自己' });
+      return;
+    }
+
+    if (challenger.status !== 'online' || challenged.status !== 'online') {
+      io.to(socketId).emit('error', { message: '挑战失败：您或对方正在游戏中或匹配中' });
+      return;
+    }
+
+    if (!Object.values(config.game.types).includes(gameType)) {
+      io.to(socketId).emit('error', { message: '挑战失败：无效的游戏类型' });
+      return;
+    }
+
+    // 检查是否已有待处理的挑战
+    if (this.challengeRequests.has(challenger.userId)) {
+      io.to(socketId).emit('error', { message: '您已发起一个挑战，请等待回应' });
+      return;
+    }
+    // 检查对方是否已发起挑战
+    if (this.challengeRequests.has(challenged.userId) && this.challengeRequests.get(challenged.userId).challengedId === challenger.userId) {
+      io.to(socketId).emit('error', { message: '对方已向您发起挑战，请先回应' });
+      return;
+    }
+
+
+    // 存储挑战请求
+    this.challengeRequests.set(challenger.userId, {
+      challengedId: challenged.userId,
+      gameType,
+      timestamp: Date.now()
+    });
+
+    // 通知被挑战者
+    const challengedSocket = this.userManager.getSocketByUserId(challenged.userId);
+    if (challengedSocket) {
+      challengedSocket.emit('challenge_received', {
+        from: challenger.userId,
+        fromNickname: challenger.nickname,
+        game: gameType,
+        timestamp: Date.now()
+      });
+      io.to(socketId).emit('challenge_sent', { success: true, message: `已向 ${challenged.nickname} 发起挑战` });
+      logger.info('挑战请求已发送', { challenger: challenger.userId, challenged: challenged.userId, gameType });
+    } else {
+      io.to(socketId).emit('error', { message: '挑战失败：对方已离线' });
+      this.challengeRequests.delete(challenger.userId); // 清理请求
+    }
+  }
+
+  // 处理挑战响应
+  handleChallengeResponse(socketId, data, io) {
+    const challenged = this.userManager.getUserBySocketId(socketId);
+    if (!challenged) {
+      io.to(socketId).emit('error', { message: '响应失败：您的用户状态异常' });
+      return;
+    }
+
+    const { from: challengerId, accept } = data;
+    const challenger = this.userManager.getUserByUserId(challengerId);
+
+    if (!challenger) {
+      io.to(socketId).emit('error', { message: '响应失败：挑战者已离线' });
+      return;
+    }
+
+    const challenge = this.challengeRequests.get(challenger.userId);
+
+    if (!challenge || challenge.challengedId !== challenged.userId) {
+      io.to(socketId).emit('error', { message: '响应失败：挑战请求不存在或已过期' });
+      return;
+    }
+
+    // 移除挑战请求
+    this.challengeRequests.delete(challenger.userId);
+
+    if (accept) {
+      // 检查双方状态是否仍然在线
+      if (challenger.status !== 'online' || challenged.status !== 'online') {
+        io.to(challenger.socketId).emit('error', { message: '挑战失败：您或对方已不在在线状态' });
+        io.to(challenged.socketId).emit('error', { message: '挑战失败：您或对方已不在在线状态' });
+        return;
+      }
+
+      // 创建游戏
+      this.createGame(challenger.userId, challenged.userId, challenge.gameType, io);
+      io.to(challenged.socketId).emit('challenge_accepted', { from: challenger.userId, fromNickname: challenger.nickname, game: challenge.gameType });
+      io.to(challenger.socketId).emit('challenge_accepted', { to: challenged.userId, toNickname: challenged.nickname, game: challenge.gameType });
+      logger.info('挑战已接受，游戏开始', { challenger: challenger.userId, challenged: challenged.userId, gameType: challenge.gameType });
+    } else {
+      // 通知挑战者被拒绝
+      io.to(challenger.socketId).emit('challenge_rejected', {
+        from: challenged.userId,
+        fromNickname: challenged.nickname,
+        game: challenge.gameType
+      });
+      io.to(challenged.socketId).emit('challenge_rejected', { success: true, message: `已拒绝 ${challenger.nickname} 的挑战` });
+      logger.info('挑战已拒绝', { challenger: challenger.userId, challenged: challenged.userId, gameType: challenge.gameType });
+    }
   }
 
   // 检查匹配
