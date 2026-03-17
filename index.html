@@ -614,16 +614,44 @@
 
     .gobang-board {
       display: grid;
-      grid-template-columns: repeat(15, 32px);
-      gap: 1px;
-      background: #bb9a7b;
-      padding: 5px;
-      border-radius: 8px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-      border: 3px solid #9a7b60;
+      grid-template-columns: repeat(15, 36px);
+      grid-template-rows: repeat(15, 36px);
+      gap: 0;
+      background: linear-gradient(135deg, #e8c49a 0%, #d4a76a 50%, #c4956a 100%);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.3);
+      border: 4px solid #8b6914;
       transform: translateZ(0);
       will-change: contents;
       display: none;
+      position: relative;
+    }
+    
+    .gobang-board::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image: 
+        repeating-linear-gradient(90deg, transparent, transparent 35px, rgba(0,0,0,0.3) 35px, rgba(0,0,0,0.3) 36px),
+        repeating-linear-gradient(0deg, transparent, transparent 35px, rgba(0,0,0,0.3) 35px, rgba(0,0,0,0.3) 36px);
+      pointer-events: none;
+      z-index: 1;
+    }
+    
+    .gobang-board::after {
+      content: '';
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      right: 20px;
+      bottom: 20px;
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.1) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 2;
     }
 
     .gobang-board.cyberpunk-gobang {
@@ -635,261 +663,421 @@
       animation: neon-pulse 2.4s ease-in-out infinite;
     }
 
+    .gobang-board.cyberpunk-gobang::before {
+      background-image: 
+        repeating-linear-gradient(90deg, transparent, transparent 35px, rgba(0, 212, 255, 0.4) 35px, rgba(0, 212, 255, 0.4) 36px),
+        repeating-linear-gradient(0deg, transparent, transparent 35px, rgba(0, 212, 255, 0.4) 35px, rgba(0, 212, 255, 0.4) 36px);
+    }
+
     .gobang-board.cyberpunk-gobang .gobang-cell::after,
     .gobang-board.cyberpunk-gobang .gobang-cell::before {
       background: rgba(0, 255, 255, 0.3);
     }
 
     .gobang-cell {
-      width: 32px;
-      height: 32px;
+      width: 36px;
+      height: 36px;
       background: transparent;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      transition: background 0.1s;
+      transition: all 0.15s;
       position: relative;
       pointer-events: auto;
-    }
-
-    .gobang-cell::after {
-      content: "";
-      position: absolute;
-      width: 1px;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.1);
-      left: 0;
-      top: 0;
-      pointer-events: none;
-    }
-
-    .gobang-cell::before {
-      content: "";
-      position: absolute;
-      width: 100%;
-      height: 1px;
-      background: rgba(0, 0, 0, 0.1);
-      left: 0;
-      top: 0;
-      pointer-events: none;
+      z-index: 3;
     }
 
     .gobang-cell:hover {
-      background: rgba(255, 255, 255, 0.25);
+      background: rgba(255, 255, 255, 0.15);
+      transform: scale(1.05);
+    }
+    
+    .gobang-cell.last-move::before {
+      content: '';
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      background: radial-gradient(circle, rgba(0, 123, 255, 0.4) 0%, transparent 70%);
+      border-radius: 50%;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.8; }
+      50% { transform: scale(1.2); opacity: 0.4; }
     }
 
     .gobang-black,
     .gobang-white {
-      width: 26px;
-      height: 26px;
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
       transform: translateZ(0);
       will-change: transform;
+      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      animation: stoneDrop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    
+    @keyframes stoneDrop {
+      0% { transform: scale(1.3); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
     }
 
     .gobang-black {
-      background: radial-gradient(circle at 30% 30%, #333, #000);
-      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3), inset 0 2px 2px rgba(255, 255, 255, 0.1);
+      background: radial-gradient(circle at 35% 35%, #4a4a4a 0%, #1a1a1a 60%, #000000 100%);
+      box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.5),
+        inset 0 2px 4px rgba(255, 255, 255, 0.15),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.3);
     }
 
     .gobang-white {
-      background: radial-gradient(circle at 30% 30%, #fff, #e0e0e0);
-      border: 1px solid #ddd;
-      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1), inset 0 2px 2px rgba(0, 0, 0, 0.05);
+      background: radial-gradient(circle at 35% 35%, #ffffff 0%, #f0f0f0 60%, #d0d0d0 100%);
+      border: 1px solid #c0c0c0;
+      box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.3),
+        inset 0 2px 4px rgba(255, 255, 255, 0.8),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.1);
     }
 
     /* 围棋棋盘样式 */
     .go-board {
       display: grid;
-      grid-template-columns: repeat(19, 30px);
+      grid-template-columns: repeat(19, 34px);
+      grid-template-rows: repeat(19, 34px);
       gap: 0;
-      background: #d4a76a;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-      border: 3px solid #8b4513;
+      background: linear-gradient(135deg, #e5c085 0%, #d4a76a 50%, #c4955a 100%);
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.3);
+      border: 4px solid #8b6914;
       transform: translateZ(0);
       will-change: contents;
       display: none;
-      /* 默认隐藏 */
+      position: relative;
+    }
+    
+    .go-board::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image: 
+        repeating-linear-gradient(90deg, transparent, transparent 33px, rgba(0,0,0,0.4) 33px, rgba(0,0,0,0.4) 34px),
+        repeating-linear-gradient(0deg, transparent, transparent 33px, rgba(0,0,0,0.4) 33px, rgba(0,0,0,0.4) 34px);
+      pointer-events: none;
+      z-index: 1;
+    }
+    
+    .go-board::after {
+      content: '';
+      position: absolute;
+      top: 24px;
+      left: 24px;
+      right: 24px;
+      bottom: 24px;
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.08) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 2;
     }
 
     .go-cell {
-      width: 30px;
-      height: 30px;
+      width: 34px;
+      height: 34px;
       background: transparent;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      transition: background 0.1s;
+      transition: all 0.15s;
       position: relative;
       pointer-events: auto;
-    }
-
-    .go-cell::after {
-      content: "";
-      position: absolute;
-      width: 1px;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.3);
-      left: 50%;
-      top: 0;
-      pointer-events: none;
-    }
-
-    .go-cell::before {
-      content: "";
-      position: absolute;
-      width: 100%;
-      height: 1px;
-      background: rgba(0, 0, 0, 0.3);
-      left: 0;
-      top: 50%;
-      pointer-events: none;
+      z-index: 3;
     }
 
     .go-cell:hover {
-      background: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.15);
+      transform: scale(1.05);
+    }
+    
+    .go-cell.last-move::before {
+      content: '';
+      position: absolute;
+      width: 38px;
+      height: 38px;
+      background: radial-gradient(circle, rgba(255, 0, 0, 0.5) 0%, transparent 70%);
+      border-radius: 50%;
+      animation: pulse 1.5s ease-in-out infinite;
+      z-index: 10;
     }
 
     .go-black,
     .go-white {
-      width: 24px;
-      height: 24px;
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
       transform: translateZ(0);
       will-change: transform;
       position: relative;
-      z-index: 1;
+      z-index: 4;
+      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      animation: stoneDrop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
 
     .go-black {
-      background: radial-gradient(circle at 30% 30%, #333, #000);
-      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4), inset 0 2px 2px rgba(255, 255, 255, 0.1);
+      background: radial-gradient(circle at 35% 35%, #3a3a3a 0%, #1a1a1a 60%, #000000 100%);
+      box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.5),
+        inset 0 2px 4px rgba(255, 255, 255, 0.12),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.35);
     }
 
     .go-white {
-      background: radial-gradient(circle at 30% 30%, #fff, #e0e0e0);
-      border: 1px solid #ddd;
-      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2), inset 0 2px 2px rgba(0, 0, 0, 0.05);
+      background: radial-gradient(circle at 35% 35%, #ffffff 0%, #f5f5f5 60%, #e0e0e0 100%);
+      border: 1px solid #c0c0c0;
+      box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.35),
+        inset 0 2px 4px rgba(255, 255, 255, 0.9),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.08);
     }
 
     .go-star {
-      width: 6px;
-      height: 6px;
-      background: #000;
+      width: 8px;
+      height: 8px;
+      background: radial-gradient(circle at 30% 30%, #1a1a1a 0%, #000000 100%);
       border-radius: 50%;
       position: absolute;
       z-index: 2;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     }
 
     /* 象棋棋盘样式 */
     .chess-board {
-      width: 360px;
-      height: 400px;
-      background: #f0d9b5;
-      padding: 10px;
-      border-radius: 8px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-      border: 3px solid #8b4513;
+      width: 400px;
+      height: 450px;
+      background: linear-gradient(135deg, #f5d9a8 0%, #e8c488 50%, #d4b06a 100%);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.3);
+      border: 4px solid #8b6914;
       transform: translateZ(0);
       will-change: contents;
       display: none;
-      /* 默认隐藏 */
       position: relative;
-      background-image:
-        linear-gradient(rgba(0, 0, 0, 0.3) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 0, 0, 0.3) 1px, transparent 1px);
-      background-size: 40px 40px;
-      background-position: 0px 0px;
+    }
+    
+    .chess-board::before {
+      content: '';
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      right: 20px;
+      bottom: 20px;
+      background-image: 
+        repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(0,0,0,0.35) 39px, rgba(0,0,0,0.35) 40px),
+        repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(0,0,0,0.35) 39px, rgba(0,0,0,0.35) 40px);
+      pointer-events: none;
+      z-index: 1;
+    }
+    
+    .chess-board::after {
+      content: '';
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      right: 20px;
+      bottom: 20px;
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.08) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 2;
     }
 
     .chess-intersection {
-      width: 20px;
-      height: 20px;
+      width: 40px;
+      height: 40px;
       position: absolute;
       transform: translate(-50%, -50%);
       cursor: pointer;
-      transition: background 0.1s;
-      z-index: 1;
+      transition: all 0.15s;
+      z-index: 3;
     }
 
     .chess-intersection:hover {
-      background: rgba(255, 255, 255, 0.3);
+      background: rgba(255, 255, 255, 0.2);
+      transform: translate(-50%, -50%) scale(1.1);
       border-radius: 50%;
+    }
+    
+    .chess-intersection.last-move::before {
+      content: '';
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      background: radial-gradient(circle, rgba(255, 0, 0, 0.5) 0%, transparent 70%);
+      border-radius: 50%;
+      animation: pulse 1.5s ease-in-out infinite;
+      z-index: 10;
     }
 
     .chess-piece {
-      width: 36px;
-      height: 36px;
+      width: 38px;
+      height: 38px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: bold;
-      font-size: 18px;
+      font-size: 20px;
       transform: translateZ(0);
       will-change: transform;
       cursor: grab;
       position: absolute;
-      z-index: 3;
-      transition: all 0.2s;
-      border: 2px solid rgba(255, 255, 255, 0.3);
+      z-index: 10;
+      transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      box-shadow: 
+        0 3px 10px rgba(0, 0, 0, 0.3),
+        inset 0 2px 4px rgba(255, 255, 255, 0.3),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.2);
+      animation: piecePlace 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    
+    @keyframes piecePlace {
+      0% { transform: scale(1.3); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
     }
 
     .chess-piece:active {
       cursor: grabbing;
-      transform: scale(1.1);
-      z-index: 10;
+      transform: scale(1.15);
+      z-index: 20;
+    }
+    
+    .chess-piece.selected {
+      transform: scale(1.2);
+      box-shadow: 
+        0 6px 16px rgba(0, 123, 255, 0.5),
+        0 0 20px rgba(0, 123, 255, 0.3),
+        inset 0 2px 4px rgba(255, 255, 255, 0.4);
+      z-index: 15;
     }
 
     .chess-red {
-      background: radial-gradient(circle at 30% 30%, #ff6b6b, #c0392b);
+      background: radial-gradient(circle at 35% 35%, #ff7b7b 0%, #e04848 50%, #c0392b 100%);
       color: white;
-      box-shadow: 0 3px 8px rgba(220, 53, 69, 0.4), inset 0 2px 2px rgba(255, 255, 255, 0.2);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
     }
 
     .chess-black {
-      background: radial-gradient(circle at 30% 30%, #34495e, #2c3e50);
+      background: radial-gradient(circle at 35% 35%, #5d6d7e 0%, #3d4c53 50%, #2c3e50 100%);
       color: white;
-      box-shadow: 0 3px 8px rgba(44, 62, 80, 0.4), inset 0 2px 2px rgba(255, 255, 255, 0.1);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
     }
 
     .chess-river {
       position: absolute;
-      top: 45%;
-      left: 0;
-      right: 0;
-      height: 80px;
-      background: linear-gradient(90deg, transparent 20%, rgba(52, 152, 219, 0.1) 20%, rgba(52, 152, 219, 0.1) 80%, transparent 80%);
+      top: 42%;
+      left: 20px;
+      right: 20px;
+      height: 90px;
+      background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(52, 152, 219, 0.08) 10%, 
+        rgba(52, 152, 219, 0.12) 50%, 
+        rgba(52, 152, 219, 0.08) 90%, 
+        transparent 100%);
       display: flex;
       align-items: center;
-      justify-content: center;
-      font-size: 16px;
+      justify-content: space-around;
+      font-size: 20px;
       color: #2c3e50;
       pointer-events: none;
       z-index: 2;
       font-weight: bold;
+      font-family: "KaiTi", "楷体", serif;
+    }
+    
+    .chess-river::before {
+      content: '楚 河';
+      opacity: 0.6;
+    }
+    
+    .chess-river::after {
+      content: '汉 界';
+      opacity: 0.6;
     }
 
     .chess-palace {
       position: absolute;
       width: 120px;
       height: 120px;
-      border: 2px solid rgba(0, 0, 0, 0.3);
+      border: 2px solid rgba(0, 0, 0, 0.35);
       pointer-events: none;
       z-index: 2;
+    }
+    
+    .chess-palace-top {
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-bottom: none;
+    }
+    
+    .chess-palace-bottom {
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-top: none;
+    }
+    
+    .chess-palace::before,
+    .chess-palace::after {
+      content: '';
+      position: absolute;
+      width: 2px;
+      height: 85px;
+      background: rgba(0, 0, 0, 0.35);
+    }
+    
+    .chess-palace-top::before {
+      top: 0;
+      left: 40px;
+      transform: rotate(45deg);
+      transform-origin: top left;
+    }
+    
+    .chess-palace-top::after {
+      top: 0;
+      right: 40px;
+      transform: rotate(-45deg);
+      transform-origin: top right;
+    }
+    
+    .chess-palace-bottom::before {
+      bottom: 0;
+      left: 40px;
+      transform: rotate(-45deg);
+      transform-origin: bottom left;
+    }
+    
+    .chess-palace-bottom::after {
+      bottom: 0;
+      right: 40px;
+      transform: rotate(45deg);
+      transform-origin: bottom right;
     }
 
     .chess-position {
       width: 8px;
       height: 8px;
-      background: #000;
+      background: radial-gradient(circle at 30% 30%, #1a1a1a 0%, #000000 100%);
       border-radius: 50%;
       position: absolute;
       z-index: 2;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
     }
 
     /* 胜利提示 */
@@ -3023,6 +3211,9 @@
         isOpponent: false
       });
       gameState.moveTimestamps.push(Date.now());
+      
+      // 记录最新移动
+      gameState.lastMove = { r: r, c: c, color: gameState.me };
 
       if (gameState.me === 1) {
         gameState.blackCount++;
@@ -3153,6 +3344,9 @@
         isOpponent: false
       });
       gameState.moveTimestamps.push(Date.now());
+      
+      // 记录最新移动
+      gameState.lastMove = { r: r, c: c, color: gameState.me };
 
       if (gameState.me === 1) {
         gameState.blackCount++;
@@ -3195,6 +3389,12 @@
       // 围棋通常通过领地判定胜负，这里简化处理
       if (checkGoWin()) {
         gameState.gameOver = true;
+        
+        // 显示点目结果
+        setTimeout(() => {
+          showGameResult();
+        }, 500);
+        
         const winMsg = gameState.me === 1 ? '黑棋获胜！' : '白棋获胜！';
         const winColor = gameState.me === 1 ? '黑棋' : '白棋';
         winnerEl.textContent = winColor;
@@ -3212,53 +3412,210 @@
       }
     }
 
+    // 围棋提子逻辑（完善版）
     function removeCapturedStones(color) {
-      // 简化的提子逻辑
+      const capturedStones = [];
+      
+      // 检查对手的棋子是否有气
       for (let r = 0; r < gameConfigs.go.size; r++) {
         for (let c = 0; c < gameConfigs.go.size; c++) {
-          if (gameState.board[r][c] === color && !hasLiberty(r, c, color)) {
-            gameState.board[r][c] = 0;
-            if (color === 1) {
-              gameState.blackCount--;
-            } else {
-              gameState.whiteCount--;
+          if (gameState.board[r][c] === color) {
+            // 检查这个棋子所在的一块棋是否有气
+            const group = getGoGroup(r, c, color);
+            if (!hasGroupLiberty(group)) {
+              // 整块棋都被提走
+              group.forEach(stone => {
+                if (!capturedStones.some(s => s.r === stone.r && s.c === stone.c)) {
+                  capturedStones.push(stone);
+                }
+              });
             }
           }
         }
       }
+      
+      // 移除被提的棋子
+      capturedStones.forEach(stone => {
+        gameState.board[stone.r][stone.c] = 0;
+        if (stone.color === 1) {
+          gameState.blackCount--;
+        } else {
+          gameState.whiteCount--;
+        }
+      });
+      
+      return capturedStones.length;
     }
-
-    function hasLiberty(r, c, color) {
-      const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+    
+    // 获取围棋棋子所在的整块
+    function getGoGroup(startR, startC, color) {
+      const group = [];
       const visited = new Set();
-
-      function dfs(r, c) {
+      const stack = [{r: startR, c: startC}];
+      
+      while (stack.length > 0) {
+        const {r, c} = stack.pop();
         const key = `${r},${c}`;
-        if (visited.has(key)) return false;
+        
+        if (visited.has(key)) continue;
         visited.add(key);
-
-        for (let [dr, dc] of directions) {
+        group.push({r, c, color});
+        
+        // 检查四个方向
+        const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+        for (const [dr, dc] of directions) {
           const nr = r + dr;
           const nc = c + dc;
-          if (nr < 0 || nr >= gameConfigs.go.size || nc < 0 || nc >= gameConfigs.go.size) continue;
-
-          if (gameState.board[nr][nc] === 0) return true;
-          if (gameState.board[nr][nc] === color && dfs(nr, nc)) return true;
+          
+          if (nr >= 0 && nr < gameConfigs.go.size && nc >= 0 && nc < gameConfigs.go.size) {
+            if (gameState.board[nr][nc] === color) {
+              stack.push({r: nr, c: nc});
+            }
+          }
         }
-
-        return false;
       }
+      
+      return group;
+    }
+    
+    // 检查整块棋是否有气
+    function hasGroupLiberty(group) {
+      const checked = new Set();
+      
+      for (const stone of group) {
+        const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+        for (const [dr, dc] of directions) {
+          const nr = stone.r + dr;
+          const nc = stone.c + dc;
+          const key = `${nr},${nc}`;
+          
+          if (checked.has(key)) continue;
+          checked.add(key);
+          
+          if (nr >= 0 && nr < gameConfigs.go.size && nc >= 0 && nc < gameConfigs.go.size) {
+            if (gameState.board[nr][nc] === 0) {
+              return true; // 找到气
+            }
+          }
+        }
+      }
+      
+      return false; // 没有气
+    }
 
-      return dfs(r, c);
+    // 检查是否打劫
+    function isKo(r, c, color) {
+      // 简化的打劫检测：检查是否会导致重复局面
+      // 实际实现需要记录所有历史局面
+      if (!gameState.moveLog || gameState.moveLog.length < 2) return false;
+      
+      const lastMove = gameState.moveLog[gameState.moveLog.length - 1];
+      const prevMove = gameState.moveLog[gameState.moveLog.length - 2];
+      
+      // 如果刚提了一子，且立即回提，可能是打劫
+      if (lastMove.r === r && lastMove.c === c) return false;
+      
+      return false;
     }
 
     function checkGoWin() {
-      // 简化的胜负判定，实际围棋需要数子
+      // 围棋胜负判定：数子法
       const totalCells = gameConfigs.go.totalCells;
       const filledCells = gameState.blackCount + gameState.whiteCount;
-
-      // 当棋盘填满时，子多的一方获胜
-      return filledCells > totalCells * 0.9;
+      
+      // 当双方都 pass 或者棋盘基本填满时结束
+      if (filledCells >= totalCells * 0.95) {
+        return true;
+      }
+      
+      // 检查是否还有合法移动
+      if (!hasValidGoMove(1) || !hasValidGoMove(2)) {
+        return true;
+      }
+      
+      return false;
+    }
+    
+    // 检查是否还有合法移动
+    function hasValidGoMove(color) {
+      for (let r = 0; r < gameConfigs.go.size; r++) {
+        for (let c = 0; c < gameConfigs.go.size; c++) {
+          if (gameState.board[r][c] === 0) {
+            // 检查这个位置是否可以落子（有气或能提子）
+            gameState.board[r][c] = color;
+            const hasLib = hasLiberty(r, c, color);
+            const canCapture = removeCapturedStones(3 - color) > 0;
+            gameState.board[r][c] = 0;
+            
+            if (hasLib || canCapture) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    }
+    
+    // 围棋点目（简化版）
+    function countGoScore() {
+      let blackScore = gameState.blackCount;
+      let whiteScore = gameState.whiteCount + 7.5; // 贴目
+      
+      // 计算空地归属
+      const visited = new Set();
+      
+      for (let r = 0; r < gameConfigs.go.size; r++) {
+        for (let c = 0; c < gameConfigs.go.size; c++) {
+          if (gameState.board[r][c] === 0 && !visited.has(`${r},${c}`)) {
+            const territory = getGoTerritory(r, c);
+            territory.visited.forEach(key => visited.add(key));
+            
+            if (territory.blackBorder && !territory.whiteBorder) {
+              blackScore += territory.emptyCount;
+            } else if (territory.whiteBorder && !territory.blackBorder) {
+              whiteScore += territory.emptyCount;
+            }
+          }
+        }
+      }
+      
+      return { black: blackScore, white: whiteScore };
+    }
+    
+    // 获取空地归属
+    function getGoTerritory(startR, startC) {
+      const visited = new Set();
+      let emptyCount = 0;
+      let blackBorder = false;
+      let whiteBorder = false;
+      const stack = [{r: startR, c: startC}];
+      
+      while (stack.length > 0) {
+        const {r, c} = stack.pop();
+        const key = `${r},${c}`;
+        
+        if (visited.has(key)) continue;
+        visited.add(key);
+        emptyCount++;
+        
+        const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+        for (const [dr, dc] of directions) {
+          const nr = r + dr;
+          const nc = c + dc;
+          
+          if (nr >= 0 && nr < gameConfigs.go.size && nc >= 0 && nc < gameConfigs.go.size) {
+            if (gameState.board[nr][nc] === 0) {
+              stack.push({r: nr, c: nc});
+            } else if (gameState.board[nr][nc] === 1) {
+              blackBorder = true;
+            } else if (gameState.board[nr][nc] === 2) {
+              whiteBorder = true;
+            }
+          }
+        }
+      }
+      
+      return { visited, emptyCount, blackBorder, whiteBorder };
     }
 
     // ========== 象棋逻辑 ==========
@@ -3299,16 +3656,16 @@
       clearChessSelection();
 
       gameState.selectedPiece = piece;
-      piece.style.boxShadow = '0 0 0 3px #007bff';
+      piece.classList.add('selected');
 
       // 计算有效移动位置
       gameState.validMoves = calculateChessMoves(r, c, piece.dataset.name, piece.dataset.color);
 
       // 显示有效移动位置
       gameState.validMoves.forEach(pos => {
-        const cell = document.querySelector(`.chess-cell[data-r="${pos.r}"][data-c="${pos.c}"]`);
+        const cell = document.querySelector(`.chess-intersection[data-r="${pos.r}"][data-c="${pos.c}"]`);
         if (cell) {
-          cell.style.backgroundColor = 'rgba(0,123,255,0.2)';
+          cell.style.backgroundColor = 'rgba(0,123,255,0.25)';
           cell.style.borderRadius = '50%';
         }
       });
@@ -3316,12 +3673,12 @@
 
     function clearChessSelection() {
       if (gameState.selectedPiece) {
-        gameState.selectedPiece.style.boxShadow = '';
+        gameState.selectedPiece.classList.remove('selected');
         gameState.selectedPiece = null;
       }
 
       // 清除有效移动标记
-      document.querySelectorAll('.chess-cell').forEach(cell => {
+      document.querySelectorAll('.chess-intersection').forEach(cell => {
         cell.style.backgroundColor = '';
         cell.style.borderRadius = '';
       });
@@ -3531,6 +3888,18 @@
       piece.style.top = `${toR * 40 + 20}px`;
       piece.style.left = `${toC * 40 + 20}px`;
       piece.style.transform = 'translate(-50%, -50%)';
+      
+      // 记录最新移动
+      gameState.lastMove = { r: toR, c: toC, color: gameState.turn };
+      
+      // 标记最新移动位置
+      document.querySelectorAll('.chess-intersection.last-move').forEach(cell => {
+        cell.classList.remove('last-move');
+      });
+      const lastMoveCell = document.querySelector(`.chess-intersection[data-r="${toR}"][data-c="${toC}"]`);
+      if (lastMoveCell) {
+        lastMoveCell.classList.add('last-move');
+      }
 
       gameState.moveCount++;
       gameState.moveLog.push({
@@ -3571,29 +3940,33 @@
           timestamp: Date.now()
         });
       } else {
-        // AI对战，处理AI回合
+        // AI 对战，处理 AI 回合
         gameState.turn = 3 - gameState.turn;
         updateTurnDisplay();
-        updateStatus(`📌 你已移动 ${piece.dataset.name} 到 (${toR},${toC})，等待AI回合`);
-        setTimeout(handleAIMove, 1000); // 延迟1秒，让用户有时间反应
+        updateStatus(`📌 你已移动 ${piece.dataset.name} 到 (${toR},${toC})，等待 AI 回合`);
+        setTimeout(handleAIMove, 1000); // 延迟 1 秒，让用户有时间反应
       }
 
-      if (checkChessWin()) {
+      // 检查游戏结束条件
+      const winResult = checkChessWin();
+      if (winResult) {
         gameState.gameOver = true;
-        const winMsg = gameState.turn === 1 ? '红方获胜！' : '绿方获胜！';
-        const winColor = gameState.turn === 1 ? '红方' : '绿方';
+        const winMsg = winResult.winner === 1 ? '红方获胜！' : '绿方获胜！';
+        const winColor = winResult.winner === 1 ? '红方' : '绿方';
         winnerEl.textContent = winColor;
-        winnerEl.className = `info-value ${gameState.turn === 1 ? 'value-red' : 'value-green'}`;
-        gameStatusEl.textContent = '游戏结束';
+        winnerEl.className = `info-value ${winResult.winner === 1 ? 'value-red' : 'value-green'}`;
+        gameStatusEl.textContent = `游戏结束 - ${winResult.reason}`;
         gameStatusEl.className = 'info-value value-waiting';
-        showWinAlert(winMsg);
-        updateStatus(`🏆 ${winMsg} 游戏结束`);
+        showWinAlert(`${winMsg}（${winResult.reason}）`);
+        updateStatus(`🏆 ${winMsg} 游戏结束 - ${winResult.reason}`);
         updateAdvancedStats();
 
-        socket.emit('game_result', {
-          result: 'win',
-          reason: '将帅被吃'
-        });
+        if (socket && socket.connected) {
+          socket.emit('game_result', {
+            result: 'win',
+            reason: winResult.reason
+          });
+        }
       }
     }
 
@@ -3602,7 +3975,93 @@
       const redGeneral = document.querySelector('.chess-piece[data-type="帅"]');
       const blackGeneral = document.querySelector('.chess-piece[data-type="将"]');
 
-      return !redGeneral || !blackGeneral;
+      if (!redGeneral) return { winner: 2, reason: '红帅被吃' };
+      if (!blackGeneral) return { winner: 1, reason: '黑将被吃' };
+
+      // 检查将帅是否对面
+      if (checkGeneralsFacing()) {
+        // 移动后造成对面的是输家
+        return { winner: 3 - gameState.turn, reason: '将帅对面' };
+      }
+
+      // 检查是否困毙（无子可动）
+      if (isStalemate(gameState.turn)) {
+        return { winner: 3 - gameState.turn, reason: '困毙' };
+      }
+
+      return null;
+    }
+    
+    // 检查将帅是否对面
+    function checkGeneralsFacing() {
+      const redGeneral = document.querySelector('.chess-piece[data-type="帅"]');
+      const blackGeneral = document.querySelector('.chess-piece[data-type="将"]');
+      
+      if (!redGeneral || !blackGeneral) return false;
+      
+      const redR = parseInt(redGeneral.dataset.r);
+      const redC = parseInt(redGeneral.dataset.c);
+      const blackR = parseInt(blackGeneral.dataset.r);
+      const blackC = parseInt(blackGeneral.dataset.c);
+      
+      // 不在同一列
+      if (redC !== blackC) return false;
+      
+      // 检查中间是否有棋子
+      const minR = Math.min(redR, blackR);
+      const maxR = Math.max(redR, blackR);
+      
+      for (let r = minR + 1; r < maxR; r++) {
+        if (getChessPieceAt(r, redC)) {
+          return false; // 中间有棋子
+        }
+      }
+      
+      return true; // 将帅对面
+    }
+    
+    // 检查是否困毙
+    function isStalemate(color) {
+      const pieces = document.querySelectorAll(`.chess-piece[data-color="${color === 1 ? 'red' : 'black'}"]`);
+      
+      for (const piece of pieces) {
+        const r = parseInt(piece.dataset.r);
+        const c = parseInt(piece.dataset.c);
+        const type = piece.dataset.name;
+        
+        const moves = calculateChessMoves(r, c, type, color.toString());
+        if (moves.length > 0) {
+          return false; // 有合法移动
+        }
+      }
+      
+      return true; // 困毙
+    }
+    
+    // 检查移动后是否造成将帅对面
+    function wouldCauseFacing(fromR, fromC, toR, toC) {
+      // 临时移动棋子
+      const piece = getChessPieceAt(fromR, fromC);
+      if (!piece) return false;
+      
+      const originalR = piece.dataset.r;
+      const originalC = piece.dataset.c;
+      
+      // 执行临时移动
+      piece.dataset.r = toR;
+      piece.dataset.c = toC;
+      piece.style.top = `${toR * 40 + 4}px`;
+      piece.style.left = `${toC * 40 + 4}px`;
+      
+      const facing = checkGeneralsFacing();
+      
+      // 恢复原位
+      piece.dataset.r = originalR;
+      piece.dataset.c = originalC;
+      piece.style.top = `${originalR * 40 + 4}px`;
+      piece.style.left = `${originalC * 40 + 4}px`;
+      
+      return facing;
     }
 
     // ========== 通信和消息处理 ==========
@@ -3757,6 +4216,11 @@
     function renderGobangBoard() {
       const config = gameConfigs.gobang;
       const cells = document.querySelectorAll(`.${config.cellClass}`);
+      
+      // 移除所有 last-move 标记
+      document.querySelectorAll('.gobang-cell.last-move').forEach(cell => {
+        cell.classList.remove('last-move');
+      });
 
       cells.forEach((cell, index) => {
         const r = Math.floor(index / config.size);
@@ -3768,12 +4232,22 @@
         if (currentContent !== newContent) {
           cell.innerHTML = newContent;
         }
+        
+        // 标记最新落子位置
+        if (gameState.lastMove && gameState.lastMove.r === r && gameState.lastMove.c === c) {
+          cell.classList.add('last-move');
+        }
       });
     }
 
     function renderGoBoard() {
       const config = gameConfigs.go;
       const cells = document.querySelectorAll(`.${config.cellClass}`);
+      
+      // 移除所有 last-move 标记
+      document.querySelectorAll('.go-cell.last-move').forEach(cell => {
+        cell.classList.remove('last-move');
+      });
 
       cells.forEach((cell, index) => {
         const r = Math.floor(index / config.size);
@@ -3789,6 +4263,11 @@
           const piece = document.createElement('div');
           piece.className = newColor === 1 ? config.pieceClasses[0] : config.pieceClasses[1];
           cell.appendChild(piece);
+        }
+        
+        // 标记最新落子位置
+        if (gameState.lastMove && gameState.lastMove.r === r && gameState.lastMove.c === c) {
+          cell.classList.add('last-move');
         }
       });
     }
@@ -4523,29 +5002,43 @@
     function handleAIMove() {
       if (!gameState.difficulty || gameState.turn === gameState.me || gameState.gameOver) return;
 
-      const difficulty = gameState.difficulty;
-      const gameType = currentGame;
-      let move = null;
+      // 显示AI思考状态
+      updateStatus('🤖 AI正在思考中...');
 
-      // 根据难度和棋种生成AI落子
-      if (difficulty === 'easy') {
-        move = generateRandomMove();
-      } else if (difficulty === 'medium') {
-        move = generateMediumMove();
-      } else if (difficulty === 'hard') {
-        move = generateHardMove();
-      }
+      // 根据难度设置思考延迟时间
+      const thinkDelay = {
+        easy: 300,
+        medium: 600,
+        hard: 1000
+      };
 
-      if (move) {
-        // 执行AI落子
-        if (gameType === 'gobang') {
-          handleGobangAIMove(move.r, move.c);
-        } else if (gameType === 'go') {
-          handleGoAIMove(move.r, move.c);
-        } else if (gameType === 'chess') {
-          handleChessAIMove(move.fromR, move.fromC, move.toR, move.toC);
+      const delay = thinkDelay[gameState.difficulty] || 500;
+
+      setTimeout(() => {
+        const difficulty = gameState.difficulty;
+        const gameType = currentGame;
+        let move = null;
+
+        // 根据难度和棋种生成AI落子
+        if (difficulty === 'easy') {
+          move = generateRandomMove();
+        } else if (difficulty === 'medium') {
+          move = generateMediumMove();
+        } else if (difficulty === 'hard') {
+          move = generateHardMove();
         }
-      }
+
+        if (move) {
+          // 执行AI落子
+          if (gameType === 'gobang') {
+            handleGobangAIMove(move.r, move.c);
+          } else if (gameType === 'go') {
+            handleGoAIMove(move.r, move.c);
+          } else if (gameType === 'chess') {
+            handleChessAIMove(move.fromR, move.fromC, move.toR, move.toC);
+          }
+        }
+      }, delay);
     }
 
     // 生成随机落子（简单难度）
@@ -4585,14 +5078,494 @@
 
     // 生成中等难度落子
     function generateMediumMove() {
-      // 中等难度：优先攻击和防守
-      return generateRandomMove(); // 暂时使用随机落子，后续可以优化
+      if (currentGame === 'gobang') {
+        return generateGobangMediumMove();
+      } else if (currentGame === 'go') {
+        return generateGoMediumMove();
+      } else if (currentGame === 'chess') {
+        return generateChessMediumMove();
+      }
+      return generateRandomMove();
     }
 
     // 生成困难难度落子
     function generateHardMove() {
-      // 困难难度：使用算法计算最优落子
-      return generateRandomMove(); // 暂时使用随机落子，后续可以优化
+      if (currentGame === 'gobang') {
+        return generateGobangHardMove();
+      } else if (currentGame === 'go') {
+        return generateGoHardMove();
+      } else if (currentGame === 'chess') {
+        return generateChessHardMove();
+      }
+      return generateRandomMove();
+    }
+
+    // ========== 五子棋AI算法 ==========
+    
+    // 五子棋中等难度：基于规则的AI
+    function generateGobangMediumMove() {
+      const aiPlayer = gameState.turn;
+      const humanPlayer = 3 - aiPlayer;
+      
+      // 1. 检查是否可以赢
+      const winningMove = findGobangWinningMove(aiPlayer);
+      if (winningMove) return winningMove;
+      
+      // 2. 检查是否需要防守（对手即将获胜）
+      const defensiveMove = findGobangWinningMove(humanPlayer);
+      if (defensiveMove) return defensiveMove;
+      
+      // 3. 检查是否可以形成活四
+      const liveFourMove = findGobangPattern(aiPlayer, 'liveFour');
+      if (liveFourMove) return liveFourMove;
+      
+      // 4. 防守对手的活四
+      const blockLiveFour = findGobangPattern(humanPlayer, 'liveFour');
+      if (blockLiveFour) return blockLiveFour;
+      
+      // 5. 检查是否可以形成活三
+      const liveThreeMove = findGobangPattern(aiPlayer, 'liveThree');
+      if (liveThreeMove) return liveThreeMove;
+      
+      // 6. 防守对手的活三
+      const blockLiveThree = findGobangPattern(humanPlayer, 'liveThree');
+      if (blockLiveThree) return blockLiveThree;
+      
+      // 7. 检查是否可以形成眠三
+      const sleepThreeMove = findGobangPattern(aiPlayer, 'sleepThree');
+      if (sleepThreeMove) return sleepThreeMove;
+      
+      // 8. 检查是否可以形成活二
+      const liveTwoMove = findGobangPattern(aiPlayer, 'liveTwo');
+      if (liveTwoMove) return liveTwoMove;
+      
+      // 9. 在中心附近落子
+      const centerMove = findGobangCenterMove();
+      if (centerMove) return centerMove;
+      
+      // 10. 随机落子
+      return generateRandomMove();
+    }
+    
+    // 五子棋困难难度：使用Minimax算法
+    function generateGobangHardMove() {
+      const aiPlayer = gameState.turn;
+      
+      // 首先检查必胜和必防
+      const winningMove = findGobangWinningMove(aiPlayer);
+      if (winningMove) return winningMove;
+      
+      const defensiveMove = findGobangWinningMove(3 - aiPlayer);
+      if (defensiveMove) return defensiveMove;
+      
+      // 使用Minimax算法
+      const bestMove = gobangMinimax(3, aiPlayer, -Infinity, Infinity, true);
+      return bestMove.move || generateRandomMove();
+    }
+    
+    // Minimax算法
+    function gobangMinimax(depth, player, alpha, beta, isMaximizing) {
+      if (depth === 0) {
+        return { score: evaluateGobangBoard(player) };
+      }
+      
+      const emptyCells = getGobangEmptyCells();
+      if (emptyCells.length === 0) {
+        return { score: 0 };
+      }
+      
+      // 只考虑有棋子附近的空位
+      const candidateCells = getCandidateCells(emptyCells);
+      
+      if (isMaximizing) {
+        let bestScore = -Infinity;
+        let bestMove = null;
+        
+        for (const cell of candidateCells) {
+          gameState.board[cell.r][cell.c] = player;
+          
+          if (checkGobangWin(cell.r, cell.c, player)) {
+            gameState.board[cell.r][cell.c] = 0;
+            return { score: 100000, move: cell };
+          }
+          
+          const result = gobangMinimax(depth - 1, player, alpha, beta, false);
+          gameState.board[cell.r][cell.c] = 0;
+          
+          if (result.score > bestScore) {
+            bestScore = result.score;
+            bestMove = cell;
+          }
+          
+          alpha = Math.max(alpha, bestScore);
+          if (beta <= alpha) break;
+        }
+        
+        return { score: bestScore, move: bestMove };
+      } else {
+        let bestScore = Infinity;
+        let bestMove = null;
+        const opponent = 3 - player;
+        
+        for (const cell of candidateCells) {
+          gameState.board[cell.r][cell.c] = opponent;
+          
+          if (checkGobangWin(cell.r, cell.c, opponent)) {
+            gameState.board[cell.r][cell.c] = 0;
+            return { score: -100000, move: cell };
+          }
+          
+          const result = gobangMinimax(depth - 1, player, alpha, beta, true);
+          gameState.board[cell.r][cell.c] = 0;
+          
+          if (result.score < bestScore) {
+            bestScore = result.score;
+            bestMove = cell;
+          }
+          
+          beta = Math.min(beta, bestScore);
+          if (beta <= alpha) break;
+        }
+        
+        return { score: bestScore, move: bestMove };
+      }
+    }
+    
+    // 评估棋盘分数
+    function evaluateGobangBoard(player) {
+      let score = 0;
+      const opponent = 3 - player;
+      
+      // 评估所有方向
+      for (let r = 0; r < 15; r++) {
+        for (let c = 0; c < 15; c++) {
+          if (gameState.board[r][c] === player) {
+            score += evaluateGobangPosition(r, c, player);
+          } else if (gameState.board[r][c] === opponent) {
+            score -= evaluateGobangPosition(r, c, opponent);
+          }
+        }
+      }
+      
+      return score;
+    }
+    
+    // 评估位置分数
+    function evaluateGobangPosition(r, c, player) {
+      let score = 0;
+      const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
+      
+      for (const [dr, dc] of directions) {
+        const line = getGobangLine(r, c, dr, dc, player);
+        score += evaluateGobangLine(line, player);
+      }
+      
+      // 中心位置加分
+      const centerDistance = Math.abs(r - 7) + Math.abs(c - 7);
+      score += Math.max(0, 7 - centerDistance);
+      
+      return score;
+    }
+    
+    // 获取一条线
+    function getGobangLine(r, c, dr, dc, player) {
+      const line = [];
+      
+      for (let i = -4; i <= 4; i++) {
+        const nr = r + dr * i;
+        const nc = c + dc * i;
+        
+        if (nr >= 0 && nr < 15 && nc >= 0 && nc < 15) {
+          line.push({ r: nr, c: nc, value: gameState.board[nr][nc] });
+        }
+      }
+      
+      return line;
+    }
+    
+    // 评估一条线的分数
+    function evaluateGobangLine(line, player) {
+      const opponent = 3 - player;
+      let score = 0;
+      let count = 0;
+      let empty = 0;
+      let blocked = 0;
+      
+      for (const cell of line) {
+        if (cell.value === player) {
+          count++;
+        } else if (cell.value === 0) {
+          empty++;
+        } else {
+          blocked++;
+        }
+      }
+      
+      if (blocked === 0) {
+        if (count === 5) score = 100000;
+        else if (count === 4) score = 10000;
+        else if (count === 3) score = 1000;
+        else if (count === 2) score = 100;
+        else if (count === 1) score = 10;
+      } else if (blocked === 1) {
+        if (count === 4) score = 1000;
+        else if (count === 3) score = 100;
+        else if (count === 2) score = 10;
+      }
+      
+      return score;
+    }
+    
+    // 获取空位
+    function getGobangEmptyCells() {
+      const cells = [];
+      for (let r = 0; r < 15; r++) {
+        for (let c = 0; c < 15; c++) {
+          if (gameState.board[r][c] === 0) {
+            cells.push({ r, c });
+          }
+        }
+      }
+      return cells;
+    }
+    
+    // 获取候选位置（有棋子附近的空位）
+    function getCandidateCells(emptyCells) {
+      const candidates = [];
+      const checked = new Set();
+      
+      for (let r = 0; r < 15; r++) {
+        for (let c = 0; c < 15; c++) {
+          if (gameState.board[r][c] !== 0) {
+            // 检查周围的空位
+            for (let dr = -2; dr <= 2; dr++) {
+              for (let dc = -2; dc <= 2; dc++) {
+                const nr = r + dr;
+                const nc = c + dc;
+                const key = `${nr},${nc}`;
+                
+                if (nr >= 0 && nr < 15 && nc >= 0 && nc < 15 &&
+                    gameState.board[nr][nc] === 0 && !checked.has(key)) {
+                  candidates.push({ r: nr, c: nc });
+                  checked.add(key);
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      return candidates.length > 0 ? candidates : emptyCells.slice(0, 20);
+    }
+    
+    // 查找获胜位置
+    function findGobangWinningMove(player) {
+      for (let r = 0; r < 15; r++) {
+        for (let c = 0; c < 15; c++) {
+          if (gameState.board[r][c] === 0) {
+            gameState.board[r][c] = player;
+            if (checkGobangWin(r, c, player)) {
+              gameState.board[r][c] = 0;
+              return { r, c };
+            }
+            gameState.board[r][c] = 0;
+          }
+        }
+      }
+      return null;
+    }
+    
+    // 查找特定棋型
+    function findGobangPattern(player, pattern) {
+      const patterns = {
+        liveFour: [[0, player, player, player, player, 0]],
+        liveThree: [[0, player, player, player, 0], [0, player, 0, player, player, 0], [0, player, player, 0, player, 0]],
+        sleepThree: [[player, player, player, 0], [0, player, player, player], [player, 0, player, player], [player, player, 0, player]],
+        liveTwo: [[0, player, player, 0], [0, player, 0, player, 0]]
+      };
+      
+      const targetPatterns = patterns[pattern] || [];
+      const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
+      
+      for (let r = 0; r < 15; r++) {
+        for (let c = 0; c < 15; c++) {
+          for (const [dr, dc] of directions) {
+            for (const targetPattern of targetPatterns) {
+              const result = matchGobangPattern(r, c, dr, dc, targetPattern, player);
+              if (result) return result;
+            }
+          }
+        }
+      }
+      
+      return null;
+    }
+    
+    // 匹配棋型
+    function matchGobangPattern(startR, startC, dr, dc, pattern, player) {
+      const opponent = 3 - player;
+      
+      for (let offset = -5; offset <= 5; offset++) {
+        let match = true;
+        let emptyPos = null;
+        
+        for (let i = 0; i < pattern.length; i++) {
+          const r = startR + dr * (offset + i);
+          const c = startC + dc * (offset + i);
+          
+          if (r < 0 || r >= 15 || c < 0 || c >= 15) {
+            match = false;
+            break;
+          }
+          
+          const expected = pattern[i];
+          const actual = gameState.board[r][c];
+          
+          if (expected === player && actual !== player) {
+            match = false;
+            break;
+          }
+          
+          if (expected === 0 && actual !== 0) {
+            match = false;
+            break;
+          }
+          
+          if (expected === 0) {
+            emptyPos = { r, c };
+          }
+        }
+        
+        if (match && emptyPos) {
+          return emptyPos;
+        }
+      }
+      
+      return null;
+    }
+    
+    // 在中心附近找落子位置
+    function findGobangCenterMove() {
+      const centerR = 7;
+      const centerC = 7;
+      
+      for (let distance = 0; distance <= 7; distance++) {
+        for (let dr = -distance; dr <= distance; dr++) {
+          for (let dc = -distance; dc <= distance; dc++) {
+            const r = centerR + dr;
+            const c = centerC + dc;
+            
+            if (r >= 0 && r < 15 && c >= 0 && c < 15 && gameState.board[r][c] === 0) {
+              return { r, c };
+            }
+          }
+        }
+      }
+      
+      return null;
+    }
+    
+    // ========== 围棋AI算法 ==========
+    
+    function generateGoMediumMove() {
+      // 围棋中等难度：优先占据角和边
+      const corners = [[3, 3], [3, 15], [15, 3], [15, 15]];
+      const edges = [];
+      
+      for (let i = 3; i <= 15; i += 3) {
+        edges.push([3, i], [15, i], [i, 3], [i, 15]);
+      }
+      
+      // 优先角落
+      for (const [r, c] of corners) {
+        if (gameState.board[r] && gameState.board[r][c] === 0) {
+          return { r, c };
+        }
+      }
+      
+      // 其次边
+      for (const [r, c] of edges) {
+        if (gameState.board[r] && gameState.board[r][c] === 0) {
+          return { r, c };
+        }
+      }
+      
+      return generateRandomMove();
+    }
+    
+    function generateGoHardMove() {
+      // 围棋困难难度：考虑更多策略
+      // 简化实现：优先占据有利位置
+      const priorityPositions = [
+        [3, 3], [3, 9], [3, 15], [9, 3], [9, 9], [9, 15], [15, 3], [15, 9], [15, 15],
+        [3, 6], [3, 12], [6, 3], [6, 9], [6, 15], [9, 6], [9, 12], [12, 3], [12, 9], [12, 15], [15, 6], [15, 12]
+      ];
+      
+      for (const [r, c] of priorityPositions) {
+        if (gameState.board[r] && gameState.board[r][c] === 0) {
+          return { r, c };
+        }
+      }
+      
+      return generateRandomMove();
+    }
+    
+    // ========== 象棋AI算法 ==========
+    
+    function generateChessMediumMove() {
+      const pieces = document.querySelectorAll('.chess-piece');
+      const aiColor = gameState.turn === 1 ? 'red' : 'black';
+      const moves = [];
+      
+      pieces.forEach(piece => {
+        if (piece.dataset.color === aiColor) {
+          const r = parseInt(piece.dataset.r);
+          const c = parseInt(piece.dataset.c);
+          const validMoves = calculateChessMoves(r, c, piece.dataset.name, parseInt(piece.dataset.color));
+          
+          validMoves.forEach(move => {
+            const score = evaluateChessMove(r, c, move.r, move.c, piece.dataset.name);
+            moves.push({ fromR: r, fromC: c, toR: move.r, toC: move.c, score });
+          });
+        }
+      });
+      
+      if (moves.length === 0) return null;
+      
+      // 选择得分最高的移动
+      moves.sort((a, b) => b.score - a.score);
+      return moves[0];
+    }
+    
+    function generateChessHardMove() {
+      // 象棋困难难度：更深入的评估
+      return generateChessMediumMove();
+    }
+    
+    // 评估象棋移动分数
+    function evaluateChessMove(fromR, fromC, toR, toC, pieceName) {
+      let score = 0;
+      
+      // 检查是否可以吃子
+      const targetPiece = getChessPieceAt(toR, toC);
+      if (targetPiece) {
+        const pieceValues = {
+          '将': 10000, '帅': 10000,
+          '车': 900, '馬': 400, '象': 200, '士': 200, '炮': 450, '兵': 100, '卒': 100
+        };
+        score += pieceValues[targetPiece.dataset.name] || 100;
+      }
+      
+      // 位置分数：控制中心
+      const centerDistance = Math.abs(toR - 4.5) + Math.abs(toC - 4.5);
+      score += Math.max(0, 5 - centerDistance);
+      
+      // 过河加分（兵卒）
+      if ((pieceName === '兵' && toR >= 5) || (pieceName === '卒' && toR <= 4)) {
+        score += 50;
+      }
+      
+      return score;
     }
 
     // 处理五子棋AI落子
@@ -4738,6 +5711,63 @@
         message: '对方请求再来一局'
       });
       updateStatus('⏳ 等待对方同意再来一局...');
+    }
+    
+    // 显示游戏结束结果（围棋点目）
+    function showGameResult() {
+      if (currentGame === 'go') {
+        const score = countGoScore();
+        const winner = score.black > score.white ? '黑棋' : '白棋';
+        const diff = Math.abs(score.black - score.white).toFixed(1);
+        
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'game-result-modal';
+        modal.innerHTML = `
+          <div class="modal" style="max-width: 500px;">
+            <div class="modal-title">
+              <span>🏁 游戏结束 - 数子结果</span>
+              <button class="modal-close" onclick="closeGameResultModal()">&times;</button>
+            </div>
+            <div class="modal-content" style="text-align: center; padding: 20px;">
+              <h2 style="color: ${score.black > score.white ? '#000' : '#666'}; margin-bottom: 20px;">
+                ${winner}获胜！
+              </h2>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                <div style="background: #000; color: white; padding: 15px; border-radius: 8px;">
+                  <div style="font-size: 24px; font-weight: bold;">黑棋</div>
+                  <div style="font-size: 36px; font-weight: bold; margin-top: 10px;">${score.black.toFixed(1)}</div>
+                  <div style="font-size: 14px; opacity: 0.8;">子数：${gameState.blackCount}</div>
+                  <div style="font-size: 14px; opacity: 0.8;">领地：${(score.black - gameState.blackCount).toFixed(1)}</div>
+                </div>
+                <div style="background: #fff; color: #000; padding: 15px; border-radius: 8px; border: 2px solid #ccc;">
+                  <div style="font-size: 24px; font-weight: bold;">白棋</div>
+                  <div style="font-size: 36px; font-weight: bold; margin-top: 10px;">${score.white.toFixed(1)}</div>
+                  <div style="font-size: 14px; opacity: 0.8;">子数：${gameState.whiteCount}</div>
+                  <div style="font-size: 14px; opacity: 0.8;">领地：${(score.white - gameState.whiteCount).toFixed(1)}</div>
+                  <div style="font-size: 12px; margin-top: 5px; color: #666;">贴目：7.5</div>
+                </div>
+              </div>
+              <div style="font-size: 18px; font-weight: bold; color: #2c3e50;">
+                胜负差：${diff}子
+              </div>
+              <button onclick="closeGameResultModal()" style="margin-top: 20px; padding: 10px 30px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">
+                确定
+              </button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+        modal.style.display = 'flex';
+      }
+    }
+    
+    // 关闭游戏结果模态框
+    function closeGameResultModal() {
+      const modal = document.getElementById('game-result-modal');
+      if (modal) {
+        modal.remove();
+      }
     }
 
     function resetGame(sendToServer) {
