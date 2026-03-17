@@ -14,22 +14,51 @@
 
     /* 赛博朋克动画效果 */
     @keyframes scanline {
-      0% { transform: translateY(-100vh); }
-      100% { transform: translateY(100vh); }
+      0% {
+        transform: translateY(-100vh);
+      }
+
+      100% {
+        transform: translateY(100vh);
+      }
     }
-    
+
     @keyframes neon-pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.7; }
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.7;
+      }
     }
-    
+
     @keyframes glitch {
-      0% { transform: translate(0); }
-      20% { transform: translate(-2px, 2px); }
-      40% { transform: translate(-2px, -2px); }
-      60% { transform: translate(2px, 2px); }
-      80% { transform: translate(2px, -2px); }
-      100% { transform: translate(0); }
+      0% {
+        transform: translate(0);
+      }
+
+      20% {
+        transform: translate(-2px, 2px);
+      }
+
+      40% {
+        transform: translate(-2px, -2px);
+      }
+
+      60% {
+        transform: translate(2px, 2px);
+      }
+
+      80% {
+        transform: translate(2px, -2px);
+      }
+
+      100% {
+        transform: translate(0);
+      }
     }
 
     @keyframes piece-scan-glow {
@@ -37,10 +66,12 @@
         box-shadow: 0 0 0 rgba(0, 255, 255, 0);
         transform: translateZ(0) scale(1);
       }
+
       40% {
         box-shadow: 0 0 12px rgba(0, 255, 255, 0.9), 0 0 18px rgba(255, 0, 255, 0.7);
         transform: translateZ(0) scale(1.06);
       }
+
       100% {
         box-shadow: 0 0 0 rgba(0, 255, 255, 0);
         transform: translateZ(0) scale(1);
@@ -219,7 +250,8 @@
       display: flex;
       align-items: center;
       gap: 5px;
-      position: relative; /* For challenge button positioning */
+      position: relative;
+      /* For challenge button positioning */
     }
 
     .challenge-btn {
@@ -5674,48 +5706,10 @@
           winsColor: '#48bb78',
           winrateColor: '#4299e1'
         }
-      },
-      'high-contrast': {
-        name: '高对比度',
-        background: '#000000',
-        primaryColor: '#ffffff',
-        secondaryColor: '#cccccc',
-        accentColor: '#ffff00',
-        boardBackground: {
-          gobang: '#1a1a1a',
-          go: '#111111',
-          chess: '#0a0a0a'
-        },
-        pieceColor: {
-          gobangBlack: '#ffffff',
-          gobangWhite: '#000000',
-          goBlack: '#ffffff',
-          goWhite: '#000000',
-          chessRed: '#ff0000',
-          chessBlack: '#ffffff'
-        },
-        uiColors: {
-          containerBg: '#1a1a1a',
-          titleColor: '#ffffff',
-          statusColor: '#ffffff',
-          statusBg: '#333333',
-          usersBg: '#222222',
-          usersTitleColor: '#ffffff',
-          userItemBg: '#333333',
-          userItemColor: '#ffffff',
-          leaderboardBg: '#222222',
-          leaderboardTitleColor: '#ffffff',
-          leaderboardItemBg: '#333333',
-          rankColor: '#ffffff',
-          nameColor: '#ffffff',
-          levelColor: '#cccccc',
-          winsColor: '#00ff00',
-          winrateColor: '#00ffff'
-        }
       }
     };
 
-    let currentTheme = 'default';
+    let currentTheme = localStorage.getItem('selectedTheme') || 'default';
 
     function showThemeModal() {
       const themeListEl = document.getElementById('theme-list');
@@ -5769,6 +5763,17 @@
       gobangBoard.classList.remove('cyberpunk-gobang');
       if (lucyPanel) {
         lucyPanel.style.display = 'none';
+      }
+
+      if (themeKey !== 'cyberpunk') {
+        document.querySelectorAll('h1, h2, h3, .nav-btn, .lobby-btn').forEach(el => {
+          el.style.textShadow = '';
+        });
+
+        document.querySelectorAll('.nav-btn, .match-btn, .cancel-btn, .lobby-btn').forEach(btn => {
+          btn.style.boxShadow = '';
+          btn.style.border = '';
+        });
       }
 
       if (themeKey === 'cyberpunk') {
@@ -5938,8 +5943,8 @@
         piece.style.background = theme.pieceColor.chessBlack;
       });
 
-      // 重新渲染主题列表，更新选中状态
-      showThemeModal();
+      // 保存主题选择到 localStorage
+      localStorage.setItem('selectedTheme', themeKey);
     }
 
     window.applyTheme = applyTheme;
@@ -6068,7 +6073,8 @@
     <div
       style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 20px rgba(0, 0, 0, 0.3); text-align: center; max-width: 600px; width: 90%;">
       <h3 style="margin-top: 0; color: #333;">选择主题</h3>
-      <div id="theme-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 20px;">
+      <div id="theme-list"
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 20px;">
         <!-- 主题选项将在这里动态加载 -->
       </div>
       <button onclick="hideThemeModal()"
