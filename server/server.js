@@ -591,9 +591,12 @@ adminNamespace.on('connection', (socket) => {
 
 // 检查不活跃用户（每5分钟）
 setInterval(() => {
-  const count = userManager.checkInactiveUsers(io);
-  if (count > 0) {
-    logger.info('检查不活跃用户', { inactiveCount: count });
+  const result = userManager.checkInactiveUsers(io);
+  if (result.inactiveCount > 0 || result.warningCount > 0) {
+    logger.info('检查不活跃用户', {
+      inactiveCount: result.inactiveCount,
+      warningCount: result.warningCount
+    });
   }
 }, 300000);
 

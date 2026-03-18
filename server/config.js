@@ -15,7 +15,10 @@ module.exports = {
   // 管理员配置
   admin: {
     token: process.env.ADMIN_TOKEN || 'admin-secret-token',
-    updateInterval: 2000 // 管理后台数据更新间隔(ms)
+    updateInterval: 2000, // 管理后台数据更新间隔(ms)
+    tokenExpiry: 24 * 60 * 60 * 1000, // Token有效期24小时
+    maxActiveSessions: 3, // 最大活跃会话数
+    enableDynamicTokens: true // 启用动态Token生成
   },
 
   // 游戏配置

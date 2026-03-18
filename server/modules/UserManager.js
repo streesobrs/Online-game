@@ -53,26 +53,62 @@ class UserManager {
     this.stats.totalConnections++;
 
     // 检查客户端是否提供了已保存的userId
-    let userId = data && data.savedUserId ? data.savedUserId : this.generateUserId();
+    let userId = data && data.savedUserId ? data.savedUserId : null;
     const token = this.generateToken();
+
+    let userData = null;
+
+    // 如果有userId，尝试从AccountManager加载用户数据
+    if (userId && this.accountManager) {
+      userData = await this.accountManager.getUser(userId);
+    }
+
+    // 如果没有用户数据，创建新的游客用户
+    if (!userData) {
+      if (this.accountManager) {
+        userData = await this.accountManager.createGuestUser();
+        userId = userData.userId;
+      } else {
+        // 如果没有AccountManager，使用旧的逻辑
+        userId = this.generateUserId();
+        userData = {
+          userId,
+          nickname: `玩家${userId.substr(0, 4)}`,
+          stats: {
+            wins: 0,
+            losses: 0,
+            draws: 0,
+            totalGames: 0
+          },
+          createdAt: Date.now(),
+          lastSeen: Date.now(),
+          updatedAt: Date.now()
+        };
+      }
+    }
 
     // 检查这个userId是否已经在线
     if (this.userSockets.has(userId)) {
       // 如果在线，生成新的userId
-      userId = this.generateUserId();
+      if (this.accountManager) {
+        userData = await this.accountManager.createGuestUser();
+        userId = userData.userId;
+      } else {
+        userId = this.generateUserId();
+      }
     }
 
     const user = {
       userId,
       token,
       socketId: socket.id,
-      nickname: `玩家${userId.substr(0, 4)}`,
+      nickname: userData.nickname,
       status: 'online',
       game: null,
       gameType: null,
       connectedAt: Date.now(),
       lastActivity: Date.now(),
-      stats: {
+      stats: userData.stats || {
         wins: 0,
         losses: 0,
         draws: 0,
@@ -81,17 +117,6 @@ class UserManager {
       ip: socket.handshake.address,
       userAgent: socket.handshake.headers['user-agent']
     };
-
-    // 尝试从数据库加载现有用户数据
-    try {
-      const existingUser = await dataStore.findOne('users', { userId });
-      if (existingUser) {
-        user.nickname = existingUser.nickname || user.nickname;
-        user.stats = existingUser.stats || user.stats;
-      }
-    } catch (err) {
-      logger.warn('加载用户数据失败', { userId, error: err.message });
-    }
 
     // 存储用户数据
     this.users.set(socket.id, user);
@@ -173,6 +198,8 @@ class UserManager {
     const user = this.onlineUsers.get(userId);
     if (user) {
       user.lastActivity = Date.now();
+      // 重置警告状态
+      this.resetUserWarning(userId);
     }
   }
 
@@ -273,7 +300,7 @@ class UserManager {
   }
 
   // 处理用户断开连接
-  handleUserDisconnect(socketId, io) {
+  async handleUserDisconnect(socketId, io) {
     const user = this.users.get(socketId);
     if (user) {
       logger.userAction(user.userId, '断开连接', {
@@ -283,14 +310,34 @@ class UserManager {
       // 广播离线状态
       this.broadcastUserStatus(user.userId, 'offline', io);
 
+      // 保存用户数据到数据库
+      if (this.accountManager) {
+        try {
+          await this.accountManager.updateUser(user.userId, {
+            nickname: user.nickname,
+            stats: user.stats,
+            lastSeen: Date.now()
+          });
+        } catch (err) {
+          logger.warn('保存用户数据失败', { userId: user.userId, error: err.message });
+        }
+      } else {
+        // 如果没有AccountManager，使用旧的逻辑
+        this.saveUserToDB(user);
+      }
+
       // 清理数据
       this.users.delete(socketId);
       this.userSockets.delete(user.userId);
       this.userIdToSocketId.delete(user.userId);
       this.onlineUsers.delete(user.userId);
 
-      // 保存用户数据
-      this.saveUserToDB(user);
+      // 清理账号映射
+      const accountId = this.userIdToAccountId.get(user.userId);
+      if (accountId) {
+        this.userIdToAccountId.delete(user.userId);
+        this.accountIdToUserId.delete(accountId);
+      }
 
       return user;
     }
@@ -358,35 +405,73 @@ class UserManager {
     return false;
   }
 
-  // 检查不活跃用户
+  // 检查不活跃用户（增强版）
   checkInactiveUsers(io, timeout = config.game.inactivityTimeout) {
     const now = Date.now();
     const inactiveUsers = [];
+    const warningUsers = [];
 
     for (const [userId, user] of this.onlineUsers) {
-      if (user.status === 'online' && now - user.lastActivity > timeout) {
-        inactiveUsers.push(userId);
+      if (user.status === 'online') {
+        const inactivityTime = now - user.lastActivity;
+
+        // 第一阶段：15分钟无活动，发送警告
+        if (inactivityTime > 15 * 60 * 1000 && !user.warningSent) {
+          warningUsers.push({ userId, user, inactivityTime });
+        }
+
+        // 第二阶段：超过超时时间，准备断开
+        if (inactivityTime > timeout) {
+          inactiveUsers.push(userId);
+        }
       }
     }
 
+    // 发送警告消息
+    for (const { userId, user, inactivityTime } of warningUsers) {
+      const socket = this.userSockets.get(userId);
+      if (socket) {
+        const remainingMinutes = Math.ceil((timeout - inactivityTime) / 1000 / 60);
+        socket.emit('inactive_warning', {
+          message: `您已${Math.floor(inactivityTime / 1000 / 60)}分钟未活动，${remainingMinutes}分钟后将被断开连接`,
+          level: 'warning',
+          remainingTime: remainingMinutes * 60 * 1000
+        });
+        user.warningSent = true;
+        logger.info('发送不活跃警告', { userId, inactivityTime: Math.floor(inactivityTime / 1000 / 60) });
+      }
+    }
+
+    // 处理超时用户
     for (const userId of inactiveUsers) {
       const socket = this.userSockets.get(userId);
       if (socket) {
         socket.emit('inactive_warning', {
-          message: '您已长时间未活动，即将断开连接'
+          message: '您已长时间未活动，即将断开连接',
+          level: 'critical'
         });
 
-        // 5分钟后断开
+        // 30秒后断开连接
         setTimeout(() => {
           const user = this.onlineUsers.get(userId);
           if (user && user.status === 'online') {
             this.kickUser(userId, '长时间未活动');
+            logger.info('断开不活跃用户', { userId, inactivityTime: Math.floor((Date.now() - user.lastActivity) / 1000 / 60) });
           }
-        }, 300000);
+        }, 30000); // 30秒后断开
       }
     }
 
-    return inactiveUsers.length;
+    return { inactiveCount: inactiveUsers.length, warningCount: warningUsers.length };
+  }
+
+  // 重置用户警告状态（当用户有活动时调用）
+  resetUserWarning(userId) {
+    const user = this.onlineUsers.get(userId);
+    if (user && user.warningSent) {
+      user.warningSent = false;
+      logger.info('重置用户警告状态', { userId });
+    }
   }
 
   // 获取排行榜

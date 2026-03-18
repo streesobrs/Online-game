@@ -37,11 +37,95 @@ class AccountManager {
   // 检查用户名是否已存在
   async usernameExists(username) {
     try {
-      const account = await dataStore.findOne('accounts', { username });
+      const account = await dataStore.findOne('accounts', { username, type: { $ne: 'guest' } });
       return !!account;
     } catch (err) {
       logger.error('检查用户名失败', { username, error: err.message });
       return false;
+    }
+  }
+
+  // 生成游客用户ID
+  generateGuestId() {
+    return 'guest_' + crypto.randomBytes(8).toString('hex');
+  }
+
+  // 创建游客用户
+  async createGuestUser(nickname = null) {
+    const guestId = this.generateGuestId();
+    const guestUser = {
+      id: guestId,
+      userId: guestId,
+      type: 'guest',
+      nickname: nickname || `玩家${guestId.substr(6, 4)}`,
+      stats: {
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        totalGames: 0
+      },
+      createdAt: Date.now(),
+      lastSeen: Date.now(),
+      updatedAt: Date.now()
+    };
+
+    try {
+      await dataStore.add('accounts', guestUser);
+      logger.info('创建游客用户', { guestId, nickname: guestUser.nickname });
+
+      // 不返回敏感信息
+      const { ...safeGuest } = guestUser;
+      return safeGuest;
+    } catch (err) {
+      logger.error('创建游客用户失败', { guestId, error: err.message });
+      return null;
+    }
+  }
+
+  // 获取用户信息（支持游客和注册用户）
+  async getUser(userId) {
+    try {
+      const user = await dataStore.findOne('accounts', { userId });
+      if (!user) {
+        return null;
+      }
+
+      // 不返回密码相关信息
+      const { passwordSalt, passwordHash, ...safeUser } = user;
+      return safeUser;
+    } catch (err) {
+      logger.error('获取用户信息失败', { userId, error: err.message });
+      return null;
+    }
+  }
+
+  // 更新用户信息（支持游客和注册用户）
+  async updateUser(userId, updates) {
+    try {
+      const user = await dataStore.findOne('accounts', { userId });
+      if (!user) {
+        return {
+          success: false,
+          message: '用户不存在'
+        };
+      }
+
+      // 更新用户信息
+      const updateData = { ...updates, updatedAt: Date.now() };
+      await dataStore.update('accounts', userId, updateData);
+
+      logger.info('更新用户信息', { userId, updates: Object.keys(updates) });
+
+      return {
+        success: true,
+        message: '更新成功'
+      };
+    } catch (err) {
+      logger.error('更新用户信息失败', { userId, error: err.message });
+      return {
+        success: false,
+        message: '更新失败'
+      };
     }
   }
 
@@ -78,7 +162,9 @@ class AccountManager {
 
     const account = {
       id: accountId,
+      userId: accountId,
       accountId: accountId,
+      type: 'registered',
       username: username.toLowerCase(),
       passwordSalt: salt,
       passwordHash: passwordHash,
@@ -128,7 +214,9 @@ class AccountManager {
         invites: 0
       },
       createdAt: Date.now(),
-      lastLogin: Date.now()
+      lastLogin: Date.now(),
+      lastSeen: Date.now(),
+      updatedAt: Date.now()
     };
 
     try {

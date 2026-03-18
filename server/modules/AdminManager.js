@@ -1,4 +1,5 @@
 // AdminManager.js - 后台管理模块
+const crypto = require('crypto');
 const config = require('../config');
 const logger = require('../utils/logger');
 const dataStore = require('../utils/dataStore');
@@ -10,16 +11,86 @@ class AdminManager {
     this.chatManager = chatManager;
     this.accountManager = accountManager;
     this.adminSockets = new Map(); // socketId -> admin信息
+    this.activeTokens = new Map(); // token -> {createdAt, lastUsed, socketIds}
     this.systemStats = {
       serverStartTime: Date.now(),
       totalRequests: 0,
       totalErrors: 0
     };
+
+    // 清理过期Token的定时任务
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupExpiredTokens();
+    }, 5 * 60 * 1000); // 每5分钟清理一次
+  }
+
+  // 生成动态管理员Token
+  generateDynamicToken() {
+    if (!config.admin.enableDynamicTokens) {
+      return config.admin.token; // 回退到静态Token
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenInfo = {
+      token: token,
+      createdAt: Date.now(),
+      lastUsed: Date.now(),
+      socketIds: new Set()
+    };
+
+    this.activeTokens.set(token, tokenInfo);
+    logger.info('生成动态管理员Token', { token: token.substr(0, 8) + '...' });
+    return token;
   }
 
   // 验证管理员token
   verifyToken(token) {
-    return token === config.admin.token;
+    // 首先检查静态Token
+    if (token === config.admin.token) {
+      return true;
+    }
+
+    // 检查动态Token
+    const tokenInfo = this.activeTokens.get(token);
+    if (!tokenInfo) {
+      return false;
+    }
+
+    // 检查Token是否过期
+    if (Date.now() - tokenInfo.createdAt > config.admin.tokenExpiry) {
+      this.activeTokens.delete(token);
+      logger.info('管理员Token已过期', { token: token.substr(0, 8) + '...' });
+      return false;
+    }
+
+    // 更新最后使用时间
+    tokenInfo.lastUsed = Date.now();
+    return true;
+  }
+
+  // 清理过期Token
+  cleanupExpiredTokens() {
+    const now = Date.now();
+    let cleanedCount = 0;
+
+    for (const [token, tokenInfo] of this.activeTokens.entries()) {
+      if (now - tokenInfo.createdAt > config.admin.tokenExpiry) {
+        this.activeTokens.delete(token);
+        cleanedCount++;
+      }
+    }
+
+    if (cleanedCount > 0) {
+      logger.info('清理过期Token', { count: cleanedCount });
+    }
+  }
+
+  // 检查会话限制
+  checkSessionLimit(token) {
+    const tokenInfo = this.activeTokens.get(token);
+    if (!tokenInfo) return true; // 静态Token无限制
+
+    return tokenInfo.socketIds.size < config.admin.maxActiveSessions;
   }
 
   // 处理管理员连接
@@ -30,23 +101,42 @@ class AdminManager {
       return false;
     }
 
+    // 检查会话限制
+    if (!this.checkSessionLimit(token)) {
+      socket.emit('auth_error', { message: '已达到最大活跃会话数，请先关闭其他会话' });
+      socket.disconnect();
+      return false;
+    }
+
     const adminInfo = {
       socketId: socket.id,
+      token: token,
       connectedAt: Date.now(),
+      lastActivity: Date.now(),
       ip: socket.handshake.address,
       io
     };
 
+    // 记录会话
+    if (token !== config.admin.token) {
+      const tokenInfo = this.activeTokens.get(token);
+      if (tokenInfo) {
+        tokenInfo.socketIds.add(socket.id);
+        tokenInfo.lastUsed = Date.now();
+      }
+    }
+
     this.adminSockets.set(socket.id, adminInfo);
-    logger.info('管理员连接', { socketId: socket.id, ip: adminInfo.ip });
+    logger.info('管理员连接', { socketId: socket.id, ip: adminInfo.ip, token: token.substr(0, 8) + '...' });
 
     // 发送初始数据
     this.sendAdminData(socket);
 
-    // 设置定时更新
+    // 设置定时更新和活动检查
     const updateInterval = setInterval(() => {
       if (socket.connected) {
         this.sendAdminData(socket);
+        this.checkAdminActivity(socket);
       } else {
         clearInterval(updateInterval);
       }
@@ -55,6 +145,19 @@ class AdminManager {
     socket.adminInterval = updateInterval;
 
     return true;
+  }
+
+  // 检查管理员活动状态
+  checkAdminActivity(socket) {
+    const adminInfo = this.adminSockets.get(socket.id);
+    if (!adminInfo) return;
+
+    const inactivityTime = Date.now() - adminInfo.lastActivity;
+    if (inactivityTime > 30 * 60 * 1000) { // 30分钟无活动
+      logger.info('管理员会话因长时间无活动而断开', { socketId: socket.id });
+      socket.emit('auth_error', { message: '会话因长时间无活动已断开' });
+      socket.disconnect();
+    }
   }
 
   // 发送管理数据
@@ -495,6 +598,21 @@ class AdminManager {
   handleAdminDisconnect(socket) {
     if (socket.adminInterval) {
       clearInterval(socket.adminInterval);
+    }
+
+    const adminInfo = this.adminSockets.get(socket.id);
+    if (adminInfo) {
+      // 清理Token会话记录
+      if (adminInfo.token && adminInfo.token !== config.admin.token) {
+        const tokenInfo = this.activeTokens.get(adminInfo.token);
+        if (tokenInfo) {
+          tokenInfo.socketIds.delete(socket.id);
+          // 如果该Token没有活跃会话，可以清理
+          if (tokenInfo.socketIds.size === 0) {
+            logger.info('动态Token无活跃会话', { token: adminInfo.token.substr(0, 8) + '...' });
+          }
+        }
+      }
     }
 
     this.adminSockets.delete(socket.id);
