@@ -49,6 +49,57 @@ module.exports = {
     maxSize: '10m'
   },
 
+  // 用户权限配置
+  permissions: {
+    // 游客权限
+    guest: {
+      canPlayGames: true,
+      canChat: true,
+      canViewLeaderboard: true,
+      canViewProfiles: false,
+      canEditProfile: false,
+      canChangePassword: false,
+      canSaveStats: false,
+      canCreateRooms: false,
+      canInviteFriends: false,
+      maxGamesPerDay: 10,
+      maxChatMessages: 50
+    },
+
+    // 注册用户权限
+    registered: {
+      canPlayGames: true,
+      canChat: true,
+      canViewLeaderboard: true,
+      canViewProfiles: true,
+      canEditProfile: true,
+      canChangePassword: true,
+      canSaveStats: true,
+      canCreateRooms: true,
+      canInviteFriends: true,
+      maxGamesPerDay: 100,
+      maxChatMessages: 500
+    },
+
+    // 管理员权限
+    admin: {
+      canPlayGames: true,
+      canChat: true,
+      canViewLeaderboard: true,
+      canViewProfiles: true,
+      canEditProfile: true,
+      canChangePassword: true,
+      canSaveStats: true,
+      canCreateRooms: true,
+      canInviteFriends: true,
+      canManageUsers: true,
+      canManageGames: true,
+      canViewSystemStats: true,
+      maxGamesPerDay: 1000,
+      maxChatMessages: 1000
+    }
+  },
+
   // 限流配置
   rateLimit: {
     windowMs: 60000, // 1分钟

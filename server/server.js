@@ -146,22 +146,45 @@ io.on('connection', (socket) => {
     });
   });
 
-  // 登录账号
-  socket.on('account_login', async (data) => {
-    const { username, password } = data;
-    const result = await accountManager.login(username, password);
+  // 游客登录
+  socket.on('guest_login', async () => {
+    const result = await accountManager.guestLogin();
 
-    if (result.success && result.account) {
+    if (result.success && result.data) {
       const user = userManager.getUserBySocketId(socket.id);
       if (user) {
-        userManager.setUserAccount(user.userId, result.account.accountId);
+        // 设置用户账号信息
+        userManager.setUserAccount(user.userId, result.data.account.id);
+
+        // 设置用户权限
+        user.permissions = result.data.permissions;
+        user.loginType = result.data.loginType;
+        user.token = result.data.token;
       }
     }
 
-    socket.emit('account_action_result', {
-      action: 'login',
-      ...result
-    });
+    socket.emit('login_result', result);
+  });
+
+  // 账号密码登录
+  socket.on('account_login', async (data) => {
+    const { username, password } = data;
+    const result = await accountManager.accountLogin(username, password);
+
+    if (result.success && result.data) {
+      const user = userManager.getUserBySocketId(socket.id);
+      if (user) {
+        // 设置用户账号信息
+        userManager.setUserAccount(user.userId, result.data.account.id);
+
+        // 设置用户权限
+        user.permissions = result.data.permissions;
+        user.loginType = result.data.loginType;
+        user.token = result.data.token;
+      }
+    }
+
+    socket.emit('login_result', result);
   });
 
   // 更新账号资料

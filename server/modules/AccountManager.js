@@ -50,6 +50,127 @@ class AccountManager {
     return 'guest_' + crypto.randomBytes(8).toString('hex');
   }
 
+  // 游客登录
+  async guestLogin() {
+    try {
+      // 创建游客用户
+      const guestUser = await this.createGuestUser();
+      if (!guestUser) {
+        return {
+          success: false,
+          message: '创建游客账号失败'
+        };
+      }
+
+      // 获取权限配置
+      const config = require('../config');
+      const permissions = config.permissions.guest;
+
+      // 返回完整的登录响应
+      return {
+        success: true,
+        message: '游客登录成功',
+        data: {
+          account: guestUser,
+          permissions: permissions,
+          token: this.generateSessionToken(guestUser.id),
+          loginType: 'guest'
+        }
+      };
+    } catch (err) {
+      logger.error('游客登录失败', { error: err.message });
+      return {
+        success: false,
+        message: '游客登录失败'
+      };
+    }
+  }
+
+  // 账号密码登录
+  async accountLogin(username, password) {
+    try {
+      // 查找用户
+      const account = await dataStore.findOne('accounts', {
+        username,
+        type: { $ne: 'guest' }
+      });
+
+      if (!account) {
+        return {
+          success: false,
+          message: '用户名或密码错误'
+        };
+      }
+
+      // 验证密码
+      if (!this.verifyPassword(password, account.passwordSalt, account.passwordHash)) {
+        return {
+          success: false,
+          message: '用户名或密码错误'
+        };
+      }
+
+      // 更新最后登录时间
+      const now = Date.now();
+      await dataStore.update('accounts', { id: account.id }, {
+        lastLogin: now,
+        lastSeen: now
+      });
+
+      // 获取权限配置
+      const config = require('../config');
+      const permissions = config.permissions[account.type] || config.permissions.registered;
+
+      // 返回完整的登录响应
+      return {
+        success: true,
+        message: '登录成功',
+        data: {
+          account: {
+            ...account,
+            passwordSalt: undefined,
+            passwordHash: undefined
+          },
+          permissions: permissions,
+          token: this.generateSessionToken(account.id),
+          loginType: 'account'
+        }
+      };
+    } catch (err) {
+      logger.error('账号登录失败', { username, error: err.message });
+      return {
+        success: false,
+        message: '登录失败，请稍后重试'
+      };
+    }
+  }
+
+  // 生成会话令牌
+  generateSessionToken(accountId) {
+    const timestamp = Date.now();
+    const random = crypto.randomBytes(16).toString('hex');
+    const tokenData = `${accountId}|${timestamp}|${random}`;
+    return Buffer.from(tokenData).toString('base64');
+  }
+
+  // 验证会话令牌
+  verifySessionToken(token) {
+    try {
+      const tokenData = Buffer.from(token, 'base64').toString('utf8');
+      const [accountId, timestamp, random] = tokenData.split('|');
+
+      // 检查令牌是否过期（24小时）
+      const tokenAge = Date.now() - parseInt(timestamp);
+      if (tokenAge > 24 * 60 * 60 * 1000) {
+        return null;
+      }
+
+      return accountId;
+    } catch (err) {
+      return null;
+    }
+  }
+
   // 创建游客用户
   async createGuestUser(nickname = null) {
     const guestId = this.generateGuestId();
