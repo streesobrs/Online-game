@@ -13,16 +13,6 @@
     }
 
     /* 赛博朋克动画效果 */
-    @keyframes scanline {
-      0% {
-        transform: translateY(-100vh);
-      }
-
-      100% {
-        transform: translateY(100vh);
-      }
-    }
-
     @keyframes neon-pulse {
 
       0%,
@@ -59,27 +49,6 @@
       100% {
         transform: translate(0);
       }
-    }
-
-    @keyframes piece-scan-glow {
-      0% {
-        box-shadow: 0 0 0 rgba(0, 255, 255, 0);
-        transform: translateZ(0) scale(1);
-      }
-
-      40% {
-        box-shadow: 0 0 12px rgba(0, 255, 255, 0.9), 0 0 18px rgba(255, 0, 255, 0.7);
-        transform: translateZ(0) scale(1.06);
-      }
-
-      100% {
-        box-shadow: 0 0 0 rgba(0, 255, 255, 0);
-        transform: translateZ(0) scale(1);
-      }
-    }
-
-    .scan-glow {
-      animation: piece-scan-glow 0.35s ease-out;
     }
 
     body {
@@ -4192,7 +4161,20 @@
       clearChessSelection();
 
       gameState.selectedPiece = piece;
+      
+      // 保存原始样式
+      piece.dataset.originalBoxShadow = piece.style.boxShadow || '';
+      piece.dataset.originalFilter = piece.style.filter || '';
+      
+      // 添加选中状态
       piece.classList.add('selected');
+      
+      // 赛博朋克主题特殊处理
+      if (currentTheme === 'cyberpunk') {
+        let glowColor = '#ff1493';
+        piece.style.boxShadow = `0 0 20px ${glowColor}, 0 0 40px ${glowColor}, 0 0 60px ${glowColor}, 0 0 80px ${glowColor}, inset 0 0 15px rgba(255, 105, 180, 0.5)`;
+        piece.style.filter = 'brightness(1.5) saturate(1.5)';
+      }
 
       // 计算有效移动位置
       gameState.validMoves = calculateChessMoves(r, c, piece.dataset.name, piece.dataset.color);
@@ -4201,7 +4183,12 @@
       gameState.validMoves.forEach(pos => {
         const cell = document.querySelector(`.chess-intersection[data-r="${pos.r}"][data-c="${pos.c}"]`);
         if (cell) {
-          cell.style.backgroundColor = 'rgba(0,123,255,0.25)';
+          // 赛博朋克主题使用霓虹色
+          if (currentTheme === 'cyberpunk') {
+            cell.style.backgroundColor = 'rgba(255, 0, 255, 0.35)';
+          } else {
+            cell.style.backgroundColor = 'rgba(0,123,255,0.25)';
+          }
           cell.style.borderRadius = '50%';
         }
       });
@@ -4209,6 +4196,16 @@
 
     function clearChessSelection() {
       if (gameState.selectedPiece) {
+        // 恢复原始样式
+        if (gameState.selectedPiece.dataset.originalBoxShadow !== undefined) {
+          if (currentTheme === 'cyberpunk') {
+            gameState.selectedPiece.style.boxShadow = `0 0 15px #ff1493, 0 0 30px #ff1493, 0 0 45px #ff1493, inset 0 0 10px rgba(255, 105, 180, 0.5)`;
+            gameState.selectedPiece.style.filter = 'brightness(1.4) saturate(1.3)';
+          } else {
+            gameState.selectedPiece.style.boxShadow = gameState.selectedPiece.dataset.originalBoxShadow;
+            gameState.selectedPiece.style.filter = gameState.selectedPiece.dataset.originalFilter;
+          }
+        }
         gameState.selectedPiece.classList.remove('selected');
         gameState.selectedPiece = null;
       }
@@ -7268,12 +7265,12 @@
           chess: '#150025'
         },
         pieceColor: {
-          gobangBlack: '#00ffff',
-          gobangWhite: '#ff00ff',
-          goBlack: '#00ffff',
-          goWhite: '#ff00ff',
-          chessRed: '#ff00ff',
-          chessBlack: '#00ffff'
+          gobangBlack: '#ff1493',
+          gobangWhite: '#ff69b4',
+          goBlack: '#ff1493',
+          goWhite: '#ff69b4',
+          chessRed: '#ff1493',
+          chessBlack: '#ff69b4'
         },
         uiColors: {
           containerBg: 'rgba(20, 20, 40, 0.9)',
@@ -7380,35 +7377,6 @@
         `;
         document.body.appendChild(glowEffect);
 
-        const scanline = document.createElement('div');
-        scanline.className = 'cyberpunk-scanline';
-        scanline.style.cssText = `
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 2px;
-          background: linear-gradient(to right, transparent, #00ffff, transparent);
-          box-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff;
-          animation: scanline 3s linear infinite;
-          pointer-events: none;
-          z-index: 9999;
-        `;
-
-        const triggerPieceScanGlow = () => {
-          const anyPiece = document.querySelector('.gobang-black, .gobang-white, .go-black, .go-white, .chess-red, .chess-black');
-          if (!anyPiece) return;
-          document.querySelectorAll('.gobang-black, .gobang-white, .go-black, .go-white, .chess-red, .chess-black')
-            .forEach(piece => {
-              piece.classList.remove('scan-glow');
-              void piece.offsetWidth;
-              piece.classList.add('scan-glow');
-            });
-        };
-
-        scanline.addEventListener('animationiteration', triggerPieceScanGlow);
-        document.body.appendChild(scanline);
-
         if (lucyBg) {
           lucyBg.style.backgroundImage = "url('/server/assets/lucy.png')";
           lucyBg.classList.add('visible');
@@ -7511,24 +7479,95 @@
       // 示例：五子棋黑白子
       document.querySelectorAll('.gobang-black').forEach(piece => {
         piece.style.background = theme.pieceColor.gobangBlack;
+        if (themeKey === 'cyberpunk') {
+          piece.style.boxShadow = `0 0 15px #ff1493, 0 0 30px #ff1493, 0 0 45px #ff1493, inset 0 0 10px rgba(255, 105, 180, 0.5)`;
+          piece.style.filter = 'brightness(1.4) saturate(1.3)';
+        } else {
+          piece.style.boxShadow = '';
+          piece.style.filter = '';
+        }
       });
       document.querySelectorAll('.gobang-white').forEach(piece => {
         piece.style.background = theme.pieceColor.gobangWhite;
+        if (themeKey === 'cyberpunk') {
+          piece.style.boxShadow = `0 0 15px #ff1493, 0 0 30px #ff1493, 0 0 45px #ff69b4, inset 0 0 10px rgba(255, 105, 180, 0.5)`;
+          piece.style.filter = 'brightness(1.4) saturate(1.3)';
+        } else {
+          piece.style.boxShadow = '';
+          piece.style.filter = '';
+        }
       });
       // 围棋黑白子
       document.querySelectorAll('.go-black').forEach(piece => {
         piece.style.background = theme.pieceColor.goBlack;
+        if (themeKey === 'cyberpunk') {
+          piece.style.boxShadow = `0 0 15px #ff1493, 0 0 30px #ff1493, 0 0 45px #ff1493, inset 0 0 10px rgba(255, 105, 180, 0.5)`;
+          piece.style.filter = 'brightness(1.4) saturate(1.3)';
+        } else {
+          piece.style.boxShadow = '';
+          piece.style.filter = '';
+        }
       });
       document.querySelectorAll('.go-white').forEach(piece => {
         piece.style.background = theme.pieceColor.goWhite;
+        if (themeKey === 'cyberpunk') {
+          piece.style.boxShadow = `0 0 15px #ff1493, 0 0 30px #ff1493, 0 0 45px #ff69b4, inset 0 0 10px rgba(255, 105, 180, 0.5)`;
+          piece.style.filter = 'brightness(1.4) saturate(1.3)';
+        } else {
+          piece.style.boxShadow = '';
+          piece.style.filter = '';
+        }
       });
       // 象棋红黑子
       document.querySelectorAll('.chess-red').forEach(piece => {
         piece.style.background = theme.pieceColor.chessRed;
+        if (themeKey === 'cyberpunk') {
+          piece.style.boxShadow = `0 0 15px #ff1493, 0 0 30px #ff1493, 0 0 45px #ff1493, inset 0 0 10px rgba(255, 105, 180, 0.5)`;
+          piece.style.filter = 'brightness(1.4) saturate(1.3)';
+        } else {
+          piece.style.boxShadow = '';
+          piece.style.filter = '';
+        }
       });
       document.querySelectorAll('.chess-black').forEach(piece => {
         piece.style.background = theme.pieceColor.chessBlack;
+        if (themeKey === 'cyberpunk') {
+          piece.style.boxShadow = `0 0 15px #ff1493, 0 0 30px #ff1493, 0 0 45px #ff69b4, inset 0 0 10px rgba(255, 105, 180, 0.5)`;
+          piece.style.filter = 'brightness(1.4) saturate(1.3)';
+        } else {
+          piece.style.boxShadow = '';
+          piece.style.filter = '';
+        }
       });
+      
+      // 更新棋盘格子悬停效果（赛博朋克主题）
+      if (themeKey === 'cyberpunk') {
+        document.querySelectorAll('.gobang-cell').forEach(cell => {
+          cell.style.background = 'rgba(255, 20, 147, 0.15)';
+          cell.style.boxShadow = 'inset 0 0 10px rgba(255, 20, 147, 0.3)';
+        });
+        document.querySelectorAll('.go-cell').forEach(cell => {
+          cell.style.background = 'rgba(255, 20, 147, 0.15)';
+          cell.style.boxShadow = 'inset 0 0 10px rgba(255, 20, 147, 0.3)';
+        });
+        document.querySelectorAll('.chess-intersection').forEach(cell => {
+          cell.style.background = 'rgba(255, 20, 147, 0.15)';
+          cell.style.boxShadow = 'inset 0 0 10px rgba(255, 20, 147, 0.3)';
+        });
+      } else {
+        document.querySelectorAll('.gobang-cell').forEach(cell => {
+          cell.style.background = 'transparent';
+          cell.style.boxShadow = 'none';
+        });
+        document.querySelectorAll('.go-cell').forEach(cell => {
+          cell.style.background = 'transparent';
+          cell.style.boxShadow = 'none';
+        });
+        document.querySelectorAll('.chess-intersection').forEach(cell => {
+          cell.style.background = 'transparent';
+          cell.style.boxShadow = 'none';
+        });
+      }
 
       // 保存主题选择到 localStorage
       localStorage.setItem('selectedTheme', themeKey);
