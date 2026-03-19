@@ -16,6 +16,7 @@ class GameManager {
     this.spectators = new Map(); // gameId -> Set(userId)
     this.gameTimers = new Map(); // gameId -> timer
     this.moveHistory = new Map(); // gameId -> moves数组
+    this.aiGames = new Map(); // userId -> aiGame对象
   }
 
   // 生成游戏ID
@@ -930,6 +931,388 @@ class GameManager {
     }
 
     return true;
+  }
+
+  // ========== AI对战功能 ==========
+
+  // 创建AI对战游戏
+  createAIGame(userId, gameType, difficulty, io) {
+    if (!this.aiManager) {
+      logger.warn('AI对战功能未启用：AIManager未初始化');
+      return false;
+    }
+
+    const user = this.userManager.getUserByUserId(userId);
+    if (!user) {
+      logger.warn('创建AI对战失败：用户不存在', { userId });
+      return false;
+    }
+
+    // 验证游戏类型
+    if (!Object.values(config.game.types).includes(gameType)) {
+      logger.warn('创建AI对战失败：无效的游戏类型', { userId, gameType });
+      return false;
+    }
+
+    // 验证难度
+    if (!['easy', 'medium', 'hard'].includes(difficulty)) {
+      logger.warn('创建AI对战失败：无效的难度', { userId, difficulty });
+      return false;
+    }
+
+    // 初始化棋盘
+    const board = this.initializeBoard(gameType);
+
+    // 创建AI游戏对象
+    const aiGame = {
+      userId: userId,
+      gameType: gameType,
+      difficulty: difficulty,
+      board: board,
+      currentPlayer: 1, // 玩家先手
+      moves: [],
+      status: 'playing',
+      startTime: Date.now(),
+      lastMoveTime: Date.now()
+    };
+
+    // 保存AI游戏
+    this.aiGames.set(userId, aiGame);
+
+    // 更新用户状态
+    user.status = 'playing';
+    user.game = 'ai';
+    this.userManager.broadcastUserStatus(userId, 'playing', io);
+
+    logger.aiGameEvent(userId, '开始AI对战', { gameType, difficulty });
+
+    // 发送游戏开始信息
+    const userSocket = this.userManager.getSocketByUserId(userId);
+    if (userSocket) {
+      userSocket.emit('ai_game_start', {
+        gameType: gameType,
+        difficulty: difficulty,
+        board: board,
+        currentPlayer: 1
+      });
+    }
+
+    return true;
+  }
+
+  // 处理AI对战移动
+  handleAIMove(userId, position, io) {
+    const aiGame = this.aiGames.get(userId);
+    if (!aiGame || aiGame.status !== 'playing') {
+      return false;
+    }
+
+    // 验证是否是玩家回合
+    if (aiGame.currentPlayer !== 1) {
+      return false;
+    }
+
+    // 验证移动是否有效
+    if (!this.isValidMove(aiGame.gameType, aiGame.board, position, aiGame.currentPlayer)) {
+      return false;
+    }
+
+    // 执行玩家移动
+    this.executeMove(aiGame.gameType, aiGame.board, position, aiGame.currentPlayer);
+
+    // 记录移动
+    const move = {
+      player: userId,
+      color: aiGame.currentPlayer,
+      position: position,
+      timestamp: Date.now()
+    };
+    aiGame.moves.push(move);
+    aiGame.lastMoveTime = Date.now();
+
+    // 检查游戏是否结束
+    const gameOver = this.checkGameOver(aiGame.gameType, aiGame.board, aiGame.currentPlayer);
+    if (gameOver) {
+      this.endAIGame(userId, 'win', io);
+      return true;
+    }
+
+    // 切换到AI回合
+    aiGame.currentPlayer = 2;
+
+    // 发送移动结果
+    const userSocket = this.userManager.getSocketByUserId(userId);
+    if (userSocket) {
+      userSocket.emit('ai_move_result', {
+        position: position,
+        color: 1,
+        currentPlayer: 2
+      });
+    }
+
+    // AI思考并移动
+    setTimeout(() => {
+      this.handleAIAutoMove(userId, io);
+    }, 500);
+
+    return true;
+  }
+
+  // AI自动移动
+  handleAIAutoMove(userId, io) {
+    const aiGame = this.aiGames.get(userId);
+    if (!aiGame || aiGame.status !== 'playing' || aiGame.currentPlayer !== 2) {
+      return;
+    }
+
+    // 获取AI移动
+    const aiMove = this.aiManager.getAIMove(
+      aiGame.gameType,
+      aiGame.board,
+      aiGame.difficulty,
+      aiGame.currentPlayer
+    );
+
+    if (!aiMove) {
+      logger.warn('AI移动失败：无法生成有效移动', { userId, gameType: aiGame.gameType });
+      return;
+    }
+
+    // 执行AI移动
+    this.executeMove(aiGame.gameType, aiGame.board, aiMove, aiGame.currentPlayer);
+
+    // 记录移动
+    const move = {
+      player: 'ai',
+      color: aiGame.currentPlayer,
+      position: aiMove,
+      timestamp: Date.now()
+    };
+    aiGame.moves.push(move);
+    aiGame.lastMoveTime = Date.now();
+
+    // 检查游戏是否结束
+    const gameOver = this.checkGameOver(aiGame.gameType, aiGame.board, aiGame.currentPlayer);
+    if (gameOver) {
+      this.endAIGame(userId, 'loss', io);
+      return;
+    }
+
+    // 切换回玩家回合
+    aiGame.currentPlayer = 1;
+
+    // 发送AI移动结果
+    const userSocket = this.userManager.getSocketByUserId(userId);
+    if (userSocket) {
+      userSocket.emit('ai_move_result', {
+        position: aiMove,
+        color: 2,
+        currentPlayer: 1
+      });
+    }
+  }
+
+  // 结束AI对战
+  endAIGame(userId, result, io) {
+    const aiGame = this.aiGames.get(userId);
+    if (!aiGame) return;
+
+    aiGame.status = 'finished';
+    aiGame.endTime = Date.now();
+    aiGame.duration = aiGame.endTime - aiGame.startTime;
+    aiGame.result = result;
+
+    // 更新用户状态
+    const user = this.userManager.getUserByUserId(userId);
+    if (user) {
+      user.status = 'online';
+      user.game = null;
+      this.userManager.broadcastUserStatus(userId, 'online', io);
+    }
+
+    // 发送游戏结束信息
+    const userSocket = this.userManager.getSocketByUserId(userId);
+    if (userSocket) {
+      userSocket.emit('ai_game_end', {
+        result: result,
+        moves: aiGame.moves,
+        duration: aiGame.duration
+      });
+    }
+
+    logger.aiGameEvent(userId, 'AI对战结束', {
+      gameType: aiGame.gameType,
+      difficulty: aiGame.difficulty,
+      result: result,
+      duration: aiGame.duration
+    });
+
+    // 清理AI游戏
+    setTimeout(() => {
+      this.aiGames.delete(userId);
+    }, 5000);
+  }
+
+  // 初始化棋盘
+  initializeBoard(gameType) {
+    switch (gameType) {
+      case 'gobang':
+        return this.initializeGobangBoard();
+      case 'go':
+        return this.initializeGoBoard();
+      case 'chess':
+        return this.initializeChessBoard();
+      default:
+        return null;
+    }
+  }
+
+  // 初始化五子棋棋盘
+  initializeGobangBoard() {
+    const board = [];
+    for (let i = 0; i < 15; i++) {
+      board.push(Array(15).fill(0));
+    }
+    return board;
+  }
+
+  // 初始化围棋棋盘
+  initializeGoBoard() {
+    const board = [];
+    for (let i = 0; i < 19; i++) {
+      board.push(Array(19).fill(0));
+    }
+    return board;
+  }
+
+  // 初始化象棋棋盘
+  initializeChessBoard() {
+    // 简化实现，返回空棋盘
+    const board = [];
+    for (let i = 0; i < 10; i++) {
+      board.push(Array(9).fill(0));
+    }
+    return board;
+  }
+
+  // 验证移动是否有效
+  isValidMove(gameType, board, position, player) {
+    switch (gameType) {
+      case 'gobang':
+        return this.isValidGobangMove(board, position);
+      case 'go':
+        return this.isValidGoMove(board, position);
+      case 'chess':
+        return this.isValidChessMove(board, position, player);
+      default:
+        return false;
+    }
+  }
+
+  // 验证五子棋移动
+  isValidGobangMove(board, position) {
+    const { r, c } = position;
+    return r >= 0 && r < board.length && c >= 0 && c < board[0].length && board[r][c] === 0;
+  }
+
+  // 验证围棋移动
+  isValidGoMove(board, position) {
+    const { r, c } = position;
+    return r >= 0 && r < board.length && c >= 0 && c < board[0].length && board[r][c] === 0;
+  }
+
+  // 验证象棋移动
+  isValidChessMove(board, position, player) {
+    // 简化实现，总是返回true
+    return true;
+  }
+
+  // 执行移动
+  executeMove(gameType, board, position, player) {
+    switch (gameType) {
+      case 'gobang':
+        this.executeGobangMove(board, position, player);
+        break;
+      case 'go':
+        this.executeGoMove(board, position, player);
+        break;
+      case 'chess':
+        this.executeChessMove(board, position, player);
+        break;
+    }
+  }
+
+  // 执行五子棋移动
+  executeGobangMove(board, position, player) {
+    const { r, c } = position;
+    board[r][c] = player;
+  }
+
+  // 执行围棋移动
+  executeGoMove(board, position, player) {
+    const { r, c } = position;
+    board[r][c] = player;
+  }
+
+  // 执行象棋移动
+  executeChessMove(board, position, player) {
+    // 简化实现
+    const { fromR, fromC, toR, toC } = position;
+    board[toR][toC] = board[fromR][fromC];
+    board[fromR][fromC] = 0;
+  }
+
+  // 检查游戏是否结束
+  checkGameOver(gameType, board, player) {
+    switch (gameType) {
+      case 'gobang':
+        return this.checkGobangWin(board, player);
+      case 'go':
+        return this.checkGoWin(board, player);
+      case 'chess':
+        return this.checkChessWin(board, player);
+      default:
+        return false;
+    }
+  }
+
+  // 检查五子棋胜利
+  checkGobangWin(board, player) {
+    // 简化实现，检查是否有五子连珠
+    const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+
+    for (let r = 0; r < board.length; r++) {
+      for (let c = 0; c < board[r].length; c++) {
+        if (board[r][c] === player) {
+          for (const [dr, dc] of directions) {
+            let count = 1;
+            for (let i = 1; i < 5; i++) {
+              const nr = r + dr * i;
+              const nc = c + dc * i;
+              if (nr >= 0 && nr < board.length && nc >= 0 && nc < board[0].length && board[nr][nc] === player) {
+                count++;
+              } else {
+                break;
+              }
+            }
+            if (count >= 5) return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  // 检查围棋胜利
+  checkGoWin(board, player) {
+    // 简化实现，总是返回false
+    return false;
+  }
+
+  // 检查象棋胜利
+  checkChessWin(board, player) {
+    // 简化实现，总是返回false
+    return false;
   }
 }
 

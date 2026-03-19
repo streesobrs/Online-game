@@ -3167,6 +3167,50 @@
         }
       });
 
+      // ========== AI对战事件处理 ==========
+
+      // AI游戏开始
+      socket.on('ai_game_start', (data) => {
+        console.log('AI游戏开始:', data);
+        // 游戏已经开始，不需要额外处理
+      });
+
+      // AI移动结果
+      socket.on('ai_move_result', (data) => {
+        console.log('收到AI移动结果:', data);
+        handleAIMoveResult(data);
+      });
+
+      // AI游戏结束
+      socket.on('ai_game_end', (data) => {
+        console.log('AI游戏结束:', data);
+        gameState.gameOver = true;
+
+        let winMsg = '';
+        if (data.result === 'win') {
+          winMsg = '🎉 你战胜了AI！';
+        } else if (data.result === 'loss') {
+          winMsg = '😢 你输给了AI！';
+        } else {
+          winMsg = '🤝 游戏结束';
+        }
+
+        winnerEl.textContent = data.result === 'win' ? '你' : 'AI';
+        gameStatusEl.textContent = '游戏结束';
+        gameStatusEl.className = 'info-value value-waiting';
+        showWinAlert(winMsg);
+        updateStatus(`🏆 ${winMsg}`);
+        updateAdvancedStats();
+
+        const playAgainBtn = document.getElementById('play-again-btn');
+        if (playAgainBtn) {
+          playAgainBtn.style.display = 'inline-block';
+        }
+
+        // 发送AI游戏结果到服务器
+        sendAIGameResult(data.result);
+      });
+
       socket.on('chat_message', (data) => {
         console.log('收到聊天消息:', data);
         const isOther = data.userId !== userId;
@@ -5518,6 +5562,14 @@
 
       // 更新状态
       document.getElementById('status').innerHTML = `状态：🎮 正在与${difficulty === 'easy' ? '简单' : difficulty === 'medium' ? '中等' : '困难'}AI对战`;
+
+      // 通知服务器开始AI对战
+      if (socket) {
+        socket.emit('ai_game_start', {
+          gameType: currentGame,
+          difficulty: difficulty
+        });
+      }
     }
 
     // 发送 AI 游戏结果到服务器
@@ -5534,47 +5586,29 @@
       });
     }
 
-    // AI对战核心逻辑
+    // AI对战核心逻辑 - 现在由服务器处理
     function handleAIMove() {
-      if (!gameState.difficulty || gameState.turn === gameState.me || gameState.gameOver) return;
+      // 这个函数现在由服务器端处理AI移动
+      // 前端只需要在玩家移动后通知服务器
+    }
 
-      // 显示AI思考状态
-      updateStatus('🤖 AI正在思考中...');
+    // 处理AI移动结果（从服务器接收）
+    function handleAIMoveResult(data) {
+      if (!gameState.difficulty || gameState.gameOver) return;
 
-      // 根据难度设置思考延迟时间
-      const thinkDelay = {
-        easy: 300,
-        medium: 600,
-        hard: 1000
-      };
+      const { position, color, currentPlayer } = data;
 
-      const delay = thinkDelay[gameState.difficulty] || 500;
+      // 更新游戏状态
+      gameState.turn = currentPlayer;
 
-      setTimeout(() => {
-        const difficulty = gameState.difficulty;
-        const gameType = currentGame;
-        let move = null;
-
-        // 根据难度和棋种生成AI落子
-        if (difficulty === 'easy') {
-          move = generateRandomMove();
-        } else if (difficulty === 'medium') {
-          move = generateMediumMove();
-        } else if (difficulty === 'hard') {
-          move = generateHardMove();
-        }
-
-        if (move) {
-          // 执行AI落子
-          if (gameType === 'gobang') {
-            handleGobangAIMove(move.r, move.c);
-          } else if (gameType === 'go') {
-            handleGoAIMove(move.r, move.c);
-          } else if (gameType === 'chess') {
-            handleChessAIMove(move.fromR, move.fromC, move.toR, move.toC);
-          }
-        }
-      }, delay);
+      // 执行AI移动
+      if (currentGame === 'gobang') {
+        handleGobangAIMove(position.r, position.c);
+      } else if (currentGame === 'go') {
+        handleGoAIMove(position.r, position.c);
+      } else if (currentGame === 'chess') {
+        handleChessAIMove(position.fromR, position.fromC, position.toR, position.toC);
+      }
     }
 
     // 生成随机落子（简单难度）

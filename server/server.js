@@ -313,6 +313,40 @@ io.on('connection', (socket) => {
     }
   });
 
+  // ========== AI对战相关事件 ==========
+
+  // 开始AI对战
+  socket.on('ai_game_start', (data) => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user) {
+      socket.emit('error', { message: '用户不存在' });
+      return;
+    }
+
+    const { gameType, difficulty } = data;
+    
+    const success = gameManager.createAIGame(user.userId, gameType, difficulty, io);
+    if (!success) {
+      socket.emit('error', { message: '创建AI对战失败' });
+    }
+  });
+
+  // AI对战移动
+  socket.on('ai_move', (data) => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user) {
+      socket.emit('error', { message: '用户不存在' });
+      return;
+    }
+
+    const { position } = data;
+    
+    const success = gameManager.handleAIMove(user.userId, position, io);
+    if (!success) {
+      socket.emit('error', { message: 'AI对战移动失败' });
+    }
+  });
+
   // AI游戏结果
   socket.on('ai_game_result', async (data) => {
     const user = userManager.getUserBySocketId(socket.id);

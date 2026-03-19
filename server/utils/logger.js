@@ -177,6 +177,11 @@ const logger = {
   // 记录断开事件
   disconnectEvent(userId, details = {}) {
     this.info(`✂️ 用户断开`, { userId, ...details });
+  },
+
+  // 记录AI对战事件
+  aiGameEvent(userId, event, details = {}) {
+    this.info(`🤖 ${event}`, { userId, ...details });
   }
 };
 
