@@ -465,7 +465,7 @@ class GameManager {
 
     const gameId = game.gameId;
 
-    // 重置游戏状态
+    // 重置游戏状态（支持游戏结束后重置）
     game.status = 'playing';
     game.moves = [];
     game.currentPlayer = 1;
@@ -497,6 +497,9 @@ class GameManager {
     if (player2Socket) {
       player2Socket.emit('reset');
     }
+
+    // 重启游戏计时器
+    this.startGameTimer(gameId, io);
 
     logger.gameEvent(game.gameId, '游戏重置', {});
 
