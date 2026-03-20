@@ -5602,17 +5602,17 @@
 
       const { position, color, currentPlayer } = data;
 
-      // 更新游戏状态
-      gameState.turn = currentPlayer;
-
-      // 执行AI移动
+      // 执行AI移动（使用color作为当前移动的颜色）
       if (currentGame === 'gobang') {
-        handleGobangAIMove(position.r, position.c);
+        handleGobangAIMove(position.r, position.c, color);
       } else if (currentGame === 'go') {
-        handleGoAIMove(position.r, position.c);
+        handleGoAIMove(position.r, position.c, color);
       } else if (currentGame === 'chess') {
-        handleChessAIMove(position.fromR, position.fromC, position.toR, position.toC);
+        handleChessAIMove(position.fromR, position.fromC, position.toR, position.toC, color);
       }
+
+      // 更新游戏状态为下一回合
+      gameState.turn = currentPlayer;
     }
 
     // 生成随机落子（简单难度）
@@ -6143,18 +6143,18 @@
     }
 
     // 处理五子棋AI落子
-    function handleGobangAIMove(r, c) {
-      gameState.board[r][c] = gameState.turn;
+    function handleGobangAIMove(r, c, color) {
+      gameState.board[r][c] = color;
       gameState.moveCount++;
       gameState.moveLog.push({
-        color: gameState.turn,
+        color: color,
         r: r,
         c: c,
         isOpponent: true
       });
       gameState.moveTimestamps.push(Date.now());
 
-      if (gameState.turn === 1) {
+      if (color === 1) {
         gameState.blackCount++;
       } else {
         gameState.whiteCount++;
@@ -6162,7 +6162,7 @@
 
       requestAnimationFrame(() => {
         updateTurnDisplay();
-        updateLastMove(r, c, gameState.turn);
+        updateLastMove(r, c, color);
         updateMoveCount();
         updateColorCount();
         updateMoveLog();
@@ -6172,12 +6172,12 @@
 
       updateStatus(`🤖 AI已落子 (${r},${c})，你的回合`);
 
-      if (checkGobangWin(r, c, gameState.turn)) {
+      if (checkGobangWin(r, c, color)) {
         gameState.gameOver = true;
-        const winMsg = gameState.turn === 1 ? '黑棋获胜！' : '白棋获胜！';
-        const winColor = gameState.turn === 1 ? '黑棋' : '白棋';
+        const winMsg = color === 1 ? '黑棋获胜！' : '白棋获胜！';
+        const winColor = color === 1 ? '黑棋' : '白棋';
         winnerEl.textContent = winColor;
-        winnerEl.className = `info-value ${gameState.turn === 1 ? 'value-black' : 'value-white'}`;
+        winnerEl.className = `info-value ${color === 1 ? 'value-black' : 'value-white'}`;
         gameStatusEl.textContent = '游戏结束';
         gameStateEl.className = 'info-value value-waiting';
         showWinAlert(winMsg);
@@ -6191,18 +6191,18 @@
     }
 
     // 处理围棋AI落子
-    function handleGoAIMove(r, c) {
-      gameState.board[r][c] = gameState.turn;
+    function handleGoAIMove(r, c, color) {
+      gameState.board[r][c] = color;
       gameState.moveCount++;
       gameState.moveLog.push({
-        color: gameState.turn,
+        color: color,
         r: r,
         c: c,
         isOpponent: true
       });
       gameState.moveTimestamps.push(Date.now());
 
-      if (gameState.turn === 1) {
+      if (color === 1) {
         gameState.blackCount++;
       } else {
         gameState.whiteCount++;
@@ -6210,7 +6210,7 @@
 
       requestAnimationFrame(() => {
         updateTurnDisplay();
-        updateLastMove(r, c, gameState.turn);
+        updateLastMove(r, c, color);
         updateMoveCount();
         updateColorCount();
         updateMoveLog();
@@ -6223,7 +6223,7 @@
     }
 
     // 处理象棋AI落子
-    function handleChessAIMove(fromR, fromC, toR, toC) {
+    function handleChessAIMove(fromR, fromC, toR, toC, color) {
       const piece = getChessPieceAt(fromR, fromC);
       if (!piece) return;
 
@@ -6237,7 +6237,7 @@
       // 更新游戏状态
       gameState.moveCount++;
       gameState.moveLog.push({
-        color: gameState.turn,
+        color: color,
         piece: piece.dataset.name,
         fromR: fromR,
         fromC: fromC,
