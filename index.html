@@ -3798,11 +3798,12 @@
           timestamp: Date.now()
         });
       } else {
-        // AI对战，处理AI回合
-        gameState.turn = 3 - gameState.me;
-        updateTurnDisplay();
-        updateStatus(`📌 你已落子 (${r},${c})，等待AI回合`);
-        setTimeout(handleAIMove, 1000); // 延迟1秒，让用户有时间反应
+        // AI对战，发送移动给服务器
+        if (socket) {
+          socket.emit('ai_move', {
+            position: { r, c }
+          });
+        }
       }
 
       if (checkGobangWin(r, c, gameState.me)) {
@@ -3929,10 +3930,12 @@
           timestamp: Date.now()
         });
       } else {
-        // AI对战，处理AI回合
-        gameState.turn = 3 - gameState.me;
-        updateTurnDisplay();
-        updateStatus(`📌 你已落子 (${r},${c})，等待AI回合`);
+        // AI对战，发送移动给服务器
+        if (socket) {
+          socket.emit('ai_move', {
+            position: { r, c }
+          });
+        }
       }
 
       // 围棋通常通过领地判定胜负，这里简化处理
@@ -4517,11 +4520,12 @@
           timestamp: Date.now()
         });
       } else {
-        // AI 对战，处理 AI 回合
-        gameState.turn = 3 - gameState.turn;
-        updateTurnDisplay();
-        updateStatus(`📌 你已移动 ${piece.dataset.name} 到 (${toR},${toC})，等待 AI 回合`);
-        setTimeout(handleAIMove, 1000); // 延迟 1 秒，让用户有时间反应
+        // AI对战，发送移动给服务器
+        if (socket) {
+          socket.emit('ai_move', {
+            position: { fromR: parseInt(fromR), fromC: parseInt(fromC), toR: toR, toC: toC }
+          });
+        }
       }
 
       // 检查游戏结束条件
@@ -5365,6 +5369,9 @@
       matchedOpponentId = null;
       userStatus = 'online';
 
+      // 清除AI对战标记
+      gameState.difficulty = null;
+
       matchBtn.disabled = false;
       cancelBtn.disabled = true;
       matchBtn.innerHTML = '🎯 开始匹配';
@@ -6172,17 +6179,15 @@
         winnerEl.textContent = winColor;
         winnerEl.className = `info-value ${gameState.turn === 1 ? 'value-black' : 'value-white'}`;
         gameStatusEl.textContent = '游戏结束';
-        gameStatusEl.className = 'info-value value-waiting';
+        gameStateEl.className = 'info-value value-waiting';
         showWinAlert(winMsg);
         updateStatus(`🏆 ${winMsg} 游戏结束`);
         updateAdvancedStats();
 
         // 发送 AI 游戏结果
         sendAIGameResult('loss');
-      } else {
-        gameState.turn = 3 - gameState.turn;
-        updateTurnDisplay();
       }
+      // 注意：回合切换已经在 handleAIMoveResult 中处理，这里不需要再切换
     }
 
     // 处理围棋AI落子
@@ -6214,8 +6219,7 @@
       });
 
       updateStatus(`🤖 AI已落子 (${r},${c})，你的回合`);
-      gameState.turn = 3 - gameState.turn;
-      updateTurnDisplay();
+      // 注意：回合切换已经在 handleAIMoveResult 中处理，这里不需要再切换
     }
 
     // 处理象棋AI落子
@@ -6267,17 +6271,95 @@
         showWinAlert(winMsg);
         updateStatus(`🏆 ${winMsg} 游戏结束`);
         updateAdvancedStats();
-      } else {
-        gameState.turn = 3 - gameState.turn;
-        updateTurnDisplay();
       }
+      // 注意：回合切换已经在 handleAIMoveResult 中处理，这里不需要再切换
     }
 
     function playAgain() {
-      socket.emit('reset', {
-        message: '对方请求再来一局'
-      });
-      updateStatus('⏳ 等待对方同意再来一局...');
+      // 检查是否是AI对战
+      if (gameState.difficulty) {
+        // AI对战，直接重新开始
+        restartAIGame();
+      } else {
+        // PVP对战，发送重置请求
+        socket.emit('reset', {
+          message: '对方请求再来一局'
+        });
+        updateStatus('⏳ 等待对方同意再来一局...');
+      }
+    }
+
+    // AI对战再来一把
+    function restartAIGame() {
+      // 重置游戏状态 - 完全重置为初始状态
+      gameState.gameType = currentGame;
+      gameState.player = 1;
+      gameState.difficulty = gameState.difficulty;
+      gameState.me = 1;
+      gameState.turn = 1;
+      gameState.gameOver = false;
+      gameState.moveCount = 0;
+      gameState.moveLog = [];
+      gameState.blackCount = 0;
+      gameState.whiteCount = 0;
+      gameState.gameStartTime = Date.now();
+      gameState.maxChain = 0;
+      gameState.moveTimestamps = [];
+      gameState.selectedPiece = null;
+      gameState.validMoves = [];
+      gameState.lastMove = null;
+      currentPlayer = 1;
+
+      // 重置棋盘数组和UI
+      initGameBoard();
+
+      // 重新渲染棋盘
+      if (currentGame === 'gobang' || currentGame === 'go') {
+        renderBoard();
+      } else if (currentGame === 'chess') {
+        renderChessPieces();
+      }
+
+      // 重置UI
+      const playAgainBtn = document.getElementById('play-again-btn');
+      if (playAgainBtn) {
+        playAgainBtn.style.display = 'none';
+      }
+
+      winnerEl.textContent = '-';
+      winnerEl.className = 'info-value';
+      gameStatusEl.textContent = '游戏中';
+      gameStatusEl.className = 'info-value value-connected';
+
+      // 重置玩家颜色显示
+      const config = gameConfigs[currentGame];
+      const myColorText = config.colorNames[0];
+      myColorEl.textContent = myColorText;
+      myColorEl.className = `info-value ${currentGame === 'chess' ? 'value-red' : 'value-black'}`;
+
+      // 重新开始计时
+      gameState.gameStartTime = Date.now();
+      if (gameState.gameTimer) clearInterval(gameState.gameTimer);
+      gameState.gameTimer = setInterval(updateGameTime, 1000);
+
+      // 更新显示
+      updateTurnDisplay();
+      updateMoveCount();
+      updateColorCount();
+      updateMoveLog();
+      updateAdvancedStats();
+
+      // 更新状态
+      const difficultyText = gameState.difficulty === 'easy' ? '简单' : gameState.difficulty === 'medium' ? '中等' : '困难';
+      updateStatus(`🎮 正在与${difficultyText}AI对战，你先落子！`);
+
+      // 通知服务器重新开始AI对战
+      if (socket) {
+        socket.emit('ai_game_start', {
+          gameType: currentGame,
+          difficulty: gameState.difficulty
+        });
+      }
     }
 
     // 显示游戏结束结果（围棋点目）
@@ -6454,12 +6536,23 @@
 
       updateStatus(`📌 你已落子(${r}, ${c})，等待对方回合`);
 
-      socket.emit('move', {
-        game: currentGame,
-        r: r,
-        c: c,
-        color: gameState.me
-      });
+      // 检查是否是AI对战
+      if (gameState.difficulty) {
+        // AI对战，发送移动给服务器
+        if (socket) {
+          socket.emit('ai_move', {
+            position: { r, c }
+          });
+        }
+      } else {
+        // PVP对战
+        socket.emit('move', {
+          game: currentGame,
+          r: r,
+          c: c,
+          color: gameState.me
+        });
+      }
 
       if (checkGobangWin(r, c, gameState.me)) {
         gameState.gameOver = true;
@@ -6473,10 +6566,16 @@
         updateStatus(`🏆 ${winMsg} 游戏结束`);
         updateAdvancedStats();
 
-        socket.emit('game_result', {
-          result: 'win',
-          reason: '五子连珠'
-        });
+        if (gameState.difficulty) {
+          // AI对战
+          sendAIGameResult('win');
+        } else {
+          // PVP对战
+          socket.emit('game_result', {
+            result: 'win',
+            reason: '五子连珠'
+          });
+        }
       } else {
         gameState.turn = 3 - gameState.me;
         updateTurnDisplay();
@@ -6515,12 +6614,23 @@
 
       updateStatus(`📌 你已落子(${r}, ${c})，等待对方回合`);
 
-      socket.emit('move', {
-        game: currentGame,
-        r: r,
-        c: c,
-        color: gameState.me
-      });
+      // 检查是否是AI对战
+      if (gameState.difficulty) {
+        // AI对战，发送移动给服务器
+        if (socket) {
+          socket.emit('ai_move', {
+            position: { r, c }
+          });
+        }
+      } else {
+        // PVP对战
+        socket.emit('move', {
+          game: currentGame,
+          r: r,
+          c: c,
+          color: gameState.me
+        });
+      }
 
       if (checkGoWin()) {
         gameState.gameOver = true;
@@ -6534,10 +6644,16 @@
         updateStatus(`🏆 ${winMsg} 游戏结束`);
         updateAdvancedStats();
 
-        socket.emit('game_result', {
-          result: 'win',
-          reason: '棋盘填满'
-        });
+        if (gameState.difficulty) {
+          // AI对战
+          sendAIGameResult('win');
+        } else {
+          // PVP对战
+          socket.emit('game_result', {
+            result: 'win',
+            reason: '棋盘填满'
+          });
+        }
       } else {
         gameState.turn = 3 - gameState.me;
         updateTurnDisplay();
@@ -6652,15 +6768,26 @@
 
       updateStatus(`📌 你已移动 ${piece.dataset.name} 到(${toR}, ${toC})，等待对方回合`);
 
-      socket.emit('move', {
-        game: currentGame,
-        fromR: fromR,
-        fromC: fromC,
-        toR: toR,
-        toC: toC,
-        color: gameState.me,
-        piece: piece.dataset.name
-      });
+      // 检查是否是AI对战
+      if (gameState.difficulty) {
+        // AI对战，发送移动给服务器
+        if (socket) {
+          socket.emit('ai_move', {
+            position: { fromR: fromR, fromC: fromC, toR: toR, toC: toC }
+          });
+        }
+      } else {
+        // PVP对战
+        socket.emit('move', {
+          game: currentGame,
+          fromR: fromR,
+          fromC: fromC,
+          toR: toR,
+          toC: toC,
+          color: gameState.me,
+          piece: piece.dataset.name
+        });
+      }
 
       if (checkChessWin()) {
         gameState.gameOver = true;
@@ -6674,10 +6801,16 @@
         updateStatus(`🏆 ${winMsg} 游戏结束`);
         updateAdvancedStats();
 
-        socket.emit('game_result', {
-          result: 'win',
-          reason: '将帅被吃'
-        });
+        if (gameState.difficulty) {
+          // AI对战
+          sendAIGameResult('win');
+        } else {
+          // PVP对战
+          socket.emit('game_result', {
+            result: 'win',
+            reason: '将帅被吃'
+          });
+        }
       } else {
         gameState.turn = 3 - gameState.me;
         updateTurnDisplay();

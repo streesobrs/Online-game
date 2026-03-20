@@ -963,6 +963,13 @@ class GameManager {
       return false;
     }
 
+    // 如果存在旧游戏，先删除
+    const existingGame = this.aiGames.get(userId);
+    if (existingGame) {
+      logger.info('删除已存在的AI游戏', { userId, status: existingGame.status });
+      this.aiGames.delete(userId);
+    }
+
     // 初始化棋盘
     const board = this.initializeBoard(gameType);
 
@@ -1005,18 +1012,24 @@ class GameManager {
 
   // 处理AI对战移动
   handleAIMove(userId, position, io) {
+    logger.info('🎯 AI对战收到移动', { userId, position, gameType: this.aiGames.get(userId)?.gameType });
+
     const aiGame = this.aiGames.get(userId);
     if (!aiGame || aiGame.status !== 'playing') {
+      logger.warn('❌ AI对战移动失败：游戏不存在或不在进行中', { userId, game: !!aiGame, status: aiGame?.status });
       return false;
     }
 
     // 验证是否是玩家回合
     if (aiGame.currentPlayer !== 1) {
+      logger.warn('❌ AI对战移动失败：不是玩家回合', { userId, currentPlayer: aiGame.currentPlayer });
       return false;
     }
 
     // 验证移动是否有效
+    logger.info('🔍 验证移动有效性', { gameType: aiGame.gameType, position, boardSize: aiGame.board.length });
     if (!this.isValidMove(aiGame.gameType, aiGame.board, position, aiGame.currentPlayer)) {
+      logger.warn('❌ AI对战移动失败：无效的移动', { userId, position, gameType: aiGame.gameType });
       return false;
     }
 
@@ -1053,10 +1066,12 @@ class GameManager {
       });
     }
 
-    // AI思考并移动
+    // AI思考并移动，根据难度设置不同的思考时间
+    const thinkTime = aiGame.difficulty === 'easy' ? 800 :
+      aiGame.difficulty === 'medium' ? 1500 : 2500;
     setTimeout(() => {
       this.handleAIAutoMove(userId, io);
-    }, 500);
+    }, thinkTime);
 
     return true;
   }
@@ -1150,9 +1165,15 @@ class GameManager {
       duration: aiGame.duration
     });
 
-    // 清理AI游戏
+    // 清理AI游戏 - 使用游戏开始时间作为标识，确保不会误删新游戏
+    const gameStartTime = aiGame.startTime;
     setTimeout(() => {
-      this.aiGames.delete(userId);
+      const currentGame = this.aiGames.get(userId);
+      // 只有当游戏仍然存在且是同一个游戏时才删除
+      if (currentGame && currentGame.startTime === gameStartTime) {
+        this.aiGames.delete(userId);
+        logger.info('清理已结束的AI游戏', { userId, gameStartTime });
+      }
     }, 5000);
   }
 
@@ -1215,13 +1236,19 @@ class GameManager {
   // 验证五子棋移动
   isValidGobangMove(board, position) {
     const { r, c } = position;
-    return r >= 0 && r < board.length && c >= 0 && c < board[0].length && board[r][c] === 0;
+    logger.info('🔍 验证五子棋移动', { r, c, boardLength: board.length, board0Length: board[0]?.length, cellValue: board[r]?.[c] });
+    const isValid = r >= 0 && r < board.length && c >= 0 && c < board[0].length && board[r][c] === 0;
+    logger.info('✅ 五子棋移动验证结果', { isValid });
+    return isValid;
   }
 
   // 验证围棋移动
   isValidGoMove(board, position) {
     const { r, c } = position;
-    return r >= 0 && r < board.length && c >= 0 && c < board[0].length && board[r][c] === 0;
+    logger.info('🔍 验证围棋移动', { r, c, boardLength: board.length, board0Length: board[0]?.length, cellValue: board[r]?.[c] });
+    const isValid = r >= 0 && r < board.length && c >= 0 && c < board[0].length && board[r][c] === 0;
+    logger.info('✅ 围棋移动验证结果', { isValid });
+    return isValid;
   }
 
   // 验证象棋移动
