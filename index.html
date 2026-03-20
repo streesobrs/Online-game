@@ -615,8 +615,8 @@
 
     .gobang-board {
       display: grid;
-      grid-template-columns: repeat(15, 36px);
-      grid-template-rows: repeat(15, 36px);
+      grid-template-columns: repeat(19, 36px);
+      grid-template-rows: repeat(19, 36px);
       gap: 0;
       background: linear-gradient(135deg, #e8c49a 0%, #d4a76a 50%, #c4956a 100%);
       padding: 20px;
@@ -761,8 +761,8 @@
     /* 围棋棋盘样式 */
     .go-board {
       display: grid;
-      grid-template-columns: repeat(19, 34px);
-      grid-template-rows: repeat(19, 34px);
+      grid-template-columns: repeat(21, 34px);
+      grid-template-rows: repeat(21, 34px);
       gap: 0;
       background: linear-gradient(135deg, #e5c085 0%, #d4a76a 50%, #c4955a 100%);
       padding: 24px;
@@ -2673,8 +2673,8 @@
     // 游戏配置
     const gameConfigs = {
       gobang: {
-        size: 15,
-        totalCells: 225,
+        size: 19,
+        totalCells: 361,
         winCondition: '五子连珠',
         colorNames: ['黑棋', '白棋'],
         pieceClasses: ['gobang-black', 'gobang-white'],
@@ -2689,8 +2689,8 @@
 • 禁止三三、四四、长连等禁手（本版本简化规则）`
       },
       go: {
-        size: 19,
-        totalCells: 361,
+        size: 21,
+        totalCells: 441,
         winCondition: '领地最多',
         colorNames: ['黑棋', '白棋'],
         pieceClasses: ['go-black', 'go-white'],
@@ -4205,14 +4205,14 @@
       clearChessSelection();
 
       gameState.selectedPiece = piece;
-      
+
       // 保存原始样式
       piece.dataset.originalBoxShadow = piece.style.boxShadow || '';
       piece.dataset.originalFilter = piece.style.filter || '';
-      
+
       // 添加选中状态
       piece.classList.add('selected');
-      
+
       // 赛博朋克主题特殊处理
       if (currentTheme === 'cyberpunk') {
         let glowColor = '#ff1493';
@@ -7573,7 +7573,7 @@
           piece.style.filter = '';
         }
       });
-      
+
       // 更新棋盘格子悬停效果（赛博朋克主题）
       if (themeKey === 'cyberpunk') {
         document.querySelectorAll('.gobang-cell').forEach(cell => {

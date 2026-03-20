@@ -384,7 +384,7 @@ class GameManager {
     const move = {
       player: user.userId,
       color: isPlayer1 ? 1 : 2,
-      position: data.position,
+      position: data.position || { r: data.r, c: data.c },
       timestamp: Date.now()
     };
 
@@ -401,7 +401,7 @@ class GameManager {
 
     logger.gameEvent(game.gameId, '移动', {
       player: user.userId,
-      position: data.position
+      position: move.position
     });
 
     // 发送给对手
@@ -1173,8 +1173,8 @@ class GameManager {
   // 初始化五子棋棋盘
   initializeGobangBoard() {
     const board = [];
-    for (let i = 0; i < 15; i++) {
-      board.push(Array(15).fill(0));
+    for (let i = 0; i < 19; i++) {
+      board.push(Array(19).fill(0));
     }
     return board;
   }
@@ -1182,8 +1182,8 @@ class GameManager {
   // 初始化围棋棋盘
   initializeGoBoard() {
     const board = [];
-    for (let i = 0; i < 19; i++) {
-      board.push(Array(19).fill(0));
+    for (let i = 0; i < 21; i++) {
+      board.push(Array(21).fill(0));
     }
     return board;
   }
