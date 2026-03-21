@@ -35,10 +35,11 @@ class AIManager {
     }
   }
 
-  // 五子棋简单难度 - 基于基础规则的AI（积极防守）
+  // 五子棋简单难度 - 基于基础规则的AI（平衡攻防）
   getGobangEasyMove(board, currentPlayer) {
     const opponent = currentPlayer === 1 ? 2 : 1;
 
+    // ===== 最高优先级：立即获胜或阻止对手获胜 =====
     // 检查是否可以赢
     const winningMove = this.findWinningMove(board, currentPlayer);
     if (winningMove) {
@@ -57,19 +58,46 @@ class AIManager {
       return defensiveFourInRow;
     }
 
-    // 检查是否可以形成活四
+    // 检查是否需要防守对手可以形成的4连珠（包括间隔的情况）
+    const defensiveFourInRowMove = this.findFourInRowMove(board, opponent);
+    if (defensiveFourInRowMove) {
+      return defensiveFourInRowMove;
+    }
+
+    // ===== 高优先级：形成自己的攻势 =====
+    // 检查是否可以形成活四（必胜）
     const liveFourMove = this.findLiveFourMove(board, currentPlayer);
     if (liveFourMove) {
       return liveFourMove;
     }
 
+    // 检查是否可以形成4连珠
+    const fourInRowMove = this.findFourInRowMove(board, currentPlayer);
+    if (fourInRowMove) {
+      return fourInRowMove;
+    }
+
+    // 检查是否可以形成冲四
+    const rushFourMove = this.findRushFourMove(board, currentPlayer);
+    if (rushFourMove) {
+      return rushFourMove;
+    }
+
+    // ===== 中优先级：防守对手的强威胁 =====
     // 检查是否需要防守活四
     const defensiveLiveFourMove = this.findLiveFourMove(board, opponent);
     if (defensiveLiveFourMove) {
       return defensiveLiveFourMove;
     }
 
-    // 检查是否可以形成活三
+    // 检查是否需要防守冲四
+    const defensiveRushFourMove = this.findRushFourMove(board, opponent);
+    if (defensiveRushFourMove) {
+      return defensiveRushFourMove;
+    }
+
+    // ===== 低优先级：活三攻防 =====
+    // 检查是否可以形成活三（优先于防守活三）
     const liveThreeMove = this.findLiveThreeMove(board, currentPlayer);
     if (liveThreeMove) {
       return liveThreeMove;
@@ -79,12 +107,6 @@ class AIManager {
     const defensiveLiveThreeMove = this.findLiveThreeMove(board, opponent);
     if (defensiveLiveThreeMove) {
       return defensiveLiveThreeMove;
-    }
-
-    // 检查是否需要防守冲四
-    const defensiveRushFourMove = this.findRushFourMove(board, opponent);
-    if (defensiveRushFourMove) {
-      return defensiveRushFourMove;
     }
 
     // 积极防守：寻找对手最有威胁的位置并阻挡
@@ -139,7 +161,7 @@ class AIManager {
   getGobangMediumMove(board, currentPlayer) {
     const opponent = currentPlayer === 1 ? 2 : 1;
 
-    // ===== 基础防守（和简单难度相同）=====
+    // ===== 最高优先级：立即获胜或阻止对手获胜 =====
     // 检查是否可以赢
     const winningMove = this.findWinningMove(board, currentPlayer);
     if (winningMove) {
@@ -158,28 +180,36 @@ class AIManager {
       return defensiveFourInRow;
     }
 
-    // 检查是否可以形成活四
+    // 检查是否需要防守对手可以形成的4连珠（包括间隔的情况）
+    const defensiveFourInRowMove = this.findFourInRowMove(board, opponent);
+    if (defensiveFourInRowMove) {
+      return defensiveFourInRowMove;
+    }
+
+    // ===== 高优先级：形成自己的强攻势 =====
+    // 检查是否可以形成活四（必胜）
     const liveFourMove = this.findLiveFourMove(board, currentPlayer);
     if (liveFourMove) {
       return liveFourMove;
     }
 
+    // 检查是否可以形成4连珠
+    const fourInRowMove = this.findFourInRowMove(board, currentPlayer);
+    if (fourInRowMove) {
+      return fourInRowMove;
+    }
+
+    // 检查是否可以形成冲四
+    const rushFourMove = this.findRushFourMove(board, currentPlayer);
+    if (rushFourMove) {
+      return rushFourMove;
+    }
+
+    // ===== 中优先级：防守对手的强威胁 =====
     // 检查是否需要防守活四
     const defensiveLiveFourMove = this.findLiveFourMove(board, opponent);
     if (defensiveLiveFourMove) {
       return defensiveLiveFourMove;
-    }
-
-    // 检查是否可以形成活三
-    const liveThreeMove = this.findLiveThreeMove(board, currentPlayer);
-    if (liveThreeMove) {
-      return liveThreeMove;
-    }
-
-    // 检查是否需要防守活三
-    const defensiveLiveThreeMove = this.findLiveThreeMove(board, opponent);
-    if (defensiveLiveThreeMove) {
-      return defensiveLiveThreeMove;
     }
 
     // 检查是否需要防守冲四
@@ -188,7 +218,7 @@ class AIManager {
       return defensiveRushFourMove;
     }
 
-    // ===== 中等难度新增：高级进攻策略 =====
+    // ===== 中等难度新增：高级进攻策略（优先于防守活三） =====
     // 检查是否可以形成双活三（必胜局面）
     const doubleLiveThreeMove = this.findDoubleLiveThreeMove(board, currentPlayer);
     if (doubleLiveThreeMove) {
@@ -207,10 +237,17 @@ class AIManager {
       return doubleLiveTwoMove;
     }
 
-    // 检查是否可以形成冲四（进攻）
-    const rushFourMove = this.findRushFourMove(board, currentPlayer);
-    if (rushFourMove) {
-      return rushFourMove;
+    // ===== 低优先级：活三攻防 =====
+    // 检查是否可以形成活三（优先于防守活三）
+    const liveThreeMove = this.findLiveThreeMove(board, currentPlayer);
+    if (liveThreeMove) {
+      return liveThreeMove;
+    }
+
+    // 检查是否需要防守活三
+    const defensiveLiveThreeMove = this.findLiveThreeMove(board, opponent);
+    if (defensiveLiveThreeMove) {
+      return defensiveLiveThreeMove;
     }
 
     // 积极进攻：寻找最佳进攻位置（优先于防守活二）
@@ -219,7 +256,7 @@ class AIManager {
       return { r: bestAttackMove.r, c: bestAttackMove.c };
     }
 
-    // ===== 基础防守（和简单难度相同）=====
+    // ===== 基础防守 =====
     // 防守活二
     const defensiveLiveTwoMove = this.findBestDefensiveMoveV2(board, opponent, currentPlayer);
     if (defensiveLiveTwoMove) {
@@ -253,6 +290,12 @@ class AIManager {
       return defensiveFourInRow;
     }
 
+    // 检查是否需要防守对手可以形成的4连珠（包括间隔的情况）
+    const defensiveFourInRowMove = this.findFourInRowMove(board, opponent);
+    if (defensiveFourInRowMove) {
+      return defensiveFourInRowMove;
+    }
+
     // 检查是否可以形成活四
     const liveFourMove = this.findLiveFourMove(board, currentPlayer);
     if (liveFourMove) {
@@ -269,12 +312,6 @@ class AIManager {
     const fourInRowMove = this.findFourInRowMove(board, currentPlayer);
     if (fourInRowMove) {
       return fourInRowMove;
-    }
-
-    // 检查是否需要防守对手的4连珠
-    const defensiveFourInRowMove = this.findFourInRowMove(board, opponent);
-    if (defensiveFourInRowMove) {
-      return defensiveFourInRowMove;
     }
 
     // 检查是否可以形成冲四（形成4连珠）
