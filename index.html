@@ -2190,13 +2190,13 @@
     <button class="nav-btn" data-game="chess" onclick="switchGame('chess')">
       🟥 象棋
     </button>
-    <button class="nav-btn" onclick="showAchievements()">
+    <button class="nav-btn" data-page="achievements" onclick="showAchievements()">
       🏆 成就
     </button>
-    <button class="nav-btn" onclick="showAIGame()">
+    <button class="nav-btn" data-page="ai" onclick="showAIGame()">
       🤖 AI对战
     </button>
-    <button class="nav-btn" onclick="showThemeModal()">
+    <button class="nav-btn" data-page="theme" onclick="showThemeModal()">
       🎨 主题
     </button>
   </div>
@@ -3669,13 +3669,38 @@
       // 更新导航按钮状态
       document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.classList.remove('active');
+        // 清除所有内联背景色（包括 data-game 和 data-page 的按钮）
+        btn.style.background = '';
       });
-      document.querySelector(`[data-game="${game}"]`).classList.add('active');
+      const activeBtn = document.querySelector(`[data-game="${game}"]`);
+      activeBtn.classList.add('active');
+      // 如果有主题，应用主题颜色
+      if (currentTheme && themes[currentTheme]) {
+        activeBtn.style.background = themes[currentTheme].primaryColor;
+      }
 
       // 显示智能提示
       showGameTips();
 
       updateStatus(`✅ 已切换到${gameConfigs[game].emoji} ${gameConfigs[game].colorNames[0]}${gameConfigs[game].colorNames[1]}，点击"开始匹配"寻找对手`);
+    }
+
+    // 更新导航按钮选中状态（用于成就、AI对战、主题页面）
+    function updateNavActiveState(page) {
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('active');
+        // 清除内联背景色
+        btn.style.background = '';
+      });
+
+      const activeBtn = document.querySelector(`[data-page="${page}"]`);
+      if (activeBtn) {
+        activeBtn.classList.add('active');
+        // 如果有主题，应用主题颜色
+        if (currentTheme && themes[currentTheme]) {
+          activeBtn.style.background = themes[currentTheme].primaryColor;
+        }
+      }
     }
 
     // 更新游戏显示
@@ -5400,6 +5425,9 @@
     }
 
     function showAchievements() {
+      // 更新导航按钮状态
+      updateNavActiveState('achievements');
+
       // 隐藏其他页面
       lobbyContainer.style.display = 'none';
       infoContainer.style.display = 'none';
@@ -5422,6 +5450,9 @@
     }
 
     function showAIGame() {
+      // 更新导航按钮状态
+      updateNavActiveState('ai');
+
       // 隐藏其他页面
       lobbyContainer.style.display = 'none';
       infoContainer.style.display = 'none';
@@ -7843,6 +7874,9 @@
     let currentTheme = localStorage.getItem('selectedTheme') || 'default';
 
     function showThemeModal() {
+      // 更新导航按钮状态
+      updateNavActiveState('theme');
+
       const themeListEl = document.getElementById('theme-list');
       themeListEl.innerHTML = ''; // 清空现有列表
 
