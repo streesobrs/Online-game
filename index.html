@@ -2619,7 +2619,9 @@
       moveTimestamps: [],
       networkLatency: 0,
       selectedPiece: null,
-      validMoves: []
+      validMoves: [],
+      koPosition: null, // 打劫位置
+      koColor: null // 打劫颜色
     };
 
     // 重置请求数据
@@ -4097,6 +4099,12 @@
     function handleGoClick(r, c) {
       if (currentGame !== 'go' || gameState.gameOver || gameState.turn !== gameState.me || gameState.board[r][c] !== 0 || (!matchedOpponentId && !gameState.difficulty)) return;
 
+      // 检查是否打劫
+      if (isKo(r, c, gameState.me)) {
+        updateStatus(`❌ 打劫，不能立即回提`);
+        return;
+      }
+
       // 简单的围棋落子逻辑（实际围棋规则更复杂）
       gameState.board[r][c] = gameState.me;
       gameState.moveCount++;
@@ -4118,7 +4126,63 @@
       }
 
       // 简单的提子逻辑
-      removeCapturedStones(3 - gameState.me);
+      const captured = removeCapturedStones(3 - gameState.me);
+
+      // 检查是否形成打劫（只提了一个子）
+      if (captured === 1) {
+        // 找到被提的子的位置
+        for (let i = 0; i < gameConfigs.go.size; i++) {
+          for (let j = 0; j < gameConfigs.go.size; j++) {
+            if (gameState.board[i][j] === 0) {
+              // 检查这个位置是否是刚被提的子
+              const wasCaptured = !gameState.moveLog.some(move => move.r === i && move.c === j && move.color === 3 - gameState.me);
+              if (wasCaptured) {
+                // 设置打劫位置，对方下一回合不能立即回提
+                gameState.koPosition = { r: i, c: j };
+                gameState.koColor = 3 - gameState.me;
+                break;
+              }
+            }
+          }
+        }
+      } else {
+        // 不是打劫，清除打劫状态
+        gameState.koPosition = null;
+        gameState.koColor = null;
+      }
+      const myGroup = getGoGroup(r, c, gameState.me);
+      if (!hasGroupLiberty(myGroup)) {
+        // 自杀，撤销落子
+        gameState.board[r][c] = 0;
+        gameState.moveCount--;
+        gameState.moveLog.pop();
+        gameState.moveTimestamps.pop();
+        gameState.lastMove = gameState.moveLog.length > 0 ? {
+          r: gameState.moveLog[gameState.moveLog.length - 1].r,
+          c: gameState.moveLog[gameState.moveLog.length - 1].c,
+          color: gameState.moveLog[gameState.moveLog.length - 1].color
+        } : null;
+
+        if (gameState.me === 1) {
+          gameState.blackCount--;
+        } else {
+          gameState.whiteCount--;
+        }
+
+        // 恢复打劫状态
+        gameState.koPosition = null;
+        gameState.koColor = null;
+
+        updateTurnDisplay();
+        updateMoveCount();
+        updateColorCount();
+        updateMoveLog();
+        updateAdvancedStats();
+        renderBoard();
+
+        updateStatus(`❌ 该位置会导致自杀，无法落子`);
+        return;
+      }
 
       requestAnimationFrame(() => {
         updateTurnDisplay();
@@ -4268,18 +4332,27 @@
       return false; // 没有气
     }
 
+    // 检查单个棋子是否有气
+    function hasLiberty(r, c, color) {
+      const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+      for (const [dr, dc] of directions) {
+        const nr = r + dr;
+        const nc = c + dc;
+        if (nr >= 0 && nr < gameConfigs.go.size && nc >= 0 && nc < gameConfigs.go.size) {
+          if (gameState.board[nr][nc] === 0) {
+            return true; // 找到气
+          }
+        }
+      }
+      return false;
+    }
+
     // 检查是否打劫
     function isKo(r, c, color) {
-      // 简化的打劫检测：检查是否会导致重复局面
-      // 实际实现需要记录所有历史局面
-      if (!gameState.moveLog || gameState.moveLog.length < 2) return false;
-
-      const lastMove = gameState.moveLog[gameState.moveLog.length - 1];
-      const prevMove = gameState.moveLog[gameState.moveLog.length - 2];
-
-      // 如果刚提了一子，且立即回提，可能是打劫
-      if (lastMove.r === r && lastMove.c === c) return false;
-
+      // 检查是否在打劫位置
+      if (gameState.koPosition && gameState.koPosition.r === r && gameState.koPosition.c === c && gameState.koColor === color) {
+        return true;
+      }
       return false;
     }
 
@@ -4294,7 +4367,7 @@
       }
 
       // 检查是否还有合法移动
-      if (!hasValidGoMove(1) || !hasValidGoMove(2)) {
+      if (!hasValidGoMove(1) && !hasValidGoMove(2)) {
         return true;
       }
 
@@ -4309,7 +4382,17 @@
             // 检查这个位置是否可以落子（有气或能提子）
             gameState.board[r][c] = color;
             const hasLib = hasLiberty(r, c, color);
+
+            // 保存当前的计数状态
+            const originalBlackCount = gameState.blackCount;
+            const originalWhiteCount = gameState.whiteCount;
+
             const canCapture = removeCapturedStones(3 - color) > 0;
+
+            // 恢复计数状态
+            gameState.blackCount = originalBlackCount;
+            gameState.whiteCount = originalWhiteCount;
+
             gameState.board[r][c] = 0;
 
             if (hasLib || canCapture) {

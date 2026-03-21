@@ -414,6 +414,9 @@ io.on('connection', (socket) => {
     const isAI = true;
 
     try {
+      // 结束AI游戏并保存记录（如果游戏还在进行中）
+      await gameManager.endAIGame(user.userId, result, io);
+
       // 更新用户统计
       const statsResult = await userManager.updateUserStats(user.userId, isWin ? 'win' : 'loss', gameType, isAI, difficulty, duration);
 

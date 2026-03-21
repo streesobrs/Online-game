@@ -1174,6 +1174,9 @@ class GameManager {
     const aiGame = this.aiGames.get(userId);
     if (!aiGame) return;
 
+    // 如果游戏已经结束，直接返回，避免重复保存
+    if (aiGame.status === 'finished') return;
+
     aiGame.status = 'finished';
     aiGame.endTime = Date.now();
     aiGame.duration = aiGame.endTime - aiGame.startTime;
