@@ -853,6 +853,40 @@ class GameManager {
     }
   }
 
+  // 获取完整游戏记录（用于回放）
+  async getGameReplay(gameId) {
+    try {
+      const games = await dataStore.read('games');
+      const game = games.find(g => g.gameId === gameId);
+
+      if (!game) {
+        return null;
+      }
+
+      return {
+        gameId: game.gameId,
+        gameType: game.gameType,
+        player1: {
+          id: game.player1,
+          nickname: game.player1Nickname
+        },
+        player2: {
+          id: game.player2,
+          nickname: game.player2Nickname
+        },
+        winner: game.winner,
+        result: game.result,
+        moves: game.moves || [],
+        startTime: game.startTime,
+        endTime: game.endTime,
+        duration: game.duration
+      };
+    } catch (err) {
+      logger.error('获取游戏回放失败', { gameId, error: err.message });
+      return null;
+    }
+  }
+
   // 获取所有游戏
   getAllGames() {
     return Array.from(this.games.values()).map(game => ({
@@ -1011,7 +1045,7 @@ class GameManager {
   }
 
   // 处理AI对战移动
-  handleAIMove(userId, position, io) {
+  async handleAIMove(userId, position, io) {
     logger.info('🎯 AI对战收到移动', { userId, position, gameType: this.aiGames.get(userId)?.gameType });
 
     const aiGame = this.aiGames.get(userId);
@@ -1049,7 +1083,7 @@ class GameManager {
     // 检查游戏是否结束
     const gameOver = this.checkGameOver(aiGame.gameType, aiGame.board, aiGame.currentPlayer);
     if (gameOver) {
-      this.endAIGame(userId, 'win', io);
+      await this.endAIGame(userId, 'win', io);
       return true;
     }
 
@@ -1131,7 +1165,7 @@ class GameManager {
   }
 
   // 结束AI对战
-  endAIGame(userId, result, io) {
+  async endAIGame(userId, result, io) {
     const aiGame = this.aiGames.get(userId);
     if (!aiGame) return;
 
@@ -1140,8 +1174,36 @@ class GameManager {
     aiGame.duration = aiGame.endTime - aiGame.startTime;
     aiGame.result = result;
 
-    // 更新用户状态
+    // 获取用户信息
     const user = this.userManager.getUserByUserId(userId);
+    if (!user) return;
+
+    // 保存AI游戏记录到 games.json
+    try {
+      const record = {
+        id: `ai_${userId}_${aiGame.startTime}`,
+        gameId: `ai_${userId}_${aiGame.startTime}`,
+        gameType: aiGame.gameType,
+        player1: userId,
+        player2: 'ai',
+        player1Nickname: user.nickname || user.userId,
+        player2Nickname: 'AI',
+        winner: result === 'win' ? userId : 'ai',
+        result: result,
+        moves: aiGame.moves,
+        startTime: aiGame.startTime,
+        endTime: aiGame.endTime,
+        duration: aiGame.duration,
+        savedAt: Date.now()
+      };
+
+      await dataStore.add('games', record);
+      logger.info('AI游戏记录已保存', { userId, gameType: aiGame.gameType, result });
+    } catch (err) {
+      logger.error('保存AI游戏记录失败', { userId, error: err.message });
+    }
+
+    // 更新用户状态
     if (user) {
       user.status = 'online';
       user.game = null;

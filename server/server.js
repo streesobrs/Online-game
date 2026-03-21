@@ -248,6 +248,22 @@ io.on('connection', (socket) => {
     }
   });
 
+  // 获取游戏回放
+  socket.on('get_game_replay', async (data) => {
+    const { gameId } = data;
+    if (!gameId) {
+      socket.emit('error', { message: '缺少游戏ID' });
+      return;
+    }
+
+    const replay = await gameManager.getGameReplay(gameId);
+    if (replay) {
+      socket.emit('game_replay', { replay });
+    } else {
+      socket.emit('error', { message: '未找到该游戏记录' });
+    }
+  });
+
   // ========== 匹配相关事件 ==========
 
   // 匹配请求
@@ -324,7 +340,7 @@ io.on('connection', (socket) => {
     }
 
     const { gameType, difficulty } = data;
-    
+
     const success = gameManager.createAIGame(user.userId, gameType, difficulty, io);
     if (!success) {
       socket.emit('error', { message: '创建AI对战失败' });
@@ -332,7 +348,7 @@ io.on('connection', (socket) => {
   });
 
   // AI对战移动
-  socket.on('ai_move', (data) => {
+  socket.on('ai_move', async (data) => {
     const user = userManager.getUserBySocketId(socket.id);
     if (!user) {
       socket.emit('error', { message: '用户不存在' });
@@ -340,8 +356,8 @@ io.on('connection', (socket) => {
     }
 
     const { position } = data;
-    
-    const success = gameManager.handleAIMove(user.userId, position, io);
+
+    const success = await gameManager.handleAIMove(user.userId, position, io);
     if (!success) {
       socket.emit('error', { message: 'AI对战移动失败' });
     }
