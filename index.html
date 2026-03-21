@@ -2171,6 +2171,16 @@
 
 <body>
   <div id="lucy-bg"></div>
+
+  <!-- 断开连接提示框 -->
+  <div id="disconnect-warning" class="disconnect-warning" style="display: none;">
+    <div class="disconnect-content">
+      <div class="disconnect-icon">🔌</div>
+      <div class="disconnect-title">连接已断开</div>
+      <div class="disconnect-message">与服务器的连接已断开，请检查网络后重新连接</div>
+      <button class="reconnect-btn" onclick="reconnectServer()">重新连接</button>
+    </div>
+  </div>
   <!-- 账号栏 -->
   <div class="account-bar" id="account-bar">
     <button class="account-btn btn-primary" onclick="showLoginModal()">登录</button>
@@ -2584,7 +2594,12 @@
     // Socket.io 连接
     const socket = io({
       transports: ['websocket', 'polling'],
-      autoConnect: true
+      autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000
     });
 
     // 游戏状态变量
@@ -2962,6 +2977,9 @@
         connectStatusEl.textContent = '已连接';
         connectStatusEl.className = 'info-value value-connected';
 
+        // 隐藏断开连接提示框
+        hideDisconnectWarning();
+
         // 发送客户端连接请求（包含版本号和savedUserId）
         socket.emit('client_connect', {
           clientVersion: CLIENT_VERSION,
@@ -2982,6 +3000,27 @@
         console.log('Socket.io断开连接');
         connectStatusEl.textContent = '已断开';
         connectStatusEl.className = 'info-value value-danger';
+
+        // 显示断开连接提示框
+        showDisconnectWarning();
+      });
+
+      socket.on('reconnect', () => {
+        console.log('Socket.io重新连接成功');
+        connectStatusEl.textContent = '已连接';
+        connectStatusEl.className = 'info-value value-connected';
+        hideDisconnectWarning();
+        updateStatus('重新连接成功');
+      });
+
+      socket.on('reconnect_attempt', (attemptNumber) => {
+        console.log('正在尝试重新连接...', attemptNumber);
+        updateStatus(`正在重新连接... (${attemptNumber}/5)`);
+      });
+
+      socket.on('reconnect_failed', () => {
+        console.log('重新连接失败');
+        updateStatus('重新连接失败，请点击重连按钮');
       });
 
       // 处理版本检查结果
@@ -7068,6 +7107,39 @@
       }, 3000);
     }
 
+    // 显示断开连接提示框
+    function showDisconnectWarning() {
+      const warning = document.getElementById('disconnect-warning');
+      if (warning) {
+        warning.style.display = 'block';
+      }
+    }
+
+    // 隐藏断开连接提示框
+    function hideDisconnectWarning() {
+      const warning = document.getElementById('disconnect-warning');
+      if (warning) {
+        warning.style.display = 'none';
+      }
+    }
+
+    // 重连服务器
+    function reconnectServer() {
+      const warning = document.getElementById('disconnect-warning');
+      if (warning) {
+        warning.style.display = 'none';
+      }
+
+      // 如果socket已经存在，先断开
+      if (socket && socket.connected) {
+        socket.disconnect();
+      }
+
+      // 重新连接
+      socket.connect();
+      updateStatus('正在重新连接...');
+    }
+
     function showLoginModal() {
       const modal = document.createElement('div');
       modal.className = 'account-modal-overlay';
@@ -8614,6 +8686,92 @@
         repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(0, 0, 0, 0.4) 27px, rgba(0, 0, 0, 0.4) 28px);
       pointer-events: none;
       z-index: 1;
+    }
+
+    /* 断开连接提示框样式 */
+    .disconnect-warning {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10000;
+      animation: slideDown 0.5s ease-out;
+    }
+
+    .disconnect-content {
+      background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
+      border: 3px solid #fc8181;
+      border-radius: 15px;
+      padding: 20px 30px;
+      box-shadow: 0 10px 30px rgba(252, 129, 129, 0.3);
+      text-align: center;
+      min-width: 300px;
+    }
+
+    .disconnect-icon {
+      font-size: 48px;
+      margin-bottom: 15px;
+      animation: pulse 2s infinite;
+    }
+
+    .disconnect-title {
+      font-size: 24px;
+      font-weight: bold;
+      color: #c53030;
+      margin-bottom: 10px;
+    }
+
+    .disconnect-message {
+      font-size: 16px;
+      color: #742a2a;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .reconnect-btn {
+      background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+      color: white;
+      border: none;
+      padding: 12px 30px;
+      font-size: 16px;
+      font-weight: bold;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(66, 153, 225, 0.3);
+    }
+
+    .reconnect-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(66, 153, 225, 0.4);
+    }
+
+    .reconnect-btn:active {
+      transform: translateY(0);
+    }
+
+    @keyframes slideDown {
+      0% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px);
+      }
+
+      100% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        transform: scale(1);
+      }
+
+      50% {
+        transform: scale(1.1);
+      }
     }
   </style>
 

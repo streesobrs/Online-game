@@ -27,8 +27,11 @@ const io = socketIo(server, {
     methods: ['GET', 'POST'],
     credentials: true
   },
-  pingTimeout: 60000,
-  pingInterval: 25000
+  pingTimeout: 120000,
+  pingInterval: 30000,
+  transports: ['websocket', 'polling'],
+  upgradeTimeout: 10000,
+  maxHttpBufferSize: 1e6
 });
 
 // 中间件
