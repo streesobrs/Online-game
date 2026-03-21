@@ -2579,6 +2579,7 @@
     let lastExp = 0;
     let lastLevel = 1;
     const ACCOUNT_STORAGE_KEY = 'game_account';
+    let pendingRegisterInfo = null; // 保存注册信息用于自动登录
 
     // Socket.io 连接
     const socket = io({
@@ -2969,7 +2970,7 @@
         socket.emit('client_connect', {
           clientVersion: CLIENT_VERSION,
           savedUserId: getSavedUserId(),
-          accountId: currentAccount?.accountId
+          id: currentAccount?.id
         });
 
         // 如果有保存的账号，自动发送昵称登录
@@ -3305,7 +3306,15 @@
 
       // 处理登录结果
       socket.on('login_result', (data) => {
+        console.log('登录结果:', data);
         const { success, message, data: resultData } = data;
+
+        // 恢复按钮状态
+        const loginBtn = document.querySelector('#account-modal .btn-primary');
+        if (loginBtn && loginBtn.textContent === '登录中...') {
+          loginBtn.textContent = '登录';
+          loginBtn.disabled = false;
+        }
 
         if (success && resultData) {
           // 登录成功
@@ -3320,6 +3329,7 @@
           // 更新界面
           updateAccountBar();
           closeAutoLoginModal();
+          closeAccountModal();
 
           // 发送用户登录事件
           if (currentAccount.nickname) {
@@ -3332,7 +3342,7 @@
           loadPermissions(resultData.permissions);
         } else {
           // 登录失败
-          showToast(message, 'error');
+          showToast(message || '登录失败，请检查用户名和密码', 'error');
         }
       });
 
@@ -3354,12 +3364,18 @@
         if (data.action === 'register') {
           if (data.success) {
             // 注册成功后自动登录
-            socket.emit('account_login', {
-              username: data.account.username,
-              password: data.account.password
-            });
+            if (pendingRegisterInfo) {
+              socket.emit('account_login', {
+                username: pendingRegisterInfo.username,
+                password: pendingRegisterInfo.password
+              });
+              pendingRegisterInfo = null; // 清除保存的信息
+            } else {
+              showToast('注册成功，请手动登录', 'success');
+            }
           } else {
             showToast('注册失败：' + data.message, 'error');
+            pendingRegisterInfo = null; // 清除保存的信息
           }
         } else if (data.action === 'update_profile') {
           if (data.success) {
@@ -7111,6 +7127,9 @@
         return;
       }
 
+      // 保存注册信息用于自动登录（用户名转小写）
+      pendingRegisterInfo = { username: username.toLowerCase(), password };
+
       // 显示加载状态
       const registerBtn = document.querySelector('#account-modal .btn-success');
       const originalText = registerBtn.textContent;
@@ -7350,7 +7369,7 @@
       const bio = document.getElementById('profile-bio').value.trim();
 
       const updates = {
-        accountId: currentAccount.accountId,
+        id: currentAccount.id,
         nickname: nickname || null,
         profile: {
           ...currentAccount.profile,
@@ -7387,7 +7406,7 @@
       }
 
       socket.emit('account_change_password', {
-        accountId: currentAccount.accountId,
+        id: currentAccount.id,
         oldPassword: oldPassword,
         newPassword: newPassword
       });

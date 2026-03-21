@@ -37,7 +37,7 @@ class AccountManager {
   // 检查用户名是否已存在
   async usernameExists(username) {
     try {
-      const account = await dataStore.findOne('accounts', { username, type: { $ne: 'guest' } });
+      const account = await dataStore.findOne('accounts', { username: username.toLowerCase(), type: { $ne: 'guest' } });
       return !!account;
     } catch (err) {
       logger.error('检查用户名失败', { username, error: err.message });
@@ -89,9 +89,9 @@ class AccountManager {
   // 账号密码登录
   async accountLogin(username, password) {
     try {
-      // 查找用户
+      // 查找用户（用户名转小写匹配）
       const account = await dataStore.findOne('accounts', {
-        username,
+        username: username.toLowerCase(),
         type: { $ne: 'guest' }
       });
 
@@ -146,10 +146,10 @@ class AccountManager {
   }
 
   // 生成会话令牌
-  generateSessionToken(accountId) {
+  generateSessionToken(id) {
     const timestamp = Date.now();
     const random = crypto.randomBytes(16).toString('hex');
-    const tokenData = `${accountId}|${timestamp}|${random}`;
+    const tokenData = `${id}|${timestamp}|${random}`;
     return Buffer.from(tokenData).toString('base64');
   }
 
@@ -157,7 +157,7 @@ class AccountManager {
   verifySessionToken(token) {
     try {
       const tokenData = Buffer.from(token, 'base64').toString('utf8');
-      const [accountId, timestamp, random] = tokenData.split('|');
+      const [id, timestamp, random] = tokenData.split('|');
 
       // 检查令牌是否过期（24小时）
       const tokenAge = Date.now() - parseInt(timestamp);
@@ -165,7 +165,7 @@ class AccountManager {
         return null;
       }
 
-      return accountId;
+      return id;
     } catch (err) {
       return null;
     }
@@ -176,7 +176,6 @@ class AccountManager {
     const guestId = this.generateGuestId();
     const guestUser = {
       id: guestId,
-      userId: guestId,
       type: 'guest',
       nickname: nickname || `玩家${guestId.substr(6, 4)}`,
       stats: {
@@ -204,9 +203,9 @@ class AccountManager {
   }
 
   // 获取用户信息（支持游客和注册用户）
-  async getUser(userId) {
+  async getUser(id) {
     try {
-      const user = await dataStore.findOne('accounts', { userId });
+      const user = await dataStore.findOne('accounts', { id });
       if (!user) {
         return null;
       }
@@ -215,15 +214,15 @@ class AccountManager {
       const { passwordSalt, passwordHash, ...safeUser } = user;
       return safeUser;
     } catch (err) {
-      logger.error('获取用户信息失败', { userId, error: err.message });
+      logger.error('获取用户信息失败', { id, error: err.message });
       return null;
     }
   }
 
   // 更新用户信息（支持游客和注册用户）
-  async updateUser(userId, updates) {
+  async updateUser(id, updates) {
     try {
-      const user = await dataStore.findOne('accounts', { userId });
+      const user = await dataStore.findOne('accounts', { id });
       if (!user) {
         return {
           success: false,
@@ -233,16 +232,16 @@ class AccountManager {
 
       // 更新用户信息
       const updateData = { ...updates, updatedAt: Date.now() };
-      await dataStore.update('accounts', userId, updateData);
+      await dataStore.update('accounts', id, updateData);
 
-      logger.info('更新用户信息', { userId, updates: Object.keys(updates) });
+      logger.info('更新用户信息', { id, updates: Object.keys(updates) });
 
       return {
         success: true,
         message: '更新成功'
       };
     } catch (err) {
-      logger.error('更新用户信息失败', { userId, error: err.message });
+      logger.error('更新用户信息失败', { id, error: err.message });
       return {
         success: false,
         message: '更新失败'
@@ -250,8 +249,8 @@ class AccountManager {
     }
   }
 
-  // 注册新账号
-  async register(username, password, nickname = null) {
+  // 注册新账号（支持游客升级）
+  async register(username, password, nickname = null, guestUserId = null) {
     // 验证用户名
     if (!this.validateUsername(username)) {
       return {
@@ -276,87 +275,140 @@ class AccountManager {
       };
     }
 
-    // 创建账号
+    // 检查是否有游客账号需要升级
+    let guestAccount = null;
+    if (guestUserId) {
+      guestAccount = await dataStore.findOne('accounts', {
+        id: guestUserId,
+        type: 'guest'
+      });
+    }
+
+    // 创建密码哈希
     const salt = this.generateSalt();
     const passwordHash = this.hashPassword(password, salt);
-    const accountId = this.generateAccountId();
+    const now = Date.now();
 
-    const account = {
-      id: accountId,
-      userId: accountId,
-      accountId: accountId,
-      type: 'registered',
-      username: username.toLowerCase(),
-      passwordSalt: salt,
-      passwordHash: passwordHash,
-      nickname: nickname || username,
-      profile: {
-        avatar: null,
-        bio: '',
-        level: 1,
-        exp: 0
-      },
-      stats: {
-        wins: 0,
-        losses: 0,
-        draws: 0,
-        totalGames: 0,
-        gameTypeWins: {
-          gobang: 0,
-          chess: 0,
-          go: 0
+    if (guestAccount) {
+      // 升级游客账号为正式账号，保持原有 id 不变
+      const updatedAccount = {
+        ...guestAccount,
+        type: 'registered',
+        username: username.toLowerCase(),
+        passwordSalt: salt,
+        passwordHash: passwordHash,
+        nickname: nickname || username,
+        profile: {
+          avatar: null,
+          bio: '',
+          level: 1,
+          exp: 0
         },
-        streak: 0,
-        maxStreak: 0,
-        aiWins: 0,
-        aiDifficulty: null,
-        aiResult: null,
-        firstGame: false,
-        nightGame: false,
-        weekendGame: false,
-        chatMessages: 0,
-        silentWin: false,
-        comebackStreak: 0,
-        allGameTypes: false,
-        singleGameType: false,
-        quickGame: false,
-        slowGame: false,
-        luckyWin: false,
-        unluckyLoss: false,
-        friends: 0,
-        lonerWin: false,
-        signInStreak: 0,
-        badges: 0,
-        dailyGames: 0,
-        weeklyGames: 0,
-        monthlyGames: 0,
-        lowLevelWins: 0,
-        returnPlayer: false,
-        invites: 0
-      },
-      createdAt: Date.now(),
-      lastLogin: Date.now(),
-      lastSeen: Date.now(),
-      updatedAt: Date.now()
-    };
-
-    try {
-      await dataStore.add('accounts', account);
-      logger.info('新账号注册', { accountId, username });
-
-      return {
-        success: true,
-        accountId: accountId,
-        username: account.username,
-        nickname: account.nickname,
-        message: '注册成功'
+        lastLogin: now,
+        lastSeen: now,
+        updatedAt: now
       };
-    } catch (err) {
-      logger.error('账号注册失败', { username, error: err.message });
-      return {
-        success: false,
-        message: '注册失败，请稍后重试'
+
+      try {
+        // 直接更新账号（保持 id 不变）
+        await dataStore.update('accounts', guestUserId, updatedAccount);
+        logger.info('游客账号升级为正式账号', {
+          id: guestUserId,
+          username
+        });
+
+        return {
+          success: true,
+          id: guestUserId,
+          username: updatedAccount.username,
+          nickname: updatedAccount.nickname,
+          message: '注册成功'
+        };
+      } catch (err) {
+        logger.error('账号升级失败', { username, error: err.message });
+        return {
+          success: false,
+          message: '注册失败，请稍后重试'
+        };
+      }
+    } else {
+      // 没有游客账号，创建新账号
+      const accountId = this.generateAccountId();
+      const account = {
+        id: accountId,
+        type: 'registered',
+        username: username.toLowerCase(),
+        passwordSalt: salt,
+        passwordHash: passwordHash,
+        nickname: nickname || username,
+        profile: {
+          avatar: null,
+          bio: '',
+          level: 1,
+          exp: 0
+        },
+        stats: {
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          totalGames: 0,
+          gameTypeWins: {
+            gobang: 0,
+            chess: 0,
+            go: 0
+          },
+          streak: 0,
+          maxStreak: 0,
+          aiWins: 0,
+          aiDifficulty: null,
+          aiResult: null,
+          firstGame: false,
+          nightGame: false,
+          weekendGame: false,
+          chatMessages: 0,
+          silentWin: false,
+          comebackStreak: 0,
+          allGameTypes: false,
+          singleGameType: false,
+          quickGame: false,
+          slowGame: false,
+          luckyWin: false,
+          unluckyLoss: false,
+          friends: 0,
+          lonerWin: false,
+          signInStreak: 0,
+          badges: 0,
+          dailyGames: 0,
+          weeklyGames: 0,
+          monthlyGames: 0,
+          lowLevelWins: 0,
+          returnPlayer: false,
+          invites: 0
+        },
+        createdAt: now,
+        lastLogin: now,
+        lastSeen: now,
+        updatedAt: now
       };
+
+      try {
+        await dataStore.add('accounts', account);
+        logger.info('新账号注册', { id: accountId, username });
+
+        return {
+          success: true,
+          id: accountId,
+          username: account.username,
+          nickname: account.nickname,
+          message: '注册成功'
+        };
+      } catch (err) {
+        logger.error('账号注册失败', { username, error: err.message });
+        return {
+          success: false,
+          message: '注册失败，请稍后重试'
+        };
+      }
     }
   }
 
@@ -384,11 +436,11 @@ class AccountManager {
 
       // 更新最后登录时间
       account.lastLogin = Date.now();
-      await dataStore.update('accounts', account.accountId, {
+      await dataStore.update('accounts', account.id, {
         lastLogin: Date.now()
       });
 
-      logger.info('账号登录', { accountId: account.accountId, username: account.username });
+      logger.info('账号登录', { id: account.id, username: account.username });
 
       // 生成登录token
       const loginToken = crypto.randomBytes(32).toString('hex');
@@ -396,7 +448,7 @@ class AccountManager {
       return {
         success: true,
         account: {
-          accountId: account.accountId,
+          id: account.id,
           username: account.username,
           nickname: account.nickname,
           profile: account.profile,
@@ -417,9 +469,9 @@ class AccountManager {
   }
 
   // 获取账号信息
-  async getAccount(accountId) {
+  async getAccount(id) {
     try {
-      const account = await dataStore.findOne('accounts', { accountId });
+      const account = await dataStore.findOne('accounts', { id });
       if (!account) {
         return null;
       }
@@ -427,15 +479,15 @@ class AccountManager {
       const { passwordSalt, passwordHash, ...safeAccount } = account;
       return safeAccount;
     } catch (err) {
-      logger.error('获取账号信息失败', { accountId, error: err.message });
+      logger.error('获取账号信息失败', { id, error: err.message });
       return null;
     }
   }
 
   // 更新账号资料
-  async updateProfile(accountId, updates) {
+  async updateProfile(id, updates) {
     try {
-      const account = await dataStore.findOne('accounts', { accountId });
+      const account = await dataStore.findOne('accounts', { id });
       if (!account) {
         return {
           success: false,
@@ -452,15 +504,15 @@ class AccountManager {
         }
       }
 
-      await dataStore.update('accounts', accountId, updateData);
-      logger.info('账号资料更新', { accountId, updates: Object.keys(updateData) });
+      await dataStore.update('accounts', id, updateData);
+      logger.info('账号资料更新', { id, updates: Object.keys(updateData) });
 
       return {
         success: true,
         message: '资料更新成功'
       };
     } catch (err) {
-      logger.error('更新账号资料失败', { accountId, error: err.message });
+      logger.error('更新账号资料失败', { id, error: err.message });
       return {
         success: false,
         message: '更新失败，请稍后重试'
@@ -469,9 +521,9 @@ class AccountManager {
   }
 
   // 更新聊天消息统计
-  async updateChatMessages(accountId) {
+  async updateChatMessages(id) {
     try {
-      const account = await dataStore.findOne('accounts', { accountId });
+      const account = await dataStore.findOne('accounts', { id });
       if (!account) {
         return { success: false, message: '账号不存在' };
       }
@@ -479,20 +531,20 @@ class AccountManager {
       const stats = account.stats || { chatMessages: 0 };
       stats.chatMessages = (stats.chatMessages || 0) + 1;
 
-      await dataStore.update('accounts', accountId, { stats });
-      logger.info('聊天消息统计更新', { accountId, total: stats.chatMessages });
+      await dataStore.update('accounts', id, { stats });
+      logger.info('聊天消息统计更新', { id, total: stats.chatMessages });
 
       return { success: true };
     } catch (err) {
-      logger.error('更新聊天消息统计失败', { accountId, error: err.message });
+      logger.error('更新聊天消息统计失败', { id, error: err.message });
       return { success: false, message: '更新失败' };
     }
   }
 
   // 更新游戏统计
-  async updateGameStats(accountId, result, gameType = null, isAI = false, aiDifficulty = null, duration = null) {
+  async updateGameStats(id, result, gameType = null, isAI = false, aiDifficulty = null, duration = null) {
     try {
-      const account = await dataStore.findOne('accounts', { accountId });
+      const account = await dataStore.findOne('accounts', { id });
       if (!account) {
         return { success: false, message: '账号不存在' };
       }
@@ -577,20 +629,20 @@ class AccountManager {
         profile.level++;
       }
 
-      await dataStore.update('accounts', accountId, { stats, profile });
-      logger.info('账号游戏统计更新', { accountId, result, gameType, isAI });
+      await dataStore.update('accounts', id, { stats, profile });
+      logger.info('账号游戏统计更新', { id, result, gameType, isAI });
 
       return { success: true, stats };
     } catch (err) {
-      logger.error('更新账号游戏统计失败', { accountId, error: err.message });
+      logger.error('更新账号游戏统计失败', { id, error: err.message });
       return { success: false, message: '更新失败' };
     }
   }
 
   // 添加经验值
-  async addExp(accountId, exp) {
+  async addExp(id, exp) {
     try {
-      const account = await dataStore.findOne('accounts', { accountId });
+      const account = await dataStore.findOne('accounts', { id });
       if (!account) {
         return { success: false, message: '账号不存在' };
       }
@@ -603,20 +655,20 @@ class AccountManager {
         profile.level++;
       }
 
-      await dataStore.update('accounts', accountId, { profile });
-      logger.info('添加经验值', { accountId, exp });
+      await dataStore.update('accounts', id, { profile });
+      logger.info('添加经验值', { id, exp });
 
       return { success: true };
     } catch (err) {
-      logger.error('添加经验值失败', { accountId, error: err.message });
+      logger.error('添加经验值失败', { id, error: err.message });
       return { success: false, message: '添加失败' };
     }
   }
 
   // 修改密码
-  async changePassword(accountId, oldPassword, newPassword) {
+  async changePassword(id, oldPassword, newPassword) {
     try {
-      const account = await dataStore.findOne('accounts', { accountId });
+      const account = await dataStore.findOne('accounts', { id });
       if (!account) {
         return {
           success: false,
@@ -645,18 +697,18 @@ class AccountManager {
       const newSalt = this.generateSalt();
       const newHash = this.hashPassword(newPassword, newSalt);
 
-      await dataStore.update('accounts', accountId, {
+      await dataStore.update('accounts', id, {
         passwordSalt: newSalt,
         passwordHash: newHash
       });
 
-      logger.info('密码修改', { accountId });
+      logger.info('密码修改', { id });
       return {
         success: true,
         message: '密码修改成功'
       };
     } catch (err) {
-      logger.error('修改密码失败', { accountId, error: err.message });
+      logger.error('修改密码失败', { id, error: err.message });
       return {
         success: false,
         message: '修改失败，请稍后重试'
@@ -696,9 +748,9 @@ class AccountManager {
   }
 
   // 管理员删除账号
-  async deleteAccount(accountId) {
+  async deleteAccount(id) {
     try {
-      const account = await dataStore.findOne('accounts', { accountId });
+      const account = await dataStore.findOne('accounts', { id });
       if (!account) {
         return {
           success: false,
@@ -706,15 +758,15 @@ class AccountManager {
         };
       }
 
-      await dataStore.remove('accounts', { accountId });
-      logger.info('账号被删除', { accountId, username: account.username });
+      await dataStore.delete('accounts', id);
+      logger.info('账号被删除', { id, username: account.username });
 
       return {
         success: true,
         message: '账号已删除'
       };
     } catch (err) {
-      logger.error('删除账号失败', { accountId, error: err.message });
+      logger.error('删除账号失败', { id, error: err.message });
       return {
         success: false,
         message: '删除失败，请稍后重试'

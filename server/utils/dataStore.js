@@ -94,7 +94,12 @@ class DataStore {
     const data = await this.read(collection);
     return data.filter(item => {
       for (const [key, value] of Object.entries(query)) {
-        if (item[key] !== value) return false;
+        // 支持 $ne 操作符
+        if (value && typeof value === 'object' && value.$ne !== undefined) {
+          if (item[key] === value.$ne) return false;
+        } else if (item[key] !== value) {
+          return false;
+        }
       }
       return true;
     });

@@ -108,7 +108,7 @@ io.on('connection', (socket) => {
     logger.info('收到客户端连接请求', {
       socketId: socket.id,
       clientVersion: data?.clientVersion,
-      accountId: data?.accountId
+      id: data?.id
     });
 
     // 检查版本兼容性
@@ -121,14 +121,14 @@ io.on('connection', (socket) => {
     });
 
     // 如果有账号ID，关联用户和账号
-    if (data?.accountId) {
+    if (data?.id) {
       const user = userManager.getUserBySocketId(socket.id);
       if (user) {
-        userManager.setUserAccount(user.userId, data.accountId);
+        userManager.setUserAccount(user.userId, data.id);
         logger.info('自动关联账号成功', {
           socketId: socket.id,
           userId: user.userId,
-          accountId: data.accountId
+          id: data.id
         });
       }
     }
@@ -139,7 +139,17 @@ io.on('connection', (socket) => {
   // 注册账号
   socket.on('account_register', async (data) => {
     const { username, password, nickname } = data;
-    const result = await accountManager.register(username, password, nickname);
+    // 获取当前用户（可能是游客）
+    const user = userManager.getUserBySocketId(socket.id);
+    const guestUserId = user?.userId;
+    const result = await accountManager.register(username, password, nickname, guestUserId);
+
+    // 如果注册成功且是游客升级，更新 userManager 中的用户信息
+    if (result.success && guestUserId && user) {
+      userManager.setUserAccount(user.userId, result.id);
+      user.loginType = 'account';
+    }
+
     socket.emit('account_action_result', {
       action: 'register',
       ...result
@@ -189,10 +199,10 @@ io.on('connection', (socket) => {
 
   // 更新账号资料
   socket.on('account_update_profile', async (data) => {
-    const { accountId, nickname, profile } = data;
-    const result = await accountManager.updateProfile(accountId, { nickname, profile });
+    const { id, nickname, profile } = data;
+    const result = await accountManager.updateProfile(id, { nickname, profile });
     if (result.success) {
-      const account = await accountManager.getAccount(accountId);
+      const account = await accountManager.getAccount(id);
       result.account = account;
     }
     socket.emit('account_action_result', {
@@ -203,8 +213,8 @@ io.on('connection', (socket) => {
 
   // 修改密码
   socket.on('account_change_password', async (data) => {
-    const { accountId, oldPassword, newPassword } = data;
-    const result = await accountManager.changePassword(accountId, oldPassword, newPassword);
+    const { id, oldPassword, newPassword } = data;
+    const result = await accountManager.changePassword(id, oldPassword, newPassword);
     socket.emit('account_action_result', {
       action: 'change_password',
       ...result
@@ -645,8 +655,8 @@ adminNamespace.on('connection', (socket) => {
 
   // 删除账号
   socket.on('delete_account', (data) => {
-    const { accountId } = data;
-    adminManager.deleteAccount(socket, accountId);
+    const { id } = data;
+    adminManager.deleteAccount(socket, id);
   });
 
   // 断开连接

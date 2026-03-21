@@ -67,12 +67,12 @@ class UserManager {
     if (!userData) {
       if (this.accountManager) {
         userData = await this.accountManager.createGuestUser();
-        userId = userData.userId;
+        userId = userData.id;
       } else {
         // 如果没有AccountManager，使用旧的逻辑
         userId = this.generateUserId();
         userData = {
-          userId,
+          id: userId,
           nickname: `玩家${userId.substr(0, 4)}`,
           stats: {
             wins: 0,
@@ -92,7 +92,7 @@ class UserManager {
       // 如果在线，生成新的userId
       if (this.accountManager) {
         userData = await this.accountManager.createGuestUser();
-        userId = userData.userId;
+        userId = userData.id;
       } else {
         userId = this.generateUserId();
       }
@@ -219,7 +219,7 @@ class UserManager {
     // 同时更新账号统计（如果有账号关联）
     const accountId = this.userIdToAccountId.get(userId);
     if (accountId && this.accountManager) {
-      const result = await this.accountManager.updateGameStats(accountId, result, gameType, isAI, aiDifficulty, duration);
+      const statsResult = await this.accountManager.updateGameStats(accountId, result, gameType, isAI, aiDifficulty, duration);
 
       // 获取更新后的账号信息并发送给客户端
       const updatedAccount = await this.accountManager.getAccount(accountId);
@@ -230,7 +230,7 @@ class UserManager {
         }
       }
 
-      return result;
+      return statsResult;
     }
 
     return { success: false };
@@ -250,7 +250,7 @@ class UserManager {
   // 保存用户到数据库
   async saveUserToDB(user) {
     try {
-      const existing = await dataStore.findOne('users', { userId: user.userId });
+      const existing = await dataStore.findOne('users', { id: user.userId });
       if (existing) {
         await dataStore.update('users', user.userId, {
           nickname: user.nickname,
@@ -260,7 +260,6 @@ class UserManager {
       } else {
         await dataStore.add('users', {
           id: user.userId,
-          userId: user.userId,
           nickname: user.nickname,
           stats: user.stats,
           createdAt: user.connectedAt,
@@ -484,7 +483,7 @@ class UserManager {
           .slice(0, limit)
           .map((account, index) => ({
             rank: index + 1,
-            accountId: account.accountId,
+            id: account.id,
             username: account.username,
             nickname: account.nickname,
             level: account.profile?.level || 1,

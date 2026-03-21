@@ -631,8 +631,8 @@ class AchievementManager {
   }
 
   // 检查成就
-  async checkAchievements(accountId, stats) {
-    const account = await this.accountManager.getAccount(accountId);
+  async checkAchievements(id, stats) {
+    const account = await this.accountManager.getAccount(id);
     if (!account) {
       return [];
     }
@@ -658,14 +658,14 @@ class AchievementManager {
 
         // 给予奖励
         if (achievement.reward) {
-          await this.giveReward(accountId, achievement.reward);
+          await this.giveReward(id, achievement.reward);
 
           // 更新徽章数量
           if (achievement.reward.badge) {
-            const accountData = await this.accountManager.getAccount(accountId);
+            const accountData = await this.accountManager.getAccount(id);
             if (accountData && accountData.stats) {
               accountData.stats.badges = (accountData.stats.badges || 0) + 1;
-              await dataStore.update('accounts', accountId, { stats: accountData.stats });
+              await dataStore.update('accounts', id, { stats: accountData.stats });
             }
           }
         }
@@ -674,8 +674,8 @@ class AchievementManager {
 
     // 保存成就
     if (unlockedAchievements.length > 0) {
-      await dataStore.update('accounts', accountId, { achievements: currentAchievements });
-      logger.info('成就解锁', { accountId, achievements: unlockedAchievements.map(a => a.id) });
+      await dataStore.update('accounts', id, { achievements: currentAchievements });
+      logger.info('成就解锁', { id, achievements: unlockedAchievements.map(a => a.id) });
     }
 
     return unlockedAchievements;
@@ -751,9 +751,9 @@ class AchievementManager {
   }
 
   // 给予奖励
-  async giveReward(accountId, reward) {
+  async giveReward(id, reward) {
     if (reward.exp) {
-      await this.accountManager.addExp(accountId, reward.exp);
+      await this.accountManager.addExp(id, reward.exp);
     }
 
     if (reward.badge) {
@@ -762,8 +762,8 @@ class AchievementManager {
   }
 
   // 获取用户成就
-  async getUserAchievements(accountId) {
-    const account = await this.accountManager.getAccount(accountId);
+  async getUserAchievements(id) {
+    const account = await this.accountManager.getAccount(id);
     if (!account) {
       return [];
     }

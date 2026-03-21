@@ -582,7 +582,7 @@ class AdminManager {
           .sort((a, b) => (b.stats?.wins || 0) - (a.stats?.wins || 0))
           .slice(0, 5)
           .map(u => ({
-            userId: u.userId,
+            id: u.id,
             nickname: u.nickname,
             wins: u.stats?.wins || 0
           }))
@@ -776,7 +776,7 @@ class AdminManager {
   }
 
   // 删除账号
-  async deleteAccount(socket, accountId) {
+  async deleteAccount(socket, id) {
     if (!this.accountManager) {
       socket.emit('admin_action_result', {
         action: 'delete_account',
@@ -786,9 +786,9 @@ class AdminManager {
       return;
     }
 
-    const result = await this.accountManager.deleteAccount(accountId);
+    const result = await this.accountManager.deleteAccount(id);
     if (result.success) {
-      logger.info('管理员删除账号', { adminSocket: socket.id, accountId });
+      logger.info('管理员删除账号', { adminSocket: socket.id, id });
     }
     socket.emit('admin_action_result', {
       action: 'delete_account',
