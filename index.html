@@ -2268,6 +2268,22 @@
     </div>
   </div>
 
+  <!-- 主题选择页面 -->
+  <div class="theme-container" id="theme-container"
+    style="display: none; width: 100%; max-width: 1000px; background: white; padding: 18px; border-radius: 10px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07); margin-bottom: 15px;">
+    <div class="lobby-title">🎨 主题选择</div>
+    <div class="lobby-status">
+      选择你喜欢的主题风格！
+    </div>
+    <div id="theme-list-container"
+      style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px;">
+      <!-- 主题选项将在这里动态加载 -->
+    </div>
+    <button class="lobby-btn cancel-btn" onclick="returnToLobby()" style="margin-top: 20px; width: 100%;">
+      🏠 返回大厅
+    </button>
+  </div>
+
   <!-- 核心信息面板 -->
   <div class="info-container" id="info-container">
     <!-- 基础联机信息面板 -->
@@ -3678,6 +3694,14 @@
       if (currentTheme && themes[currentTheme]) {
         activeBtn.style.background = themes[currentTheme].primaryColor;
       }
+
+      // 隐藏成就、AI对战、主题页面
+      document.getElementById('achievements-container').style.display = 'none';
+      document.getElementById('ai-game-container').style.display = 'none';
+      document.getElementById('theme-container').style.display = 'none';
+
+      // 显示大厅
+      lobbyContainer.style.display = 'block';
 
       // 显示智能提示
       showGameTips();
@@ -5436,6 +5460,7 @@
       moveLogPanel.style.display = 'none';
       chatContainer.classList.remove('show');
       document.getElementById('ai-game-container').style.display = 'none';
+      document.getElementById('theme-container').style.display = 'none';
 
       // 隐藏所有棋盘
       document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
@@ -5461,6 +5486,7 @@
       moveLogPanel.style.display = 'none';
       chatContainer.classList.remove('show');
       document.getElementById('achievements-container').style.display = 'none';
+      document.getElementById('theme-container').style.display = 'none';
 
       // 隐藏所有棋盘
       document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
@@ -7877,7 +7903,26 @@
       // 更新导航按钮状态
       updateNavActiveState('theme');
 
-      const themeListEl = document.getElementById('theme-list');
+      // 隐藏其他页面
+      lobbyContainer.style.display = 'none';
+      infoContainer.style.display = 'none';
+      gameControls.style.display = 'none';
+      statusBox.style.display = 'none';
+      moveLogPanel.style.display = 'none';
+      chatContainer.classList.remove('show');
+      document.getElementById('achievements-container').style.display = 'none';
+      document.getElementById('ai-game-container').style.display = 'none';
+
+      // 隐藏所有棋盘
+      document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
+        board.style.display = 'none';
+      });
+
+      // 显示主题页面
+      document.getElementById('theme-container').style.display = 'block';
+
+      // 加载主题列表
+      const themeListEl = document.getElementById('theme-list-container');
       themeListEl.innerHTML = ''; // 清空现有列表
 
       for (const themeKey in themes) {
@@ -7885,9 +7930,9 @@
         const themeItem = document.createElement('div');
         themeItem.className = 'theme-item';
         themeItem.style.background = theme.background;
-        themeItem.style.border = `2px solid ${currentTheme === themeKey ? theme.primaryColor : 'transparent'}`;
+        themeItem.style.border = `3px solid ${currentTheme === themeKey ? theme.primaryColor : 'transparent'}`;
         themeItem.style.borderRadius = '8px';
-        themeItem.style.padding = '10px';
+        themeItem.style.padding = '15px';
         themeItem.style.cursor = 'pointer';
         themeItem.style.transition = 'all 0.2s';
         themeItem.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
@@ -7895,22 +7940,15 @@
         themeItem.onclick = () => applyTheme(themeKey);
 
         themeItem.innerHTML = `
-          <div style="font-weight: bold; color: ${themeKey === 'default' ? '#2d3748' : 'white'}; margin-bottom: 5px;">${theme.name}</div>
-          <div style="width: 100%; height: 50px; background: ${theme.primaryColor}; border-radius: 4px;"></div>
+          <div style="font-weight: bold; color: ${themeKey === 'default' ? '#2d3748' : 'white'}; margin-bottom: 10px; font-size: 16px;">${theme.name}</div>
+          <div style="width: 100%; height: 80px; background: ${theme.primaryColor}; border-radius: 4px; margin-bottom: 10px;"></div>
+          <div style="font-size: 12px; color: ${themeKey === 'default' ? '#718096' : 'rgba(255,255,255,0.8)'};">${currentTheme === themeKey ? '✓ 当前主题' : '点击切换'}</div>
         `;
         themeListEl.appendChild(themeItem);
       }
-
-      document.getElementById('theme-modal').style.display = 'flex';
     }
 
     window.showThemeModal = showThemeModal;
-
-    function hideThemeModal() {
-      document.getElementById('theme-modal').style.display = 'none';
-    }
-
-    window.hideThemeModal = hideThemeModal;
 
     function applyTheme(themeKey) {
       currentTheme = themeKey;
@@ -8152,6 +8190,12 @@
 
       // 保存主题选择到 localStorage
       localStorage.setItem('selectedTheme', themeKey);
+
+      // 如果主题页面正在显示，刷新主题列表以更新选中状态
+      const themeContainer = document.getElementById('theme-container');
+      if (themeContainer && themeContainer.style.display === 'block') {
+        showThemeModal();
+      }
     }
 
     window.applyTheme = applyTheme;
@@ -8557,21 +8601,6 @@
         <button id="challenge-reject"
           style="padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">拒绝</button>
       </div>
-    </div>
-  </div>
-
-  <!-- 主题选择模态框 -->
-  <div id="theme-modal"
-    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 9999;">
-    <div
-      style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 20px rgba(0, 0, 0, 0.3); text-align: center; max-width: 600px; width: 90%;">
-      <h3 style="margin-top: 0; color: #333;">选择主题</h3>
-      <div id="theme-list"
-        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 20px;">
-        <!-- 主题选项将在这里动态加载 -->
-      </div>
-      <button onclick="hideThemeModal()"
-        style="margin-top: 20px; padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">关闭</button>
     </div>
   </div>
 
