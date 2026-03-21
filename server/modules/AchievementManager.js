@@ -659,15 +659,6 @@ class AchievementManager {
         // 给予奖励
         if (achievement.reward) {
           await this.giveReward(id, achievement.reward);
-
-          // 更新徽章数量
-          if (achievement.reward.badge) {
-            const accountData = await this.accountManager.getAccount(id);
-            if (accountData && accountData.stats) {
-              accountData.stats.badges = (accountData.stats.badges || 0) + 1;
-              await dataStore.update('accounts', id, { stats: accountData.stats });
-            }
-          }
         }
       }
     }
@@ -676,6 +667,22 @@ class AchievementManager {
     if (unlockedAchievements.length > 0) {
       await dataStore.update('accounts', id, { achievements: currentAchievements });
       logger.info('成就解锁', { id, achievements: unlockedAchievements.map(a => a.id) });
+    }
+
+    // 重新计算徽章数量（基于实际解锁的成就）
+    if (unlockedAchievements.length > 0) {
+      const updatedAccount = await this.accountManager.getAccount(id);
+      if (updatedAccount && updatedAccount.achievements) {
+        const badgeCount = updatedAccount.achievements.filter(aid => {
+          const achievement = this.achievements.find(a => a.id === aid);
+          return achievement && achievement.reward && achievement.reward.badge;
+        }).length;
+
+        if (updatedAccount.stats) {
+          updatedAccount.stats.badges = badgeCount;
+          await dataStore.update('accounts', id, { stats: updatedAccount.stats });
+        }
+      }
     }
 
     return unlockedAchievements;
@@ -692,7 +699,7 @@ class AchievementManager {
           return stats.draws >= achievement.condition.draws;
         }
         if (achievement.condition.maxMoves !== undefined && achievement.condition.result) {
-          return stats.result === achievement.condition.result;
+          return stats.result === achievement.condition.result && stats.maxMoves <= achievement.condition.maxMoves;
         }
         return false;
       case 'level':
@@ -707,26 +714,28 @@ class AchievementManager {
           return stats.aiWins >= achievement.condition.wins;
         }
         if (achievement.condition.difficulty && achievement.condition.result) {
+          // 只检查当前游戏的AI对战结果
           return stats.aiDifficulty === achievement.condition.difficulty &&
-            stats.aiResult === achievement.condition.result;
+            stats.aiResult === achievement.condition.result &&
+            stats.result === achievement.condition.result;
         }
         return false;
       case 'creative':
         const condition = achievement.condition;
-        if (condition.firstGame !== undefined) return stats.firstGame;
+        if (condition.firstGame !== undefined) return stats.firstGame && stats.totalGames === 1;
         if (condition.nightGame !== undefined) return stats.nightGame;
         if (condition.weekendGame !== undefined) return stats.weekendGame;
         if (condition.chatMessages !== undefined) return stats.chatMessages >= condition.chatMessages;
-        if (condition.silentWin !== undefined) return stats.silentWin;
+        if (condition.silentWin !== undefined) return stats.silentWin && stats.result === 'win';
         if (condition.comebackStreak !== undefined) return stats.comebackStreak >= condition.comebackStreak;
         if (condition.allGameTypes !== undefined) return stats.allGameTypes;
         if (condition.singleGameType !== undefined) return stats.singleGameType;
         if (condition.quickGame !== undefined) return stats.quickGame;
         if (condition.slowGame !== undefined) return stats.slowGame;
-        if (condition.luckyWin !== undefined) return stats.luckyWin;
-        if (condition.unluckyLoss !== undefined) return stats.unluckyLoss;
+        if (condition.luckyWin !== undefined) return stats.luckyWin && stats.result === 'win';
+        if (condition.unluckyLoss !== undefined) return stats.unluckyLoss && stats.result === 'loss';
         if (condition.friends !== undefined) return stats.friends >= condition.friends;
-        if (condition.lonerWin !== undefined) return stats.lonerWin;
+        if (condition.lonerWin !== undefined) return stats.lonerWin && stats.result === 'win';
         if (condition.signInStreak !== undefined) return stats.signInStreak >= condition.signInStreak;
         if (condition.badges !== undefined) return stats.badges >= condition.badges;
         if (condition.dailyGames !== undefined) return stats.dailyGames >= condition.dailyGames;
@@ -775,6 +784,133 @@ class AchievementManager {
   // 获取所有成就
   getAllAchievements() {
     return this.achievements;
+  }
+
+  // 计算成就进度
+  calculateAchievementProgress(achievement, stats) {
+    switch (achievement.type) {
+      case 'game':
+        if (achievement.condition.wins !== undefined) {
+          return {
+            current: stats.wins || 0,
+            target: achievement.condition.wins,
+            percent: Math.min(100, Math.round(((stats.wins || 0) / achievement.condition.wins) * 100))
+          };
+        }
+        if (achievement.condition.draws !== undefined) {
+          return {
+            current: stats.draws || 0,
+            target: achievement.condition.draws,
+            percent: Math.min(100, Math.round(((stats.draws || 0) / achievement.condition.draws) * 100))
+          };
+        }
+        break;
+      case 'level':
+        return {
+          current: stats.level || 1,
+          target: achievement.condition.level,
+          percent: Math.min(100, Math.round(((stats.level || 1) / achievement.condition.level) * 100))
+        };
+      case 'streak':
+        return {
+          current: stats.maxStreak || 0,
+          target: achievement.condition.streak,
+          percent: Math.min(100, Math.round(((stats.maxStreak || 0) / achievement.condition.streak) * 100))
+        };
+      case 'game_type':
+        return {
+          current: stats.gameTypeWins?.[achievement.condition.gameType] || 0,
+          target: achievement.condition.wins,
+          percent: Math.min(100, Math.round(((stats.gameTypeWins?.[achievement.condition.gameType] || 0) / achievement.condition.wins) * 100))
+        };
+      case 'ai':
+        if (achievement.condition.wins !== undefined) {
+          return {
+            current: stats.aiWins || 0,
+            target: achievement.condition.wins,
+            percent: Math.min(100, Math.round(((stats.aiWins || 0) / achievement.condition.wins) * 100))
+          };
+        }
+        break;
+      case 'creative':
+        const condition = achievement.condition;
+        if (condition.chatMessages !== undefined) {
+          return {
+            current: stats.chatMessages || 0,
+            target: condition.chatMessages,
+            percent: Math.min(100, Math.round(((stats.chatMessages || 0) / condition.chatMessages) * 100))
+          };
+        }
+        if (condition.friends !== undefined) {
+          return {
+            current: stats.friends || 0,
+            target: condition.friends,
+            percent: Math.min(100, Math.round(((stats.friends || 0) / condition.friends) * 100))
+          };
+        }
+        if (condition.signInStreak !== undefined) {
+          return {
+            current: stats.signInStreak || 0,
+            target: condition.signInStreak,
+            percent: Math.min(100, Math.round(((stats.signInStreak || 0) / condition.signInStreak) * 100))
+          };
+        }
+        if (condition.dailyGames !== undefined) {
+          return {
+            current: stats.dailyGames || 0,
+            target: condition.dailyGames,
+            percent: Math.min(100, Math.round(((stats.dailyGames || 0) / condition.dailyGames) * 100))
+          };
+        }
+        if (condition.weeklyGames !== undefined) {
+          return {
+            current: stats.weeklyGames || 0,
+            target: condition.weeklyGames,
+            percent: Math.min(100, Math.round(((stats.weeklyGames || 0) / condition.weeklyGames) * 100))
+          };
+        }
+        if (condition.monthlyGames !== undefined) {
+          return {
+            current: stats.monthlyGames || 0,
+            target: condition.monthlyGames,
+            percent: Math.min(100, Math.round(((stats.monthlyGames || 0) / condition.monthlyGames) * 100))
+          };
+        }
+        if (condition.achievements !== undefined) {
+          return {
+            current: stats.achievementCount || 0,
+            target: condition.achievements,
+            percent: Math.min(100, Math.round(((stats.achievementCount || 0) / condition.achievements) * 100))
+          };
+        }
+        break;
+    }
+    return null;
+  }
+
+  // 获取分类的成就列表
+  getAchievementsByCategory(stats = {}) {
+    const categories = {
+      game: { name: '🏆 胜利成就', achievements: [] },
+      game_type: { name: '🎯 棋种成就', achievements: [] },
+      level: { name: '📈 等级成就', achievements: [] },
+      streak: { name: '🔥 连胜成就', achievements: [] },
+      ai: { name: '🤖 AI对战', achievements: [] },
+      creative: { name: '✨ 特殊成就', achievements: [] }
+    };
+
+    this.achievements.forEach(achievement => {
+      const progress = this.calculateAchievementProgress(achievement, stats);
+      const achievementWithProgress = {
+        ...achievement,
+        progress: progress
+      };
+      if (categories[achievement.type]) {
+        categories[achievement.type].achievements.push(achievementWithProgress);
+      }
+    });
+
+    return categories;
   }
 }
 

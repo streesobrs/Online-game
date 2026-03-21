@@ -248,6 +248,31 @@ io.on('connection', (socket) => {
     socket.emit('leaderboard', { leaderboard });
   });
 
+  // 获取成就列表
+  socket.on('get_achievements', async (data) => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (user) {
+      const accountId = userManager.userIdToAccountId.get(user.userId);
+      if (accountId) {
+        const account = await accountManager.getAccount(accountId);
+        const stats = account?.stats || {};
+        const level = account?.profile?.level || 1;
+        const categories = achievementManager.getAchievementsByCategory({ ...stats, level });
+        const userAchievementIds = account?.achievements || [];
+
+        // 为每个成就添加解锁状态
+        Object.values(categories).forEach(category => {
+          category.achievements.forEach(achievement => {
+            achievement.isUnlocked = userAchievementIds.includes(achievement.id);
+          });
+        });
+
+        const totalAchievements = achievementManager.achievements.length;
+        socket.emit('achievements_list', { categories, userAchievements: userAchievementIds, totalAchievements });
+      }
+    }
+  });
+
   // 获取游戏历史
   socket.on('get_game_history', async (data) => {
     const user = userManager.getUserBySocketId(socket.id);

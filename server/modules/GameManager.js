@@ -573,26 +573,6 @@ class GameManager {
       await this.userManager.updateUserStats(winner, 'win', game.gameType, false, null, duration);
       const loser = winner === game.player1 ? game.player2 : game.player1;
       await this.userManager.updateUserStats(loser, 'loss', game.gameType, false, null, duration);
-
-      // 检查成就
-      const winnerAccountId = this.userManager.userIdToAccountId.get(winner);
-      if (winnerAccountId && this.accountManager) {
-        const account = await this.accountManager.getAccount(winnerAccountId);
-        if (account) {
-          const stats = {
-            ...account.stats,
-            level: account.profile ? account.profile.level : 1,
-            result: 'win'
-          };
-          const unlockedAchievements = await this.achievementManager.checkAchievements(winnerAccountId, stats);
-          if (unlockedAchievements.length > 0) {
-            const socket = this.userManager.getSocketByUserId(winner);
-            if (socket) {
-              socket.emit('achievements_unlocked', { achievements: unlockedAchievements });
-            }
-          }
-        }
-      }
     } else if (result === 'draw') {
       const duration = game.endTime - game.startTime;
 
@@ -602,6 +582,31 @@ class GameManager {
       // 超时判负
       await this.userManager.updateUserStats(game.player1, 'loss', game.gameType);
       await this.userManager.updateUserStats(game.player2, 'loss', game.gameType);
+    }
+
+    // 为所有玩家检查成就
+    const players = [game.player1, game.player2];
+    for (const player of players) {
+      const accountId = this.userManager.userIdToAccountId.get(player);
+      if (accountId && this.accountManager) {
+        const account = await this.accountManager.getAccount(accountId);
+        if (account) {
+          const isWinner = player === winner;
+          const playerResult = isWinner ? 'win' : (result === 'draw' ? 'draw' : 'loss');
+          const stats = {
+            ...account.stats,
+            level: account.profile ? account.profile.level : 1,
+            result: playerResult
+          };
+          const unlockedAchievements = await this.achievementManager.checkAchievements(accountId, stats);
+          if (unlockedAchievements.length > 0) {
+            const socket = this.userManager.getSocketByUserId(player);
+            if (socket) {
+              socket.emit('achievements_unlocked', { achievements: unlockedAchievements });
+            }
+          }
+        }
+      }
     }
 
     // 通知玩家

@@ -2658,11 +2658,7 @@
     const channelGameBtn = document.getElementById('channel-game');
 
     // 挑战相关DOM
-    const challengeModal = document.getElementById('challenge-modal');
-    const challengeTitle = document.getElementById('challenge-title');
-    const challengeMessage = document.getElementById('challenge-message');
-    const challengeAcceptBtn = document.getElementById('challenge-accept');
-    const challengeRejectBtn = document.getElementById('challenge-reject');
+    let challengeModal, challengeTitle, challengeMessage, challengeAcceptBtn, challengeRejectBtn;
 
     const lucyPanel = document.getElementById('lucy-panel');
 
@@ -3145,12 +3141,126 @@
       // 成就解锁事件
       socket.on('achievements_unlocked', (data) => {
         if (data.achievements && data.achievements.length > 0) {
-          let message = '🎉 解锁成就：\n';
-          data.achievements.forEach(achievement => {
-            message += `- ${achievement.name}: ${achievement.description}\n`;
+          // 逐个显示成就解锁动画
+          let delay = 0;
+          data.achievements.forEach((achievement, index) => {
+            setTimeout(() => {
+              showAchievementUnlockAnimation(achievement);
+            }, delay);
+            delay += 1500; // 每个成就间隔1.5秒
           });
-          alert(message);
         }
+      });
+
+      // 显示成就解锁动画
+      function showAchievementUnlockAnimation(achievement) {
+        const achievementDiv = document.createElement('div');
+        achievementDiv.className = 'achievement-unlock-animation';
+        achievementDiv.innerHTML = `
+          <div style="font-size: 48px; margin-bottom: 10px;">🏆</div>
+          <div style="font-size: 28px; font-weight: bold; color: #38a169;">解锁成就</div>
+          <div style="font-size: 24px; margin-top: 10px; font-weight: bold;">${achievement.name}</div>
+          <div style="font-size: 14px; margin-top: 5px; color: #4a5568;">${achievement.description}</div>
+          ${achievement.reward ? `<div style="font-size: 16px; margin-top: 15px; color: #ed8936;">+${achievement.reward.exp} EXP</div>` : ''}
+        `;
+        achievementDiv.style.position = 'fixed';
+        achievementDiv.style.top = '50%';
+        achievementDiv.style.left = '50%';
+        achievementDiv.style.transform = 'translate(-50%, -50%)';
+        achievementDiv.style.background = 'white';
+        achievementDiv.style.padding = '40px';
+        achievementDiv.style.borderRadius = '20px';
+        achievementDiv.style.boxShadow = '0 10px 40px rgba(0, 0, 0, 0.3)';
+        achievementDiv.style.textAlign = 'center';
+        achievementDiv.style.zIndex = '9999';
+        achievementDiv.style.animation = 'levelupPop 0.5s ease-out';
+        document.body.appendChild(achievementDiv);
+
+        setTimeout(() => {
+          achievementDiv.style.animation = 'levelupFade 0.5s ease-out forwards';
+          setTimeout(() => {
+            achievementDiv.remove();
+          }, 500);
+        }, 3000);
+      }
+
+      // 成就列表事件
+      socket.on('achievements_list', (data) => {
+        if (!data.categories) return;
+
+        const achievementsList = document.getElementById('achievements-list');
+        const unlockedIds = Array.isArray(data.userAchievements) ? data.userAchievements : [];
+        const totalAchievements = data.totalAchievements || 0;
+        const unlockedCount = unlockedIds.length;
+        const progressPercent = totalAchievements > 0 ? Math.round((unlockedCount / totalAchievements) * 100) : 0;
+
+        let html = `
+          <div style="margin-bottom: 20px; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; color: white;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <span style="font-size: 18px; font-weight: bold;">成就进度</span>
+              <span style="font-size: 24px; font-weight: bold;">${unlockedCount}/${totalAchievements}</span>
+            </div>
+            <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.3); border-radius: 4px; overflow: hidden;">
+              <div style="width: ${progressPercent}%; height: 100%; background: #4ade80; border-radius: 4px; transition: width 0.5s ease;"></div>
+            </div>
+            <div style="text-align: center; margin-top: 8px; font-size: 14px; opacity: 0.9;">已完成 ${progressPercent}%</div>
+          </div>
+        `;
+
+        // 渲染每个分类
+        Object.entries(data.categories).forEach(([type, category]) => {
+          if (!category.achievements || category.achievements.length === 0) return;
+
+          const categoryUnlocked = category.achievements.filter(a => unlockedIds.includes(a.id)).length;
+
+          html += `
+            <div style="margin-bottom: 25px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0;">
+                <span style="font-size: 16px; font-weight: bold; color: #2d3748;">${category.name}</span>
+                <span style="font-size: 13px; color: #718096; background: #f7fafc; padding: 4px 10px; border-radius: 12px;">${categoryUnlocked}/${category.achievements.length}</span>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;">
+          `;
+
+          category.achievements.forEach(achievement => {
+            const isUnlocked = unlockedIds.includes(achievement.id);
+            const cardBg = isUnlocked ? 'linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%)' : '#f7fafc';
+            const borderColor = isUnlocked ? '#48bb78' : '#e2e8f0';
+            const statusText = isUnlocked ? '✓ 已解锁' : '○ 未解锁';
+            const statusColor = isUnlocked ? '#38a169' : '#a0aec0';
+            const icon = isUnlocked ? '🏆' : '🔒';
+            const opacity = isUnlocked ? '1' : '0.7';
+
+            html += `
+              <div style="padding: 15px; background: ${cardBg}; border-radius: 10px; border: 2px solid ${borderColor}; opacity: ${opacity}; transition: all 0.3s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                  <span style="font-size: 24px; margin-right: 10px;">${icon}</span>
+                  <span style="font-weight: bold; color: #2d3748; font-size: 15px;">${achievement.name}</span>
+                </div>
+                <div style="font-size: 13px; color: #4a5568; margin-bottom: 10px; line-height: 1.4;">${achievement.description}</div>
+                ${achievement.progress ? `
+                  <div style="margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px;">
+                      <span>进度</span>
+                      <span>${achievement.progress.current}/${achievement.progress.target}</span>
+                    </div>
+                    <div style="height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                      <div style="width: ${achievement.progress.percent}%; height: 100%; background: ${isUnlocked ? '#48bb78' : '#ed8936'}; transition: width 0.5s ease;"></div>
+                    </div>
+                  </div>
+                ` : ''}
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 11px; color: ${statusColor}; font-weight: 600; padding: 3px 8px; background: ${isUnlocked ? '#c6f6d5' : '#e2e8f0'}; border-radius: 10px;">${statusText}</span>
+                  ${achievement.reward ? `<span style="font-size: 11px; color: #ed8936;">+${achievement.reward.exp} EXP</span>` : ''}
+                </div>
+              </div>
+            `;
+          });
+
+          html += '</div></div>';
+        });
+
+        achievementsList.innerHTML = html;
       });
 
       // ========== AI对战事件处理 ==========
@@ -3272,7 +3382,6 @@
       });
 
       // ========== 挑战相关事件 ==========
-      let currentChallenge = null; // 存储当前收到的挑战信息
 
       socket.on('challenge_received', (data) => {
         console.log('收到挑战请求:', data);
@@ -5514,72 +5623,14 @@
     }
 
     function loadAchievements() {
-      // 模拟加载成就
-      const achievementsList = document.getElementById('achievements-list');
-      achievementsList.innerHTML = `
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-          <div style="padding: 10px; background: #f7fafc; border-radius: 8px; border-left: 3px solid #27ae60;">
-            <div style="font-weight: bold; color: #2d3748;">🏆 初露锋芒</div>
-            <div style="font-size: 12px; color: #718096;">获得第一场胜利</div>
-            <div style="font-size: 10px; color: #27ae60; margin-top: 5px;">已解锁</div>
-          </div>
-          <div style="padding: 10px; background: #f7fafc; border-radius: 8px; border-left: 3px solid #bdc3c7;">
-            <div style="font-weight: bold; color: #2d3748;">🏆 渐入佳境</div>
-            <div style="font-size: 12px; color: #718096;">获得五场胜利</div>
-            <div style="font-size: 10px; color: #bdc3c7; margin-top: 5px;">未解锁</div>
-          </div>
-          <div style="padding: 10px; background: #f7fafc; border-radius: 8px; border-left: 3px solid #bdc3c7;">
-            <div style="font-weight: bold; color: #2d3748;">🏆 常胜将军</div>
-            <div style="font-size: 12px; color: #718096;">获得十场胜利</div>
-            <div style="font-size: 10px; color: #bdc3c7; margin-top: 5px;">未解锁</div>
-          </div>
-          <div style="padding: 10px; background: #f7fafc; border-radius: 8px; border-left: 3px solid #bdc3c7;">
-            <div style="font-weight: bold; color: #2d3748;">🏆 棋坛宗师</div>
-            <div style="font-size: 12px; color: #718096;">获得五十场胜利</div>
-            <div style="font-size: 10px; color: #bdc3c7; margin-top: 5px;">未解锁</div>
-          </div>
-          <div style="padding: 10px; background: #f7fafc; border-radius: 8px; border-left: 3px solid #bdc3c7;">
-            <div style="font-weight: bold; color: #2d3748;">🏆 连胜达人</div>
-            <div style="font-size: 12px; color: #718096;">连续获得五场胜利</div>
-            <div style="font-size: 10px; color: #bdc3c7; margin-top: 5px;">未解锁</div>
-          </div>
-          <div style="padding: 10px; background: #f7fafc; border-radius: 8px; border-left: 3px solid #bdc3c7;">
-            <div style="font-weight: bold; color: #2d3748;">🤖 战胜简单AI</div>
-            <div style="font-size: 12px; color: #718096;">在人机对战中战胜简单难度AI</div>
-            <div style="font-size: 10px; color: #bdc3c7; margin-top: 5px;">未解锁</div>
-          </div>
-          <div style="padding: 10px; background: #f7fafc; border-radius: 8px; border-left: 3px solid #bdc3c7;">
-            <div style="font-weight: bold; color: #2d3748;">🤖 战胜中等AI</div>
-            <div style="font-size: 12px; color: #718096;">在人机对战中战胜中等难度AI</div>
-            <div style="font-size: 10px; color: #bdc3c7; margin-top: 5px;">未解锁</div>
-          </div>
-          <div style="padding: 10px; background: #f7fafc; border-radius: 8px; border-left: 3px solid #bdc3c7;">
-            <div style="font-weight: bold; color: #2d3748;">🤖 战胜困难AI</div>
-            <div style="font-size: 12px; color: #718096;">在人机对战中战胜困难难度AI</div>
-            <div style="font-size: 10px; color: #bdc3c7; margin-top: 5px;">未解锁</div>
-          </div>
-          <div style="padding: 10px; background: #f7fafc; border-radius: 8px; border-left: 3px solid #bdc3c7;">
-            <div style="font-weight: bold; color: #2d3748;">🎯 五子棋高手</div>
-            <div style="font-size: 12px; color: #718096;">五子棋获得十场胜利</div>
-            <div style="font-size: 10px; color: #bdc3c7; margin-top: 5px;">未解锁</div>
-          </div>
-          <div style="padding: 10px; background: #f7fafc; border-radius: 8px; border-left: 3px solid #bdc3c7;">
-            <div style="font-weight: bold; color: #2d3748;">⚪ 围棋高手</div>
-            <div style="font-size: 12px; color: #718096;">围棋获得十场胜利</div>
-            <div style="font-size: 10px; color: #bdc3c7; margin-top: 5px;">未解锁</div>
-          </div>
-          <div style="padding: 10px; background: #f7fafc; border-radius: 8px; border-left: 3px solid #bdc3c7;">
-            <div style="font-weight: bold; color: #2d3748;">🟥 象棋高手</div>
-            <div style="font-size: 12px; color: #718096;">象棋获得十场胜利</div>
-            <div style="font-size: 10px; color: #bdc3c7; margin-top: 5px;">未解锁</div>
-          </div>
-          <div style="padding: 10px; background: #f7fafc; border-radius: 8px; border-left: 3px solid #bdc3c7;">
-            <div style="font-weight: bold; color: #2d3748;">🎮 游戏达人</div>
-            <div style="font-size: 12px; color: #718096;">累计进行一百场游戏</div>
-            <div style="font-size: 10px; color: #bdc3c7; margin-top: 5px;">未解锁</div>
-          </div>
-        </div>
-      `;
+      if (!currentAccount || !currentAccount.id) {
+        const achievementsList = document.getElementById('achievements-list');
+        achievementsList.innerHTML = '<div style="text-align: center; padding: 20px; color: #718096;">请先登录查看成就</div>';
+        return;
+      }
+
+      // 从服务器获取成就列表
+      socket.emit('get_achievements');
     }
 
     function startAIGame(difficulty) {
@@ -7412,6 +7463,8 @@
       });
     }
 
+    let currentChallenge = null; // 存储当前收到的挑战信息
+
     // 显示挑战请求模态框
     function showChallengeModal(fromNickname, gameType) {
       const gameTypeName = gameConfigs[gameType] ? gameConfigs[gameType].emoji + ' ' + (gameType === 'gobang' ? '五子棋' : gameType === 'go' ? '围棋' : '象棋') : gameType;
@@ -7427,38 +7480,47 @@
 
     // 挑战请求模态框事件处理
     document.addEventListener('DOMContentLoaded', () => {
-      challengeAcceptBtn.addEventListener('click', () => {
-        if (currentChallenge) {
-          socket.emit('challenge_response', {
-            from: currentChallenge.from,
-            accept: true
-          });
-          hideChallengeModal();
-        }
-      });
+      // 初始化挑战相关DOM
+      challengeModal = document.getElementById('challenge-modal');
+      challengeTitle = document.getElementById('challenge-title');
+      challengeMessage = document.getElementById('challenge-message');
+      challengeAcceptBtn = document.getElementById('challenge-accept');
+      challengeRejectBtn = document.getElementById('challenge-reject');
 
-      challengeRejectBtn.addEventListener('click', () => {
-        if (currentChallenge) {
-          socket.emit('challenge_response', {
-            from: currentChallenge.from,
-            accept: false
-          });
-          hideChallengeModal();
-        }
-      });
+      if (challengeAcceptBtn && challengeRejectBtn && challengeModal) {
+        challengeAcceptBtn.addEventListener('click', () => {
+          if (currentChallenge) {
+            socket.emit('challenge_response', {
+              from: currentChallenge.from,
+              accept: true
+            });
+            hideChallengeModal();
+          }
+        });
 
-      challengeModal.addEventListener('click', (e) => {
-        if (e.target === challengeModal) {
-          // 点击背景默认拒绝
+        challengeRejectBtn.addEventListener('click', () => {
           if (currentChallenge) {
             socket.emit('challenge_response', {
               from: currentChallenge.from,
               accept: false
             });
+            hideChallengeModal();
           }
-          hideChallengeModal();
-        }
-      });
+        });
+
+        challengeModal.addEventListener('click', (e) => {
+          if (e.target === challengeModal) {
+            // 点击背景默认拒绝
+            if (currentChallenge) {
+              socket.emit('challenge_response', {
+                from: currentChallenge.from,
+                accept: false
+              });
+            }
+            hideChallengeModal();
+          }
+        });
+      }
     });
 
     // ========== 游戏回放系统 ==========
