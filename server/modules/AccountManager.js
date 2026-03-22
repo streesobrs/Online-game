@@ -268,6 +268,48 @@ class AccountManager {
     }
   }
 
+  // 通过token获取账号信息
+  async getAccountByToken(token) {
+    try {
+      // 验证token并获取用户ID
+      const userId = this.verifySessionToken(token);
+      if (!userId) {
+        return {
+          success: false,
+          message: 'Token无效或已过期'
+        };
+      }
+
+      // 获取账号信息
+      const account = await this.getUser(userId);
+      if (!account) {
+        return {
+          success: false,
+          message: '账号不存在'
+        };
+      }
+
+      // 获取权限配置
+      const config = require('../config');
+      const permissions = config.permissions[account.type] || config.permissions.registered;
+
+      return {
+        success: true,
+        data: {
+          account: account,
+          permissions: permissions,
+          loginType: account.type === 'guest' ? 'guest' : 'account'
+        }
+      };
+    } catch (err) {
+      logger.error('通过token获取账号信息失败', { error: err.message });
+      return {
+        success: false,
+        message: '获取账号信息失败'
+      };
+    }
+  }
+
   // 更新用户信息（支持游客和注册用户）
   async updateUser(id, updates) {
     try {

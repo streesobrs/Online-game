@@ -161,22 +161,67 @@ io.on('connection', (socket) => {
 
   // 游客登录
   socket.on('guest_login', async () => {
-    const result = await accountManager.guestLogin();
+    const user = userManager.getUserBySocketId(socket.id);
 
-    if (result.success && result.data) {
-      const user = userManager.getUserBySocketId(socket.id);
-      if (user) {
-        // 设置用户账号信息
-        userManager.setUserAccount(user.userId, result.data.account.id);
+    // 检查用户是否已经有账号关联
+    const accountId = user ? userManager.getAccountIdByUserId(user.userId) : null;
 
-        // 设置用户权限
-        user.permissions = result.data.permissions;
-        user.loginType = result.data.loginType;
-        user.token = result.data.token;
+    if (accountId) {
+      // 已经有账号，返回已有的账号信息
+      const account = await accountManager.getAccount(accountId);
+      if (account) {
+        const permissions = config.permissions[account.type] || config.permissions.guest;
+
+        const result = {
+          success: true,
+          message: '游客登录成功',
+          data: {
+            account: account,
+            permissions: permissions,
+            token: userManager.generateToken(),
+            loginType: 'guest'
+          }
+        };
+
+        socket.emit('login_result', result);
+        return;
       }
     }
 
-    socket.emit('login_result', result);
+    // 创建游客用户
+    const userData = await userManager.createGuestUser(socket);
+
+    if (userData) {
+      // 获取权限配置
+      const permissions = config.permissions.guest;
+
+      const result = {
+        success: true,
+        message: '游客登录成功',
+        data: {
+          account: userData,
+          permissions: permissions,
+          token: userManager.generateToken(),
+          loginType: 'guest'
+        }
+      };
+
+      if (user) {
+        // 设置用户账号信息
+        userManager.setUserAccount(user.userId, userData.id);
+
+        // 设置用户权限
+        user.permissions = permissions;
+        user.loginType = 'guest';
+      }
+
+      socket.emit('login_result', result);
+    } else {
+      socket.emit('login_result', {
+        success: false,
+        message: '创建游客账号失败'
+      });
+    }
   });
 
   // 账号密码登录
@@ -245,6 +290,13 @@ io.on('connection', (socket) => {
       action: 'change_password',
       ...result
     });
+  });
+
+  // 通过token获取账号信息
+  socket.on('get_account_by_token', async (data) => {
+    const { token } = data;
+    const result = await accountManager.getAccountByToken(token);
+    socket.emit('account_info', result);
   });
 
   // ========== 用户相关事件 ==========

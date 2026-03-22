@@ -56,73 +56,44 @@ class UserManager {
     let userId = data && data.savedUserId ? data.savedUserId : null;
     const token = this.generateToken();
 
-    let userData = null;
+    // 如果有账号ID，从数据库获取账号信息
+    let nickname = `访客${Math.random().toString(36).substr(2, 4)}`;
+    let stats = { wins: 0, losses: 0, draws: 0, totalGames: 0 };
 
-    // 如果有userId，尝试从AccountManager加载用户数据
-    if (userId && this.accountManager) {
-      userData = await this.accountManager.getUser(userId);
-    }
-
-    // 如果没有用户数据，创建新的游客用户
-    if (!userData) {
-      if (this.accountManager) {
-        userData = await this.accountManager.createGuestUser();
-        userId = userData.id;
-      } else {
-        // 如果没有AccountManager，使用旧的逻辑
-        userId = this.generateUserId();
-        userData = {
-          id: userId,
-          nickname: `玩家${userId.substr(0, 4)}`,
-          stats: {
-            wins: 0,
-            losses: 0,
-            draws: 0,
-            totalGames: 0
-          },
-          createdAt: Date.now(),
-          lastSeen: Date.now(),
-          updatedAt: Date.now()
-        };
+    if (data && data.id && this.accountManager) {
+      try {
+        const account = await this.accountManager.getUser(data.id);
+        if (account) {
+          nickname = account.nickname || nickname;
+          stats = account.stats || stats;
+          logger.info('从账号恢复用户信息', { accountId: data.id, nickname });
+        }
+      } catch (err) {
+        logger.warn('获取账号信息失败', { accountId: data.id, error: err.message });
       }
     }
 
-    // 检查这个userId是否已经在线
-    if (this.userSockets.has(userId)) {
-      // 如果在线，生成新的userId
-      if (this.accountManager) {
-        userData = await this.accountManager.createGuestUser();
-        userId = userData.id;
-      } else {
-        userId = this.generateUserId();
-      }
-    }
-
+    // 创建临时用户对象，不自动创建游客账号
     const user = {
-      userId,
+      userId: userId || this.generateUserId(),
       token,
       socketId: socket.id,
-      nickname: userData.nickname,
+      nickname: nickname,
       status: 'online',
       game: null,
       gameType: null,
       connectedAt: Date.now(),
       lastActivity: Date.now(),
-      stats: userData.stats || {
-        wins: 0,
-        losses: 0,
-        draws: 0,
-        totalGames: 0
-      },
+      stats: stats,
       ip: socket.handshake.address,
       userAgent: socket.handshake.headers['user-agent']
     };
 
     // 存储用户数据
     this.users.set(socket.id, user);
-    this.userSockets.set(userId, socket);
-    this.userIdToSocketId.set(userId, socket.id);
-    this.onlineUsers.set(userId, user);
+    this.userSockets.set(user.userId, socket);
+    this.userIdToSocketId.set(user.userId, socket.id);
+    this.onlineUsers.set(user.userId, user);
 
     // 更新峰值在线人数
     if (this.onlineUsers.size > this.stats.peakOnline) {
@@ -130,19 +101,19 @@ class UserManager {
       await this.saveStats();
     }
 
-    logger.userAction(userId, '连接', { ip: user.ip });
+    logger.userAction(user.userId, '连接', { ip: user.ip });
 
     // 发送用户信息
     socket.emit('user_connected', {
-      userId,
-      token,
+      userId: user.userId,
+      token: user.token,
       nickname: user.nickname,
       status: user.status,
       stats: user.stats
     });
 
     // 广播用户上线
-    this.broadcastUserStatus(userId, 'online', io);
+    this.broadcastUserStatus(user.userId, 'online', io);
 
     // 发送在线用户列表
     this.sendOnlineUsers(socket, io);
@@ -155,6 +126,44 @@ class UserManager {
     });
 
     return user;
+  }
+
+  // 创建游客用户
+  async createGuestUser(socket) {
+    if (this.accountManager) {
+      const userData = await this.accountManager.createGuestUser();
+      const user = this.users.get(socket.id);
+
+      if (user) {
+        // 更新用户信息
+        user.userId = userData.id;
+        user.nickname = userData.nickname;
+        user.stats = userData.stats || {
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          totalGames: 0
+        };
+
+        // 保存用户连接
+        this.userSockets.set(userData.id, socket);
+        this.userIdToSocketId.set(userData.id, socket.id);
+        this.onlineUsers.set(userData.id, user);
+
+        // 移除旧的用户ID映射
+        this.userSockets.delete(user.userId);
+        this.userIdToSocketId.delete(user.userId);
+        this.onlineUsers.delete(user.userId);
+
+        logger.info('创建游客用户', {
+          socketId: socket.id,
+          userId: userData.id
+        });
+
+        return userData;
+      }
+    }
+    return null;
   }
 
   // 处理用户登录（使用token恢复会话）
@@ -327,8 +336,9 @@ class UserManager {
       // 广播离线状态
       this.broadcastUserStatus(user.userId, 'offline', io);
 
-      // 保存用户数据到数据库
-      if (this.accountManager) {
+      // 只保存正式账号（有账号映射或不是临时访客）
+      const accountId = this.userIdToAccountId.get(user.userId);
+      if (accountId && this.accountManager) {
         try {
           await this.accountManager.updateUser(user.userId, {
             nickname: user.nickname,
@@ -338,9 +348,21 @@ class UserManager {
         } catch (err) {
           logger.warn('保存用户数据失败', { userId: user.userId, error: err.message });
         }
-      } else {
-        // 如果没有AccountManager，使用旧的逻辑
-        this.saveUserToDB(user);
+      } else if (!accountId && user.nickname && !user.nickname.startsWith('访客')) {
+        // 保存正式游客账号
+        if (this.accountManager) {
+          try {
+            await this.accountManager.updateUser(user.userId, {
+              nickname: user.nickname,
+              stats: user.stats,
+              lastSeen: Date.now()
+            });
+          } catch (err) {
+            logger.warn('保存用户数据失败', { userId: user.userId, error: err.message });
+          }
+        } else {
+          this.saveUserToDB(user);
+        }
       }
 
       // 清理数据
@@ -350,7 +372,6 @@ class UserManager {
       this.onlineUsers.delete(user.userId);
 
       // 清理账号映射
-      const accountId = this.userIdToAccountId.get(user.userId);
       if (accountId) {
         this.userIdToAccountId.delete(user.userId);
         this.accountIdToUserId.delete(accountId);

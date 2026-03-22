@@ -2588,7 +2588,6 @@
     let currentAccount = null;
     let lastExp = 0;
     let lastLevel = 1;
-    const ACCOUNT_STORAGE_KEY = 'game_account';
     let pendingRegisterInfo = null; // 保存注册信息用于自动登录
 
     // Socket.io 连接
@@ -2601,6 +2600,9 @@
       reconnectionDelayMax: 5000,
       timeout: 20000
     });
+
+    // 立即设置Socket.io事件监听
+    setupSocketListeners();
 
     // 游戏状态变量
     let gameState = {
@@ -2795,12 +2797,16 @@
     };
 
     // ========== 初始化 ==========
-    function init() {
-      // 加载保存的账号信息
-      loadSavedAccount();
+    async function init() {
+      // 加载保存的账号信息并检查登录状态
+      const isLoggedIn = await loadSavedAccount();
 
-      // 检查登录状态
-      checkLoginStatus();
+      if (!isLoggedIn) {
+        // 如果没有登录，显示自动登录模态窗口
+        setTimeout(() => {
+          showAutoLoginModal();
+        }, 1000);
+      }
 
       // 初始化缓存
       moveLogEl.dataset.lastIndex = "-1";
@@ -2814,9 +2820,6 @@
       updateGameDisplay();
       // 初始化棋盘
       initBoards();
-
-      // 监听Socket.io事件
-      initSocketEvents();
     }
 
     // 统一错误提示函数
@@ -2932,49 +2935,114 @@
       return { valid: true };
     }
 
+    // 等待socket连接
+    async function waitForSocketConnection(timeout = 10000) {
+      return new Promise((resolve) => {
+        if (socket && socket.connected) {
+          resolve(true);
+          return;
+        }
+
+        const checkInterval = setInterval(() => {
+          if (socket && socket.connected) {
+            clearInterval(checkInterval);
+            resolve(true);
+          }
+        }, 100);
+
+        setTimeout(() => {
+          clearInterval(checkInterval);
+          resolve(false);
+        }, timeout);
+      });
+    }
+
+    // 通过token从服务端获取账号信息
+    async function fetchAccountByToken() {
+      return new Promise(async (resolve) => {
+        const token = localStorage.getItem('userToken');
+        if (!token) {
+          resolve(null);
+          return;
+        }
+
+        // 等待socket连接
+        const isConnected = await waitForSocketConnection();
+        if (!isConnected) {
+          console.warn('Socket未连接，无法获取账号信息');
+          resolve(null);
+          return;
+        }
+
+        socket.emit('get_account_by_token', { token });
+
+        // 设置一次性监听器来接收响应
+        const handleAccountInfo = (data) => {
+          socket.off('account_info', handleAccountInfo);
+          if (data.success && data.data) {
+            resolve(data.data);
+          } else {
+            resolve(null);
+          }
+        };
+
+        socket.on('account_info', handleAccountInfo);
+
+        // 设置超时
+        setTimeout(() => {
+          socket.off('account_info', handleAccountInfo);
+          resolve(null);
+        }, 5000);
+      });
+    }
+
     // 加载保存的账号信息
-    function loadSavedAccount() {
+    async function loadSavedAccount() {
       try {
-        const saved = localStorage.getItem(ACCOUNT_STORAGE_KEY);
-        if (saved) {
-          currentAccount = JSON.parse(saved);
+        const accountData = await fetchAccountByToken();
+        if (accountData) {
+          currentAccount = accountData.account;
+          currentAccount.permissions = accountData.permissions;
+          currentAccount.loginType = accountData.loginType;
           lastExp = currentAccount.profile?.exp || 0;
           lastLevel = currentAccount.profile?.level || 1;
           updateAccountBar();
           console.log('已恢复登录状态', currentAccount);
+          return true;
         }
       } catch (e) {
         console.error('加载账号信息失败', e);
-        localStorage.removeItem(ACCOUNT_STORAGE_KEY);
       }
+      return false;
     }
 
-    // 保存账号信息
-    function saveAccount(account) {
+    // 保存token
+    function saveToken(token) {
       try {
-        localStorage.setItem(ACCOUNT_STORAGE_KEY, JSON.stringify(account));
-        console.log('账号信息已保存');
+        localStorage.setItem('userToken', token);
+        console.log('Token已保存');
       } catch (e) {
-        console.error('保存账号信息失败', e);
+        console.error('保存token失败', e);
       }
     }
 
     // 清除账号信息
     function clearAccount() {
       try {
-        localStorage.removeItem(ACCOUNT_STORAGE_KEY);
-        localStorage.removeItem('currentAccount');
         localStorage.removeItem('userToken');
         localStorage.removeItem('loginStatus');
+        localStorage.removeItem('currentAccountId');
         console.log('账号信息已清除');
       } catch (e) {
         console.error('清除账号信息失败', e);
       }
     }
 
-    // 初始化Socket.io事件
-    function initSocketEvents() {
-      socket.on('connect', () => {
+    // 设置Socket.io事件监听（在socket初始化后立即调用）
+    function setupSocketListeners() {
+      let isInitialized = false;
+
+      socket.on('connect', async () => {
         console.log('Socket.io连接成功');
         connectStatusEl.textContent = '已连接';
         connectStatusEl.className = 'info-value value-connected';
@@ -2982,14 +3050,21 @@
         // 隐藏断开连接提示框
         hideDisconnectWarning();
 
+        // 只在第一次连接时初始化
+        if (!isInitialized) {
+          isInitialized = true;
+          await init();
+        }
+
         // 发送客户端连接请求（包含版本号和savedUserId）
+        // 注意：init()函数会恢复currentAccount，所以这里可以获取到正确的id
         socket.emit('client_connect', {
           clientVersion: CLIENT_VERSION,
           savedUserId: getSavedUserId(),
-          id: currentAccount?.id
+          id: currentAccount?.id || localStorage.getItem('currentAccountId')
         });
 
-        // 如果有保存的账号，自动发送昵称登录
+        // 如果已经有账号信息，发送用户登录事件
         if (currentAccount && currentAccount.nickname) {
           socket.emit('user_login', { nickname: currentAccount.nickname });
         }
@@ -3478,8 +3553,9 @@
           currentAccount.token = resultData.token;
           currentAccount.loginType = resultData.loginType;
 
-          // 保存到本地存储
-          localStorage.setItem('currentAccount', JSON.stringify(currentAccount));
+          // 保存token和账号ID到本地存储
+          localStorage.setItem('userToken', resultData.token);
+          localStorage.setItem('currentAccountId', resultData.account.id);
 
           // 更新界面
           updateAccountBar();
@@ -3536,7 +3612,6 @@
           if (data.success) {
             if (data.account) {
               currentAccount = data.account;
-              saveAccount(currentAccount);
               updateAccountBar();
             }
             closeAccountModal();
@@ -3608,7 +3683,6 @@
           lastLevel = newLevel;
 
           currentAccount = data.account;
-          saveAccount(currentAccount);
           updateAccountBar();
         }
       });
@@ -7360,8 +7434,6 @@
 
     function logout() {
       if (confirm('确定要退出登录吗？')) {
-        // 清除本地存储
-        localStorage.removeItem('currentAccount');
         currentAccount = null;
         clearAccount();
         updateAccountBar();
@@ -7376,8 +7448,6 @@
     // 游客退出
     function guestLogout() {
       if (confirm('确定要退出游客模式吗？')) {
-        // 清除本地存储
-        localStorage.removeItem('currentAccount');
         currentAccount = null;
         clearAccount();
         updateAccountBar();
@@ -8542,6 +8612,12 @@
 
     // 游客登录
     function guestLogin() {
+      if (currentAccount) {
+        // 已经登录，显示提示
+        showToast('您已经登录了账号', 'info');
+        return;
+      }
+
       if (socket && socket.connected) {
         socket.emit('guest_login');
         showToast('正在创建游客账号...', 'info');
@@ -8557,23 +8633,15 @@
     }
 
     // 检查登录状态并显示模态窗口
-    function checkLoginStatus() {
-      const savedAccount = localStorage.getItem('currentAccount');
-      if (savedAccount) {
-        try {
-          currentAccount = JSON.parse(savedAccount);
-          updateAccountBar();
+    async function checkLoginStatus() {
+      const isLoggedIn = await loadSavedAccount();
 
-          // 加载已保存的权限
-          if (currentAccount.permissions) {
-            loadPermissions(currentAccount.permissions);
-          }
-
-          return true;
-        } catch (e) {
-          console.error('解析保存的账号信息失败:', e);
-          localStorage.removeItem('currentAccount');
+      if (isLoggedIn) {
+        // 加载已保存的权限
+        if (currentAccount.permissions) {
+          loadPermissions(currentAccount.permissions);
         }
+        return true;
       }
 
       // 如果没有登录，显示自动登录模态窗口
@@ -8675,8 +8743,7 @@
       });
     };
 
-    // 初始化
-    init();
+    // init函数现在由setupSocketListeners在socket连接成功后自动调用
   </script>
 
   <style>
