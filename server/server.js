@@ -17,6 +17,7 @@ const VersionManager = require('./modules/VersionManager');
 const AccountManager = require('./modules/AccountManager');
 const AchievementManager = require('./modules/AchievementManager');
 const AIManager = require('./modules/AIManager');
+const ThemeManager = require('./modules/ThemeManager');
 
 // 初始化Express应用
 const app = express();
@@ -88,6 +89,136 @@ app.get('/api/spectate/games', (req, res) => {
   });
 });
 
+// ========== 主题相关API ==========
+
+// 获取所有主题
+app.get('/api/themes', (req, res) => {
+  try {
+    const themes = themeManager.getAllThemes();
+    res.json({
+      success: true,
+      data: themes
+    });
+  } catch (err) {
+    logger.error('获取主题列表失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '获取主题列表失败'
+    });
+  }
+});
+
+// 获取单个主题
+app.get('/api/themes/:id', (req, res) => {
+  try {
+    const theme = themeManager.getTheme(req.params.id);
+    if (!theme) {
+      return res.status(404).json({
+        success: false,
+        message: '主题不存在'
+      });
+    }
+    res.json({
+      success: true,
+      data: theme
+    });
+  } catch (err) {
+    logger.error('获取主题失败', { id: req.params.id, error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '获取主题失败'
+    });
+  }
+});
+
+// 添加主题（仅管理员）
+app.post('/api/themes', async (req, res) => {
+  try {
+    const { adminToken } = req.body;
+    if (adminToken !== config.adminToken) {
+      return res.status(403).json({
+        success: false,
+        message: '权限不足'
+      });
+    }
+
+    const result = await themeManager.addTheme(req.body);
+    res.json(result);
+  } catch (err) {
+    logger.error('添加主题失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '添加主题失败'
+    });
+  }
+});
+
+// 更新主题（仅管理员）
+app.put('/api/themes/:id', async (req, res) => {
+  try {
+    const { adminToken } = req.body;
+    if (adminToken !== config.adminToken) {
+      return res.status(403).json({
+        success: false,
+        message: '权限不足'
+      });
+    }
+
+    const result = await themeManager.updateTheme(req.params.id, req.body);
+    res.json(result);
+  } catch (err) {
+    logger.error('更新主题失败', { id: req.params.id, error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '更新主题失败'
+    });
+  }
+});
+
+// 删除主题（仅管理员）
+app.delete('/api/themes/:id', async (req, res) => {
+  try {
+    const { adminToken } = req.query;
+    if (adminToken !== config.adminToken) {
+      return res.status(403).json({
+        success: false,
+        message: '权限不足'
+      });
+    }
+
+    const result = await themeManager.deleteTheme(req.params.id);
+    res.json(result);
+  } catch (err) {
+    logger.error('删除主题失败', { id: req.params.id, error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '删除主题失败'
+    });
+  }
+});
+
+// 重新加载主题（仅管理员）
+app.post('/api/themes/reload', async (req, res) => {
+  try {
+    const { adminToken } = req.body;
+    if (adminToken !== config.adminToken) {
+      return res.status(403).json({
+        success: false,
+        message: '权限不足'
+      });
+    }
+
+    const result = await themeManager.reloadThemes();
+    res.json(result);
+  } catch (err) {
+    logger.error('重新加载主题失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '重新加载主题失败'
+    });
+  }
+});
+
 // 初始化管理器
 const accountManager = new AccountManager();
 const achievementManager = new AchievementManager(accountManager);
@@ -97,6 +228,7 @@ const gameManager = new GameManager(userManager, accountManager, achievementMana
 const chatManager = new ChatManager(userManager, gameManager, accountManager);
 const adminManager = new AdminManager(userManager, gameManager, chatManager, accountManager);
 const versionManager = new VersionManager();
+const themeManager = new ThemeManager();
 
 const serverStartTime = Date.now();
 

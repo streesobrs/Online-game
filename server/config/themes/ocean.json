@@ -1,0 +1,40 @@
+{
+  "id": "ocean",
+  "name": "海洋之心",
+  "description": "清新的海洋风格主题",
+  "background": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+  "primaryColor": "#00d4ff",
+  "secondaryColor": "#6c757d",
+  "accentColor": "#27ae60",
+  "boardBackground": {
+    "gobang": "#1e3a5f",
+    "go": "#2a4a7f",
+    "chess": "#1e3a5f"
+  },
+  "pieceColor": {
+    "gobangBlack": "#0a1929",
+    "gobangWhite": "#e3f2fd",
+    "goBlack": "#0a1929",
+    "goWhite": "#e3f2fd",
+    "chessRed": "#e53935",
+    "chessBlack": "#0a1929"
+  },
+  "uiColors": {
+    "containerBg": "rgba(30, 58, 95, 0.9)",
+    "titleColor": "#ffffff",
+    "statusColor": "#e3f2fd",
+    "statusBg": "rgba(0, 212, 255, 0.1)",
+    "usersBg": "rgba(0, 212, 255, 0.05)",
+    "usersTitleColor": "#00d4ff",
+    "userItemBg": "rgba(0, 212, 255, 0.2)",
+    "userItemColor": "#ffffff",
+    "leaderboardBg": "rgba(0, 212, 255, 0.05)",
+    "leaderboardTitleColor": "#00d4ff",
+    "leaderboardItemBg": "rgba(0, 212, 255, 0.1)",
+    "rankColor": "#ffffff",
+    "nameColor": "#e3f2fd",
+    "levelColor": "#90caf9",
+    "winsColor": "#48bb78",
+    "winrateColor": "#4299e1"
+  }
+}
