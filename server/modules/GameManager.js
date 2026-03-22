@@ -595,9 +595,19 @@ class GameManager {
           const playerResult = isWinner ? 'win' : (result === 'draw' ? 'draw' : 'loss');
           const gameDuration = game.endTime - game.startTime;
           const playerChatted = game.playerChatted && game.playerChatted[player];
+          let level = 1;
+          if (account.profile && account.profile.exp) {
+            const totalExp = account.profile.exp;
+            let exp = totalExp;
+            while (exp >= accountManager.getExpForLevel(level + 1)) {
+              exp -= accountManager.getExpForLevel(level + 1);
+              level++;
+            }
+          }
+
           const stats = {
             ...account.stats,
-            level: account.profile ? account.profile.level : 1,
+            level: level,
             result: playerResult,
             silentWin: isWinner && !playerChatted,
             quickGame: gameDuration <= 5 * 60 * 1000,
@@ -1276,9 +1286,19 @@ class GameManager {
       const account = await this.accountManager.getAccount(accountId);
       if (account) {
         const playerChatted = aiGame.playerChatted && aiGame.playerChatted[userId];
+        let level = 1;
+        if (account.profile && account.profile.exp) {
+          const totalExp = account.profile.exp;
+          let exp = totalExp;
+          while (exp >= this.accountManager.getExpForLevel(level + 1)) {
+            exp -= this.accountManager.getExpForLevel(level + 1);
+            level++;
+          }
+        }
+
         const stats = {
           ...account.stats,
-          level: account.profile ? account.profile.level : 1,
+          level: level,
           result: result,
           aiDifficulty: aiGame.difficulty,
           aiResult: result,

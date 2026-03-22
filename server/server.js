@@ -198,9 +198,19 @@ io.on('connection', (socket) => {
         // 检查回归玩家成就
         const account = await accountManager.getAccount(result.data.account.id);
         if (account && achievementManager) {
+          let level = 1;
+          if (account.profile && account.profile.exp) {
+            const totalExp = account.profile.exp;
+            let exp = totalExp;
+            while (exp >= accountManager.getExpForLevel(level + 1)) {
+              exp -= accountManager.getExpForLevel(level + 1);
+              level++;
+            }
+          }
+
           const stats = {
             ...account.stats,
-            level: account.profile ? account.profile.level : 1
+            level: level
           };
           const unlockedAchievements = await achievementManager.checkAchievements(result.data.account.id, stats);
           if (unlockedAchievements.length > 0) {
@@ -677,6 +687,21 @@ adminNamespace.on('connection', (socket) => {
   // 获取所有账号
   socket.on('get_all_accounts', () => {
     adminManager.getAllAccounts(socket);
+  });
+
+  // 获取等级经验配置
+  socket.on('get_level_exp_config', () => {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const configPath = path.join(__dirname, 'config/levelExp.json');
+      const configData = fs.readFileSync(configPath, 'utf8');
+      const config = JSON.parse(configData);
+      socket.emit('level_exp_config', config);
+    } catch (err) {
+      logger.error('获取等级经验配置失败', { error: err.message });
+      socket.emit('level_exp_config', { levelExp: {} });
+    }
   });
 
   // 获取账号详情

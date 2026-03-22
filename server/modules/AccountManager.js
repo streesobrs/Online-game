@@ -2,6 +2,8 @@
 const crypto = require('crypto');
 const logger = require('../utils/logger');
 const dataStore = require('../utils/dataStore');
+const fs = require('fs');
+const path = require('path');
 
 class AccountManager {
   constructor() {
@@ -11,6 +13,50 @@ class AccountManager {
     this.keyLength = 64;
     // 哈希算法
     this.digest = 'sha512';
+    // 加载等级经验配置
+    this.levelExpConfig = this.loadLevelExpConfig();
+  }
+
+  loadLevelExpConfig() {
+    try {
+      const configPath = path.join(__dirname, '../config/levelExp.json');
+      const configData = fs.readFileSync(configPath, 'utf8');
+      const config = JSON.parse(configData);
+      return config.levelExp || {};
+    } catch (err) {
+      logger.error('加载等级经验配置失败', { error: err.message });
+      // 默认使用 level * 100 的公式
+      return {};
+    }
+  }
+
+  getExpForLevel(level) {
+    if (this.levelExpConfig[level]) {
+      return this.levelExpConfig[level];
+    }
+    // 如果配置表中没有，使用默认公式
+    return (level - 1) * 100;
+  }
+
+  getTotalExpForLevel(level) {
+    let totalExp = 0;
+    for (let i = 1; i <= level; i++) {
+      totalExp += this.getExpForLevel(i);
+    }
+    return totalExp;
+  }
+
+  // 根据总经验值计算等级和剩余经验值
+  calculateLevelAndExp(totalExp) {
+    let level = 1;
+    let exp = totalExp;
+
+    while (exp >= this.getExpForLevel(level + 1)) {
+      exp -= this.getExpForLevel(level + 1);
+      level++;
+    }
+
+    return { level, exp };
   }
 
   // 生成密码盐
@@ -584,8 +630,17 @@ class AccountManager {
           stats.aiResult = 'win';
         }
 
-        if (account.profile && account.profile.level < 10) {
-          stats.lowLevelWins++;
+        if (account.profile && account.profile.exp) {
+          const totalExp = account.profile.exp;
+          let level = 1;
+          let exp = totalExp;
+          while (exp >= this.getExpForLevel(level + 1)) {
+            exp -= this.getExpForLevel(level + 1);
+            level++;
+          }
+          if (level < 10) {
+            stats.lowLevelWins++;
+          }
         }
       } else if (result === 'loss') {
         stats.losses++;
@@ -624,13 +679,8 @@ class AccountManager {
         }
       }
 
-      const profile = account.profile || { level: 1, exp: 0 };
+      const profile = account.profile || { exp: 0 };
       profile.exp += result === 'win' ? 10 : (result === 'draw' ? 5 : 2);
-
-      while (profile.exp >= profile.level * 100) {
-        profile.exp -= profile.level * 100;
-        profile.level++;
-      }
 
       await dataStore.update('accounts', id, { stats, profile });
       logger.info('账号游戏统计更新', { id, result, gameType, isAI });
@@ -650,13 +700,8 @@ class AccountManager {
         return { success: false, message: '账号不存在' };
       }
 
-      const profile = account.profile || { level: 1, exp: 0 };
+      const profile = account.profile || { exp: 0 };
       profile.exp += exp;
-
-      while (profile.exp >= profile.level * 100) {
-        profile.exp -= profile.level * 100;
-        profile.level++;
-      }
 
       await dataStore.update('accounts', id, { profile });
       logger.info('添加经验值', { id, exp });
@@ -790,29 +835,21 @@ class AccountManager {
       }
 
       // 确保profile对象存在
-      const profile = account.profile || { level: 1, exp: 0 };
-
-      // 计算总经验值
-      let totalExp = 0;
-      for (let i = 1; i < profile.level; i++) {
-        totalExp += i * 100;
-      }
-      totalExp += profile.exp;
-
-      let newTotalExp = totalExp;
+      const profile = account.profile || { exp: 0 };
+      let exp = profile.exp || 0;
 
       switch (operation) {
         case 'add':
-          newTotalExp = totalExp + amount;
+          exp = exp + amount;
           break;
         case 'subtract':
-          newTotalExp = Math.max(0, totalExp - amount);
+          exp = Math.max(0, exp - amount);
           break;
         case 'reset':
-          newTotalExp = 0;
+          exp = 0;
           break;
         case 'set':
-          newTotalExp = Math.max(0, amount);
+          exp = Math.max(0, amount);
           break;
         default:
           return {
@@ -821,23 +858,14 @@ class AccountManager {
           };
       }
 
-      // 重新计算等级和剩余经验值
-      let newLevel = 1;
-      let newExp = newTotalExp;
-
-      while (newExp >= newLevel * 100) {
-        newExp -= newLevel * 100;
-        newLevel++;
-      }
-
-      await dataStore.update('accounts', id, { profile: { level: newLevel, exp: newExp } });
-      logger.info('管理员修改用户经验值', { id, operation, amount, oldExp: totalExp, newExp: newTotalExp, newLevel });
+      await dataStore.update('accounts', id, { profile: { exp } });
+      logger.info('管理员修改用户经验值', { id, operation, amount, oldExp: profile.exp, newExp: exp });
 
       return {
         success: true,
         message: '经验值修改成功',
-        oldExp: totalExp,
-        newExp: newTotalExp
+        oldExp: profile.exp,
+        newExp: exp
       };
     } catch (err) {
       logger.error('修改用户经验值失败', { id, error: err.message });

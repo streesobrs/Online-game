@@ -1190,7 +1190,8 @@
       games: [],
       accounts: [],
       chatMessages: [],
-      stats: {}
+      stats: {},
+      levelExpConfig: {}
     };
 
     // ==================== 页面切换 ====================
@@ -1322,6 +1323,11 @@
         if (currentView === 'data') renderDataAccounts();
       });
 
+      // 等级经验配置
+      socket.on('level_exp_config', (data) => {
+        adminData.levelExpConfig = data.levelExp || {};
+      });
+
       // 系统统计
       socket.on('admin_system_stats', (data) => {
         // 更新统计数据
@@ -1363,6 +1369,7 @@
 
     function loadDataAccounts() {
       socket.emit('get_all_accounts');
+      socket.emit('get_level_exp_config');
     }
 
     function renderDataAccounts() {
@@ -1376,15 +1383,16 @@
 
       tbody.innerHTML = accounts.map(acc => {
         const typeClass = acc.type === 'registered' ? 'badge-online' : 'badge-warning';
-        const level = acc.profile?.level || 1;
-        const exp = acc.profile?.exp || 0;
+        const totalExp = acc.profile?.exp || 0;
 
-        // 计算总经验值
-        let totalExp = 0;
-        for (let i = 1; i < level; i++) {
-          totalExp += i * 100;
+        // 计算等级和剩余经验值
+        let level = 1;
+        let exp = totalExp;
+
+        while (exp >= (adminData.levelExpConfig[level + 1] || level * 100)) {
+          exp -= adminData.levelExpConfig[level + 1] || level * 100;
+          level++;
         }
-        totalExp += exp;
 
         return `
       <tr>
@@ -1427,15 +1435,16 @@
 
       tbody.innerHTML = filtered.map(acc => {
         const typeClass = acc.type === 'registered' ? 'badge-online' : 'badge-warning';
-        const level = acc.profile?.level || 1;
-        const exp = acc.profile?.exp || 0;
+        const totalExp = acc.profile?.exp || 0;
 
-        // 计算总经验值
-        let totalExp = 0;
-        for (let i = 1; i < level; i++) {
-          totalExp += i * 100;
+        // 计算等级和剩余经验值
+        let level = 1;
+        let exp = totalExp;
+
+        while (exp >= (adminData.levelExpConfig[level + 1] || level * 100)) {
+          exp -= adminData.levelExpConfig[level + 1] || level * 100;
+          level++;
         }
-        totalExp += exp;
 
         return `
       <tr>
@@ -1482,15 +1491,16 @@
     function updateAccountData(account) {
       if (!account) return;
 
-      const level = account.profile?.level || 1;
-      const exp = account.profile?.exp || 0;
+      const totalExp = account.profile?.exp || 0;
 
-      // 计算总经验值
-      let totalExp = 0;
-      for (let i = 1; i < level; i++) {
-        totalExp += i * 100;
+      // 计算等级和剩余经验值
+      let level = 1;
+      let exp = totalExp;
+
+      while (exp >= (adminData.levelExpConfig[level + 1] || level * 100)) {
+        exp -= adminData.levelExpConfig[level + 1] || level * 100;
+        level++;
       }
-      totalExp += exp;
 
       document.getElementById('account-id').value = account.id;
       document.getElementById('account-username').value = account.username || '-';
