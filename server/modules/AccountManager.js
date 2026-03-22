@@ -105,11 +105,19 @@ class AccountManager {
         };
       }
 
-      // 更新最后登录时间
+      // 检查是否为回归玩家（用于成就检测）
       const now = Date.now();
+      const lastLogin = account.lastLogin || 0;
+      const daysSinceLastLogin = (now - lastLogin) / (1000 * 60 * 60 * 24);
+      const returnPlayer = daysSinceLastLogin >= 7;
+      const longReturnPlayer = daysSinceLastLogin >= 30;
+
+      // 更新最后登录时间
       await dataStore.update('accounts', { id: account.id }, {
         lastLogin: now,
-        lastSeen: now
+        lastSeen: now,
+        'stats.returnPlayer': returnPlayer,
+        'stats.longReturnPlayer': longReturnPlayer
       });
 
       // 获取权限配置
@@ -727,6 +735,7 @@ class AccountManager {
   // 获取所有账号列表（用于后台管理）
   async getAllAccounts(limit = 50) {
     try {
+      // 强制重新读取数据，确保获取最新状态
       const accounts = await dataStore.read('accounts');
       return accounts
         .slice(-limit)
@@ -765,6 +774,178 @@ class AccountManager {
       return {
         success: false,
         message: '删除失败，请稍后重试'
+      };
+    }
+  }
+
+  // 管理员修改用户经验值
+  async modifyUserExp(id, operation, amount) {
+    try {
+      const account = await dataStore.findOne('accounts', { id });
+      if (!account) {
+        return {
+          success: false,
+          message: '账号不存在'
+        };
+      }
+
+      // 确保profile对象存在
+      const profile = account.profile || { level: 1, exp: 0 };
+
+      // 计算总经验值
+      let totalExp = 0;
+      for (let i = 1; i < profile.level; i++) {
+        totalExp += i * 100;
+      }
+      totalExp += profile.exp;
+
+      let newTotalExp = totalExp;
+
+      switch (operation) {
+        case 'add':
+          newTotalExp = totalExp + amount;
+          break;
+        case 'subtract':
+          newTotalExp = Math.max(0, totalExp - amount);
+          break;
+        case 'reset':
+          newTotalExp = 0;
+          break;
+        case 'set':
+          newTotalExp = Math.max(0, amount);
+          break;
+        default:
+          return {
+            success: false,
+            message: '无效的操作类型'
+          };
+      }
+
+      // 重新计算等级和剩余经验值
+      let newLevel = 1;
+      let newExp = newTotalExp;
+
+      while (newExp >= newLevel * 100) {
+        newExp -= newLevel * 100;
+        newLevel++;
+      }
+
+      await dataStore.update('accounts', id, { profile: { level: newLevel, exp: newExp } });
+      logger.info('管理员修改用户经验值', { id, operation, amount, oldExp: totalExp, newExp: newTotalExp, newLevel });
+
+      return {
+        success: true,
+        message: '经验值修改成功',
+        oldExp: totalExp,
+        newExp: newTotalExp
+      };
+    } catch (err) {
+      logger.error('修改用户经验值失败', { id, error: err.message });
+      return {
+        success: false,
+        message: '修改失败，请稍后重试'
+      };
+    }
+  }
+
+  // 管理员添加用户成就
+  async addUserAchievement(id, achievementId) {
+    try {
+      const account = await dataStore.findOne('accounts', { id });
+      if (!account) {
+        return {
+          success: false,
+          message: '账号不存在'
+        };
+      }
+
+      const achievements = account.achievements || [];
+      if (achievements.includes(achievementId)) {
+        return {
+          success: false,
+          message: '该成就已解锁'
+        };
+      }
+
+      achievements.push(achievementId);
+      await dataStore.update('accounts', id, { achievements });
+      logger.info('管理员添加用户成就', { id, achievementId });
+
+      return {
+        success: true,
+        message: '成就添加成功',
+        achievementId: achievementId
+      };
+    } catch (err) {
+      logger.error('添加用户成就失败', { id, achievementId, error: err.message });
+      return {
+        success: false,
+        message: '添加失败，请稍后重试'
+      };
+    }
+  }
+
+  // 管理员移除用户成就
+  async removeUserAchievement(id, achievementId) {
+    try {
+      const account = await dataStore.findOne('accounts', { id });
+      if (!account) {
+        return {
+          success: false,
+          message: '账号不存在'
+        };
+      }
+
+      const achievements = account.achievements || [];
+      const index = achievements.indexOf(achievementId);
+      if (index === -1) {
+        return {
+          success: false,
+          message: '该成就未解锁'
+        };
+      }
+
+      achievements.splice(index, 1);
+      await dataStore.update('accounts', id, { achievements });
+      logger.info('管理员移除用户成就', { id, achievementId });
+
+      return {
+        success: true,
+        message: '成就移除成功',
+        achievementId: achievementId
+      };
+    } catch (err) {
+      logger.error('移除用户成就失败', { id, achievementId, error: err.message });
+      return {
+        success: false,
+        message: '移除失败，请稍后重试'
+      };
+    }
+  }
+
+  // 管理员重置用户成就
+  async resetUserAchievements(id) {
+    try {
+      const account = await dataStore.findOne('accounts', { id });
+      if (!account) {
+        return {
+          success: false,
+          message: '账号不存在'
+        };
+      }
+
+      await dataStore.update('accounts', id, { achievements: [] });
+      logger.info('管理员重置用户成就', { id });
+
+      return {
+        success: true,
+        message: '成就重置成功'
+      };
+    } catch (err) {
+      logger.error('重置用户成就失败', { id, error: err.message });
+      return {
+        success: false,
+        message: '重置失败，请稍后重试'
       };
     }
   }

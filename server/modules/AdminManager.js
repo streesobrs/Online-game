@@ -838,10 +838,176 @@ class AdminManager {
 
     const result = await this.accountManager.deleteAccount(id);
     if (result.success) {
+      // 清理UserManager中的映射关系
+      if (this.userManager) {
+        // 找到对应的userId
+        let userId = null;
+        for (const [accountId, user] of this.userManager.accountIdToUserId.entries()) {
+          if (accountId === id) {
+            userId = user;
+            break;
+          }
+        }
+
+        // 删除映射关系
+        if (userId) {
+          this.userManager.accountIdToUserId.delete(id);
+          this.userManager.userIdToAccountId.delete(userId);
+          // 从在线用户中移除
+          this.userManager.onlineUsers.delete(userId);
+        }
+      }
+
       logger.info('管理员删除账号', { adminSocket: socket.id, id });
     }
     socket.emit('admin_action_result', {
       action: 'delete_account',
+      ...result
+    });
+
+    // 发送账号列表更新事件
+    socket.emit('admin_accounts_updated', {});
+  }
+
+  // 获取账号详情
+  async getAccountDetail(socket, id) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'get_account_detail',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+
+    const account = await this.accountManager.getAccount(id);
+    if (!account) {
+      socket.emit('admin_action_result', {
+        action: 'get_account_detail',
+        success: false,
+        message: '账号不存在'
+      });
+      return;
+    }
+
+    // 从UserManager获取映射关系
+    let userId = null;
+    let user = null;
+    if (this.userManager) {
+      userId = this.userManager.accountIdToUserId.get(id);
+      user = userId ? this.userManager.getUserByUserId(userId) : null;
+    }
+
+    let muted = false;
+    let muteInfo = null;
+    if (user && this.chatManager) {
+      muteInfo = this.chatManager.muteList.get(userId);
+      muted = !!muteInfo;
+    }
+
+    socket.emit('admin_account_detail', {
+      account: {
+        id: account.id,
+        type: account.type,
+        username: account.username,
+        nickname: account.nickname,
+        createdAt: account.createdAt,
+        lastSeen: account.lastSeen,
+        lastLogin: account.lastLogin,
+        stats: account.stats,
+        profile: account.profile
+      },
+      user: user ? {
+        userId: user.userId,
+        nickname: user.nickname,
+        status: user.status,
+        gameType: user.gameType,
+        game: user.game,
+        connectedAt: user.connectedAt,
+        lastActivity: user.lastActivity,
+        ip: user.ip,
+        muted: muted,
+        muteInfo: muteInfo ? {
+          reason: muteInfo.reason,
+          expiresAt: muteInfo.expiresAt,
+          remainingMinutes: muteInfo.expiresAt ? Math.max(0, Math.ceil((muteInfo.expiresAt - Date.now()) / 1000 / 60)) : null
+        } : null
+      } : null
+    });
+  }
+
+  // 修改用户经验值
+  async modifyUserExp(socket, id, operation, amount) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'modify_user_exp',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+
+    const result = await this.accountManager.modifyUserExp(id, operation, amount);
+    logger.info('管理员修改用户经验值', { adminSocket: socket.id, id, operation, amount });
+    socket.emit('admin_action_result', {
+      action: 'modify_user_exp',
+      ...result
+    });
+  }
+
+  // 添加用户成就
+  async addUserAchievement(socket, id, achievementId) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'add_user_achievement',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+
+    const result = await this.accountManager.addUserAchievement(id, achievementId);
+    logger.info('管理员添加用户成就', { adminSocket: socket.id, id, achievementId });
+    socket.emit('admin_action_result', {
+      action: 'add_user_achievement',
+      ...result
+    });
+  }
+
+  // 移除用户成就
+  async removeUserAchievement(socket, id, achievementId) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'remove_user_achievement',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+
+    const result = await this.accountManager.removeUserAchievement(id, achievementId);
+    logger.info('管理员移除用户成就', { adminSocket: socket.id, id, achievementId });
+    socket.emit('admin_action_result', {
+      action: 'remove_user_achievement',
+      ...result
+    });
+  }
+
+  // 重置用户成就
+  async resetUserAchievements(socket, id) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'reset_user_achievements',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+
+    const result = await this.accountManager.resetUserAchievements(id);
+    logger.info('管理员重置用户成就', { adminSocket: socket.id, id });
+    socket.emit('admin_action_result', {
+      action: 'reset_user_achievements',
       ...result
     });
   }

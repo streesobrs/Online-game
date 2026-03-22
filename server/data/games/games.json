@@ -4266,5 +4266,1036 @@
     "endTime": 1774155617291,
     "duration": 94631,
     "savedAt": 1774155617295
+  },
+  {
+    "id": "ai_8515f9990bb8084a_1774161418017",
+    "gameId": "ai_8515f9990bb8084a_1774161418017",
+    "gameType": "gobang",
+    "player1": "8515f9990bb8084a",
+    "player2": "ai",
+    "player1Nickname": "我操了",
+    "player2Nickname": "AI",
+    "winner": "8515f9990bb8084a",
+    "result": "win",
+    "moves": [
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 8,
+          "c": 9
+        },
+        "timestamp": 1774161419587
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 7,
+          "c": 8
+        },
+        "timestamp": 1774161421340
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 9,
+          "c": 8
+        },
+        "timestamp": 1774161422172
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 6,
+          "c": 11
+        },
+        "timestamp": 1774161423682
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 10,
+          "c": 7
+        },
+        "timestamp": 1774161424188
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 7,
+          "c": 10
+        },
+        "timestamp": 1774161425018
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 10,
+          "c": 9
+        },
+        "timestamp": 1774161425867
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 11,
+          "c": 6
+        },
+        "timestamp": 1774161426733
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 10,
+          "c": 8
+        },
+        "timestamp": 1774161428246
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 10,
+          "c": 6
+        },
+        "timestamp": 1774161429083
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 10,
+          "c": 10
+        },
+        "timestamp": 1774161429701
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 10,
+          "c": 11
+        },
+        "timestamp": 1774161430509
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 8,
+          "c": 7
+        },
+        "timestamp": 1774161431971
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 7,
+          "c": 6
+        },
+        "timestamp": 1774161432818
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 11,
+          "c": 10
+        },
+        "timestamp": 1774161433492
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 12,
+          "c": 11
+        },
+        "timestamp": 1774161434312
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 11,
+          "c": 8
+        },
+        "timestamp": 1774161436093
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 8,
+          "c": 8
+        },
+        "timestamp": 1774161436925
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 12,
+          "c": 8
+        },
+        "timestamp": 1774161438617
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 13,
+          "c": 8
+        },
+        "timestamp": 1774161439433
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 12,
+          "c": 7
+        },
+        "timestamp": 1774161440097
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 9,
+          "c": 10
+        },
+        "timestamp": 1774161440912
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 13,
+          "c": 6
+        },
+        "timestamp": 1774161442679
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 14,
+          "c": 5
+        },
+        "timestamp": 1774161443494
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 11,
+          "c": 7
+        },
+        "timestamp": 1774161443964
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 9,
+          "c": 7
+        },
+        "timestamp": 1774161444773
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 13,
+          "c": 7
+        },
+        "timestamp": 1774161445290
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 14,
+          "c": 7
+        },
+        "timestamp": 1774161446099
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 11,
+          "c": 9
+        },
+        "timestamp": 1774161446803
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 9,
+          "c": 11
+        },
+        "timestamp": 1774161447625
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 11,
+          "c": 11
+        },
+        "timestamp": 1774161450197
+      }
+    ],
+    "startTime": 1774161418017,
+    "endTime": 1774161450197,
+    "duration": 32180,
+    "savedAt": 1774161450197
+  },
+  {
+    "id": "ai_8515f9990bb8084a_1774161904478",
+    "gameId": "ai_8515f9990bb8084a_1774161904478",
+    "gameType": "gobang",
+    "player1": "8515f9990bb8084a",
+    "player2": "ai",
+    "player1Nickname": "我操了",
+    "player2Nickname": "AI",
+    "winner": "8515f9990bb8084a",
+    "result": "win",
+    "moves": [
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 8,
+          "c": 9
+        },
+        "timestamp": 1774161906024
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 7,
+          "c": 8
+        },
+        "timestamp": 1774161908467
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 7,
+          "c": 10
+        },
+        "timestamp": 1774161909137
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 5,
+          "c": 12
+        },
+        "timestamp": 1774161911151
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 9,
+          "c": 8
+        },
+        "timestamp": 1774161911482
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 6,
+          "c": 11
+        },
+        "timestamp": 1774161913014
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 10,
+          "c": 7
+        },
+        "timestamp": 1774161913397
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 11,
+          "c": 6
+        },
+        "timestamp": 1774161914915
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 10,
+          "c": 9
+        },
+        "timestamp": 1774161918026
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 3,
+          "c": 8
+        },
+        "timestamp": 1774161919914
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 10,
+          "c": 8
+        },
+        "timestamp": 1774161921157
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 10,
+          "c": 6
+        },
+        "timestamp": 1774161922719
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 10,
+          "c": 10
+        },
+        "timestamp": 1774161924690
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 10,
+          "c": 11
+        },
+        "timestamp": 1774161926204
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 8,
+          "c": 7
+        },
+        "timestamp": 1774161926669
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 7,
+          "c": 6
+        },
+        "timestamp": 1774161928209
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 11,
+          "c": 10
+        },
+        "timestamp": 1774161928800
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 12,
+          "c": 11
+        },
+        "timestamp": 1774161930309
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 9,
+          "c": 10
+        },
+        "timestamp": 1774161931386
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 8,
+          "c": 10
+        },
+        "timestamp": 1774161932898
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 11,
+          "c": 8
+        },
+        "timestamp": 1774161934735
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 8,
+          "c": 8
+        },
+        "timestamp": 1774161936269
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 12,
+          "c": 7
+        },
+        "timestamp": 1774161937673
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 8,
+          "c": 11
+        },
+        "timestamp": 1774161939176
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 13,
+          "c": 6
+        },
+        "timestamp": 1774161941144
+      }
+    ],
+    "startTime": 1774161904478,
+    "endTime": 1774161941144,
+    "duration": 36666,
+    "savedAt": 1774161941144
+  },
+  {
+    "id": "ai_8515f9990bb8084a_1774162093241",
+    "gameId": "ai_8515f9990bb8084a_1774162093241",
+    "gameType": "gobang",
+    "player1": "8515f9990bb8084a",
+    "player2": "ai",
+    "player1Nickname": "我操了",
+    "player2Nickname": "AI",
+    "winner": "ai",
+    "result": "loss",
+    "moves": [
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 9,
+          "c": 10
+        },
+        "timestamp": 1774162095196
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 9,
+          "c": 11
+        },
+        "timestamp": 1774162098293
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 10,
+          "c": 9
+        },
+        "timestamp": 1774162099007
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 8,
+          "c": 11
+        },
+        "timestamp": 1774162101926
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 11,
+          "c": 8
+        },
+        "timestamp": 1774162104734
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 12,
+          "c": 7
+        },
+        "timestamp": 1774162107246
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 11,
+          "c": 9
+        },
+        "timestamp": 1774162107708
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 7,
+          "c": 11
+        },
+        "timestamp": 1774162110810
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 11,
+          "c": 10
+        },
+        "timestamp": 1774162111467
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 11,
+          "c": 7
+        },
+        "timestamp": 1774162113977
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 9,
+          "c": 8
+        },
+        "timestamp": 1774162119734
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 8,
+          "c": 7
+        },
+        "timestamp": 1774162122237
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 10,
+          "c": 8
+        },
+        "timestamp": 1774162123331
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 8,
+          "c": 8
+        },
+        "timestamp": 1774162125844
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 10,
+          "c": 10
+        },
+        "timestamp": 1774162126413
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 8,
+          "c": 10
+        },
+        "timestamp": 1774162128926
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 12,
+          "c": 11
+        },
+        "timestamp": 1774162131513
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 8,
+          "c": 9
+        },
+        "timestamp": 1774162134022
+      }
+    ],
+    "startTime": 1774162093241,
+    "endTime": 1774162134022,
+    "duration": 40781,
+    "savedAt": 1774162134022
+  },
+  {
+    "id": "ai_8515f9990bb8084a_1774162240885",
+    "gameId": "ai_8515f9990bb8084a_1774162240885",
+    "gameType": "gobang",
+    "player1": "8515f9990bb8084a",
+    "player2": "ai",
+    "player1Nickname": "我操了",
+    "player2Nickname": "AI",
+    "winner": "8515f9990bb8084a",
+    "result": "win",
+    "moves": [
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 8,
+          "c": 9
+        },
+        "timestamp": 1774162241945
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 7,
+          "c": 9
+        },
+        "timestamp": 1774162245005
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 9,
+          "c": 8
+        },
+        "timestamp": 1774162245729
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 7,
+          "c": 10
+        },
+        "timestamp": 1774162248692
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 10,
+          "c": 9
+        },
+        "timestamp": 1774162250880
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 7,
+          "c": 8
+        },
+        "timestamp": 1774162253856
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 7,
+          "c": 6
+        },
+        "timestamp": 1774162255628
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 8,
+          "c": 7
+        },
+        "timestamp": 1774162258135
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 11,
+          "c": 10
+        },
+        "timestamp": 1774162260889
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 12,
+          "c": 11
+        },
+        "timestamp": 1774162263401
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 11,
+          "c": 8
+        },
+        "timestamp": 1774162263655
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 7,
+          "c": 7
+        },
+        "timestamp": 1774162266214
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 7,
+          "c": 11
+        },
+        "timestamp": 1774162268375
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 9,
+          "c": 6
+        },
+        "timestamp": 1774162271440
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 10,
+          "c": 5
+        },
+        "timestamp": 1774162277234
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 5,
+          "c": 10
+        },
+        "timestamp": 1774162279809
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 6,
+          "c": 9
+        },
+        "timestamp": 1774162281283
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 10,
+          "c": 8
+        },
+        "timestamp": 1774162284305
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 9,
+          "c": 10
+        },
+        "timestamp": 1774162287175
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 8,
+          "c": 11
+        },
+        "timestamp": 1774162289688
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 12,
+          "c": 7
+        },
+        "timestamp": 1774162291654
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 13,
+          "c": 6
+        },
+        "timestamp": 1774162294170
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 12,
+          "c": 9
+        },
+        "timestamp": 1774162294595
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 9,
+          "c": 9
+        },
+        "timestamp": 1774162297228
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 10,
+          "c": 11
+        },
+        "timestamp": 1774162301182
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 9,
+          "c": 12
+        },
+        "timestamp": 1774162303701
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 11,
+          "c": 12
+        },
+        "timestamp": 1774162304473
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 12,
+          "c": 13
+        },
+        "timestamp": 1774162306991
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 13,
+          "c": 8
+        },
+        "timestamp": 1774162307900
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 14,
+          "c": 7
+        },
+        "timestamp": 1774162310409
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 11,
+          "c": 6
+        },
+        "timestamp": 1774162311531
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 9,
+          "c": 4
+        },
+        "timestamp": 1774162314047
+      },
+      {
+        "player": "8515f9990bb8084a",
+        "color": 1,
+        "position": {
+          "r": 14,
+          "c": 9
+        },
+        "timestamp": 1774162314967
+      }
+    ],
+    "startTime": 1774162240885,
+    "endTime": 1774162314967,
+    "duration": 74082,
+    "savedAt": 1774162314967
   }
 ]

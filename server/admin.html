@@ -392,6 +392,16 @@
       color: #fff;
     }
 
+    .btn-warning {
+      background: #f59e0b;
+      color: #fff;
+    }
+
+    .btn-success {
+      background: #10b981;
+      color: #fff;
+    }
+
     .btn-secondary {
       background: #334155;
       color: #e2e8f0;
@@ -713,6 +723,10 @@
           <span class="nav-icon">🔐</span>
           <span class="nav-text">账号管理</span>
         </div>
+        <div class="nav-item" onclick="switchView('data')">
+          <span class="nav-icon">📋</span>
+          <span class="nav-text">数据管理</span>
+        </div>
         <div class="nav-item" onclick="switchView('system')">
           <span class="nav-icon">⚙️</span>
           <span class="nav-text">系统设置</span>
@@ -984,6 +998,134 @@
           </div>
         </section>
 
+        <!-- 数据管理 -->
+        <section id="view-data" class="content-section">
+          <div class="data-card">
+            <div class="card-header">
+              <span class="card-title">📋 用户数据管理</span>
+              <div class="card-tools">
+                <input type="text" id="data-account-search" class="search-input" placeholder="搜索账号ID/用户名/昵称"
+                  onkeyup="filterDataAccounts(this.value)">
+                <button class="action-btn btn-secondary" onclick="loadDataAccounts()"
+                  style="padding: 8px 16px; font-size: 13px;">刷新</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>用户名</th>
+                    <th>昵称</th>
+                    <th>类型</th>
+                    <th>等级</th>
+                    <th>总经验值</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="data-accounts-body">
+                  <tr>
+                    <td colspan="5">
+                      <div class="empty-state">
+                        <div class="empty-icon">📋</div>暂无账号数据
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="account-data-management" class="hidden">
+            <div class="data-card">
+              <div class="card-header">
+                <span class="card-title" id="current-account-title">账号数据管理</span>
+                <div class="card-tools">
+                  <button class="action-btn btn-secondary" onclick="backToAccountList()"
+                    style="padding: 8px 16px; font-size: 13px;">返回列表</button>
+                </div>
+              </div>
+              <div style="padding: 24px;">
+                <div class="grid grid-cols-2 gap-4">
+                  <!-- 基本信息 -->
+                  <div class="form-group">
+                    <label class="form-label">账号ID</label>
+                    <input type="text" id="account-id" class="form-input" readonly>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">用户名</label>
+                    <input type="text" id="account-username" class="form-input" readonly>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">昵称</label>
+                    <input type="text" id="account-nickname" class="form-input" readonly>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">账号类型</label>
+                    <input type="text" id="account-type" class="form-input" readonly>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">等级</label>
+                    <input type="text" id="account-level" class="form-input" readonly>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">经验值</label>
+                    <input type="text" id="account-exp" class="form-input" readonly>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">成就数</label>
+                    <input type="text" id="account-achievements" class="form-input" readonly>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">注册时间</label>
+                    <input type="text" id="account-created" class="form-input" readonly>
+                  </div>
+                </div>
+
+                <!-- 经验值管理 -->
+                <div class="form-group" style="margin-top: 24px;">
+                  <label class="form-label">经验值管理</label>
+                  <div style="background: #0f172a; padding: 16px; border-radius: 8px;">
+                    <div style="margin-bottom: 12px;">
+                      <label class="form-label">快捷操作</label>
+                      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button id="exp-add-100" class="btn-primary" style="padding: 8px 12px;">+100</button>
+                        <button id="exp-add-500" class="btn-primary" style="padding: 8px 12px;">+500</button>
+                        <button id="exp-subtract-100" class="btn-secondary" style="padding: 8px 12px;">-100</button>
+                        <button id="exp-reset" class="btn-danger" style="padding: 8px 12px;">重置</button>
+                      </div>
+                    </div>
+                    <div>
+                      <label class="form-label">自定义经验值</label>
+                      <div style="display: flex; gap: 10px;">
+                        <input type="number" id="custom-exp-amount" class="form-input" value="100" style="flex: 1;">
+                        <button id="exp-add-custom" class="btn-primary" style="padding: 8px 12px;">添加</button>
+                        <button id="exp-subtract-custom" class="btn-secondary" style="padding: 8px 12px;">减少</button>
+                        <button id="exp-set-custom" class="btn-warning" style="padding: 8px 12px;">设置</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 成就管理 -->
+                <div class="form-group" style="margin-top: 24px;">
+                  <label class="form-label">成就管理</label>
+                  <div style="background: #0f172a; padding: 16px; border-radius: 8px;">
+                    <div style="margin-bottom: 12px;">
+                      <label class="form-label">成就操作</label>
+                      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button id="add-achievement" class="btn-primary" style="padding: 8px 12px;">添加成就</button>
+                        <button id="remove-achievement" class="btn-secondary" style="padding: 8px 12px;">移除成就</button>
+                        <button id="reset-achievements" class="btn-danger" style="padding: 8px 12px;">重置所有成就</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- 系统设置 -->
         <section id="view-system" class="content-section">
           <div class="stats-row">
@@ -1066,6 +1208,7 @@
         games: '游戏管理',
         chat: '聊天管理',
         accounts: '账号管理',
+        data: '数据管理',
         system: '系统设置'
       };
       document.getElementById('page-title').textContent = titles[view];
@@ -1080,6 +1223,7 @@
       if (view === 'games') loadGames();
       if (view === 'chat') loadChatMessages();
       if (view === 'accounts') loadAccounts();
+      if (view === 'data') loadUserData();
       if (view === 'system') loadSystemStats();
     }
 
@@ -1134,6 +1278,11 @@
         }
       });
 
+      // 账号列表更新事件
+      socket.on('admin_accounts_updated', () => {
+        loadAccounts();
+      });
+
       // 排行榜数据
       socket.on('admin_leaderboard', (data) => {
         adminData.leaderboard = data.leaderboard || [];
@@ -1170,6 +1319,7 @@
       socket.on('admin_accounts_list', (data) => {
         adminData.accounts = data.accounts || [];
         if (currentView === 'accounts') renderAccounts();
+        if (currentView === 'data') renderDataAccounts();
       });
 
       // 系统统计
@@ -1207,6 +1357,186 @@
 
     function loadAccounts() {
       socket.emit('get_all_accounts');
+    }
+
+    let currentDataAccountId = null;
+
+    function loadDataAccounts() {
+      socket.emit('get_all_accounts');
+    }
+
+    function renderDataAccounts() {
+      const tbody = document.getElementById('data-accounts-body');
+      const accounts = adminData.accounts || [];
+
+      if (accounts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📋</div>暂无账号数据</div></td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = accounts.map(acc => {
+        const typeClass = acc.type === 'registered' ? 'badge-online' : 'badge-warning';
+        const level = acc.profile?.level || 1;
+        const exp = acc.profile?.exp || 0;
+
+        // 计算总经验值
+        let totalExp = 0;
+        for (let i = 1; i < level; i++) {
+          totalExp += i * 100;
+        }
+        totalExp += exp;
+
+        return `
+      <tr>
+        <td>${acc.id}</td>
+        <td>${acc.username || '-'}</td>
+        <td>${acc.nickname || '-'}</td>
+        <td><span class="badge ${typeClass}">${acc.type === 'registered' ? '注册用户' : '游客'}</span></td>
+        <td>Lv.${level}</td>
+        <td>${totalExp}</td>
+        <td>
+          <div class="table-actions">
+            <button class="table-btn table-btn-primary" onclick="selectAccountForDataManagement('${acc.id}')">管理数据</button>
+          </div>
+        </td>
+      </tr>
+    `;
+      }).join('');
+    }
+
+    function filterDataAccounts() {
+      const keyword = document.getElementById('data-account-search')?.value || '';
+
+      // 前端过滤账号数据
+      const accounts = adminData.accounts || [];
+      let filtered = accounts;
+
+      if (keyword) {
+        filtered = filtered.filter(a =>
+          (a.username && a.username.includes(keyword)) ||
+          (a.id && a.id.includes(keyword)) ||
+          (a.nickname && a.nickname.includes(keyword))
+        );
+      }
+
+      const tbody = document.getElementById('data-accounts-body');
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📋</div>暂无匹配账号</div></td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(acc => {
+        const typeClass = acc.type === 'registered' ? 'badge-online' : 'badge-warning';
+        const level = acc.profile?.level || 1;
+        const exp = acc.profile?.exp || 0;
+
+        // 计算总经验值
+        let totalExp = 0;
+        for (let i = 1; i < level; i++) {
+          totalExp += i * 100;
+        }
+        totalExp += exp;
+
+        return `
+      <tr>
+        <td>${acc.id}</td>
+        <td>${acc.username || '-'}</td>
+        <td>${acc.nickname || '-'}</td>
+        <td><span class="badge ${typeClass}">${acc.type === 'registered' ? '注册用户' : '游客'}</span></td>
+        <td>Lv.${level}</td>
+        <td>${totalExp}</td>
+        <td>
+          <div class="table-actions">
+            <button class="table-btn table-btn-primary" onclick="selectAccountForDataManagement('${acc.id}')">管理数据</button>
+          </div>
+        </td>
+      </tr>
+    `;
+      }).join('');
+    }
+
+    function selectAccountForDataManagement(accountId) {
+      currentDataAccountId = accountId;
+      socket.emit('get_account_detail', { id: accountId });
+
+      // 监听成功响应
+      socket.once('admin_account_detail', (data) => {
+        updateAccountData(data.account);
+      });
+
+      // 监听失败响应
+      socket.once('admin_action_result', (data) => {
+        if (data.action === 'get_account_detail' && !data.success) {
+          showToast(`获取账号详情失败: ${data.message || '未知错误'}`, 'error');
+          currentDataAccountId = null;
+        }
+      });
+    }
+
+    function backToAccountList() {
+      currentDataAccountId = null;
+      document.querySelector('#view-data .data-card').classList.remove('hidden');
+      document.getElementById('account-data-management').classList.add('hidden');
+    }
+
+    function updateAccountData(account) {
+      if (!account) return;
+
+      const level = account.profile?.level || 1;
+      const exp = account.profile?.exp || 0;
+
+      // 计算总经验值
+      let totalExp = 0;
+      for (let i = 1; i < level; i++) {
+        totalExp += i * 100;
+      }
+      totalExp += exp;
+
+      document.getElementById('account-id').value = account.id;
+      document.getElementById('account-username').value = account.username || '-';
+      document.getElementById('account-nickname').value = account.nickname || '-';
+      document.getElementById('account-type').value = account.type === 'registered' ? '注册用户' : '游客';
+      document.getElementById('account-level').value = `Lv.${level}`;
+      document.getElementById('account-exp').value = `${totalExp} (当前等级: ${exp})`;
+      document.getElementById('account-achievements').value = account.achievements?.length || 0;
+      document.getElementById('account-created').value = formatTime(account.createdAt);
+      document.getElementById('current-account-title').textContent = `账号数据管理 - ${account.username || account.id}`;
+
+      // 显示管理界面
+      document.querySelector('#view-data .data-card').classList.add('hidden');
+      document.getElementById('account-data-management').classList.remove('hidden');
+
+      // 绑定事件监听器
+      bindDataManagementEvents();
+    }
+
+    function bindDataManagementEvents() {
+      if (!currentDataAccountId) return;
+
+      // 经验值快捷操作
+      document.getElementById('exp-add-100').onclick = () => modifyExp(currentDataAccountId, 'add', 100);
+      document.getElementById('exp-add-500').onclick = () => modifyExp(currentDataAccountId, 'add', 500);
+      document.getElementById('exp-subtract-100').onclick = () => modifyExp(currentDataAccountId, 'subtract', 100);
+      document.getElementById('exp-reset').onclick = () => modifyExp(currentDataAccountId, 'set', 0);
+
+      // 经验值自定义操作
+      document.getElementById('exp-add-custom').onclick = () => {
+        const amount = parseInt(document.getElementById('custom-exp-amount').value) || 0;
+        if (amount > 0) modifyExp(currentDataAccountId, 'add', amount);
+      };
+      document.getElementById('exp-subtract-custom').onclick = () => {
+        const amount = parseInt(document.getElementById('custom-exp-amount').value) || 0;
+        if (amount > 0) modifyExp(currentDataAccountId, 'subtract', amount);
+      };
+      document.getElementById('exp-set-custom').onclick = () => {
+        const amount = parseInt(document.getElementById('custom-exp-amount').value) || 0;
+        modifyExp(currentDataAccountId, 'set', amount);
+      };
+
+      // 成就操作
+      document.getElementById('add-achievement').onclick = () => showAddAchievementModal(currentDataAccountId);
+      document.getElementById('remove-achievement').onclick = () => showRemoveAchievementModal(currentDataAccountId);
+      document.getElementById('reset-achievements').onclick = () => resetAchievements(currentDataAccountId);
     }
 
     function loadChatMessages() {
@@ -1266,6 +1596,9 @@
 
     function refreshAllData() {
       loadDashboardData();
+      loadOnlineUsers();
+      loadGames();
+      loadAccounts();
       showToast('数据已刷新', 'success');
     }
 
@@ -1389,6 +1722,41 @@
             <button class="table-btn table-btn-info" onclick="viewAccountDetail('${acc.id}')">查看</button>
             <button class="table-btn table-btn-warning" onclick="resetPassword('${acc.id}')">重置密码</button>
             <button class="table-btn table-btn-danger" onclick="deleteAccount('${acc.id}')">删除</button>
+          </div>
+        </td>
+      </tr>
+    `;
+      }).join('');
+    }
+
+    function renderUserData() {
+      const tbody = document.getElementById('user-data-body');
+      const accounts = adminData.accounts || [];
+
+      if (accounts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📋</div>暂无用户数据</div></td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = accounts.map(acc => {
+        const typeClass = acc.type === 'registered' ? 'badge-online' : 'badge-warning';
+        const level = acc.profile?.level || 1;
+        const exp = acc.profile?.exp || 0;
+        const achievementCount = acc.achievements?.length || 0;
+        return `
+      <tr>
+        <td>${acc.id}</td>
+        <td>${acc.username || '-'}</td>
+        <td>${acc.nickname || '-'}</td>
+        <td><span class="badge ${typeClass}">${acc.type === 'registered' ? '注册用户' : '游客'}</span></td>
+        <td>Lv.${level}</td>
+        <td>${exp}</td>
+        <td>${achievementCount}</td>
+        <td>
+          <div class="table-actions">
+            <button class="table-btn table-btn-info" onclick="viewAccountDetail('${acc.id}')">查看</button>
+            <button class="table-btn table-btn-primary" onclick="showExpManagement('${acc.id}')">经验</button>
+            <button class="table-btn table-btn-success" onclick="showAchievementManagement('${acc.id}')">成就</button>
           </div>
         </td>
       </tr>
@@ -1546,10 +1914,245 @@
       `, [{ text: '关闭', class: 'btn-secondary', action: closeModal }]);
     }
 
-    function viewAccountDetail(userId) {
-      socket.emit('get_user_detail', { userId });
-      socket.once('admin_user_detail', (data) => {
-        showUserDetailModal(data);
+    // 修改用户经验值
+    function modifyExp(accountId, operation, amount) {
+      if (!confirm(`确定要${operation === 'add' ? '添加' : operation === 'subtract' ? '减少' : '设置'} ${amount} 经验值吗？`)) return;
+
+      socket.emit('modify_user_exp', { id: accountId, operation, amount });
+      socket.once('admin_action_result', (data) => {
+        if (data.action === 'modify_user_exp' && data.success) {
+          showToast(`经验值修改成功：${data.oldExp} -> ${data.newExp}`, 'success');
+          closeModal();
+          if (currentView === 'data' && currentDataAccountId === accountId) {
+            selectAccountForDataManagement(accountId);
+          } else if (currentView === 'data') {
+            loadDataAccounts();
+          } else if (currentView === 'accounts') {
+            loadAccounts();
+          }
+        }
+      });
+    }
+
+    // 显示添加成就模态框
+    function showAddAchievementModal(accountId) {
+      socket.emit('get_achievements_list');
+      socket.once('achievements_list', (data) => {
+        if (!data.categories) return;
+
+        let achievementsOptions = '';
+        for (const category of data.categories) {
+          achievementsOptions += `<optgroup label="${category.name}">`;
+          for (const achievement of category.achievements) {
+            achievementsOptions += `<option value="${achievement.id}">${achievement.name} (${achievement.reward} EXP)</option>`;
+          }
+          achievementsOptions += `</optgroup>`;
+        }
+
+        showModal('添加成就', `
+          <div class="form-group">
+            <label class="form-label">选择成就</label>
+            <select id="achievement-select" class="form-input" style="max-height: 300px;">
+              ${achievementsOptions}
+            </select>
+          </div>
+        `, [
+          { text: '取消', class: 'btn-secondary', action: closeModal },
+          {
+            text: '添加', class: 'btn-primary', action: () => {
+              const achievementId = document.getElementById('achievement-select').value;
+              if (!achievementId) {
+                showToast('请选择成就', 'error');
+                return;
+              }
+              addUserAchievement(accountId, achievementId);
+            }
+          }
+        ]);
+      });
+    }
+
+    // 显示移除成就模态框
+    function showRemoveAchievementModal(accountId) {
+      socket.emit('get_account_detail', { id: accountId });
+      socket.once('admin_account_detail', (data) => {
+        if (!data.account || !data.account.achievements) {
+          showToast('该用户没有成就', 'error');
+          return;
+        }
+
+        const achievements = data.account.achievements;
+        if (achievements.length === 0) {
+          showToast('该用户没有成就', 'error');
+          return;
+        }
+
+        socket.emit('get_achievements_list');
+        socket.once('achievements_list', (achievementData) => {
+          if (!achievementData.categories) return;
+
+          const achievementMap = {};
+          for (const category of achievementData.categories) {
+            for (const achievement of category.achievements) {
+              achievementMap[achievement.id] = achievement;
+            }
+          }
+
+          let achievementsOptions = '';
+          for (const achievementId of achievements) {
+            const achievement = achievementMap[achievementId];
+            if (achievement) {
+              achievementsOptions += `<option value="${achievement.id}">${achievement.name} (${achievement.reward} EXP)</option>`;
+            }
+          }
+
+          showModal('移除成就', `
+            <div class="form-group">
+              <label class="form-label">选择要移除的成就</label>
+              <select id="achievement-select" class="form-input" style="max-height: 300px;">
+                ${achievementsOptions}
+              </select>
+            </div>
+          `, [
+            { text: '取消', class: 'btn-secondary', action: closeModal },
+            {
+              text: '移除', class: 'btn-danger', action: () => {
+                const achievementId = document.getElementById('achievement-select').value;
+                if (!achievementId) {
+                  showToast('请选择成就', 'error');
+                  return;
+                }
+                removeUserAchievement(accountId, achievementId);
+              }
+            }
+          ]);
+        });
+      });
+    }
+
+    // 添加用户成就
+    function addUserAchievement(accountId, achievementId) {
+      socket.emit('add_user_achievement', { id: accountId, achievementId });
+      socket.once('admin_action_result', (data) => {
+        if (data.action === 'add_user_achievement' && data.success) {
+          showToast('成就添加成功', 'success');
+          closeModal();
+          if (currentView === 'data' && currentDataAccountId === accountId) {
+            selectAccountForDataManagement(accountId);
+          } else if (currentView === 'data') {
+            loadDataAccounts();
+          } else if (currentView === 'accounts') {
+            loadAccounts();
+          }
+        }
+      });
+    }
+
+    // 移除用户成就
+    function removeUserAchievement(accountId, achievementId) {
+      socket.emit('remove_user_achievement', { id: accountId, achievementId });
+      socket.once('admin_action_result', (data) => {
+        if (data.action === 'remove_user_achievement' && data.success) {
+          showToast('成就移除成功', 'success');
+          closeModal();
+          if (currentView === 'data' && currentDataAccountId === accountId) {
+            selectAccountForDataManagement(accountId);
+          } else if (currentView === 'data') {
+            loadDataAccounts();
+          } else if (currentView === 'accounts') {
+            loadAccounts();
+          }
+        }
+      });
+    }
+
+    // 重置用户成就
+    function resetAchievements(accountId) {
+      if (!confirm('确定要重置该用户的所有成就吗？此操作不可恢复！')) return;
+
+      socket.emit('reset_user_achievements', { id: accountId });
+      socket.once('admin_action_result', (data) => {
+        if (data.action === 'reset_user_achievements' && data.success) {
+          showToast('成就重置成功', 'success');
+          closeModal();
+          if (currentView === 'data' && currentDataAccountId === accountId) {
+            selectAccountForDataManagement(accountId);
+          } else if (currentView === 'data') {
+            loadDataAccounts();
+          } else if (currentView === 'accounts') {
+            loadAccounts();
+          }
+        }
+      });
+    }
+
+    // 显示经验值管理模态框
+    function showExpManagement(accountId) {
+      socket.emit('get_account_detail', { id: accountId });
+      socket.once('admin_account_detail', (data) => {
+        if (!data.account) return;
+
+        const account = data.account;
+        const currentExp = account.profile?.exp || 0;
+
+        showModal('经验值管理', `
+          <div class="form-group">
+            <label class="form-label">当前经验值</label>
+            <input type="text" class="form-input" value="${currentExp}" readonly>
+          </div>
+          <div class="form-group">
+            <label class="form-label">快捷操作</label>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <button onclick="modifyExp('${accountId}', 'add', 100)" class="btn-primary" style="padding: 8px 12px;">+100</button>
+              <button onclick="modifyExp('${accountId}', 'add', 500)" class="btn-primary" style="padding: 8px 12px;">+500</button>
+              <button onclick="modifyExp('${accountId}', 'subtract', 100)" class="btn-secondary" style="padding: 8px 12px;">-100</button>
+              <button onclick="modifyExp('${accountId}', 'reset', 0)" class="btn-danger" style="padding: 8px 12px;">重置</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">自定义经验值</label>
+            <div style="display: flex; gap: 10px;">
+              <input type="number" id="custom-exp-amount" class="form-input" value="100" style="flex: 1;">
+              <button onclick="modifyExp('${accountId}', 'add', parseInt(document.getElementById('custom-exp-amount').value))" class="btn-primary" style="padding: 8px 12px;">添加</button>
+              <button onclick="modifyExp('${accountId}', 'subtract', parseInt(document.getElementById('custom-exp-amount').value))" class="btn-secondary" style="padding: 8px 12px;">减少</button>
+              <button onclick="modifyExp('${accountId}', 'set', parseInt(document.getElementById('custom-exp-amount').value))" class="btn-warning" style="padding: 8px 12px;">设置</button>
+            </div>
+          </div>
+        `, [{ text: '关闭', class: 'btn-secondary', action: closeModal }]);
+      });
+    }
+
+    // 显示成就管理模态框
+    function showAchievementManagement(accountId) {
+      socket.emit('get_account_detail', { id: accountId });
+      socket.once('admin_account_detail', (data) => {
+        if (!data.account) return;
+
+        const account = data.account;
+        const achievements = account.achievements || [];
+
+        showModal('成就管理', `
+          <div class="form-group">
+            <label class="form-label">已解锁成就</label>
+            <div style="background: #0f172a; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+              <div style="text-align: center; font-size: 14px; color: #60a5fa; margin-bottom: 10px;">
+                已解锁成就: ${achievements.length} 个
+              </div>
+              <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button onclick="showAddAchievementModal('${accountId}')" class="btn-primary" style="padding: 8px 12px; font-size: 12px;">添加成就</button>
+                <button onclick="showRemoveAchievementModal('${accountId}')" class="btn-secondary" style="padding: 8px 12px; font-size: 12px;">移除成就</button>
+                <button onclick="resetAchievements('${accountId}')" class="btn-danger" style="padding: 8px 12px; font-size: 12px;">重置所有成就</button>
+              </div>
+            </div>
+          </div>
+        `, [{ text: '关闭', class: 'btn-secondary', action: closeModal }]);
+      });
+    }
+
+    function viewAccountDetail(accountId) {
+      socket.emit('get_account_detail', { id: accountId });
+      socket.once('admin_account_detail', (data) => {
+        showAccountDetailModal(data);
       });
     }
 
@@ -1561,8 +2164,14 @@
 
     function deleteAccount(userId) {
       if (!confirm(`确定要删除账号 ${userId} 吗？此操作不可恢复！`)) return;
+
+      socket.once('admin_action_result', (data) => {
+        if (data.action === 'delete_account' && data.success) {
+          loadAccounts();
+        }
+      });
+
       socket.emit('delete_account', { id: userId });
-      loadAccounts();
     }
 
     function loadGameHistory() {
@@ -1780,6 +2389,143 @@
     }
 
     // ==================== 模态框内容显示函数 ====================
+    function showAccountDetailModal(data) {
+      const account = data.account || {};
+      const user = data.user || null;
+
+      let userHtml = '';
+      if (user) {
+        userHtml = `
+          <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #334155;">
+            <h3 style="margin-bottom: 15px; color: #60a5fa;">👤 在线用户信息</h3>
+            <div class="form-group">
+              <label class="form-label">用户ID</label>
+              <input type="text" class="form-input" value="${user.userId}" readonly>
+            </div>
+            <div class="form-group">
+              <label class="form-label">状态</label>
+              <input type="text" class="form-input" value="${user.status || '-'}" readonly>
+            </div>
+            <div class="form-group">
+              <label class="form-label">IP地址</label>
+              <input type="text" class="form-input" value="${user.ip || '-'}" readonly>
+            </div>
+            <div class="form-group">
+              <label class="form-label">连接时间</label>
+              <input type="text" class="form-input" value="${formatTime(user.connectedAt)}" readonly>
+            </div>
+            <div class="form-group">
+              <label class="form-label">最后活动</label>
+              <input type="text" class="form-input" value="${formatTime(user.lastActivity)}" readonly>
+            </div>
+            ${user.muted ? `
+            <div class="form-group">
+              <label class="form-label">禁言信息</label>
+              <input type="text" class="form-input" value="${user.muteInfo?.reason || '无原因'} (剩余${user.muteInfo?.remainingMinutes || 0}分钟)" readonly style="color: #ef4444;">
+            </div>
+            ` : ''}
+          </div>
+        `;
+      } else {
+        userHtml = `
+          <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #334155;">
+            <div style="text-align: center; color: #64748b; padding: 20px;">
+              <div style="font-size: 48px; margin-bottom: 10px;">😴</div>
+              <div>用户当前离线</div>
+            </div>
+          </div>
+        `;
+      }
+
+      showModal('账号详情', `
+        <div style="margin-bottom: 20px;">
+          <h3 style="margin-bottom: 15px; color: #60a5fa;">🔐 账号信息</h3>
+          <div class="form-group">
+            <label class="form-label">账号ID</label>
+            <input type="text" class="form-input" value="${account.id}" readonly>
+          </div>
+          <div class="form-group">
+            <label class="form-label">账号类型</label>
+            <input type="text" class="form-input" value="${account.type === 'registered' ? '注册用户' : '游客'}" readonly>
+          </div>
+          <div class="form-group">
+            <label class="form-label">用户名</label>
+            <input type="text" class="form-input" value="${account.username || '-'}" readonly>
+          </div>
+          <div class="form-group">
+            <label class="form-label">昵称</label>
+            <input type="text" class="form-input" value="${account.nickname || '-'}" readonly>
+          </div>
+          <div class="form-group">
+            <label class="form-label">等级</label>
+            <input type="text" class="form-input" value="Lv.${account.profile?.level || 1}" readonly>
+          </div>
+          <div class="form-group">
+            <label class="form-label">经验值</label>
+            <div style="display: flex; gap: 10px;">
+              <input type="text" class="form-input" value="${account.profile?.exp || 0}" readonly style="flex: 1;">
+              <button onclick="modifyExp('${account.id}', 'add', 100)" class="btn-primary" style="padding: 8px 12px;">+100</button>
+              <button onclick="modifyExp('${account.id}', 'add', 500)" class="btn-primary" style="padding: 8px 12px;">+500</button>
+              <button onclick="modifyExp('${account.id}', 'subtract', 100)" class="btn-secondary" style="padding: 8px 12px;">-100</button>
+              <button onclick="modifyExp('${account.id}', 'reset', 0)" class="btn-danger" style="padding: 8px 12px;">重置</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">自定义经验值</label>
+            <div style="display: flex; gap: 10px;">
+              <input type="number" id="custom-exp-amount" class="form-input" value="100" style="flex: 1;">
+              <button onclick="modifyExp('${account.id}', 'add', parseInt(document.getElementById('custom-exp-amount').value))" class="btn-primary" style="padding: 8px 12px;">添加</button>
+              <button onclick="modifyExp('${account.id}', 'subtract', parseInt(document.getElementById('custom-exp-amount').value))" class="btn-secondary" style="padding: 8px 12px;">减少</button>
+              <button onclick="modifyExp('${account.id}', 'set', parseInt(document.getElementById('custom-exp-amount').value))" class="btn-warning" style="padding: 8px 12px;">设置</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">注册时间</label>
+            <input type="text" class="form-input" value="${formatTime(account.createdAt)}" readonly>
+          </div>
+          <div class="form-group">
+            <label class="form-label">最后登录</label>
+            <input type="text" class="form-input" value="${formatTime(account.lastLogin)}" readonly>
+          </div>
+          <div class="form-group">
+            <label class="form-label">最后在线</label>
+            <input type="text" class="form-input" value="${formatTime(account.lastSeen)}" readonly>
+          </div>
+          ${account.stats ? `
+          <div class="form-group">
+            <label class="form-label">游戏统计</label>
+            <div style="background: #0f172a; padding: 12px; border-radius: 8px;">
+              <div style="display: flex; justify-content: space-around; text-align: center;">
+                <div><div style="font-size: 20px; font-weight: bold; color: #22c55e;">${account.stats.wins || 0}</div><div style="font-size: 12px; color: #64748b;">胜</div></div>
+                <div><div style="font-size: 20px; font-weight: bold; color: #ef4444;">${account.stats.losses || 0}</div><div style="font-size: 12px; color: #64748b;">负</div></div>
+                <div><div style="font-size: 20px; font-weight: bold; color: #64748b;">${account.stats.draws || 0}</div><div style="font-size: 12px; color: #64748b;">平</div></div>
+              </div>
+              <div style="margin-top: 10px; text-align: center; font-size: 12px; color: #64748b;">
+                总场次: ${account.stats.totalGames || 0} | 连胜: ${account.stats.streak || 0} | 最高连胜: ${account.stats.maxStreak || 0}
+              </div>
+            </div>
+          </div>
+          ` : ''}
+          ${account.achievements ? `
+          <div class="form-group">
+            <label class="form-label">成就管理</label>
+            <div style="background: #0f172a; padding: 12px; border-radius: 8px;">
+              <div style="margin-bottom: 10px; text-align: center; font-size: 14px; color: #60a5fa;">
+                已解锁成就: ${account.achievements.length} 个
+              </div>
+              <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button onclick="showAddAchievementModal('${account.id}')" class="btn-primary" style="padding: 8px 12px; font-size: 12px;">添加成就</button>
+                <button onclick="showRemoveAchievementModal('${account.id}')" class="btn-secondary" style="padding: 8px 12px; font-size: 12px;">移除成就</button>
+                <button onclick="resetAchievements('${account.id}')" class="btn-danger" style="padding: 8px 12px; font-size: 12px;">重置所有成就</button>
+              </div>
+            </div>
+          </div>
+          ` : ''}
+        </div>
+        ${userHtml}
+      `, [{ text: '关闭', class: 'btn-secondary', action: closeModal }]);
+    }
+
     function showUserDetailModal(data) {
       showModal('用户详情', `
         <div class="form-group">
@@ -2022,6 +2768,58 @@
               <button class="table-btn table-btn-info" onclick="viewAccountDetail('${acc.id}')">详情</button>
               <button class="table-btn table-btn-warning" onclick="resetPassword('${acc.id}')">重置密码</button>
               <button class="table-btn table-btn-danger" onclick="deleteAccount('${acc.id}')">删除</button>
+            </div>
+          </td>
+        </tr>
+      `;
+      }).join('');
+    }
+
+    function filterUserData() {
+      const keyword = document.getElementById('user-data-search')?.value || '';
+      const type = document.getElementById('user-data-type')?.value || 'all';
+
+      // 前端过滤用户数据
+      const accounts = adminData.accounts || [];
+      let filtered = accounts;
+
+      if (keyword) {
+        filtered = filtered.filter(a =>
+          (a.username && a.username.includes(keyword)) ||
+          (a.id && a.id.includes(keyword)) ||
+          (a.nickname && a.nickname.includes(keyword))
+        );
+      }
+
+      if (type !== 'all') {
+        filtered = filtered.filter(a => a.type === type);
+      }
+
+      const tbody = document.getElementById('user-data-body');
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📋</div>暂无用户数据</div></td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(acc => {
+        const typeClass = acc.type === 'registered' ? 'badge-online' : 'badge-warning';
+        const level = acc.profile?.level || 1;
+        const exp = acc.profile?.exp || 0;
+        const achievementCount = acc.achievements?.length || 0;
+        return `
+        <tr>
+          <td>${acc.id}</td>
+          <td>${acc.username || '-'}</td>
+          <td>${acc.nickname || '-'}</td>
+          <td><span class="badge ${typeClass}">${acc.type === 'registered' ? '注册用户' : '游客'}</span></td>
+          <td>Lv.${level}</td>
+          <td>${exp}</td>
+          <td>${achievementCount}</td>
+          <td>
+            <div class="table-actions">
+              <button class="table-btn table-btn-info" onclick="viewAccountDetail('${acc.id}')">详情</button>
+              <button class="table-btn table-btn-primary" onclick="showExpManagement('${acc.id}')">经验</button>
+              <button class="table-btn table-btn-success" onclick="showAchievementManagement('${acc.id}')">成就</button>
             </div>
           </td>
         </tr>

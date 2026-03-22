@@ -154,7 +154,14 @@ class ChatManager {
     }
 
     const game = this.gameManager.getGameById(user.game);
+    let targetGame = game;
+
+    // 如果不是PvP游戏，检查是否是AI游戏
     if (!game) {
+      targetGame = this.gameManager.aiGames.get(user.userId);
+    }
+
+    if (!targetGame) {
       return { success: false, message: '游戏不存在' };
     }
 
@@ -174,46 +181,66 @@ class ChatManager {
       timestamp: Date.now()
     };
 
-    // 保存到游戏聊天记录
-    if (!this.gameChatHistory.has(game.gameId)) {
+    // 保存到游戏聊天记录（仅PvP游戏）
+    if (game && !this.gameChatHistory.has(game.gameId)) {
       this.gameChatHistory.set(game.gameId, []);
     }
-    const gameChat = this.gameChatHistory.get(game.gameId);
-    gameChat.push(chatMessage);
-    if (gameChat.length > this.maxHistoryLength) {
-      gameChat.shift();
+    if (game) {
+      const gameChat = this.gameChatHistory.get(game.gameId);
+      gameChat.push(chatMessage);
+      if (gameChat.length > this.maxHistoryLength) {
+        gameChat.shift();
+      }
     }
+
+    // 标记玩家在游戏中发送了消息（用于沉默杀手成就检测）
+    if (!targetGame.playerChatted) {
+      targetGame.playerChatted = {};
+    }
+    targetGame.playerChatted[user.userId] = true;
 
     // 保存到文件
     this.saveChatHistory();
 
-    // 发送给游戏内玩家和观战者
-    const socket1 = this.userManager.getSocketByUserId(game.player1);
-    const socket2 = this.userManager.getSocketByUserId(game.player2);
+    // 发送给游戏内玩家和观战者（仅PvP游戏）
+    if (game) {
+      const socket1 = this.userManager.getSocketByUserId(game.player1);
+      const socket2 = this.userManager.getSocketByUserId(game.player2);
 
-    if (socket1) {
-      socket1.emit('chat_message', {
+      if (socket1) {
+        socket1.emit('chat_message', {
+          scope: 'game',
+          gameId: game.gameId,
+          ...chatMessage
+        });
+      }
+      if (socket2) {
+        socket2.emit('chat_message', {
+          scope: 'game',
+          gameId: game.gameId,
+          ...chatMessage
+        });
+      }
+
+      // 发送给观战者
+      this.gameManager.broadcastToSpectators(game.gameId, 'chat_message', {
         scope: 'game',
         gameId: game.gameId,
         ...chatMessage
-      });
-    }
-    if (socket2) {
-      socket2.emit('chat_message', {
-        scope: 'game',
-        gameId: game.gameId,
-        ...chatMessage
-      });
+      }, io);
+    } else {
+      // AI游戏，只发送给自己
+      const userSocket = this.userManager.getSocketByUserId(user.userId);
+      if (userSocket) {
+        userSocket.emit('chat_message', {
+          scope: 'game',
+          gameId: targetGame.gameId,
+          ...chatMessage
+        });
+      }
     }
 
-    // 发送给观战者
-    this.gameManager.broadcastToSpectators(game.gameId, 'chat_message', {
-      scope: 'game',
-      gameId: game.gameId,
-      ...chatMessage
-    }, io);
-
-    logger.chatEvent(user.userId, '局内', { gameId: game.gameId, messageLength: message.length });
+    logger.chatEvent(user.userId, '局内', { gameId: targetGame.gameId, messageLength: message.length });
 
     // 更新聊天消息统计
     this.updateChatMessageCount(user.userId);

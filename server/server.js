@@ -194,6 +194,19 @@ io.on('connection', (socket) => {
         user.permissions = result.data.permissions;
         user.loginType = result.data.loginType;
         user.token = result.data.token;
+
+        // 检查回归玩家成就
+        const account = await accountManager.getAccount(result.data.account.id);
+        if (account && achievementManager) {
+          const stats = {
+            ...account.stats,
+            level: account.profile ? account.profile.level : 1
+          };
+          const unlockedAchievements = await achievementManager.checkAchievements(result.data.account.id, stats);
+          if (unlockedAchievements.length > 0) {
+            socket.emit('achievements_unlocked', { achievements: unlockedAchievements });
+          }
+        }
       }
     }
 
@@ -417,25 +430,7 @@ io.on('connection', (socket) => {
       // 结束AI游戏并保存记录（如果游戏还在进行中）
       await gameManager.endAIGame(user.userId, result, io);
 
-      // 更新用户统计
-      const statsResult = await userManager.updateUserStats(user.userId, isWin ? 'win' : 'loss', gameType, isAI, difficulty, duration);
-
-      // 检查成就
-      const accountId = userManager.userIdToAccountId.get(user.userId);
-      if (accountId && accountManager && achievementManager) {
-        const account = await accountManager.getAccount(accountId);
-        if (account) {
-          const stats = {
-            ...account.stats,
-            level: account.profile ? account.profile.level : 1,
-            result: isWin ? 'win' : 'loss'
-          };
-          const unlockedAchievements = await achievementManager.checkAchievements(accountId, stats);
-          if (unlockedAchievements.length > 0) {
-            socket.emit('achievements_unlocked', { achievements: unlockedAchievements });
-          }
-        }
-      }
+      // 注意：endAIGame内部已经处理了用户统计更新
 
       logger.info('AI游戏结束', {
         userId: user.userId,
@@ -684,10 +679,40 @@ adminNamespace.on('connection', (socket) => {
     adminManager.getAllAccounts(socket);
   });
 
+  // 获取账号详情
+  socket.on('get_account_detail', (data) => {
+    const { id } = data;
+    adminManager.getAccountDetail(socket, id);
+  });
+
   // 删除账号
   socket.on('delete_account', (data) => {
     const { id } = data;
     adminManager.deleteAccount(socket, id);
+  });
+
+  // 修改用户经验值
+  socket.on('modify_user_exp', (data) => {
+    const { id, operation, amount } = data;
+    adminManager.modifyUserExp(socket, id, operation, amount);
+  });
+
+  // 添加用户成就
+  socket.on('add_user_achievement', (data) => {
+    const { id, achievementId } = data;
+    adminManager.addUserAchievement(socket, id, achievementId);
+  });
+
+  // 移除用户成就
+  socket.on('remove_user_achievement', (data) => {
+    const { id, achievementId } = data;
+    adminManager.removeUserAchievement(socket, id, achievementId);
+  });
+
+  // 重置用户成就
+  socket.on('reset_user_achievements', (data) => {
+    const { id } = data;
+    adminManager.resetUserAchievements(socket, id);
   });
 
   // 断开连接

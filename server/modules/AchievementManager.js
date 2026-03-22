@@ -452,27 +452,11 @@ class AchievementManager {
         reward: { exp: 50, badge: 'unlucky' }
       },
       {
-        id: 112,
-        name: '社交达人',
-        description: '添加10个好友',
-        type: 'creative',
-        condition: { friends: 10 },
-        reward: { exp: 200, badge: 'social_butterfly' }
-      },
-      {
-        id: 113,
-        name: '独行侠',
-        description: '不添加任何好友并获得10场胜利',
-        type: 'creative',
-        condition: { lonerWin: true },
-        reward: { exp: 200, badge: 'loner' }
-      },
-      {
         id: 114,
         name: '成就猎人',
-        description: '解锁20个成就',
+        description: '解锁15个成就',
         type: 'creative',
-        condition: { achievements: 20 },
+        condition: { achievements: 15 },
         reward: { exp: 500, badge: 'achievement_hunter' }
       },
       {
@@ -482,22 +466,6 @@ class AchievementManager {
         type: 'creative',
         condition: { allAchievements: true },
         reward: { exp: 2000, badge: 'achievement_master' }
-      },
-      {
-        id: 116,
-        name: '签到达人',
-        description: '连续签到7天',
-        type: 'creative',
-        condition: { signInStreak: 7 },
-        reward: { exp: 300, badge: 'sign_in_streak' }
-      },
-      {
-        id: 117,
-        name: '签到王者',
-        description: '连续签到30天',
-        type: 'creative',
-        condition: { signInStreak: 30 },
-        reward: { exp: 1000, badge: 'sign_in_king' }
       },
       {
         id: 118,
@@ -540,36 +508,12 @@ class AchievementManager {
         reward: { exp: 5000, badge: 'game_monthly' }
       },
       {
-        id: 123,
-        name: '社交之王',
-        description: '添加100个好友',
-        type: 'creative',
-        condition: { friends: 100 },
-        reward: { exp: 2000, badge: 'social_king' }
-      },
-      {
-        id: 124,
-        name: '孤独王者',
-        description: '不添加任何好友并获得100场胜利',
-        type: 'creative',
-        condition: { lonerWin: true },
-        reward: { exp: 2000, badge: 'loner_king' }
-      },
-      {
         id: 125,
         name: '聊天之王',
         description: '发送1000条聊天消息',
         type: 'creative',
         condition: { chatMessages: 1000 },
         reward: { exp: 1000, badge: 'chat_king' }
-      },
-      {
-        id: 126,
-        name: '沉默王者',
-        description: '在游戏中不发送任何消息并获得100场胜利',
-        type: 'creative',
-        condition: { silentWin: true },
-        reward: { exp: 1000, badge: 'silent_king' }
       },
       {
         id: 127,
@@ -606,26 +550,18 @@ class AchievementManager {
       {
         id: 131,
         name: '老手回归',
-        description: '一个月未登录后回归游戏',
+        description: '7天未登录后回归游戏',
         type: 'creative',
         condition: { returnPlayer: true },
-        reward: { exp: 500, badge: 'return_player' }
+        reward: { exp: 300, badge: 'return_player' }
       },
       {
         id: 132,
-        name: '邀请达人',
-        description: '邀请5个好友注册',
+        name: '长期离线',
+        description: '30天未登录后回归游戏',
         type: 'creative',
-        condition: { invites: 5 },
-        reward: { exp: 500, badge: 'invite_daily' }
-      },
-      {
-        id: 133,
-        name: '邀请王者',
-        description: '邀请20个好友注册',
-        type: 'creative',
-        condition: { invites: 20 },
-        reward: { exp: 2000, badge: 'invite_king' }
+        condition: { longReturnPlayer: true },
+        reward: { exp: 500, badge: 'long_return_player' }
       }
     ];
   }
@@ -638,7 +574,7 @@ class AchievementManager {
     }
 
     const unlockedAchievements = [];
-    const currentAchievements = account.achievements || [];
+    const currentAchievements = [...(account.achievements || [])];
 
     // 添加成就数量到统计数据
     stats.achievementCount = currentAchievements.length;
@@ -743,6 +679,7 @@ class AchievementManager {
         if (condition.monthlyGames !== undefined) return stats.monthlyGames >= condition.monthlyGames;
         if (condition.lowLevelWins !== undefined) return stats.lowLevelWins >= condition.lowLevelWins;
         if (condition.returnPlayer !== undefined) return stats.returnPlayer;
+        if (condition.longReturnPlayer !== undefined) return stats.longReturnPlayer;
         if (condition.invites !== undefined) return stats.invites >= condition.invites;
         if (condition.achievements !== undefined) {
           return stats.achievementCount >= condition.achievements;

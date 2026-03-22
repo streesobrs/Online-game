@@ -206,15 +206,6 @@ class UserManager {
   // 更新用户统计
   async updateUserStats(userId, result, gameType = null, isAI = false, aiDifficulty = null, duration = null) {
     const user = this.onlineUsers.get(userId);
-    if (user) {
-      user.stats.totalGames++;
-      if (result === 'win') user.stats.wins++;
-      else if (result === 'loss') user.stats.losses++;
-      else if (result === 'draw') user.stats.draws++;
-
-      // 异步保存到数据库
-      this.saveUserToDB(user);
-    }
 
     // 同时更新账号统计（如果有账号关联）
     const accountId = this.userIdToAccountId.get(userId);
@@ -224,6 +215,19 @@ class UserManager {
       // 获取更新后的账号信息并发送给客户端
       const updatedAccount = await this.accountManager.getAccount(accountId);
       if (updatedAccount) {
+        // 同步用户对象的统计数据
+        if (user) {
+          user.stats = updatedAccount.stats || {
+            wins: 0,
+            losses: 0,
+            draws: 0,
+            totalGames: 0,
+            streak: 0
+          };
+          // 异步保存到数据库
+          this.saveUserToDB(user);
+        }
+
         const socket = this.getSocketByUserId(userId);
         if (socket) {
           socket.emit('account_updated', { account: updatedAccount });
@@ -231,6 +235,20 @@ class UserManager {
       }
 
       return statsResult;
+    } else if (user) {
+      // 没有账号关联时，只更新本地用户统计
+      user.stats.totalGames++;
+      if (result === 'win') {
+        user.stats.wins++;
+        user.stats.streak = (user.stats.streak || 0) + 1;
+      } else if (result === 'loss' || result === 'draw') {
+        user.stats.streak = 0;
+        if (result === 'loss') user.stats.losses++;
+        else if (result === 'draw') user.stats.draws++;
+      }
+
+      // 异步保存到数据库
+      this.saveUserToDB(user);
     }
 
     return { success: false };

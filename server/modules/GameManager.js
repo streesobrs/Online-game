@@ -593,10 +593,16 @@ class GameManager {
         if (account) {
           const isWinner = player === winner;
           const playerResult = isWinner ? 'win' : (result === 'draw' ? 'draw' : 'loss');
+          const gameDuration = game.endTime - game.startTime;
+          const playerChatted = game.playerChatted && game.playerChatted[player];
           const stats = {
             ...account.stats,
             level: account.profile ? account.profile.level : 1,
-            result: playerResult
+            result: playerResult,
+            silentWin: isWinner && !playerChatted,
+            quickGame: gameDuration <= 5 * 60 * 1000,
+            slowGame: gameDuration >= 60 * 60 * 1000,
+            maxMoves: game.moves ? game.moves.length : 0
           };
           const unlockedAchievements = await this.achievementManager.checkAchievements(accountId, stats);
           if (unlockedAchievements.length > 0) {
@@ -1259,6 +1265,33 @@ class GameManager {
         moves: aiGame.moves,
         duration: aiGame.duration
       });
+    }
+
+    // 更新用户统计
+    await this.userManager.updateUserStats(userId, result, aiGame.gameType, true, aiGame.difficulty, aiGame.duration);
+
+    // 检查成就
+    const accountId = this.userManager.userIdToAccountId.get(userId);
+    if (accountId && this.accountManager && this.achievementManager) {
+      const account = await this.accountManager.getAccount(accountId);
+      if (account) {
+        const playerChatted = aiGame.playerChatted && aiGame.playerChatted[userId];
+        const stats = {
+          ...account.stats,
+          level: account.profile ? account.profile.level : 1,
+          result: result,
+          aiDifficulty: aiGame.difficulty,
+          aiResult: result,
+          silentWin: result === 'win' && !playerChatted,
+          quickGame: aiGame.duration <= 5 * 60 * 1000,
+          slowGame: aiGame.duration >= 60 * 60 * 1000,
+          maxMoves: aiGame.moves ? aiGame.moves.length : 0
+        };
+        const unlockedAchievements = await this.achievementManager.checkAchievements(accountId, stats);
+        if (unlockedAchievements.length > 0 && userSocket) {
+          userSocket.emit('achievements_unlocked', { achievements: unlockedAchievements });
+        }
+      }
     }
 
     logger.aiGameEvent(userId, 'AI对战结束', {

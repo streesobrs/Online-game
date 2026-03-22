@@ -262,6 +262,8 @@ class DataStore {
         // 清除缓存
         const cacheKey = `${collection}:${id}`;
         this.cache.delete(cacheKey);
+        // 清除整个集合的缓存，确保下次读取时重新加载
+        this.cache.delete(collection);
 
         return true;
       } catch (err) {
