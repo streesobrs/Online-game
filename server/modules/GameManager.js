@@ -894,16 +894,37 @@ class GameManager {
 
   // 获取所有游戏
   getAllGames() {
-    return Array.from(this.games.values()).map(game => ({
-      gameId: game.gameId,
-      gameType: game.gameType,
-      player1: game.player1Nickname,
-      player2: game.player2Nickname,
-      status: game.status,
-      moveCount: game.moves.length,
-      startTime: game.startTime,
-      spectatorCount: this.spectators.get(game.gameId)?.size || 0
-    }));
+    const pvpGames = Array.from(this.games.values()).map(game => {
+      const user1 = this.userManager.getUserByUserId(game.player1);
+      const user2 = this.userManager.getUserByUserId(game.player2);
+      return {
+        gameId: game.gameId,
+        gameType: game.gameType,
+        player1: user1 ? { nickname: user1.nickname, userId: user1.userId } : { nickname: game.player1Nickname, userId: game.player1 },
+        player2: user2 ? { nickname: user2.nickname, userId: user2.userId } : { nickname: game.player2Nickname, userId: game.player2 },
+        status: game.status,
+        moveCount: game.moves.length,
+        startTime: game.startTime,
+        spectatorCount: this.spectators.get(game.gameId)?.size || 0
+      };
+    });
+
+    // 添加AI对战游戏
+    const aiGames = Array.from(this.aiGames.values()).map(aiGame => {
+      const user = this.userManager.getUserByUserId(aiGame.userId);
+      return {
+        gameId: aiGame.gameId,
+        gameType: aiGame.gameType,
+        player1: user ? { nickname: user.nickname, userId: user.userId } : null,
+        player2: { nickname: 'AI', userId: 'ai' },
+        status: aiGame.status === 'finished' ? 'ended' : aiGame.status,
+        moveCount: aiGame.moves.length,
+        startTime: aiGame.startTime,
+        spectatorCount: 0
+      };
+    });
+
+    return [...pvpGames, ...aiGames];
   }
 
   // 根据ID获取游戏
@@ -922,11 +943,22 @@ class GameManager {
 
   // 管理员强制结束游戏
   adminEndGame(gameId, io) {
+    // 先尝试结束普通游戏
     const game = this.games.get(gameId);
     if (game && game.status === 'playing') {
       this.endGame(gameId, 'admin', io, null, '管理员结束游戏');
       return true;
     }
+
+    // 尝试结束AI游戏
+    for (const [userId, aiGame] of this.aiGames.entries()) {
+      if (aiGame.gameId === gameId && aiGame.status === 'playing') {
+        this.endAIGame(userId, 'loss', io);
+        logger.info('管理员结束AI游戏', { gameId, userId });
+        return true;
+      }
+    }
+
     return false;
   }
 
@@ -1014,6 +1046,7 @@ class GameManager {
 
     // 创建AI游戏对象
     const aiGame = {
+      gameId: `ai_${userId}_${Date.now()}`,
       userId: userId,
       gameType: gameType,
       difficulty: difficulty,

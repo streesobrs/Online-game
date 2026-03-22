@@ -1,5 +1,6 @@
 // ChatManager.js - 聊天管理模块
 const logger = require('../utils/logger');
+const dataStore = require('../utils/dataStore');
 
 class ChatManager {
   constructor(userManager, gameManager, accountManager) {
@@ -11,6 +12,46 @@ class ChatManager {
     this.maxHistoryLength = 100; // 最大保存消息数
     this.muteList = new Map(); // 被禁言用户列表 -> { reason, expiresAt, timeoutId }
     this.messageRateLimit = new Map(); // 用户消息频率限制
+    this.init();
+  }
+
+  async init() {
+    try {
+      await this.loadChatHistory();
+      logger.info('聊天记录加载完成');
+    } catch (err) {
+      logger.error('加载聊天记录失败', { error: err.message });
+    }
+  }
+
+  async loadChatHistory() {
+    try {
+      const globalChats = await dataStore.read('globalChats');
+      this.globalChatHistory = globalChats || [];
+
+      const gameChats = await dataStore.read('gameChats');
+      if (gameChats) {
+        for (const [gameId, messages] of Object.entries(gameChats)) {
+          this.gameChatHistory.set(gameId, messages);
+        }
+      }
+    } catch (err) {
+      logger.error('加载聊天记录失败', { error: err.message });
+    }
+  }
+
+  async saveChatHistory() {
+    try {
+      await dataStore.write('globalChats', this.globalChatHistory);
+
+      const gameChatsObj = {};
+      for (const [gameId, messages] of this.gameChatHistory.entries()) {
+        gameChatsObj[gameId] = messages;
+      }
+      await dataStore.write('gameChats', gameChatsObj);
+    } catch (err) {
+      logger.error('保存聊天记录失败', { error: err.message });
+    }
   }
 
   // 处理全局聊天消息
@@ -45,7 +86,7 @@ class ChatManager {
     }
 
     const chatMessage = {
-      id: this.generateMessageId(),
+      messageId: this.generateMessageId(),
       userId: user.userId,
       nickname: user.nickname,
       message: this.sanitizeMessage(message),
@@ -58,6 +99,9 @@ class ChatManager {
     if (this.globalChatHistory.length > this.maxHistoryLength) {
       this.globalChatHistory.shift();
     }
+
+    // 保存到文件
+    this.saveChatHistory();
 
     // 广播消息
     io.emit('chat_message', {
@@ -122,7 +166,7 @@ class ChatManager {
     }
 
     const chatMessage = {
-      id: this.generateMessageId(),
+      messageId: this.generateMessageId(),
       userId: user.userId,
       nickname: user.nickname,
       message: this.sanitizeMessage(message),
@@ -139,6 +183,9 @@ class ChatManager {
     if (gameChat.length > this.maxHistoryLength) {
       gameChat.shift();
     }
+
+    // 保存到文件
+    this.saveChatHistory();
 
     // 发送给游戏内玩家和观战者
     const socket1 = this.userManager.getSocketByUserId(game.player1);
@@ -192,7 +239,7 @@ class ChatManager {
     }
 
     const chatMessage = {
-      id: this.generateMessageId(),
+      messageId: this.generateMessageId(),
       fromUserId: user.userId,
       fromNickname: user.nickname,
       message: this.sanitizeMessage(message),

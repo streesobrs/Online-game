@@ -1,0 +1,183 @@
+[
+  {
+    "id": "acc_b6603826725c6748",
+    "type": "registered",
+    "nickname": "我操了",
+    "stats": {
+      "wins": 12,
+      "losses": 0,
+      "draws": 0,
+      "totalGames": 12,
+      "gameTypeWins": {
+        "gobang": 11,
+        "chess": 0,
+        "go": 1
+      },
+      "streak": 12,
+      "maxStreak": 12,
+      "aiWins": 11,
+      "aiDifficulty": "easy",
+      "aiResult": "win",
+      "firstGame": true,
+      "nightGame": false,
+      "weekendGame": true,
+      "chatMessages": 7,
+      "silentWin": false,
+      "comebackStreak": 0,
+      "allGameTypes": false,
+      "singleGameType": false,
+      "quickGame": true,
+      "slowGame": false,
+      "luckyWin": false,
+      "unluckyLoss": false,
+      "friends": 0,
+      "lonerWin": false,
+      "signInStreak": 0,
+      "badges": 16,
+      "dailyGames": 0,
+      "weeklyGames": 0,
+      "monthlyGames": 0,
+      "lowLevelWins": 12,
+      "returnPlayer": false,
+      "invites": 0
+    },
+    "createdAt": 1774070443126,
+    "lastSeen": 1774070475466,
+    "updatedAt": 1774157793053,
+    "username": "wcnm",
+    "passwordSalt": "013aedda1e53e117eeafc71542c89829",
+    "passwordHash": "031eb9f77c07fdf5750cb9ccd12e22dc0bc835a50463977dc7dad9c273520cba1cd643ff07140b287a31c7471a70e50c8d35c00e42f537ab8896eac72ae66428",
+    "profile": {
+      "avatar": null,
+      "bio": "",
+      "level": 9,
+      "exp": 270
+    },
+    "lastLogin": 1774070475466,
+    "achievements": [
+      1,
+      60,
+      70,
+      100,
+      102,
+      108,
+      40,
+      50,
+      118,
+      2,
+      10,
+      51,
+      3,
+      52,
+      73,
+      130
+    ]
+  },
+  {
+    "id": "guest_e58e9e50c9127862",
+    "type": "guest",
+    "nickname": "玩家e58e",
+    "stats": {
+      "wins": 0,
+      "losses": 0,
+      "draws": 0,
+      "totalGames": 0
+    },
+    "createdAt": 1774070524962,
+    "lastSeen": 1774070550000,
+    "updatedAt": 1774070550000
+  },
+  {
+    "id": "guest_dbb3bee533218d70",
+    "type": "guest",
+    "nickname": "我操了",
+    "stats": {
+      "wins": 14,
+      "losses": 0,
+      "draws": 0,
+      "totalGames": 14
+    },
+    "createdAt": 1774070550714,
+    "lastSeen": 1774156249687,
+    "updatedAt": 1774156249688
+  },
+  {
+    "id": "guest_c61839b177c9458c",
+    "type": "guest",
+    "nickname": "玩家b5a2",
+    "stats": {
+      "wins": 4,
+      "losses": 1,
+      "draws": 0,
+      "totalGames": 5
+    },
+    "createdAt": 1774072790806,
+    "lastSeen": 1774148432674,
+    "updatedAt": 1774148432674
+  },
+  {
+    "id": "guest_e079071547672668",
+    "type": "registered",
+    "nickname": "原来如此",
+    "stats": {
+      "wins": 16,
+      "losses": 2,
+      "draws": 0,
+      "totalGames": 18,
+      "streak": 0,
+      "gameTypeWins": {
+        "gobang": 8,
+        "chess": 0,
+        "go": 0
+      },
+      "aiWins": null,
+      "aiDifficulty": "hard",
+      "aiResult": "win",
+      "lowLevelWins": null,
+      "weekendGame": true,
+      "quickGame": true,
+      "badges": 11,
+      "chatMessages": 21
+    },
+    "createdAt": 1774110741361,
+    "lastSeen": 1774155788617,
+    "updatedAt": 1774155788617,
+    "username": "test",
+    "passwordSalt": "feef43db0061974f5b0a5e9f2ff1b179",
+    "passwordHash": "d3c81c8e908d35ea9611163260b6d27e1ea8471dfbbe93294861f4b3adda688349603144232219170f493511be8e25e9ed9d3d9adcb31887906a9fa876557543",
+    "profile": {
+      "avatar": null,
+      "bio": "",
+      "level": 7,
+      "exp": 132
+    },
+    "lastLogin": 1774110765527,
+    "achievements": [
+      1,
+      72,
+      102,
+      108,
+      2,
+      70,
+      3,
+      10,
+      40,
+      71,
+      118
+    ]
+  },
+  {
+    "id": "guest_6acd66db9220959f",
+    "type": "guest",
+    "nickname": "玩家6acd",
+    "stats": {
+      "wins": 1,
+      "losses": 0,
+      "draws": 0,
+      "totalGames": 1
+    },
+    "createdAt": 1774155162560,
+    "lastSeen": 1774155778393,
+    "updatedAt": 1774155778394
+  }
+]

@@ -566,8 +566,25 @@ class AdminManager {
     try {
       const users = await dataStore.read('users');
       const games = await dataStore.read('games');
+      const userStats = this.userManager.getSystemStats();
+      const allGames = this.gameManager.getAllGames();
+      const activeGames = allGames.filter(g => g.status === 'playing');
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayUsers = users.filter(u => {
+        const lastLogin = u.lastLogin || u.lastSeen;
+        return lastLogin && new Date(lastLogin) >= today;
+      }).length;
 
       const stats = {
+        totalUsers: users.length,
+        onlineUsers: userStats.onlineUsers || 0,
+        activeGames: activeGames.length,
+        totalGames: games.length,
+        todayUsers: todayUsers,
+        peakOnline: userStats.peakOnline || 0,
+        totalConnections: userStats.totalConnections || 0,
         totalRegisteredUsers: users.length,
         totalGamesPlayed: games.length,
         gamesByType: {
@@ -694,16 +711,49 @@ class AdminManager {
     const { scope = 'global', gameId, limit = 50 } = options;
     let messages = [];
 
-    if (scope === 'global') {
-      messages = this.chatManager.globalChatHistory.slice(-limit);
+    if (scope === 'all') {
+      // 获取所有类型的聊天记录
+      const globalMessages = this.chatManager.globalChatHistory.slice(-limit).map(msg => ({
+        ...msg,
+        type: 'global',
+        senderNickname: msg.nickname,
+        sender: msg.userId
+      }));
+
+      const gameMessages = [];
+      for (const [gameId, gameChat] of this.chatManager.gameChatHistory.entries()) {
+        const gameMsgs = gameChat.slice(-limit).map(msg => ({
+          ...msg,
+          type: 'game',
+          gameId: gameId,
+          senderNickname: msg.nickname,
+          sender: msg.userId
+        }));
+        gameMessages.push(...gameMsgs);
+      }
+
+      messages = [...globalMessages, ...gameMessages].sort((a, b) => b.timestamp - a.timestamp).slice(-limit * 2);
+    } else if (scope === 'global') {
+      messages = this.chatManager.globalChatHistory.slice(-limit).map(msg => ({
+        ...msg,
+        type: 'global',
+        senderNickname: msg.nickname,
+        sender: msg.userId
+      }));
     } else if (scope === 'game' && gameId) {
-      messages = (this.chatManager.gameChatHistory.get(gameId) || []).slice(-limit);
+      messages = (this.chatManager.gameChatHistory.get(gameId) || []).slice(-limit).map(msg => ({
+        ...msg,
+        type: 'game',
+        gameId: gameId,
+        senderNickname: msg.nickname,
+        sender: msg.userId
+      }));
     }
 
     socket.emit('admin_chat_history', {
       scope,
       gameId,
-      messages
+      history: messages
     });
   }
 

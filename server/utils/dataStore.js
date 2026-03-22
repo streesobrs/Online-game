@@ -8,6 +8,13 @@ class DataStore {
   constructor() {
     this.dataDir = config.paths.data;
     this.cache = new Map();
+    this.collectionDirs = {
+      'accounts': 'users',
+      'games': 'games',
+      'globalChats': 'chats',
+      'gameChats': 'chats',
+      'systemStats': 'system'
+    };
     this.init();
   }
 
@@ -29,7 +36,15 @@ class DataStore {
         return this.cache.get(collection);
       }
 
-      const filePath = path.join(this.dataDir, `${collection}.json`);
+      const subDir = this.collectionDirs[collection] || '';
+      const filePath = subDir
+        ? path.join(this.dataDir, subDir, `${collection}.json`)
+        : path.join(this.dataDir, `${collection}.json`);
+
+      if (subDir) {
+        await fs.mkdir(path.join(this.dataDir, subDir), { recursive: true });
+      }
+
       try {
         const data = await fs.readFile(filePath, 'utf8');
         const parsed = JSON.parse(data);
@@ -37,7 +52,6 @@ class DataStore {
         return parsed;
       } catch (err) {
         if (err.code === 'ENOENT') {
-          // 文件不存在，返回空数组
           return [];
         }
         throw err;
@@ -48,15 +62,68 @@ class DataStore {
     }
   }
 
+  // 读取数据（支持子目录）
+  async readWithDir(collection, subDir) {
+    try {
+      const cacheKey = `${subDir}/${collection}`;
+      if (this.cache.has(cacheKey)) {
+        return this.cache.get(cacheKey);
+      }
+
+      const dirPath = path.join(this.dataDir, subDir);
+      await fs.mkdir(dirPath, { recursive: true });
+
+      const filePath = path.join(dirPath, `${collection}.json`);
+      try {
+        const data = await fs.readFile(filePath, 'utf8');
+        const parsed = JSON.parse(data);
+        this.cache.set(cacheKey, parsed);
+        return parsed;
+      } catch (err) {
+        if (err.code === 'ENOENT') {
+          return [];
+        }
+        throw err;
+      }
+    } catch (err) {
+      logger.error('读取数据失败', { collection, subDir, error: err.message });
+      return [];
+    }
+  }
+
   // 写入数据
   async write(collection, data) {
     try {
-      const filePath = path.join(this.dataDir, `${collection}.json`);
+      const subDir = this.collectionDirs[collection] || '';
+      const filePath = subDir
+        ? path.join(this.dataDir, subDir, `${collection}.json`)
+        : path.join(this.dataDir, `${collection}.json`);
+
+      if (subDir) {
+        await fs.mkdir(path.join(this.dataDir, subDir), { recursive: true });
+      }
+
       await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
       this.cache.set(collection, data);
       return true;
     } catch (err) {
       logger.error('写入数据失败', { collection, error: err.message });
+      return false;
+    }
+  }
+
+  // 写入数据（支持子目录）
+  async writeWithDir(collection, data, subDir) {
+    try {
+      const dirPath = path.join(this.dataDir, subDir);
+      await fs.mkdir(dirPath, { recursive: true });
+
+      const filePath = path.join(dirPath, `${collection}.json`);
+      await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
+      this.cache.set(`${subDir}/${collection}`, data);
+      return true;
+    } catch (err) {
+      logger.error('写入数据失败', { collection, subDir, error: err.message });
       return false;
     }
   }
@@ -69,9 +136,19 @@ class DataStore {
   }
 
   // 更新记录
-  async update(collection, id, updates) {
+  async update(collection, query, updates) {
     const data = await this.read(collection);
-    const index = data.findIndex(item => item.id === id);
+    const index = data.findIndex(item => {
+      if (typeof query === 'string') {
+        return item.id === query;
+      } else if (typeof query === 'object') {
+        for (const [key, value] of Object.entries(query)) {
+          if (item[key] !== value) return false;
+        }
+        return true;
+      }
+      return false;
+    });
     if (index !== -1) {
       data[index] = { ...data[index], ...updates, updatedAt: Date.now() };
       return await this.write(collection, data);
