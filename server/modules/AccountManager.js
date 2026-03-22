@@ -29,9 +29,9 @@ class AccountManager {
     return hashToVerify === hash;
   }
 
-  // 生成账号ID
-  generateAccountId() {
-    return 'acc_' + crypto.randomBytes(8).toString('hex');
+  // 生成用户ID
+  generateUserId() {
+    return crypto.randomBytes(8).toString('hex');
   }
 
   // 检查用户名是否已存在
@@ -43,11 +43,6 @@ class AccountManager {
       logger.error('检查用户名失败', { username, error: err.message });
       return false;
     }
-  }
-
-  // 生成游客用户ID
-  generateGuestId() {
-    return 'guest_' + crypto.randomBytes(8).toString('hex');
   }
 
   // 游客登录
@@ -173,11 +168,11 @@ class AccountManager {
 
   // 创建游客用户
   async createGuestUser(nickname = null) {
-    const guestId = this.generateGuestId();
+    const guestId = this.generateUserId();
     const guestUser = {
       id: guestId,
       type: 'guest',
-      nickname: nickname || `玩家${guestId.substr(6, 4)}`,
+      nickname: nickname || `玩家${guestId.substr(0, 4)}`,
       stats: {
         wins: 0,
         losses: 0,
@@ -333,7 +328,7 @@ class AccountManager {
       }
     } else {
       // 没有游客账号，创建新账号
-      const accountId = this.generateAccountId();
+      const accountId = this.generateUserId();
       const account = {
         id: accountId,
         type: 'registered',

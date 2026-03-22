@@ -10,8 +10,8 @@ yarn-error.log*
 lerna-debug.log*
 
 # 运行时数据
-server/data/*.json
-server/data/*.lock
+server/data/
+!server/data/.gitkeep
 
 # 环境变量文件
 .env
