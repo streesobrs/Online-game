@@ -30,7 +30,7 @@ module.exports = {
     },
     maxWaitTime: 300000, // 最大等待时间 5分钟
     maxGameTime: 3600000, // 最大游戏时间 1小时
-    inactivityTimeout: 60000 // 不活动超时 1分钟
+    inactivityTimeout: 30 * 60 * 1000 // 不活动超时 30分钟
   },
 
   // 数据存储路径

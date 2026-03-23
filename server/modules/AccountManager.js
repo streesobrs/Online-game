@@ -724,10 +724,14 @@ class AccountManager {
       const profile = account.profile || { exp: 0 };
       profile.exp += result === 'win' ? 10 : (result === 'draw' ? 5 : 2);
 
-      await dataStore.update('accounts', id, { stats, profile });
-      logger.info('账号游戏统计更新', { id, result, gameType, isAI });
+      // 重新计算等级
+      const { level } = this.calculateLevelAndExp(profile.exp);
+      profile.level = level;
 
-      return { success: true, stats };
+      await dataStore.update('accounts', id, { stats, profile });
+      logger.info('账号游戏统计更新', { id, result, gameType, isAI, newLevel: level });
+
+      return { success: true, stats, level };
     } catch (err) {
       logger.error('更新账号游戏统计失败', { id, error: err.message });
       return { success: false, message: '更新失败' };
@@ -745,10 +749,14 @@ class AccountManager {
       const profile = account.profile || { exp: 0 };
       profile.exp += exp;
 
-      await dataStore.update('accounts', id, { profile });
-      logger.info('添加经验值', { id, exp });
+      // 重新计算等级
+      const { level } = this.calculateLevelAndExp(profile.exp);
+      profile.level = level;
 
-      return { success: true };
+      await dataStore.update('accounts', id, { profile });
+      logger.info('添加经验值', { id, exp, newLevel: level });
+
+      return { success: true, level };
     } catch (err) {
       logger.error('添加经验值失败', { id, error: err.message });
       return { success: false, message: '添加失败' };
@@ -900,14 +908,18 @@ class AccountManager {
           };
       }
 
-      await dataStore.update('accounts', id, { profile: { exp } });
-      logger.info('管理员修改用户经验值', { id, operation, amount, oldExp: profile.exp, newExp: exp });
+      // 重新计算等级
+      const { level } = this.calculateLevelAndExp(exp);
+
+      await dataStore.update('accounts', id, { profile: { exp, level } });
+      logger.info('管理员修改用户经验值', { id, operation, amount, oldExp: profile.exp, newExp: exp, newLevel: level });
 
       return {
         success: true,
         message: '经验值修改成功',
         oldExp: profile.exp,
-        newExp: exp
+        newExp: exp,
+        level: level
       };
     } catch (err) {
       logger.error('修改用户经验值失败', { id, error: err.message });

@@ -3603,6 +3603,112 @@
 
           currentAccount = data.account;
           updateAccountBar();
+
+          // 如果资料模态框已打开，重新更新其内容
+          const profileModal = document.getElementById('account-modal');
+          if (profileModal) {
+            // 重新打开资料模态框以显示最新数据
+            const modal = profileModal;
+            modal.innerHTML = `
+              <div class="account-modal" style="max-width: 500px;">
+                <div class="account-modal-title">👤 用户资料</div>
+                
+                <div class="account-form-group">
+                  <label class="account-form-label">用户名</label>
+                  <input type="text" class="account-form-input" value="${currentAccount.username}" disabled style="background: #f7fafc; cursor: not-allowed;">
+                </div>
+                
+                <div class="account-form-group">
+                  <label class="account-form-label">昵称</label>
+                  <input type="text" class="account-form-input" id="profile-nickname" value="${currentAccount.nickname || ''}" placeholder="请输入昵称">
+                </div>
+                
+                <div class="account-form-group">
+                  <label class="account-form-label">个人简介</label>
+                  <textarea class="account-form-input" id="profile-bio" rows="3" placeholder="介绍一下自己...">${currentAccount.profile?.bio || ''}</textarea>
+                </div>
+                
+                <div class="account-form-group">
+                  <label class="account-form-label">等级</label>
+                  <input type="text" class="account-form-input" value="Lv.${currentAccount.profile?.level || 1}" disabled style="background: #f7fafc; cursor: not-allowed;">
+                </div>
+                
+                <div class="account-form-group">
+                  <label class="account-form-label">经验值</label>
+                  <div style="background: #f7fafc; padding: 12px; border-radius: 8px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px;">
+                      <span>${currentAccount.profile?.exp || 0} EXP</span>
+                      <span>下一级需要 ${(() => {
+                const totalExp = currentAccount.profile?.exp || 0;
+                const level = currentAccount.profile?.level || 1;
+                let currentExp = totalExp;
+                let currentLevel = 1;
+
+                // 按照后端逻辑计算当前等级内的经验值
+                while (currentExp >= currentLevel * 100) {
+                  currentExp -= currentLevel * 100;
+                  currentLevel++;
+                }
+
+                let expNeeded = 0;
+                if (currentLevel === level) {
+                  expNeeded = level * 100 - currentExp;
+                }
+
+                return Math.max(0, expNeeded);
+              })()} EXP</span>
+                    </div>
+                    <div style="height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden;">
+                      <div style="width: ${(() => {
+                const totalExp = currentAccount.profile?.exp || 0;
+                const level = currentAccount.profile?.level || 1;
+                let currentExp = totalExp;
+                let currentLevel = 1;
+
+                // 按照后端逻辑计算当前等级内的经验值
+                while (currentExp >= currentLevel * 100) {
+                  currentExp -= currentLevel * 100;
+                  currentLevel++;
+                }
+
+                let progress = 0;
+                if (level > 0) {
+                  progress = (currentExp / (level * 100)) * 100;
+                }
+
+                return Math.min(100, progress);
+              })()}%; height: 100%; background: linear-gradient(90deg, #4299e1, #3182ce); border-radius: 5px;"></div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="account-form-group">
+                  <label class="account-form-label">游戏统计</label>
+                  <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                    <div style="background: #f7fafc; padding: 10px; border-radius: 8px; text-align: center;">
+                      <div style="font-size: 20px; font-weight: bold; color: #38a169;">${currentAccount.stats?.wins || 0}</div>
+                      <div style="font-size: 12px; color: #718096;">胜</div>
+                    </div>
+                    <div style="background: #f7fafc; padding: 10px; border-radius: 8px; text-align: center;">
+                      <div style="font-size: 20px; font-weight: bold; color: #e53e3e;">${currentAccount.stats?.losses || 0}</div>
+                      <div style="font-size: 12px; color: #718096;">负</div>
+                    </div>
+                    <div style="background: #f7fafc; padding: 10px; border-radius: 8px; text-align: center;">
+                      <div style="font-size: 20px; font-weight: bold; color: #d69e2e;">${currentAccount.stats?.draws || 0}</div>
+                      <div style="font-size: 12px; color: #718096;">平</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="account-form-actions">
+                  <button class="account-btn btn-secondary" onclick="closeAccountModal()">返回</button>
+                  <button class="account-btn btn-info" onclick="showGameHistoryModal()">游戏历史</button>
+                  <button class="account-btn btn-warning" onclick="showChangePasswordModal()">修改密码</button>
+                  <button class="account-btn btn-primary" onclick="saveProfile()">保存资料</button>
+                </div>
+              </div>
+            `;
+          }
         }
       });
     }
@@ -7423,10 +7529,46 @@
             <div style="background: #f7fafc; padding: 12px; border-radius: 8px;">
               <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px;">
                 <span>${currentAccount.profile?.exp || 0} EXP</span>
-                <span>下一级需要 ${(currentAccount.profile?.level || 1) * 100} EXP</span>
+                <span>下一级需要 ${(() => {
+          const totalExp = currentAccount.profile?.exp || 0;
+          const level = currentAccount.profile?.level || 1;
+          let currentExp = totalExp;
+          let currentLevel = 1;
+
+          // 按照后端逻辑计算当前等级内的经验值
+          while (currentExp >= currentLevel * 100) {
+            currentExp -= currentLevel * 100;
+            currentLevel++;
+          }
+
+          let expNeeded = 0;
+          if (currentLevel === level) {
+            expNeeded = level * 100 - currentExp;
+          }
+
+          return Math.max(0, expNeeded);
+        })()} EXP</span>
               </div>
               <div style="height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden;">
-                <div style="width: ${Math.min(100, ((currentAccount.profile?.exp || 0) / ((currentAccount.profile?.level || 1) * 100)) * 100)}%; height: 100%; background: linear-gradient(90deg, #4299e1, #3182ce); border-radius: 5px;"></div>
+                <div style="width: ${(() => {
+          const totalExp = currentAccount.profile?.exp || 0;
+          const level = currentAccount.profile?.level || 1;
+          let currentExp = totalExp;
+          let currentLevel = 1;
+
+          // 按照后端逻辑计算当前等级内的经验值
+          while (currentExp >= currentLevel * 100) {
+            currentExp -= currentLevel * 100;
+            currentLevel++;
+          }
+
+          let progress = 0;
+          if (level > 0) {
+            progress = (currentExp / (level * 100)) * 100;
+          }
+
+          return Math.min(100, progress);
+        })()}%; height: 100%; background: linear-gradient(90deg, #4299e1, #3182ce); border-radius: 5px;"></div>
               </div>
             </div>
           </div>
@@ -7450,7 +7592,7 @@
           </div>
           
           <div class="account-modal-footer">
-            <button class="account-btn" onclick="closeAccountModal();showAutoLoginModal();">返回</button>
+            <button class="account-btn" onclick="closeAccountModal();">返回</button>
             <button class="account-btn" onclick="showGameHistoryModal()">游戏历史</button>
             <button class="account-btn" onclick="showChangePasswordModal()">修改密码</button>
             <button class="account-btn btn-primary" onclick="doUpdateProfile()">保存资料</button>

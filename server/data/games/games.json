@@ -5297,5 +5297,229 @@
     "endTime": 1774162314967,
     "duration": 74082,
     "savedAt": 1774162314967
+  },
+  {
+    "id": "ai_user_cwonzwbj1_1774244731069",
+    "gameId": "ai_user_cwonzwbj1_1774244731069",
+    "gameType": "gobang",
+    "player1": "user_cwonzwbj1",
+    "player2": "ai",
+    "player1Nickname": "321321",
+    "player2Nickname": "AI",
+    "winner": "user_cwonzwbj1",
+    "result": "win",
+    "moves": [
+      {
+        "player": "user_cwonzwbj1",
+        "color": 1,
+        "position": {
+          "r": 9,
+          "c": 9
+        },
+        "timestamp": 1774244732206
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 8,
+          "c": 8
+        },
+        "timestamp": 1774244733867
+      },
+      {
+        "player": "user_cwonzwbj1",
+        "color": 1,
+        "position": {
+          "r": 10,
+          "c": 8
+        },
+        "timestamp": 1774244734533
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 7,
+          "c": 11
+        },
+        "timestamp": 1774244735880
+      },
+      {
+        "player": "user_cwonzwbj1",
+        "color": 1,
+        "position": {
+          "r": 11,
+          "c": 7
+        },
+        "timestamp": 1774244738469
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 8,
+          "c": 10
+        },
+        "timestamp": 1774244739300
+      },
+      {
+        "player": "user_cwonzwbj1",
+        "color": 1,
+        "position": {
+          "r": 11,
+          "c": 9
+        },
+        "timestamp": 1774244739842
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 12,
+          "c": 6
+        },
+        "timestamp": 1774244740677
+      },
+      {
+        "player": "user_cwonzwbj1",
+        "color": 1,
+        "position": {
+          "r": 11,
+          "c": 8
+        },
+        "timestamp": 1774244742188
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 11,
+          "c": 6
+        },
+        "timestamp": 1774244743011
+      },
+      {
+        "player": "user_cwonzwbj1",
+        "color": 1,
+        "position": {
+          "r": 11,
+          "c": 10
+        },
+        "timestamp": 1774244744071
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 11,
+          "c": 11
+        },
+        "timestamp": 1774244744899
+      },
+      {
+        "player": "user_cwonzwbj1",
+        "color": 1,
+        "position": {
+          "r": 12,
+          "c": 10
+        },
+        "timestamp": 1774244745454
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 9,
+          "c": 7
+        },
+        "timestamp": 1774244746274
+      },
+      {
+        "player": "user_cwonzwbj1",
+        "color": 1,
+        "position": {
+          "r": 13,
+          "c": 11
+        },
+        "timestamp": 1774244747786
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 14,
+          "c": 12
+        },
+        "timestamp": 1774244748596
+      },
+      {
+        "player": "user_cwonzwbj1",
+        "color": 1,
+        "position": {
+          "r": 12,
+          "c": 9
+        },
+        "timestamp": 1774244749986
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 10,
+          "c": 9
+        },
+        "timestamp": 1774244750816
+      },
+      {
+        "player": "user_cwonzwbj1",
+        "color": 1,
+        "position": {
+          "r": 13,
+          "c": 10
+        },
+        "timestamp": 1774244752865
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 10,
+          "c": 7
+        },
+        "timestamp": 1774244753680
+      },
+      {
+        "player": "user_cwonzwbj1",
+        "color": 1,
+        "position": {
+          "r": 14,
+          "c": 10
+        },
+        "timestamp": 1774244754467
+      },
+      {
+        "player": "ai",
+        "color": 2,
+        "position": {
+          "r": 10,
+          "c": 10
+        },
+        "timestamp": 1774244755283
+      },
+      {
+        "player": "user_cwonzwbj1",
+        "color": 1,
+        "position": {
+          "r": 15,
+          "c": 10
+        },
+        "timestamp": 1774244756342
+      }
+    ],
+    "startTime": 1774244731069,
+    "endTime": 1774244756343,
+    "duration": 25274,
+    "savedAt": 1774244756343
   }
 ]

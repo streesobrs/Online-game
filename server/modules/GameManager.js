@@ -1080,6 +1080,7 @@ class GameManager {
     // 更新用户状态
     user.status = 'playing';
     user.game = 'ai';
+    user.lastActivity = Date.now();
     this.userManager.broadcastUserStatus(userId, 'playing', io);
 
     logger.aiGameEvent(userId, '开始AI对战', { gameType, difficulty });
@@ -1108,6 +1109,13 @@ class GameManager {
       return false;
     }
 
+    // 获取用户信息
+    const user = this.userManager.getUserByUserId(userId);
+    if (!user) {
+      logger.warn('❌ AI对战移动失败：用户不存在', { userId });
+      return false;
+    }
+
     // 验证是否是玩家回合
     if (aiGame.currentPlayer !== 1) {
       logger.warn('❌ AI对战移动失败：不是玩家回合', { userId, currentPlayer: aiGame.currentPlayer });
@@ -1133,6 +1141,9 @@ class GameManager {
     };
     aiGame.moves.push(move);
     aiGame.lastMoveTime = Date.now();
+
+    // 更新用户活动时间
+    user.lastActivity = Date.now();
 
     // 检查游戏是否结束
     const gameOver = this.checkGameOver(aiGame.gameType, aiGame.board, aiGame.currentPlayer);
@@ -1196,6 +1207,12 @@ class GameManager {
     };
     aiGame.moves.push(move);
     aiGame.lastMoveTime = Date.now();
+
+    // 更新用户活动时间
+    const user = this.userManager.getUserByUserId(userId);
+    if (user) {
+      user.lastActivity = Date.now();
+    }
 
     // 检查游戏是否结束
     const gameOver = this.checkGameOver(aiGame.gameType, aiGame.board, aiGame.currentPlayer);
