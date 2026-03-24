@@ -115,8 +115,8 @@ class AIManager {
       return bestDefensiveMove;
     }
 
-    // 使用智能随机（优先靠近对手棋子）
-    return this.getGobangRandomMoveDefensive(board, opponent);
+    // 使用困难级位置选择（让简单AI也更聪明）
+    return this.getBestPositionByScoreHard(board, currentPlayer, opponent);
   }
 
   // 智能随机落子 - 优先选择靠近已有棋子的位置
@@ -263,11 +263,11 @@ class AIManager {
       return defensiveLiveTwoMove;
     }
 
-    // 使用进攻性位置评分（比简单的随机更具侵略性）
-    return this.getBestPositionByScoreAggressive(board, currentPlayer, opponent);
+    // 使用最优位置选择（无随机性，始终选择最佳）
+    return this.getBestPositionByScoreHard(board, currentPlayer, opponent);
   }
 
-  // 五子棋困难难度 - 基于 Minimax 算法（优化版）
+  // 五子棋困难难度 - 基于 Minimax 算法（增强进攻版）
   getGobangHardMove(board, currentPlayer) {
     const opponent = currentPlayer === 1 ? 2 : 1;
 
@@ -338,9 +338,20 @@ class AIManager {
       return defensiveDoubleLiveThree;
     }
 
-    // ===== 使用优化的 Minimax 算法 =====
-    // 获取候选位置（只搜索有意义的位置）
-    const candidateMoves = this.getCandidateMoves(board, currentPlayer);
+    // ===== 预测玩家关键落子位置 =====
+    // 预测玩家最可能的下一步（高威胁位置）
+    const predictedPlayerMove = this.predictPlayerMove(board, opponent);
+    if (predictedPlayerMove && predictedPlayerMove.score >= 2000) {
+      // 优先阻断玩家的高威胁位置
+      const blockMove = this.findBlockingMove(board, opponent, predictedPlayerMove);
+      if (blockMove) {
+        return blockMove;
+      }
+    }
+
+    // ===== 使用增强的 Minimax 算法 =====
+    // 获取候选位置（只搜索最有威胁的位置）
+    const candidateMoves = this.getCandidateMovesEnhanced(board, currentPlayer);
 
     if (candidateMoves.length === 0) {
       // 如果没有候选位置，下在中心
@@ -349,8 +360,13 @@ class AIManager {
       return { r: centerR, c: centerC };
     }
 
-    // 搜索深度4（比之前的3更深）
-    const depth = 4;
+    // 搜索深度8-10层（更深的搜索，实现3-5步预测）
+    // 根据棋盘复杂度动态调整深度
+    let depth = 8;
+    const emptyCount = this.getEmptyCells(board).length;
+    if (emptyCount < 20) depth = 10; // 残局时深度更深
+    if (emptyCount > 40) depth = 7;  // 开局时稍浅一点
+
     const result = this.minimaxOptimized(board, depth, currentPlayer, -Infinity, Infinity, true, candidateMoves);
 
     // 返回最佳移动位置
@@ -362,7 +378,7 @@ class AIManager {
     return this.getGobangMediumMove(board, currentPlayer);
   }
 
-  // 获取候选位置（只搜索有意义的位置，减少无效搜索）
+  // 获取候选位置（更大范围搜索，更多候选位置）
   getCandidateMoves(board, currentPlayer) {
     const candidates = [];
     const visited = new Set();
@@ -371,9 +387,9 @@ class AIManager {
     for (let r = 0; r < board.length; r++) {
       for (let c = 0; c < board[0].length; c++) {
         if (board[r][c] !== 0) {
-          // 检查周围2格范围内的空位
-          for (let dr = -2; dr <= 2; dr++) {
-            for (let dc = -2; dc <= 2; dc++) {
+          // 检查周围3格范围内的空位（更大搜索范围）
+          for (let dr = -3; dr <= 3; dr++) {
+            for (let dc = -3; dc <= 3; dc++) {
               const nr = r + dr;
               const nc = c + dc;
               const key = `${nr},${nc}`;
@@ -394,8 +410,8 @@ class AIManager {
     // 按分数排序，优先搜索高分位置
     candidates.sort((a, b) => b.score - a.score);
 
-    // 限制候选数量，提高性能
-    return candidates.slice(0, Math.min(20, candidates.length));
+    // 增加候选数量到30个（更全面的搜索）
+    return candidates.slice(0, Math.min(30, candidates.length));
   }
 
   // 评估候选位置的优先级
@@ -481,18 +497,18 @@ class AIManager {
     }
   }
 
-  // 高级棋盘评估函数
+  // 高级棋盘评估函数（增强版 - 更高的进攻和防守权重
   evaluateBoardAdvanced(board, currentPlayer) {
     const opponent = currentPlayer === 1 ? 2 : 1;
     let score = 0;
 
-    // 评估连子情况
-    score += this.evaluateLinesAdvanced(board, currentPlayer) * 10;
-    score -= this.evaluateLinesAdvanced(board, opponent) * 8;
+    // 评估连子情况 - 显著提高权重
+    score += this.evaluateLinesAdvanced(board, currentPlayer) * 20;
+    score -= this.evaluateLinesAdvanced(board, opponent) * 18;
 
     // 位置优势评估
     score += this.evaluatePositionAdvantage(board, currentPlayer);
-    score -= this.evaluatePositionAdvantage(board, opponent) * 0.8;
+    score -= this.evaluatePositionAdvantage(board, opponent) * 1.2;
 
     return score;
   }
@@ -550,21 +566,21 @@ class AIManager {
             }
           }
 
-          // 评分（更精确）
+          // 评分（大幅提高 - 更重视连子）
           if (count >= 5) {
-            score += 100000;
+            score += 500000; // 获胜 - 极高权重
           } else if (count === 4 && emptyEnds === 2) {
-            score += 10000; // 活四
+            score += 50000; // 活四 - 必胜局面
           } else if (count === 4 && emptyEnds === 1) {
-            score += 1000; // 冲四
+            score += 5000; // 冲四 - 强威胁
           } else if (count === 3 && emptyEnds === 2) {
-            score += 500; // 活三
+            score += 2000; // 活三 - 很强的威胁
           } else if (count === 3 && emptyEnds === 1) {
-            score += 100; // 眠三
+            score += 500; // 眠三
           } else if (count === 2 && emptyEnds === 2) {
-            score += 50; // 活二
+            score += 200; // 活二
           } else if (count === 2 && emptyEnds === 1) {
-            score += 10; // 眠二
+            score += 50; // 眠二
           }
         }
       }
@@ -1695,24 +1711,24 @@ class AIManager {
         }
       }
 
-      // 根据连子数和开放端评分（进攻导向）
+      // 根据连子数和开放端评分（进攻导向 - 大幅提高）
       let score = 0;
       if (count >= 5) {
-        score = 10000; // 获胜
+        score = 100000; // 获胜 - 极高权重
       } else if (count === 4 && emptyEnds === 2) {
-        score = 2000; // 活四（必胜）
+        score = 20000; // 活四（必胜）- 极高权重
       } else if (count === 4 && emptyEnds === 1) {
-        score = 500; // 冲四
+        score = 5000; // 冲四 - 很高权重
       } else if (count === 3 && emptyEnds === 2) {
-        score = 200; // 活三（很强）
+        score = 2000; // 活三（很强）- 高权重
       } else if (count === 3 && emptyEnds === 1) {
-        score = 80; // 冲三
+        score = 800; // 冲三
       } else if (count === 2 && emptyEnds === 2) {
-        score = 50; // 活二
+        score = 500; // 活二
       } else if (count === 2 && emptyEnds === 1) {
-        score = 20; // 冲二
+        score = 200; // 冲二
       } else if (count === 1 && emptyEnds >= 1) {
-        score = 5; // 单点
+        score = 50; // 单点
       }
 
       totalScore += score;
@@ -1771,6 +1787,59 @@ class AIManager {
     // 从前3个候选位置中选择最佳（减少随机性，增加侵略性）
     const topCandidates = scoredCells.slice(0, Math.min(3, scoredCells.length));
     const selected = topCandidates[0]; // 总是选择最佳位置
+
+    return { r: selected.r, c: selected.c };
+  }
+
+  // 困难级位置评分（最强进攻+最强防守，无随机性）
+  getBestPositionByScoreHard(board, currentPlayer, opponent) {
+    const emptyCells = this.getEmptyCells(board);
+
+    if (emptyCells.length === 0) return null;
+
+    // 评估每个空位 - 更高的权重
+    const scoredCells = emptyCells.map(cell => {
+      let score = 0;
+
+      // 进攻评分：在这个位置落子后自己的连子情况（权重更高）
+      board[cell.r][cell.c] = currentPlayer;
+      score += this.evaluatePositionV2(board, cell.r, cell.c, currentPlayer) * 3.0;
+      board[cell.r][cell.c] = 0;
+
+      // 防守评分：对手在这个位置落子后的威胁（权重显著提高）
+      board[cell.r][cell.c] = opponent;
+      score += this.evaluatePositionV2(board, cell.r, cell.c, opponent) * 2.5;
+      board[cell.r][cell.c] = 0;
+
+      // 中心位置加分（更高权重）
+      const centerR = Math.floor(board.length / 2);
+      const centerC = Math.floor(board[0].length / 2);
+      const distanceToCenter = Math.abs(cell.r - centerR) + Math.abs(cell.c - centerC);
+      score += Math.max(0, 30 - distanceToCenter * 2);
+
+      // 靠近已有棋子加分（更强的进攻性）
+      for (let dr = -2; dr <= 2; dr++) {
+        for (let dc = -2; dc <= 2; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          const nr = cell.r + dr;
+          const nc = cell.c + dc;
+          if (nr >= 0 && nr < board.length && nc >= 0 && nc < board[0].length) {
+            if (board[nr][nc] === currentPlayer) {
+              const distance = Math.abs(dr) + Math.abs(dc);
+              score += (3 - distance) * 8; // 更高的自己棋子权重
+            }
+          }
+        }
+      }
+
+      return { r: cell.r, c: cell.c, score };
+    });
+
+    // 按分数排序
+    scoredCells.sort((a, b) => b.score - a.score);
+
+    // 总是选择最佳位置 - 无任何随机性
+    const selected = scoredCells[0];
 
     return { r: selected.r, c: selected.c };
   }
@@ -2181,6 +2250,212 @@ class AIManager {
     }
 
     return null;
+  }
+
+  // ===== 增强的AI辅助函数 =====
+
+  // 预测玩家最可能的下一步落子
+  predictPlayerMove(board, opponent) {
+    const emptyCells = this.getEmptyCells(board);
+    let bestMove = null;
+    let maxScore = 0;
+
+    for (const cell of emptyCells) {
+      board[cell.r][cell.c] = opponent;
+      const threatScore = this.evaluatePositionV2(board, cell.r, cell.c, opponent);
+      board[cell.r][cell.c] = 0;
+
+      if (threatScore > maxScore) {
+        maxScore = threatScore;
+        bestMove = { r: cell.r, c: cell.c, score: threatScore };
+      }
+    }
+
+    return bestMove;
+  }
+
+  // 寻找阻断玩家的最佳位置
+  findBlockingMove(board, opponent, predictedMove) {
+    const emptyCells = this.getEmptyCells(board);
+    const currentPlayer = opponent === 1 ? 2 : 1;
+    let bestMove = null;
+    let maxScore = 0;
+
+    for (const cell of emptyCells) {
+      let score = 0;
+
+      // 优先考虑能阻断预测位置的位置
+      const distance = Math.abs(cell.r - predictedMove.r) + Math.abs(cell.c - predictedMove.c);
+      if (distance <= 2) {
+        score += 500; // 靠近预测位置
+      }
+
+      // 评估这个位置的进攻价值
+      board[cell.r][cell.c] = currentPlayer;
+      score += this.evaluatePositionV2(board, cell.r, cell.c, currentPlayer) * 1.2;
+      board[cell.r][cell.c] = 0;
+
+      // 评估这个位置的防守价值（阻断玩家）
+      board[cell.r][cell.c] = opponent;
+      score += this.evaluatePositionV2(board, cell.r, cell.c, opponent) * 0.8;
+      board[cell.r][cell.c] = 0;
+
+      if (score > maxScore) {
+        maxScore = score;
+        bestMove = { r: cell.r, c: cell.c };
+      }
+    }
+
+    return bestMove;
+  }
+
+  // 增强版候选位置获取（更严格的筛选）
+  getCandidateMovesEnhanced(board, currentPlayer) {
+    const candidates = [];
+    const visited = new Set();
+    const opponent = currentPlayer === 1 ? 2 : 1;
+
+    // 遍历所有已有棋子周围的位置
+    for (let r = 0; r < board.length; r++) {
+      for (let c = 0; c < board[0].length; c++) {
+        if (board[r][c] !== 0) {
+          // 检查周围2格范围内的空位（缩小搜索范围提高效率）
+          for (let dr = -2; dr <= 2; dr++) {
+            for (let dc = -2; dc <= 2; dc++) {
+              const nr = r + dr;
+              const nc = c + dc;
+              const key = `${nr},${nc}`;
+
+              if (nr >= 0 && nr < board.length && nc >= 0 && nc < board[0].length &&
+                board[nr][nc] === 0 && !visited.has(key)) {
+                visited.add(key);
+                // 评估这个位置的优先级（更激进的评分）
+                const score = this.evaluateCandidatePositionEnhanced(board, nr, nc, currentPlayer);
+                if (score > 0) { // 只保留有价值的位置
+                  candidates.push({ r: nr, c: nc, score });
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 按分数排序，优先搜索高分位置
+    candidates.sort((a, b) => b.score - a.score);
+
+    // 减少候选数量到15个（只保留最有威胁的位置）
+    return candidates.slice(0, Math.min(15, candidates.length));
+  }
+
+  // 增强版候选位置评估（更重视进攻）
+  evaluateCandidatePositionEnhanced(board, r, c, currentPlayer) {
+    const opponent = currentPlayer === 1 ? 2 : 1;
+    let score = 0;
+
+    // 进攻评分（极高权重）
+    board[r][c] = currentPlayer;
+    score += this.evaluatePositionV2(board, r, c, currentPlayer) * 2.5;
+    board[r][c] = 0;
+
+    // 防守评分（降低权重，让AI更具进攻性）
+    board[r][c] = opponent;
+    score += this.evaluatePositionV2(board, r, c, opponent) * 0.8;
+    board[r][c] = 0;
+
+    return score;
+  }
+
+  // 高级棋盘评估函数（增强进攻版）
+  evaluateBoardAdvanced(board, currentPlayer) {
+    const opponent = currentPlayer === 1 ? 2 : 1;
+    let score = 0;
+
+    // 评估连子情况 - 显著提高进攻权重
+    score += this.evaluateLinesAdvanced(board, currentPlayer) * 25; // 进攻权重进一步提高
+    score -= this.evaluateLinesAdvanced(board, opponent) * 16;     // 防守权重相对降低
+
+    // 位置优势评估
+    score += this.evaluatePositionAdvantage(board, currentPlayer);
+    score -= this.evaluatePositionAdvantage(board, opponent) * 1.1;
+
+    return score;
+  }
+
+  // 高级连子评估（增强进攻版）
+  evaluateLinesAdvanced(board, player) {
+    let score = 0;
+    const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+
+    for (let r = 0; r < board.length; r++) {
+      for (let c = 0; c < board[0].length; c++) {
+        if (board[r][c] !== player) continue;
+
+        for (const [dr, dc] of directions) {
+          // 检查这个方向上的连子
+          let count = 1;
+          let emptyEnds = 0;
+          let blocked = 0;
+
+          // 正向检查
+          for (let i = 1; i < 5; i++) {
+            const nr = r + dr * i;
+            const nc = c + dc * i;
+            if (nr < 0 || nr >= board.length || nc < 0 || nc >= board[0].length) {
+              blocked++;
+              break;
+            }
+            if (board[nr][nc] === player) {
+              count++;
+            } else if (board[nr][nc] === 0) {
+              emptyEnds++;
+              break;
+            } else {
+              blocked++;
+              break;
+            }
+          }
+
+          // 反向检查
+          for (let i = 1; i < 5; i++) {
+            const nr = r - dr * i;
+            const nc = c - dc * i;
+            if (nr < 0 || nr >= board.length || nc < 0 || nc >= board[0].length) {
+              blocked++;
+              break;
+            }
+            if (board[nr][nc] === player) {
+              count++;
+            } else if (board[nr][nc] === 0) {
+              emptyEnds++;
+              break;
+            } else {
+              blocked++;
+              break;
+            }
+          }
+
+          // 评分（进一步提高进攻相关评分）
+          if (count >= 5) {
+            score += 600000; // 获胜 - 极高权重
+          } else if (count === 4 && emptyEnds === 2) {
+            score += 60000; // 活四 - 必胜局面，权重提高
+          } else if (count === 4 && emptyEnds === 1) {
+            score += 6000; // 冲四 - 强威胁，权重提高
+          } else if (count === 3 && emptyEnds === 2) {
+            score += 2500; // 活三 - 很强的威胁，权重提高
+          } else if (count === 3 && emptyEnds === 1) {
+            score += 600; // 眠三
+          } else if (count === 2 && emptyEnds === 2) {
+            score += 250; // 活二
+          } else if (count === 2 && emptyEnds === 1) {
+            score += 60; // 眠二
+          }
+        }
+      }
+    }
+
+    return score;
   }
 }
 
