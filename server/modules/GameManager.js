@@ -437,22 +437,65 @@ class GameManager {
       return false;
     }
 
+    // 检查是否已有待处理的请求
+    if (game.pendingResetRequest) {
+      const userSocket = this.userManager.getSocketByUserId(user.userId);
+      if (userSocket) {
+        userSocket.emit('reset_request_pending', {
+          message: '已有重置请求待处理，请等待对方回应'
+        });
+      }
+      return false;
+    }
+
     // 转发给对手
     const opponentId = game.player1 === user.userId ? game.player2 : game.player1;
     const opponentSocket = this.userManager.getSocketByUserId(opponentId);
 
     if (opponentSocket) {
+      // 设置重置请求信息
+      game.pendingResetRequest = {
+        requesterId: user.userId,
+        requestTime: Date.now(),
+        message: (data && data.message) ? data.message : '对方请求重置棋盘'
+      };
+
+      // 记录重置请求
+      logger.gameEvent(game.gameId, '重置请求', {
+        requester: user.userId,
+        opponent: opponentId,
+        message: (data && data.message) ? data.message : '对方请求重置棋盘'
+      });
+
       opponentSocket.emit('reset_request', {
         from: user.userId,
-        message: data.message || '对方请求重置棋盘'
+        fromNickname: user.nickname,
+        message: (data && data.message) ? data.message : '对方请求重置棋盘',
+        requestId: game.pendingResetRequest.requestTime
       });
+
+      // 设置超时（30秒后自动取消）
+      game.resetTimeout = setTimeout(() => {
+        if (game.pendingResetRequest) {
+          const requesterSocket = this.userManager.getSocketByUserId(game.pendingResetRequest.requesterId);
+          if (requesterSocket) {
+            requesterSocket.emit('reset_request_timeout', {
+              message: '重置请求超时，对方未回应'
+            });
+          }
+          delete game.pendingResetRequest;
+          delete game.resetTimeout;
+        }
+      }, 30000);
+
+      return true;
     }
 
-    return true;
+    return false;
   }
 
   // 处理重置确认
-  handleResetConfirm(socketId, io) {
+  handleResetConfirm(socketId, io, requestId = null) {
     const user = this.userManager.getUserBySocketId(socketId);
     if (!user) {
       return false;
@@ -463,7 +506,36 @@ class GameManager {
       return false;
     }
 
+    // 检查是否有待处理的请求
+    if (!game.pendingResetRequest) {
+      const userSocket = this.userManager.getSocketByUserId(user.userId);
+      if (userSocket) {
+        userSocket.emit('reset_request_invalid', {
+          message: '没有待处理的重置请求'
+        });
+      }
+      return false;
+    }
+
+    // 验证请求ID（如果提供）
+    if (requestId && game.pendingResetRequest.requestTime !== requestId) {
+      const userSocket = this.userManager.getSocketByUserId(user.userId);
+      if (userSocket) {
+        userSocket.emit('reset_request_invalid', {
+          message: '重置请求已过期'
+        });
+      }
+      return false;
+    }
+
+    // 清理超时计时器
+    if (game.resetTimeout) {
+      clearTimeout(game.resetTimeout);
+      delete game.resetTimeout;
+    }
+
     const gameId = game.gameId;
+    const requesterId = game.pendingResetRequest.requesterId;
 
     // 重置游戏状态（支持游戏结束后重置）
     game.status = 'playing';
@@ -474,6 +546,9 @@ class GameManager {
     game.endTime = null;
     game.endReason = null;
     game.winner = null;
+
+    // 清理重置请求信息
+    delete game.pendingResetRequest;
 
     // 重置移动历史
     this.moveHistory.set(gameId, []);
@@ -492,16 +567,94 @@ class GameManager {
     const player2Socket = this.userManager.getSocketByUserId(game.player2);
 
     if (player1Socket) {
-      player1Socket.emit('reset');
+      player1Socket.emit('reset', {
+        message: '游戏已重置，重新开始'
+      });
     }
     if (player2Socket) {
-      player2Socket.emit('reset');
+      player2Socket.emit('reset', {
+        message: '游戏已重置，重新开始'
+      });
+    }
+
+    // 通知请求者重置成功
+    const requesterSocket = this.userManager.getSocketByUserId(requesterId);
+    if (requesterSocket) {
+      requesterSocket.emit('reset_accepted', {
+        message: '对方已同意重置游戏'
+      });
     }
 
     // 重启游戏计时器
     this.startGameTimer(gameId, io);
 
-    logger.gameEvent(game.gameId, '游戏重置', {});
+    logger.gameEvent(game.gameId, '游戏重置', {
+      requester: requesterId,
+      responder: user.userId
+    });
+
+    return true;
+  }
+
+  // 处理重置拒绝
+  handleResetReject(socketId, io, requestId = null) {
+    const user = this.userManager.getUserBySocketId(socketId);
+    if (!user) {
+      return false;
+    }
+
+    const game = this.games.get(user.game);
+    if (!game) {
+      return false;
+    }
+
+    // 检查是否有待处理的请求
+    if (!game.pendingResetRequest) {
+      const userSocket = this.userManager.getSocketByUserId(user.userId);
+      if (userSocket) {
+        userSocket.emit('reset_request_invalid', {
+          message: '没有待处理的重置请求'
+        });
+      }
+      return false;
+    }
+
+    // 验证请求ID（如果提供）
+    if (requestId && game.pendingResetRequest.requestTime !== requestId) {
+      const userSocket = this.userManager.getSocketByUserId(user.userId);
+      if (userSocket) {
+        userSocket.emit('reset_request_invalid', {
+          message: '重置请求已过期'
+        });
+      }
+      return false;
+    }
+
+    // 清理超时计时器
+    if (game.resetTimeout) {
+      clearTimeout(game.resetTimeout);
+      delete game.resetTimeout;
+    }
+
+    const requesterId = game.pendingResetRequest.requesterId;
+
+    // 通知请求者重置被拒绝
+    const requesterSocket = this.userManager.getSocketByUserId(requesterId);
+    if (requesterSocket) {
+      requesterSocket.emit('reset_rejected', {
+        from: user.userId,
+        fromNickname: user.nickname,
+        message: '对方拒绝了重置请求'
+      });
+    }
+
+    // 清理重置请求信息
+    delete game.pendingResetRequest;
+
+    logger.gameEvent(game.gameId, '重置请求被拒绝', {
+      requester: requesterId,
+      rejecter: user.userId
+    });
 
     return true;
   }
@@ -546,7 +699,13 @@ class GameManager {
   // 结束游戏
   async endGame(gameId, result, io, winner = null, reason = '') {
     const game = this.games.get(gameId);
-    if (!game || game.status !== 'playing') {
+    if (!game) {
+      logger.warn('结束游戏失败：游戏不存在', { gameId });
+      return false;
+    }
+
+    if (game.status !== 'playing') {
+      logger.warn('结束游戏失败：游戏状态不正确', { gameId, status: game.status });
       return false;
     }
 
@@ -567,62 +726,77 @@ class GameManager {
     });
 
     // 更新用户统计
-    if (result === 'win' || result === 'resign') {
-      const duration = game.endTime - game.startTime;
+    try {
+      if (result === 'win' || result === 'resign') {
+        const duration = game.endTime - game.startTime;
 
-      await this.userManager.updateUserStats(winner, 'win', game.gameType, false, null, duration);
-      const loser = winner === game.player1 ? game.player2 : game.player1;
-      await this.userManager.updateUserStats(loser, 'loss', game.gameType, false, null, duration);
-    } else if (result === 'draw') {
-      const duration = game.endTime - game.startTime;
+        await this.userManager.updateUserStats(winner, 'win', game.gameType, false, null, duration);
+        const loser = winner === game.player1 ? game.player2 : game.player1;
+        await this.userManager.updateUserStats(loser, 'loss', game.gameType, false, null, duration);
+      } else if (result === 'draw') {
+        const duration = game.endTime - game.startTime;
 
-      await this.userManager.updateUserStats(game.player1, 'draw', game.gameType, false, null, duration);
-      await this.userManager.updateUserStats(game.player2, 'draw', game.gameType, false, null, duration);
-    } else if (result === 'timeout') {
-      // 超时判负
-      await this.userManager.updateUserStats(game.player1, 'loss', game.gameType);
-      await this.userManager.updateUserStats(game.player2, 'loss', game.gameType);
+        await this.userManager.updateUserStats(game.player1, 'draw', game.gameType, false, null, duration);
+        await this.userManager.updateUserStats(game.player2, 'draw', game.gameType, false, null, duration);
+      } else if (result === 'timeout') {
+        // 超时判负
+        await this.userManager.updateUserStats(game.player1, 'loss', game.gameType);
+        await this.userManager.updateUserStats(game.player2, 'loss', game.gameType);
+      } else if (result === 'invalid') {
+        // 无效游戏，不更新统计
+        logger.gameEvent(gameId, '无效游戏，不更新统计', {
+          reason: reason,
+          moveCount: game.moves ? game.moves.length : 0,
+          duration: game.endTime - game.startTime
+        });
+      }
+    } catch (err) {
+      logger.error('更新用户统计失败', { gameId, error: err.message });
     }
 
     // 为所有玩家检查成就
-    const players = [game.player1, game.player2];
-    for (const player of players) {
-      const accountId = this.userManager.userIdToAccountId.get(player);
-      if (accountId && this.accountManager) {
-        const account = await this.accountManager.getAccount(accountId);
-        if (account) {
-          const isWinner = player === winner;
-          const playerResult = isWinner ? 'win' : (result === 'draw' ? 'draw' : 'loss');
-          const gameDuration = game.endTime - game.startTime;
-          const playerChatted = game.playerChatted && game.playerChatted[player];
-          let level = 1;
-          if (account.profile && account.profile.exp) {
-            const totalExp = account.profile.exp;
-            let exp = totalExp;
-            while (exp >= accountManager.getExpForLevel(level + 1)) {
-              exp -= accountManager.getExpForLevel(level + 1);
-              level++;
+    try {
+      const players = [game.player1, game.player2];
+      for (const player of players) {
+        const accountId = this.userManager.userIdToAccountId.get(player);
+        if (accountId && this.accountManager) {
+          const account = await this.accountManager.getAccount(accountId);
+          if (account) {
+            const isWinner = player === winner;
+            const playerResult = isWinner ? 'win' : (result === 'draw' ? 'draw' : 'loss');
+            const gameDuration = game.endTime - game.startTime;
+            const playerChatted = game.playerChatted && game.playerChatted[player];
+            let level = 1;
+            if (account.profile && account.profile.exp) {
+              const totalExp = account.profile.exp;
+              let exp = totalExp;
+              while (exp >= this.accountManager.getExpForLevel(level + 1)) {
+                exp -= this.accountManager.getExpForLevel(level + 1);
+                level++;
+              }
             }
-          }
 
-          const stats = {
-            ...account.stats,
-            level: level,
-            result: playerResult,
-            silentWin: isWinner && !playerChatted,
-            quickGame: gameDuration <= 5 * 60 * 1000,
-            slowGame: gameDuration >= 60 * 60 * 1000,
-            maxMoves: game.moves ? game.moves.length : 0
-          };
-          const unlockedAchievements = await this.achievementManager.checkAchievements(accountId, stats);
-          if (unlockedAchievements.length > 0) {
-            const socket = this.userManager.getSocketByUserId(player);
-            if (socket) {
-              socket.emit('achievements_unlocked', { achievements: unlockedAchievements });
+            const stats = {
+              ...account.stats,
+              level: level,
+              result: playerResult,
+              silentWin: isWinner && !playerChatted,
+              quickGame: gameDuration <= 5 * 60 * 1000,
+              slowGame: gameDuration >= 60 * 60 * 1000,
+              maxMoves: game.moves ? game.moves.length : 0
+            };
+            const unlockedAchievements = await this.achievementManager.checkAchievements(accountId, stats);
+            if (unlockedAchievements.length > 0) {
+              const socket = this.userManager.getSocketByUserId(player);
+              if (socket) {
+                socket.emit('achievements_unlocked', { achievements: unlockedAchievements });
+              }
             }
           }
         }
       }
+    } catch (err) {
+      logger.error('检查成就失败', { gameId, error: err.message });
     }
 
     // 通知玩家
@@ -685,9 +859,23 @@ class GameManager {
   }
 
   // 处理返回大厅
-  handleReturnLobby(socketId, io) {
+  handleReturnLobby(socketId, io, reason = '主动返回') {
     const user = this.userManager.getUserBySocketId(socketId);
-    if (!user) return false;
+    if (!user) {
+      logger.warn('返回大厅失败：用户不存在', { socketId });
+      return false;
+    }
+
+    logger.info('用户返回大厅', {
+      userId: user.userId,
+      userStatus: user.status,
+      userGame: user.game,
+      reason: reason
+    });
+
+    let gameEnded = false;
+    let gameResult = null;
+    let winnerId = null;
 
     // 如果在等待队列中，先移除
     if (user.status === 'waiting') {
@@ -696,30 +884,110 @@ class GameManager {
 
     // 如果在游戏中，结束游戏
     if (user.status === 'playing' && user.game) {
+      logger.info('用户正在游戏中，准备结束游戏', { userId: user.userId, gameId: user.game });
       const game = this.games.get(user.game);
+      logger.info('检查游戏状态', {
+        userId: user.userId,
+        gameId: user.game,
+        gameExists: !!game,
+        gameStatus: game ? game.status : 'no game'
+      });
       if (game && game.status === 'playing') {
-        // 通知对手
         const opponentId = game.player1 === user.userId ? game.player2 : game.player1;
-        const opponentSocket = this.userManager.getSocketByUserId(opponentId);
+        const opponent = this.userManager.getUserByUserId(opponentId);
 
+        // 根据游戏进度决定结算方式
+        const gameDuration = Date.now() - game.startTime;
+        const moveCount = game.moves.length;
+
+        // 非正常结算逻辑
+        if (moveCount < 5 && gameDuration < 60000) {
+          // 游戏刚开始不久，判定为无效游戏
+          gameResult = 'invalid';
+          winnerId = null;
+          reason = '游戏刚开始，判定为无效游戏';
+        } else if (moveCount < 10 && gameDuration < 120000) {
+          // 游戏进行中但时间较短，判定为平局
+          gameResult = 'draw';
+          winnerId = null;
+          reason = '游戏进行中，判定为平局';
+        } else {
+          // 正常游戏，对方获胜
+          gameResult = 'resign';
+          winnerId = opponentId;
+          reason = '玩家离开游戏';
+        }
+
+        // 通知对手
+        const opponentSocket = this.userManager.getSocketByUserId(opponentId);
         if (opponentSocket) {
+          // 发送即时通知
           opponentSocket.emit('opponent_left', {
             userId: user.userId,
-            message: '对方已离开游戏'
+            nickname: user.nickname,
+            reason: reason,
+            result: gameResult,
+            winner: winnerId,
+            moveCount: moveCount,
+            gameDuration: gameDuration
+          });
+
+          // 发送游戏结束通知
+          opponentSocket.emit('game_ended', {
+            result: gameResult,
+            winner: winnerId,
+            reason: reason,
+            opponentLeft: true,
+            leaverNickname: user.nickname,
+            moveCount: moveCount,
+            gameDuration: gameDuration
+          });
+
+          // 发送广播消息
+          opponentSocket.emit('game_message', {
+            type: 'opponent_left',
+            message: `${user.nickname} 已离开游戏，${reason}`,
+            timestamp: Date.now()
           });
         }
 
-        // 结束游戏，对方获胜
-        this.endGame(game.gameId, 'resign', io, opponentId, '玩家离开游戏');
+        // 结束游戏
+        this.endGame(game.gameId, gameResult, io, winnerId, reason);
+        gameEnded = true;
+
+        // 记录非正常结算
+        logger.gameEvent(game.gameId, '非正常结算', {
+          leaver: user.userId,
+          opponent: opponentId,
+          result: gameResult,
+          reason: reason,
+          moveCount: moveCount,
+          duration: gameDuration
+        });
       }
     }
 
-    // 更新用户状态
+    // 更新用户状态（必须在游戏结束逻辑之后）
     user.status = 'online';
     user.game = null;
     user.lastActivity = Date.now();
 
-    logger.userAction(user.userId, '返回大厅');
+    // 通知用户返回大厅结果
+    const userSocket = this.userManager.getSocketByUserId(user.userId);
+    if (userSocket) {
+      userSocket.emit('return_lobby_result', {
+        success: true,
+        gameEnded: gameEnded,
+        result: gameResult,
+        reason: reason
+      });
+    }
+
+    logger.userAction(user.userId, '返回大厅', {
+      reason: reason,
+      gameEnded: gameEnded,
+      result: gameResult
+    });
 
     // 广播用户状态
     this.userManager.broadcastUserStatus(user.userId, 'online', io);
@@ -1384,11 +1652,44 @@ class GameManager {
 
   // 初始化象棋棋盘
   initializeChessBoard() {
-    // 简化实现，返回空棋盘
-    const board = [];
-    for (let i = 0; i < 10; i++) {
-      board.push(Array(9).fill(0));
-    }
+    const board = Array(10).fill().map(() => Array(9).fill(0));
+
+    // 初始化红方棋子
+    board[9][0] = 'r-ju';    // 车
+    board[9][1] = 'r-ma';    // 马
+    board[9][2] = 'r-xiang'; // 相
+    board[9][3] = 'r-shi';   // 仕
+    board[9][4] = 'r-shuai'; // 帅
+    board[9][5] = 'r-shi';   // 仕
+    board[9][6] = 'r-xiang'; // 相
+    board[9][7] = 'r-ma';    // 马
+    board[9][8] = 'r-ju';    // 车
+    board[7][1] = 'r-pao';   // 炮
+    board[7][7] = 'r-pao';   // 炮
+    board[6][0] = 'r-bing';  // 兵
+    board[6][2] = 'r-bing';  // 兵
+    board[6][4] = 'r-bing';  // 兵
+    board[6][6] = 'r-bing';  // 兵
+    board[6][8] = 'r-bing';  // 兵
+
+    // 初始化黑方棋子
+    board[0][0] = 'b-ju';    // 车
+    board[0][1] = 'b-ma';    // 马
+    board[0][2] = 'b-xiang'; // 象
+    board[0][3] = 'b-shi';   // 士
+    board[0][4] = 'b-jiang'; // 将
+    board[0][5] = 'b-shi';   // 士
+    board[0][6] = 'b-xiang'; // 象
+    board[0][7] = 'b-ma';    // 马
+    board[0][8] = 'b-ju';    // 车
+    board[2][1] = 'b-pao';   // 炮
+    board[2][7] = 'b-pao';   // 炮
+    board[3][0] = 'b-zu';    // 卒
+    board[3][2] = 'b-zu';    // 卒
+    board[3][4] = 'b-zu';    // 卒
+    board[3][6] = 'b-zu';    // 卒
+    board[3][8] = 'b-zu';    // 卒
+
     return board;
   }
 
@@ -1514,7 +1815,30 @@ class GameManager {
 
   // 检查象棋胜利
   checkChessWin(board, player) {
-    // 简化实现，总是返回false
+    // 检查是否将帅被吃
+    let redGeneralExists = false;
+    let blackGeneralExists = false;
+
+    for (let r = 0; r < board.length; r++) {
+      for (let c = 0; c < board[r].length; c++) {
+        if (board[r][c] === 'r-shuai') {
+          redGeneralExists = true;
+        } else if (board[r][c] === 'b-jiang') {
+          blackGeneralExists = true;
+        }
+      }
+    }
+
+    if (!redGeneralExists) {
+      // 红方帅被吃，黑方获胜
+      return player === 2 ? 'win' : 'loss';
+    }
+
+    if (!blackGeneralExists) {
+      // 黑方将被吃，红方获胜
+      return player === 1 ? 'win' : 'loss';
+    }
+
     return false;
   }
 }

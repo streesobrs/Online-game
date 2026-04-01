@@ -135,6 +135,9 @@ class UserManager {
       const user = this.users.get(socket.id);
 
       if (user) {
+        // 保存旧的用户ID
+        const oldUserId = user.userId;
+        
         // 更新用户信息
         user.userId = userData.id;
         user.nickname = userData.nickname;
@@ -151,13 +154,14 @@ class UserManager {
         this.onlineUsers.set(userData.id, user);
 
         // 移除旧的用户ID映射
-        this.userSockets.delete(user.userId);
-        this.userIdToSocketId.delete(user.userId);
-        this.onlineUsers.delete(user.userId);
+        this.userSockets.delete(oldUserId);
+        this.userIdToSocketId.delete(oldUserId);
+        this.onlineUsers.delete(oldUserId);
 
         logger.info('创建游客用户', {
           socketId: socket.id,
-          userId: userData.id
+          userId: userData.id,
+          oldUserId: oldUserId
         });
 
         return userData;

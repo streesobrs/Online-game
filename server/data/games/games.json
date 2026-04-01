@@ -5521,5 +5521,138 @@
     "endTime": 1774244756343,
     "duration": 25274,
     "savedAt": 1774244756343
+  },
+  {
+    "id": "becdae12ea",
+    "gameId": "becdae12ea",
+    "gameType": "gobang",
+    "player1": "guest_3b4ffef1edb0f0b5",
+    "player2": "user_cwonzwbj1",
+    "player1Nickname": "玩家a8e6",
+    "player2Nickname": "321321",
+    "winner": null,
+    "result": "draw",
+    "moves": [
+      {
+        "player": "guest_3b4ffef1edb0f0b5",
+        "color": 1,
+        "position": {
+          "r": 11,
+          "c": 7
+        },
+        "timestamp": 1775034879255
+      },
+      {
+        "player": "user_cwonzwbj1",
+        "color": 2,
+        "position": {
+          "r": 2,
+          "c": 14
+        },
+        "timestamp": 1775034879607
+      },
+      {
+        "player": "guest_3b4ffef1edb0f0b5",
+        "color": 1,
+        "position": {
+          "r": 10,
+          "c": 8
+        },
+        "timestamp": 1775034880285
+      },
+      {
+        "player": "user_cwonzwbj1",
+        "color": 2,
+        "position": {
+          "r": 2,
+          "c": 13
+        },
+        "timestamp": 1775034881031
+      },
+      {
+        "player": "guest_3b4ffef1edb0f0b5",
+        "color": 1,
+        "position": {
+          "r": 4,
+          "c": 4
+        },
+        "timestamp": 1775034881754
+      },
+      {
+        "player": "user_cwonzwbj1",
+        "color": 2,
+        "position": {
+          "r": 2,
+          "c": 10
+        },
+        "timestamp": 1775034882071
+      }
+    ],
+    "startTime": 1775034877270,
+    "endTime": 1775034883746,
+    "duration": 6476,
+    "savedAt": 1775034883790
+  },
+  {
+    "id": "5964184d7e",
+    "gameId": "5964184d7e",
+    "gameType": "gobang",
+    "player1": "user_cwonzwbj1",
+    "player2": "guest_3b4ffef1edb0f0b5",
+    "player1Nickname": "321321",
+    "player2Nickname": "玩家a8e6",
+    "winner": null,
+    "result": "draw",
+    "moves": [
+      {
+        "player": "user_cwonzwbj1",
+        "color": 1,
+        "position": {
+          "r": 2,
+          "c": 10
+        },
+        "timestamp": 1775035111126
+      },
+      {
+        "player": "guest_3b4ffef1edb0f0b5",
+        "color": 2,
+        "position": {
+          "r": 18,
+          "c": 8
+        },
+        "timestamp": 1775035111562
+      },
+      {
+        "player": "user_cwonzwbj1",
+        "color": 1,
+        "position": {
+          "r": 4,
+          "c": 14
+        },
+        "timestamp": 1775035111733
+      },
+      {
+        "player": "guest_3b4ffef1edb0f0b5",
+        "color": 2,
+        "position": {
+          "r": 14,
+          "c": 7
+        },
+        "timestamp": 1775035112353
+      },
+      {
+        "player": "user_cwonzwbj1",
+        "color": 1,
+        "position": {
+          "r": 2,
+          "c": 15
+        },
+        "timestamp": 1775035112572
+      }
+    ],
+    "startTime": 1775035109880,
+    "endTime": 1775035114743,
+    "duration": 4863,
+    "savedAt": 1775035114836
   }
 ]

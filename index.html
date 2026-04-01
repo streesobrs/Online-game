@@ -863,6 +863,24 @@
       z-index: 10;
     }
 
+    .chess-intersection.valid-move::before {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      background: radial-gradient(circle, rgba(52, 152, 219, 0.6) 0%, transparent 70%);
+      border-radius: 50%;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 5;
+    }
+
+    .chess-intersection.valid-move:hover::before {
+      background: radial-gradient(circle, rgba(52, 152, 219, 0.8) 0%, transparent 70%);
+      transform: translate(-50%, -50%) scale(1.2);
+    }
+
     .chess-piece {
       width: 38px;
       height: 38px;
@@ -2310,7 +2328,7 @@
 
   <!-- 操作控制区 -->
   <div class="controls" id="game-controls">
-    <button onclick="resetGame()" id="reset-btn" class="reset-btn">🔄 重置游戏</button>
+    <button onclick="resetGame(true)" id="reset-btn" class="reset-btn">🔄 重置游戏</button>
     <button onclick="toggleAdvancedStats()" id="stats-btn" class="stats-btn">📈 高级统计</button>
     <button onclick="exportGameData()" id="export-btn" style="background:#27ae60;">📤 导出对局数据</button>
     <button onclick="playAgain()" id="play-again-btn" style="background:#e74c3c; display:none;">🔄 再来一把</button>
@@ -2672,43 +2690,43 @@
       }
     };
 
-    // 象棋棋子配置
+    // 象棋棋子配置（正确的象棋棋子位置）
     const chessPieces = {
       red: [
         { name: '帅', r: 9, c: 4, moves: 'general' },
         { name: '仕', r: 9, c: 3, moves: 'advisor' },
+        { name: '仕', r: 9, c: 5, moves: 'advisor' },
         { name: '相', r: 9, c: 2, moves: 'elephant' },
+        { name: '相', r: 9, c: 6, moves: 'elephant' },
         { name: '马', r: 9, c: 1, moves: 'horse' },
+        { name: '马', r: 9, c: 7, moves: 'horse' },
         { name: '车', r: 9, c: 0, moves: 'chariot' },
+        { name: '车', r: 9, c: 8, moves: 'chariot' },
         { name: '炮', r: 7, c: 1, moves: 'cannon' },
+        { name: '炮', r: 7, c: 7, moves: 'cannon' },
         { name: '兵', r: 6, c: 0, moves: 'soldier' },
         { name: '兵', r: 6, c: 2, moves: 'soldier' },
         { name: '兵', r: 6, c: 4, moves: 'soldier' },
         { name: '兵', r: 6, c: 6, moves: 'soldier' },
-        { name: '兵', r: 6, c: 8, moves: 'soldier' },
-        { name: '炮', r: 7, c: 7, moves: 'cannon' },
-        { name: '车', r: 9, c: 8, moves: 'chariot' },
-        { name: '马', r: 9, c: 7, moves: 'horse' },
-        { name: '相', r: 9, c: 6, moves: 'elephant' },
-        { name: '仕', r: 9, c: 5, moves: 'advisor' }
+        { name: '兵', r: 6, c: 8, moves: 'soldier' }
       ],
       black: [
         { name: '将', r: 0, c: 4, moves: 'general' },
         { name: '士', r: 0, c: 3, moves: 'advisor' },
+        { name: '士', r: 0, c: 5, moves: 'advisor' },
         { name: '象', r: 0, c: 2, moves: 'elephant' },
+        { name: '象', r: 0, c: 6, moves: 'elephant' },
         { name: '马', r: 0, c: 1, moves: 'horse' },
+        { name: '马', r: 0, c: 7, moves: 'horse' },
         { name: '车', r: 0, c: 0, moves: 'chariot' },
+        { name: '车', r: 0, c: 8, moves: 'chariot' },
         { name: '炮', r: 2, c: 1, moves: 'cannon' },
+        { name: '炮', r: 2, c: 7, moves: 'cannon' },
         { name: '卒', r: 3, c: 0, moves: 'soldier' },
         { name: '卒', r: 3, c: 2, moves: 'soldier' },
         { name: '卒', r: 3, c: 4, moves: 'soldier' },
         { name: '卒', r: 3, c: 6, moves: 'soldier' },
-        { name: '卒', r: 3, c: 8, moves: 'soldier' },
-        { name: '炮', r: 2, c: 7, moves: 'cannon' },
-        { name: '车', r: 0, c: 8, moves: 'chariot' },
-        { name: '马', r: 0, c: 7, moves: 'horse' },
-        { name: '象', r: 0, c: 6, moves: 'elephant' },
-        { name: '士', r: 0, c: 5, moves: 'advisor' }
+        { name: '卒', r: 3, c: 8, moves: 'soldier' }
       ]
     };
 
@@ -3084,6 +3102,25 @@
         resetGame(false);
       });
 
+      // 重置请求被接受
+      socket.on('reset_accepted', (data) => {
+        console.log('重置请求被接受:', data);
+        resetGame(false);
+        showBroadcast(data.message || '对方已同意重置游戏', '系统', Date.now());
+      });
+
+      // 重置请求被拒绝
+      socket.on('reset_rejected', (data) => {
+        console.log('重置请求被拒绝:', data);
+        showBroadcast(data.message || '对方拒绝了重置请求', '系统', Date.now());
+      });
+
+      // 重置请求超时
+      socket.on('reset_request_timeout', (data) => {
+        console.log('重置请求超时:', data);
+        showBroadcast(data.message || '重置请求超时，对方未回应', '系统', Date.now());
+      });
+
       socket.on('reset_request', (data) => {
         let confirmMessage = '';
         if (data.message && data.message.includes('再来一局')) {
@@ -3125,8 +3162,27 @@
       });
 
       socket.on('opponent_left', (data) => {
-        alert(data.message);
-        returnToLobby();
+        console.log('对手离开游戏:', data);
+
+        let message = '';
+        if (data.reason === '游戏刚开始，判定为无效游戏') {
+          message = `对方(${data.nickname})在游戏刚开始时离开，本局判定为无效游戏`;
+        } else if (data.reason === '游戏进行中，判定为平局') {
+          message = `对方(${data.nickname})在游戏进行中离开，本局判定为平局`;
+        } else if (data.result === 'resign') {
+          message = `对方(${data.nickname})已认输，你获胜了！🎉`;
+        } else {
+          message = `对方(${data.nickname})已离开游戏，${data.reason}`;
+        }
+
+        // 显示更友好的提示
+        showWinAlert(message);
+        updateStatus(`🏆 ${message}`);
+
+        // 延迟返回大厅，让用户看到提示
+        setTimeout(() => {
+          returnToLobby();
+        }, 3000);
       });
 
       socket.on('game_ended', (data) => {
@@ -3419,6 +3475,14 @@
         gameState.gameOver = true;
         showBroadcast(data.message || '游戏已被管理员重置', '系统', Date.now());
         returnToLobby();
+      });
+
+      // 游戏消息
+      socket.on('game_message', (data) => {
+        console.log('收到游戏消息:', data);
+        if (data.type === 'opponent_left') {
+          showBroadcast(data.message, '系统', data.timestamp);
+        }
       });
 
       // ========== 挑战相关事件 ==========
@@ -3862,10 +3926,10 @@
           intersection.onclick = () => handleChessClick(r, c);
           intersection.onmousemove = () => updateMousePos(r, c);
 
-          // 添加兵位标记
-          if (((r === 2 || r === 7) && (c === 0 || c === 2 || c === 4 || c === 6 || c === 8)) ||
-            ((r === 0 || r === 3 || r === 6 || r === 9) && (c === 1 || c === 7)) ||
-            ((r === 0 || r === 9) && (c === 0 || c === 8))) {
+          // 添加兵位标记（正确的象棋棋盘标记位置）
+          if (((r === 3 || r === 6) && (c === 0 || c === 2 || c === 4 || c === 6 || c === 8)) ||
+            ((r === 2 || r === 7) && (c === 1 || c === 7)) ||
+            ((r === 0 || r === 9) && (c === 0 || c === 2 || c === 4 || c === 6 || c === 8))) {
             const pos = document.createElement('div');
             pos.className = 'chess-position';
             pos.style.left = '50%';
@@ -3884,17 +3948,13 @@
       river.textContent = '楚 河          汉 界';
       chessBoard.appendChild(river);
 
-      // 添加九宫格
+      // 添加九宫格（正确的九宫格位置）
       const redPalace = document.createElement('div');
-      redPalace.className = 'chess-palace';
-      redPalace.style.top = '160px';
-      redPalace.style.left = '80px';
+      redPalace.className = 'chess-palace chess-palace-bottom';
       chessBoard.appendChild(redPalace);
 
       const blackPalace = document.createElement('div');
-      blackPalace.className = 'chess-palace';
-      blackPalace.style.top = '0px';
-      blackPalace.style.left = '80px';
+      blackPalace.className = 'chess-palace chess-palace-top';
       chessBoard.appendChild(blackPalace);
 
       // 渲染棋子
@@ -5155,17 +5215,30 @@
 
       updateStatus(`⚪ 对方已移动 ${pieceType} 到 (${toR},${toC})，该你了！`);
 
-      if (checkChessWin()) {
+      const winResult = checkChessWin();
+      if (winResult !== 0) {
         gameState.gameOver = true;
-        const winMsg = color === 1 ? '红方获胜！' : '绿方获胜！';
-        const winColor = color === 1 ? '红方' : '绿方';
+        const isPlayerWin = winResult !== color; // 对手移动后，如果对手获胜，则玩家输
+        const winMsg = isPlayerWin ? '你获胜了！' : '你输了！';
+        const winColor = winResult === 1 ? '红方' : '黑方';
         winnerEl.textContent = winColor;
-        winnerEl.className = `info-value ${color === 1 ? 'value-red' : 'value-green'}`;
+        winnerEl.className = `info-value ${winResult === 1 ? 'value-red' : 'value-green'}`;
         gameStatusEl.textContent = '游戏结束';
         gameStatusEl.className = 'info-value value-waiting';
         showWinAlert(winMsg);
         updateStatus(`🏆 ${winMsg} 游戏结束`);
         updateAdvancedStats();
+
+        if (gameState.difficulty) {
+          // AI对战
+          sendAIGameResult(isPlayerWin ? 'win' : 'loss');
+        } else {
+          // PVP对战
+          socket.emit('game_result', {
+            result: isPlayerWin ? 'win' : 'loss',
+            reason: '将帅被吃'
+          });
+        }
       } else {
         gameState.turn = 3 - color;
         updateTurnDisplay();
@@ -5772,6 +5845,11 @@
 
       isMatching = false;
       matchedOpponentId = null;
+
+      // 先发送返回大厅请求
+      socket.emit('return_lobby');
+
+      // 再更新用户状态
       userStatus = 'online';
 
       // 清除AI对战标记
@@ -5800,8 +5878,6 @@
       });
       updateUserList();
       updateGameChannelButton();
-
-      socket.emit('return_lobby');
     }
 
     function showAchievements() {
@@ -6781,9 +6857,13 @@
       }
 
       if (sendToServer) {
+        // 发送重置请求给服务器，等待对方确认
         socket.emit('reset');
+        // 不立即重置本地游戏，等待服务器确认
+        return;
       }
 
+      // 只有收到服务器确认或本地重置时才执行重置
       initGameBoard();
       gameState.turn = 1;
       gameState.gameOver = false;
@@ -6841,6 +6921,14 @@
       // 拒绝按钮
       confirmNoBtn.addEventListener('click', () => {
         confirmModal.style.display = 'none';
+
+        // 通知服务器拒绝重置请求
+        if (currentResetRequest && socket) {
+          socket.emit('reset_reject', {
+            requestId: currentResetRequest.requestId
+          });
+        }
+
         currentResetRequest = null;
       });
 
@@ -7073,6 +7161,10 @@
       } else {
         piece.style.boxShadow = '0 0 15px rgba(52, 152, 219, 0.8)';
       }
+
+      // 获取并显示有效移动
+      gameState.validMoves = getChessValidMoves(piece);
+      highlightValidMoves(gameState.validMoves);
     }
 
     function clearSelection() {
@@ -7082,6 +7174,234 @@
       }
       gameState.selectedPiece = null;
       gameState.validMoves = [];
+
+      // 清除高亮显示
+      document.querySelectorAll('.chess-intersection.valid-move').forEach(cell => {
+        cell.classList.remove('valid-move');
+      });
+    }
+
+    // 高亮显示有效移动
+    function highlightValidMoves(validMoves) {
+      validMoves.forEach(move => {
+        const cell = document.querySelector(`.chess-intersection[data-r="${move.r}"][data-c="${move.c}"]`);
+        if (cell) {
+          cell.classList.add('valid-move');
+        }
+      });
+    }
+
+    // 获取象棋有效移动
+    function getChessValidMoves(piece) {
+      const r = parseInt(piece.dataset.r);
+      const c = parseInt(piece.dataset.c);
+      const name = piece.dataset.name;
+      const color = piece.dataset.color;
+
+      const moves = [];
+
+      // 根据棋子类型获取有效移动
+      switch (name) {
+        case '帅':
+        case '将':
+          // 将帅只能在九宫格内移动一步
+          const palaceMoves = [
+            [-1, 0], [1, 0], [0, -1], [0, 1]
+          ];
+          for (const [dr, dc] of palaceMoves) {
+            const nr = r + dr;
+            const nc = c + dc;
+            if (isInPalace(nr, nc, color) && !isMyPieceAt(nr, nc, color)) {
+              moves.push({ r: nr, c: nc });
+            }
+          }
+          break;
+
+        case '仕':
+        case '士':
+          // 士走斜线，只能在九宫格内
+          const advisorMoves = [
+            [-1, -1], [-1, 1], [1, -1], [1, 1]
+          ];
+          for (const [dr, dc] of advisorMoves) {
+            const nr = r + dr;
+            const nc = c + dc;
+            if (isInPalace(nr, nc, color) && !isMyPieceAt(nr, nc, color)) {
+              moves.push({ r: nr, c: nc });
+            }
+          }
+          break;
+
+        case '相':
+        case '象':
+          // 象走田字，不能过河
+          const elephantMoves = [
+            [-2, -2], [-2, 2], [2, -2], [2, 2]
+          ];
+          for (const [dr, dc] of elephantMoves) {
+            const nr = r + dr;
+            const nc = c + dc;
+            const eyeR = r + dr / 2;
+            const eyeC = c + dc / 2;
+            if (isInBoard(nr, nc) && !isMyPieceAt(nr, nc, color) &&
+              !isPieceAt(eyeR, eyeC) && isOnSameSide(nr, color)) {
+              moves.push({ r: nr, c: nc });
+            }
+          }
+          break;
+
+        case '马':
+          // 马走日字，蹩马腿
+          const horseMoves = [
+            [-2, -1], [-2, 1], [-1, -2], [-1, 2],
+            [1, -2], [1, 2], [2, -1], [2, 1]
+          ];
+          const horseLegs = [
+            [-1, 0], [-1, 0], [0, -1], [0, 1],
+            [0, -1], [0, 1], [1, 0], [1, 0]
+          ];
+          for (let i = 0; i < horseMoves.length; i++) {
+            const [dr, dc] = horseMoves[i];
+            const [legDr, legDc] = horseLegs[i];
+            const nr = r + dr;
+            const nc = c + dc;
+            const legR = r + legDr;
+            const legC = c + legDc;
+            if (isInBoard(nr, nc) && !isMyPieceAt(nr, nc, color) &&
+              !isPieceAt(legR, legC)) {
+              moves.push({ r: nr, c: nc });
+            }
+          }
+          break;
+
+        case '车':
+          // 车走直线，可以吃子
+          const chariotDirections = [
+            [-1, 0], [1, 0], [0, -1], [0, 1]
+          ];
+          for (const [dr, dc] of chariotDirections) {
+            for (let i = 1; i <= 9; i++) {
+              const nr = r + dr * i;
+              const nc = c + dc * i;
+              if (!isInBoard(nr, nc)) break;
+              if (!isPieceAt(nr, nc)) {
+                moves.push({ r: nr, c: nc });
+              } else {
+                if (!isMyPieceAt(nr, nc, color)) {
+                  moves.push({ r: nr, c: nc });
+                }
+                break;
+              }
+            }
+          }
+          break;
+
+        case '炮':
+          // 炮走直线，吃子需要隔一个棋子
+          const cannonDirections = [
+            [-1, 0], [1, 0], [0, -1], [0, 1]
+          ];
+          for (const [dr, dc] of cannonDirections) {
+            let hasPiece = false;
+            for (let i = 1; i <= 9; i++) {
+              const nr = r + dr * i;
+              const nc = c + dc * i;
+              if (!isInBoard(nr, nc)) break;
+              if (!hasPiece) {
+                if (!isPieceAt(nr, nc)) {
+                  moves.push({ r: nr, c: nc });
+                } else {
+                  hasPiece = true;
+                }
+              } else {
+                if (isPieceAt(nr, nc)) {
+                  if (!isMyPieceAt(nr, nc, color)) {
+                    moves.push({ r: nr, c: nc });
+                  }
+                  break;
+                }
+              }
+            }
+          }
+          break;
+
+        case '兵':
+        case '卒':
+          // 兵卒移动规则
+          const soldierMoves = [];
+          if (color === 'red') {
+            // 红方兵向前移动
+            soldierMoves.push([-1, 0]);
+            if (r <= 4) { // 过河后可以左右移动
+              soldierMoves.push([0, -1], [0, 1]);
+            }
+          } else {
+            // 黑方卒向前移动
+            soldierMoves.push([1, 0]);
+            if (r >= 5) { // 过河后可以左右移动
+              soldierMoves.push([0, -1], [0, 1]);
+            }
+          }
+          for (const [dr, dc] of soldierMoves) {
+            const nr = r + dr;
+            const nc = c + dc;
+            if (isInBoard(nr, nc) && !isMyPieceAt(nr, nc, color)) {
+              moves.push({ r: nr, c: nc });
+            }
+          }
+          break;
+      }
+
+      return moves;
+    }
+
+    // 辅助函数
+    function isInBoard(r, c) {
+      return r >= 0 && r < 10 && c >= 0 && c < 9;
+    }
+
+    function isPieceAt(r, c) {
+      return !!getChessPieceAt(r, c);
+    }
+
+    function isMyPieceAt(r, c, color) {
+      const piece = getChessPieceAt(r, c);
+      return piece && piece.dataset.color === color;
+    }
+
+    function isInPalace(r, c, color) {
+      if (color === 'red') {
+        return r >= 7 && r <= 9 && c >= 3 && c <= 5;
+      } else {
+        return r >= 0 && r <= 2 && c >= 3 && c <= 5;
+      }
+    }
+
+    function isOnSameSide(r, color) {
+      if (color === 'red') {
+        return r >= 5; // 红方在下方
+      } else {
+        return r <= 4; // 黑方在上方
+      }
+    }
+
+    // 检查象棋胜利条件
+    function checkChessWin() {
+      // 检查是否将帅被吃
+      const redGeneral = getChessPieceAt(9, 4); // 红方帅的位置
+      const blackGeneral = getChessPieceAt(0, 4); // 黑方将的位置
+
+      if (!redGeneral) {
+        // 红方帅被吃，黑方获胜
+        return 2; // 黑方获胜
+      }
+
+      if (!blackGeneral) {
+        // 黑方将被吃，红方获胜
+        return 1; // 红方获胜
+      }
+
+      return 0; // 游戏继续
     }
 
     function moveChessPiece(piece, toR, toC) {
@@ -7151,12 +7471,14 @@
         });
       }
 
-      if (checkChessWin()) {
+      const winResult = checkChessWin();
+      if (winResult !== 0) {
         gameState.gameOver = true;
-        const winMsg = '你获胜了！';
-        const winColor = gameState.me === 1 ? '红方' : '黑方';
+        const isPlayerWin = winResult === gameState.me;
+        const winMsg = isPlayerWin ? '你获胜了！' : '你输了！';
+        const winColor = winResult === 1 ? '红方' : '黑方';
         winnerEl.textContent = winColor;
-        winnerEl.className = `info-value ${gameState.me === 1 ? 'value-red' : 'value-green'}`;
+        winnerEl.className = `info-value ${winResult === 1 ? 'value-red' : 'value-green'}`;
         gameStatusEl.textContent = '游戏结束';
         gameStatusEl.className = 'info-value value-waiting';
         showWinAlert(winMsg);
@@ -7165,11 +7487,11 @@
 
         if (gameState.difficulty) {
           // AI对战
-          sendAIGameResult('win');
+          sendAIGameResult(isPlayerWin ? 'win' : 'loss');
         } else {
           // PVP对战
           socket.emit('game_result', {
-            result: 'win',
+            result: isPlayerWin ? 'win' : 'loss',
             reason: '将帅被吃'
           });
         }

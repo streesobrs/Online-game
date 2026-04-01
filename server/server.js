@@ -562,8 +562,15 @@ io.on('connection', (socket) => {
   });
 
   // 游戏重置确认
-  socket.on('reset_confirm', () => {
-    gameManager.handleResetConfirm(socket.id, io);
+  socket.on('reset_confirm', (data) => {
+    const requestId = data ? data.requestId : null;
+    gameManager.handleResetConfirm(socket.id, io, requestId);
+  });
+
+  // 游戏重置拒绝
+  socket.on('reset_reject', (data) => {
+    const requestId = data ? data.requestId : null;
+    gameManager.handleResetReject(socket.id, io, requestId);
   });
 
   // 游戏结果
