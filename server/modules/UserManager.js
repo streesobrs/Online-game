@@ -158,6 +158,15 @@ class UserManager {
         this.userIdToSocketId.delete(oldUserId);
         this.onlineUsers.delete(oldUserId);
 
+        // 发送更新后的用户信息给客户端
+        socket.emit('user_connected', {
+          userId: userData.id,
+          token: user.token,
+          nickname: userData.nickname,
+          status: user.status,
+          stats: userData.stats
+        });
+
         logger.info('创建游客用户', {
           socketId: socket.id,
           userId: userData.id,

@@ -3089,7 +3089,16 @@
 
       socket.on('move', (data) => {
         console.log('收到移动:', data);
+        console.log('当前userId:', userId);
+        console.log('消息from:', data.from);
+        console.log('是否是自己的消息:', data.from === userId);
         if (gameState.gameOver) return;
+
+        // 检查是否是自己的落子，如果是则跳过
+        if (data.from === userId) {
+          console.log('收到自己的落子消息，跳过');
+          return;
+        }
 
         if (data.game === 'chess') {
           handleChessMove(data);
@@ -5114,25 +5123,50 @@
 
 
     function handleBoardMove(data) {
-      gameState.board[data.r][data.c] = data.color;
-      gameState.turn = 3 - data.color; // 切换回合
+      console.log('处理对手落子:', data);
+      console.log('当前棋盘状态:', gameState.board[data.r][data.c]);
+      console.log('是否是自己的消息:', data.from === userId);
+
+      // 检查是否是自己的落子，如果是则跳过
+      if (data.from === userId) {
+        console.log('跳过自己的落子消息');
+        return;
+      }
+
+      // 检查位置是否已经有棋子
+      if (gameState.board[data.r][data.c] !== 0) {
+        console.warn('位置已有棋子，跳过:', data);
+        return;
+      }
+
+      // 检查是否已经记录过这个位置的落子
+      const existingMove = gameState.moveLog.find(move => move.r === data.r && move.c === data.c);
+      if (existingMove) {
+        console.warn('重复落子记录，跳过:', data);
+        return;
+      }
+
+      // 确保颜色正确 - 对手的颜色就是他们的落子颜色
+      const opponentColor = data.color;
+      gameState.board[data.r][data.c] = opponentColor;
+      gameState.turn = 3 - opponentColor; // 切换回合
       gameState.moveCount++;
       gameState.moveLog.push({
-        color: data.color,
+        color: opponentColor,
         r: data.r,
         c: data.c,
         isOpponent: true
       });
       gameState.moveTimestamps.push(Date.now());
 
-      if (data.color === 1) {
+      if (opponentColor === 1) {
         gameState.blackCount++;
       } else {
         gameState.whiteCount++;
       }
 
       if (currentGame === 'gobang') {
-        const chain = calculateGobangChain(data.r, data.c, data.color);
+        const chain = calculateGobangChain(data.r, data.c, opponentColor);
         if (chain > gameState.maxChain) {
           gameState.maxChain = chain;
         }
@@ -5140,7 +5174,7 @@
 
       requestAnimationFrame(() => {
         updateTurnDisplay();
-        updateLastMove(data.r, data.c, data.color);
+        updateLastMove(data.r, data.c, opponentColor);
         updateMoveCount();
         updateColorCount();
         updateMoveLog();
@@ -5150,12 +5184,12 @@
 
       updateStatus(`⚪ 对方已落子 (${data.r},${data.c})，该你了！`);
 
-      if (currentGame === 'gobang' && checkGobangWin(data.r, data.c, data.color)) {
+      if (currentGame === 'gobang' && checkGobangWin(data.r, data.c, opponentColor)) {
         gameState.gameOver = true;
-        const winMsg = data.color === 1 ? '黑棋获胜！' : '白棋获胜！';
-        const winColor = data.color === 1 ? '黑棋' : '白棋';
+        const winMsg = opponentColor === 1 ? '黑棋获胜！' : '白棋获胜！';
+        const winColor = opponentColor === 1 ? '黑棋' : '白棋';
         winnerEl.textContent = winColor;
-        winnerEl.className = `info-value ${data.color === 1 ? 'value-black' : 'value-white'}`;
+        winnerEl.className = `info-value ${opponentColor === 1 ? 'value-black' : 'value-white'}`;
         gameStatusEl.textContent = '游戏结束';
         gameStatusEl.className = 'info-value value-waiting';
         showWinAlert(winMsg);
@@ -6032,6 +6066,18 @@
       if (!gameState.difficulty || gameState.gameOver) return;
 
       const { position, color, currentPlayer } = data;
+
+      // 检查位置是否已经有棋子（防止重复记录用户的落子）
+      if (currentGame === 'gobang' || currentGame === 'go') {
+        if (gameState.board[position.r][position.c] !== 0) {
+          console.log('位置已有棋子，跳过AI移动结果:', data);
+          // 只更新回合，不记录落子
+          gameState.turn = currentPlayer;
+          return;
+        }
+      } else if (currentGame === 'chess') {
+        // 国际象棋不需要位置检查，因为每次移动都是不同的位置
+      }
 
       // 执行AI移动（使用color作为当前移动的颜色）
       if (currentGame === 'gobang') {

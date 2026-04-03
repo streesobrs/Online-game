@@ -401,12 +401,21 @@ class GameManager {
 
     logger.gameEvent(game.gameId, '移动', {
       player: user.userId,
-      position: move.position
+      position: move.position,
+      isPlayer1: isPlayer1,
+      isPlayer2: isPlayer2,
+      gamePlayer1: game.player1,
+      gamePlayer2: game.player2
     });
 
-    // 发送给对手
+    // 发送给对手（不发送给自己）
     const opponentId = isPlayer1 ? game.player2 : game.player1;
     const opponentSocket = this.userManager.getSocketByUserId(opponentId);
+    logger.info('发送移动消息', {
+      from: user.userId,
+      to: opponentId,
+      hasOpponentSocket: !!opponentSocket
+    });
     if (opponentSocket) {
       opponentSocket.emit('move', {
         ...data,
@@ -415,7 +424,7 @@ class GameManager {
       });
     }
 
-    // 发送给观战者
+    // 发送给观战者（不发送给玩家自己）
     this.broadcastToSpectators(game.gameId, 'move', {
       ...data,
       from: user.userId,
@@ -1093,6 +1102,10 @@ class GameManager {
     const spectators = this.spectators.get(gameId);
     if (spectators) {
       for (const userId of spectators) {
+        // 不发送给落子玩家自己
+        if (data.from === userId) {
+          continue;
+        }
         const socket = this.userManager.getSocketByUserId(userId);
         if (socket) {
           socket.emit(event, data);
