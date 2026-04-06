@@ -2321,26 +2321,77 @@
 
   <!-- AI对战页面 -->
   <div class="ai-game-container" id="ai-game-container"
-    style="display: none; width: 100%; max-width: 1000px; background: white; padding: 18px; border-radius: 10px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07); margin-bottom: 15px;">
-    <div class="lobby-title">🤖 AI对战</div>
-    <div class="lobby-status">
-      选择难度，挑战AI！
+    style="display: none; width: 100%; max-width: 1000px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2); margin-bottom: 20px; color: white;">
+    <div class="lobby-title"
+      style="font-size: 28px; text-align: center; margin-bottom: 20px; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">🤖
+      AI对战</div>
+    <div class="lobby-status" style="text-align: center; margin-bottom: 30px; font-size: 18px; opacity: 0.9;">
+      选择游戏类型和难度，挑战AI！
     </div>
     <div class="ai-game-controls"
-      style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px;">
-      <button class="lobby-btn match-btn" onclick="startAIGame('easy')" style="background: #27ae60;">
+      style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 20px;">
+      <div style="grid-column: 1 / -1; margin-bottom: 30px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <label style="font-weight: bold; font-size: 20px; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">游戏类型：</label>
+        </div>
+        <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+          <style>
+            .game-type-card {
+              padding: 20px 30px;
+              border-radius: 16px;
+              border: 3px solid rgba(255, 255, 255, 0.3);
+              background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+              color: white;
+              font-size: 18px;
+              font-weight: bold;
+              cursor: pointer;
+              transition: all 0.3s ease;
+              box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+              min-width: 120px;
+              text-align: center;
+            }
+
+            .game-type-card:hover {
+              transform: translateY(-5px);
+              box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+              border-color: white;
+            }
+
+            .game-type-card.selected {
+              border-color: #ffeb3b;
+              background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+              box-shadow: 0 6px 20px rgba(255, 152, 0, 0.4);
+            }
+          </style>
+          <div class="game-type-card selected" data-game-type="gobang" onclick="selectGameType('gobang')">
+            🔴 五子棋
+          </div>
+          <div class="game-type-card" data-game-type="go" onclick="selectGameType('go')">
+            ⚪ 围棋
+          </div>
+          <div class="game-type-card" data-game-type="chess" onclick="selectGameType('chess')">
+            🟥 象棋
+          </div>
+          <input type="hidden" id="ai-game-type" value="gobang">
+        </div>
+      </div>
+      <button class="lobby-btn match-btn" onclick="startAIGame('easy')"
+        style="background: linear-gradient(135deg, #27ae60 0%, #219a52 100%); padding: 20px; border-radius: 12px; border: none; color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);">
         🟢 简单难度
-        <div style="font-size: 12px; color: #fff; margin-top: 5px;">AI会随机落子</div>
+        <div style="font-size: 14px; color: rgba(255, 255, 255, 0.8); margin-top: 8px;">AI会随机落子</div>
       </button>
-      <button class="lobby-btn match-btn" onclick="startAIGame('medium')" style="background: #f39c12;">
+      <button class="lobby-btn match-btn" onclick="startAIGame('medium')"
+        style="background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); padding: 20px; border-radius: 12px; border: none; color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(243, 156, 18, 0.4);">
         🟡 中等难度
-        <div style="font-size: 12px; color: #fff; margin-top: 5px;">AI会进行简单的策略思考</div>
+        <div style="font-size: 14px; color: rgba(255, 255, 255, 0.8); margin-top: 8px;">AI会进行简单的策略思考</div>
       </button>
-      <button class="lobby-btn match-btn" onclick="startAIGame('hard')" style="background: #e74c3c;">
+      <button class="lobby-btn match-btn" onclick="startAIGame('hard')"
+        style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); padding: 20px; border-radius: 12px; border: none; color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);">
         🔴 困难难度
-        <div style="font-size: 12px; color: #fff; margin-top: 5px;">AI会进行深度的策略思考</div>
+        <div style="font-size: 14px; color: rgba(255, 255, 255, 0.8); margin-top: 8px;">AI会进行深度的策略思考</div>
       </button>
-      <button class="lobby-btn cancel-btn" onclick="returnToLobby()" style="grid-column: 1 / -1;">
+      <button class="lobby-btn cancel-btn" onclick="returnToLobby()"
+        style="grid-column: 1 / -1; background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); padding: 15px; border-radius: 12px; border: none; color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(52, 152, 219, 0.4);">
         🏠 返回大厅
       </button>
     </div>
@@ -6469,27 +6520,33 @@
         playAgainBtn.style.display = 'none';
       }
 
+      // 检查是否从AI对战返回
+      const isFromAI = gameState.difficulty !== null;
+
       // 隐藏所有页面
-      lobbyContainer.style.display = 'flex';
+      lobbyContainer.style.display = isFromAI ? 'none' : 'flex';
       infoContainer.style.display = 'none';
       gameControls.style.display = 'none';
       statusBox.style.display = 'none';
       moveLogPanel.style.display = 'none';
       chatContainer.classList.remove('show');
       document.getElementById('achievements-container').style.display = 'none';
-      document.getElementById('ai-game-container').style.display = 'none';
+      document.getElementById('ai-game-container').style.display = isFromAI ? 'block' : 'none';
 
-      // 隐藏所有棋盘，然后显示当前选中的棋种棋盘（空棋盘）
+      // 隐藏所有棋盘
       document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
         board.style.display = 'none';
       });
 
-      if (currentGame === 'gobang') {
-        gobangBoard.style.display = 'grid';
-      } else if (currentGame === 'go') {
-        goBoard.style.display = 'grid';
-      } else if (currentGame === 'chess') {
-        chessBoard.style.display = 'block';
+      // 如果不是从AI对战返回，显示当前选中的棋种棋盘（空棋盘）
+      if (!isFromAI) {
+        if (currentGame === 'gobang') {
+          gobangBoard.style.display = 'grid';
+        } else if (currentGame === 'go') {
+          goBoard.style.display = 'grid';
+        } else if (currentGame === 'chess') {
+          chessBoard.style.display = 'block';
+        }
       }
 
       isMatching = false;
@@ -6580,6 +6637,20 @@
       document.getElementById('ai-game-container').style.display = 'block';
     }
 
+    // 选择游戏类型
+    function selectGameType(gameType) {
+      // 移除所有卡片的选中状态
+      document.querySelectorAll('.game-type-card').forEach(card => {
+        card.classList.remove('selected');
+      });
+
+      // 为当前选中的卡片添加选中状态
+      document.querySelector(`[data-game-type="${gameType}"]`).classList.add('selected');
+
+      // 更新隐藏输入框的值
+      document.getElementById('ai-game-type').value = gameType;
+    }
+
     function loadAchievements() {
       if (!currentAccount || !currentAccount.id) {
         const achievementsList = document.getElementById('achievements-list');
@@ -6592,6 +6663,13 @@
     }
 
     function startAIGame(difficulty) {
+      // 获取用户选择的游戏类型
+      const gameTypeSelect = document.getElementById('ai-game-type');
+      const selectedGameType = gameTypeSelect ? gameTypeSelect.value : currentGame;
+
+      // 更新当前游戏类型
+      currentGame = selectedGameType;
+
       // 隐藏AI对战页面
       document.getElementById('ai-game-container').style.display = 'none';
 
@@ -6601,7 +6679,12 @@
       statusBox.style.display = 'block';
       moveLogPanel.style.display = 'block';
 
-      // 显示当前棋种的棋盘
+      // 隐藏所有棋盘
+      document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
+        board.style.display = 'none';
+      });
+
+      // 显示选择的棋种的棋盘
       if (currentGame === 'gobang') {
         gobangBoard.style.display = 'grid';
       } else if (currentGame === 'go') {
