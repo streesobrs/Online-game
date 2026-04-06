@@ -642,7 +642,7 @@ class AccountManager {
 
       const stats = account.stats || {
         wins: 0, losses: 0, draws: 0, totalGames: 0,
-        gameTypeWins: { gobang: 0, chess: 0, go: 0 },
+        gameTypeWins: { gobang: 0, chess: 0, go: 0, snake: 0 },
         streak: 0, maxStreak: 0, aiWins: 0,
         aiDifficulty: null, aiResult: null, firstGame: false,
         nightGame: false, weekendGame: false, chatMessages: 0,
@@ -662,7 +662,7 @@ class AccountManager {
         }
 
         if (gameType) {
-          if (!stats.gameTypeWins) stats.gameTypeWins = { gobang: 0, chess: 0, go: 0 };
+          if (!stats.gameTypeWins) stats.gameTypeWins = { gobang: 0, chess: 0, go: 0, snake: 0 };
           stats.gameTypeWins[gameType] = (stats.gameTypeWins[gameType] || 0) + 1;
         }
 

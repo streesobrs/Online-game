@@ -73,7 +73,8 @@ app.get('/api/status', (req, res) => {
 app.get('/api/leaderboard', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 10;
-    const leaderboard = await userManager.getLeaderboard(limit);
+    const gameType = req.query.gameType || null;
+    const leaderboard = await userManager.getLeaderboard(limit, gameType);
     res.json({ success: true, data: leaderboard });
   } catch (err) {
     logger.error('获取排行榜API错误', { error: err.message });
@@ -454,7 +455,8 @@ io.on('connection', (socket) => {
   // 获取排行榜
   socket.on('get_leaderboard', async (data) => {
     const limit = data?.limit || 10;
-    const leaderboard = await userManager.getLeaderboard(limit);
+    const gameType = data?.gameType || null;
+    const leaderboard = await userManager.getLeaderboard(limit, gameType);
     socket.emit('leaderboard', { leaderboard });
   });
 
@@ -737,6 +739,11 @@ io.on('connection', (socket) => {
               score: account.stats.snakeGames.highScore
             });
           }
+
+          // 更新游戏统计数据（用于排行榜）
+          // 贪吃蛇游戏：如果分数大于100，则认为是获胜
+          const result = score > 100 ? 'win' : 'loss';
+          await gameManager.accountManager.updateGameStats(accountId, result, 'snake', false, null, null);
 
           await gameManager.accountManager.updateUser(accountId, account);
         }
