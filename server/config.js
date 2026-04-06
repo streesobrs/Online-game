@@ -26,7 +26,8 @@ module.exports = {
     types: {
       GOBANG: 'gobang',
       GO: 'go',
-      CHESS: 'chess'
+      CHESS: 'chess',
+      SNAKE: 'snake'
     },
     maxWaitTime: 300000, // 最大等待时间 5分钟
     maxGameTime: 3600000, // 最大游戏时间 1小时

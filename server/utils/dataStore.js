@@ -10,11 +10,11 @@ class DataStore {
     this.cache = new Map();
     // 按ID拆分的集合配置
     this.splitByIdCollections = {
-      'accounts': 'users'
+      'accounts': 'users',
+      'games': 'games' // 游戏记录按ID拆分存储
     };
     // 普通集合的目录映射
     this.collectionDirs = {
-      'games': 'games',
       'globalChats': 'chats',
       'gameChats': 'chats',
       'systemStats': 'system'
@@ -57,18 +57,45 @@ class DataStore {
         await fs.mkdir(dirPath, { recursive: true });
 
         try {
-          const files = await fs.readdir(dirPath);
-          const jsonFiles = files.filter(f => f.endsWith('.json'));
           const items = [];
 
-          for (const file of jsonFiles) {
-            try {
-              const filePath = path.join(dirPath, file);
-              const data = await fs.readFile(filePath, 'utf8');
-              const item = JSON.parse(data);
-              items.push(item);
-            } catch (err) {
-              logger.error('读取单个文件失败', { file, error: err.message });
+          // 游戏记录需要遍历所有游戏类型文件夹
+          if (collection === 'games') {
+            // 读取所有游戏类型文件夹
+            const gameTypeDirs = await fs.readdir(dirPath, { withFileTypes: true });
+            const subdirectories = gameTypeDirs.filter(dirent => dirent.isDirectory()).map(dirent => dirent.name);
+
+            // 遍历每个游戏类型文件夹
+            for (const gameType of subdirectories) {
+              const gameTypePath = path.join(dirPath, gameType);
+              const files = await fs.readdir(gameTypePath);
+              const jsonFiles = files.filter(f => f.endsWith('.json'));
+
+              for (const file of jsonFiles) {
+                try {
+                  const filePath = path.join(gameTypePath, file);
+                  const data = await fs.readFile(filePath, 'utf8');
+                  const item = JSON.parse(data);
+                  items.push(item);
+                } catch (err) {
+                  logger.error('读取单个文件失败', { file, error: err.message });
+                }
+              }
+            }
+          } else {
+            // 其他集合直接读取
+            const files = await fs.readdir(dirPath);
+            const jsonFiles = files.filter(f => f.endsWith('.json'));
+
+            for (const file of jsonFiles) {
+              try {
+                const filePath = path.join(dirPath, file);
+                const data = await fs.readFile(filePath, 'utf8');
+                const item = JSON.parse(data);
+                items.push(item);
+              } catch (err) {
+                logger.error('读取单个文件失败', { file, error: err.message });
+              }
             }
           }
 
@@ -159,16 +186,50 @@ class DataStore {
       }
 
       const subDir = this.splitByIdCollections[collection];
-      const filePath = path.join(this.dataDir, subDir, `${id}.json`);
 
-      try {
-        const data = await fs.readFile(filePath, 'utf8');
-        return JSON.parse(data);
-      } catch (err) {
-        if (err.code === 'ENOENT') {
+      // 游戏记录需要遍历所有游戏类型文件夹查找
+      if (collection === 'games') {
+        const gamesDir = path.join(this.dataDir, subDir);
+
+        try {
+          // 读取所有游戏类型文件夹
+          const gameTypeDirs = await fs.readdir(gamesDir, { withFileTypes: true });
+          const subdirectories = gameTypeDirs.filter(dirent => dirent.isDirectory()).map(dirent => dirent.name);
+
+          // 遍历每个游戏类型文件夹查找记录
+          for (const gameType of subdirectories) {
+            const filePath = path.join(gamesDir, gameType, `${id}.json`);
+            try {
+              const data = await fs.readFile(filePath, 'utf8');
+              return JSON.parse(data);
+            } catch (err) {
+              // 文件不存在，继续查找
+              if (err.code !== 'ENOENT') {
+                throw err;
+              }
+            }
+          }
+          // 所有文件夹都查找过了，没找到
           return null;
+        } catch (err) {
+          if (err.code === 'ENOENT') {
+            return null;
+          }
+          throw err;
         }
-        throw err;
+      } else {
+        // 其他集合直接查找
+        const filePath = path.join(this.dataDir, subDir, `${id}.json`);
+
+        try {
+          const data = await fs.readFile(filePath, 'utf8');
+          return JSON.parse(data);
+        } catch (err) {
+          if (err.code === 'ENOENT') {
+            return null;
+          }
+          throw err;
+        }
       }
     } catch (err) {
       logger.error('读取单条记录失败', { collection, id, error: err.message });
@@ -184,8 +245,16 @@ class DataStore {
         return await this.update(collection, id, item);
       }
 
-      const subDir = this.splitByIdCollections[collection];
-      const dirPath = path.join(this.dataDir, subDir);
+      let subDir = this.splitByIdCollections[collection];
+      let dirPath;
+
+      // 游戏记录按类型存储到不同子文件夹
+      if (collection === 'games' && item.gameType) {
+        dirPath = path.join(this.dataDir, subDir, item.gameType);
+      } else {
+        dirPath = path.join(this.dataDir, subDir);
+      }
+
       await fs.mkdir(dirPath, { recursive: true });
 
       const filePath = path.join(dirPath, `${id}.json`);
@@ -206,7 +275,12 @@ class DataStore {
 
   // 添加记录
   async add(collection, item) {
-    const id = item.id || item.userId;
+    let id = item.id || item.userId;
+
+    // 游戏记录使用gameId作为ID
+    if (collection === 'games' && item.gameId) {
+      id = item.gameId;
+    }
 
     // 如果是按ID拆分的集合，直接写入单个文件
     if (this.isSplitById(collection) && id) {
@@ -258,16 +332,57 @@ class DataStore {
     if (this.isSplitById(collection)) {
       try {
         const subDir = this.splitByIdCollections[collection];
-        const filePath = path.join(this.dataDir, subDir, `${id}.json`);
-        await fs.unlink(filePath);
 
-        // 清除缓存
-        const cacheKey = `${collection}:${id}`;
-        this.cache.delete(cacheKey);
-        // 清除整个集合的缓存，确保下次读取时重新加载
-        this.cache.delete(collection);
+        // 游戏记录需要遍历所有游戏类型文件夹查找
+        if (collection === 'games') {
+          const gamesDir = path.join(this.dataDir, subDir);
 
-        return true;
+          try {
+            // 读取所有游戏类型文件夹
+            const gameTypeDirs = await fs.readdir(gamesDir, { withFileTypes: true });
+            const subdirectories = gameTypeDirs.filter(dirent => dirent.isDirectory()).map(dirent => dirent.name);
+
+            // 遍历每个游戏类型文件夹查找并删除记录
+            for (const gameType of subdirectories) {
+              const filePath = path.join(gamesDir, gameType, `${id}.json`);
+              try {
+                await fs.unlink(filePath);
+
+                // 清除缓存
+                const cacheKey = `${collection}:${id}`;
+                this.cache.delete(cacheKey);
+                // 清除整个集合的缓存，确保下次读取时重新加载
+                this.cache.delete(collection);
+
+                return true;
+              } catch (err) {
+                // 文件不存在，继续查找
+                if (err.code !== 'ENOENT') {
+                  throw err;
+                }
+              }
+            }
+            // 所有文件夹都查找过了，没找到
+            return false;
+          } catch (err) {
+            if (err.code === 'ENOENT') {
+              return false;
+            }
+            throw err;
+          }
+        } else {
+          // 其他集合直接删除
+          const filePath = path.join(this.dataDir, subDir, `${id}.json`);
+          await fs.unlink(filePath);
+
+          // 清除缓存
+          const cacheKey = `${collection}:${id}`;
+          this.cache.delete(cacheKey);
+          // 清除整个集合的缓存，确保下次读取时重新加载
+          this.cache.delete(collection);
+
+          return true;
+        }
       } catch (err) {
         if (err.code === 'ENOENT') {
           return false;

@@ -650,6 +650,112 @@ io.on('connection', (socket) => {
     gameManager.handleReturnLobby(socket.id, io);
   });
 
+  // ========== 贪吃蛇游戏相关事件 ==========
+
+  // 贪吃蛇游戏开始
+  socket.on('snake_game_start', (data) => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user) {
+      socket.emit('error', { message: '用户不存在' });
+      return;
+    }
+
+    const accountId = userManager.getAccountIdByUserId(user.userId);
+    const { gameType } = data;
+
+    try {
+      logger.info('贪吃蛇游戏开始', {
+        userId: user.userId,
+        accountId: accountId,
+        gameType
+      });
+
+      // 可以在这里添加游戏开始时的统计或其他逻辑
+
+    } catch (err) {
+      logger.error('处理贪吃蛇游戏开始失败', { error: err.message });
+    }
+  });
+
+  // 贪吃蛇游戏结束
+  socket.on('snake_game_end', async (data) => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user) {
+      socket.emit('error', { message: '用户不存在' });
+      return;
+    }
+
+    const accountId = userManager.getAccountIdByUserId(user.userId);
+    const { score, gameType, moveHistory } = data;
+
+    try {
+      // 记录游戏结束日志（无论用户是否登录）
+      logger.info('贪吃蛇游戏结束', {
+        userId: user.userId,
+        accountId: accountId,
+        score,
+        moveCount: moveHistory ? moveHistory.length : 0
+      });
+
+      // 保存游戏记录
+      if (gameManager && gameManager.saveSnakeGameRecord) {
+        await gameManager.saveSnakeGameRecord({
+          userId: user.userId,
+          accountId: accountId,
+          score: score,
+          gameType: gameType,
+          moveHistory: moveHistory,
+          startTime: moveHistory && moveHistory.length > 0 ? moveHistory[0].timestamp : Date.now(),
+          endTime: Date.now()
+        });
+      }
+
+      // 更新用户统计（如果用户已登录）
+      if (accountId && gameManager.accountManager) {
+        const account = await gameManager.accountManager.getAccount(accountId);
+        if (account) {
+          // 更新贪吃蛇游戏统计
+          if (!account.stats.snakeGames) {
+            account.stats.snakeGames = {
+              totalGames: 0,
+              highScore: 0,
+              totalScore: 0
+            };
+          }
+
+          account.stats.snakeGames.totalGames++;
+          account.stats.totalScore = (account.stats.totalScore || 0) + score;
+          account.stats.snakeGames.totalScore += score;
+
+          if (score > account.stats.snakeGames.highScore) {
+            account.stats.snakeGames.highScore = score;
+
+            // 记录新高分
+            logger.info('贪吃蛇游戏新高分', {
+              userId: user.userId,
+              accountId: accountId,
+              score: account.stats.snakeGames.highScore
+            });
+          }
+
+          await gameManager.accountManager.updateUser(accountId, account);
+        }
+      }
+
+      // 检查成就（如果用户已登录）
+      if (accountId && gameManager.achievementManager) {
+        await gameManager.achievementManager.checkAchievements(accountId, {
+          gameType: 'snake',
+          score: score,
+          timestamp: Date.now()
+        });
+      }
+
+    } catch (err) {
+      logger.error('处理贪吃蛇游戏结果失败', { error: err.message });
+    }
+  });
+
   // ========== 观战相关事件 ==========
 
   // 开始观战

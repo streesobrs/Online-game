@@ -20,8 +20,11 @@ class GameManager {
   }
 
   // 生成游戏ID
-  generateGameId() {
-    return crypto.randomBytes(5).toString('hex'); // 10位十六进制
+  generateGameId(gameType) {
+    const date = new Date();
+    const readableTime = date.toISOString().replace(/[:.]/g, '-').replace('T', '_').substring(0, 19);
+    const randomId = Math.random().toString(36).substr(2, 9);
+    return `${gameType}_${readableTime}_${randomId}`;
   }
 
   // 处理匹配请求
@@ -240,7 +243,7 @@ class GameManager {
 
   // 创建游戏
   createGame(userId1, userId2, gameType, io) {
-    const gameId = this.generateGameId();
+    const gameId = this.generateGameId(gameType);
     const user1 = this.userManager.getUserByUserId(userId1);
     const user2 = this.userManager.getUserByUserId(userId2);
 
@@ -843,6 +846,7 @@ class GameManager {
   // 保存游戏记录
   async saveGameRecord(game) {
     try {
+      // 基础记录结构
       const record = {
         id: game.gameId,
         gameId: game.gameId,
@@ -860,10 +864,56 @@ class GameManager {
         savedAt: Date.now()
       };
 
+      // 根据游戏类型添加独特字段
+      switch (game.gameType) {
+        case 'gobang':
+        case 'chess':
+        case 'go':
+          // 棋类游戏特有字段
+          record.boardSize = game.boardSize || 15; // 棋盘大小
+          record.gameMode = game.gameMode || 'pvp'; // 游戏模式：pvp或ai
+          record.difficulty = game.difficulty || 'normal'; // AI难度（如果是AI对战）
+          record.winReason = game.winReason || 'normal'; // 获胜原因
+          break;
+        case 'snake':
+          // 贪吃蛇游戏特有字段（在saveSnakeGameRecord中处理）
+          break;
+      }
+
       await dataStore.add('games', record);
-      logger.info('游戏记录已保存', { gameId: game.gameId });
+      logger.info('游戏记录已保存', { gameId: game.gameId, gameType: game.gameType });
     } catch (err) {
       logger.error('保存游戏记录失败', { gameId: game.gameId, error: err.message });
+    }
+  }
+
+  // 保存贪吃蛇游戏记录
+  async saveSnakeGameRecord(data) {
+    try {
+      const record = {
+        gameId: this.generateGameId('snake'),
+        gameType: 'snake',
+        player1: data.userId,
+        player2: 'computer', // 贪吃蛇是单人游戏
+        player1Nickname: '玩家',
+        player2Nickname: '电脑',
+        winner: data.score > 0 ? data.userId : 'computer',
+        result: data.score > 0 ? 'win' : 'end',
+        moves: data.moveHistory,
+        score: data.score,
+        maxLength: data.maxLength || 0, // 蛇的最大长度
+        foodEaten: data.foodEaten || 0, // 吃到的食物数量
+        gameMode: 'single', // 游戏模式：single
+        startTime: data.startTime,
+        endTime: data.endTime,
+        duration: data.endTime - data.startTime,
+        savedAt: Date.now()
+      };
+
+      await dataStore.add('games', record);
+      logger.info('贪吃蛇游戏记录已保存', { gameId: record.gameId, score: data.score, maxLength: record.maxLength });
+    } catch (err) {
+      logger.error('保存贪吃蛇游戏记录失败', { error: err.message });
     }
   }
 
@@ -1144,7 +1194,7 @@ class GameManager {
           gameId: game.gameId,
           gameType: game.gameType,
           opponent: game.player1 === userId ? game.player2Nickname : game.player1Nickname,
-          result: game.winner === userId ? 'win' : game.winner === null ? 'draw' : 'loss',
+          result: game.gameType === 'snake' ? game.result : (game.winner === userId ? 'win' : game.winner === null ? 'draw' : 'loss'),
           moves: game.moves?.length || 0,
           date: game.endTime,
           duration: game.duration
@@ -1343,7 +1393,7 @@ class GameManager {
 
     // 创建AI游戏对象
     const aiGame = {
-      gameId: `ai_${userId}_${Date.now()}`,
+      gameId: this.generateGameId(gameType),
       userId: userId,
       gameType: gameType,
       difficulty: difficulty,
@@ -1535,9 +1585,11 @@ class GameManager {
 
     // 保存AI游戏记录到 games.json
     try {
+      const gameId = this.generateGameId(aiGame.gameType);
+      // 基础记录结构
       const record = {
-        id: `ai_${userId}_${aiGame.startTime}`,
-        gameId: `ai_${userId}_${aiGame.startTime}`,
+        id: gameId,
+        gameId: gameId,
         gameType: aiGame.gameType,
         player1: userId,
         player2: 'ai',
@@ -1551,6 +1603,25 @@ class GameManager {
         duration: aiGame.duration,
         savedAt: Date.now()
       };
+
+      // 根据游戏类型添加独特字段
+      switch (aiGame.gameType) {
+        case 'gobang':
+        case 'chess':
+        case 'go':
+          // 棋类游戏特有字段
+          record.boardSize = aiGame.boardSize || 15; // 棋盘大小
+          record.gameMode = 'ai'; // 游戏模式：ai
+          record.difficulty = aiGame.difficulty || 'normal'; // AI难度
+          record.winReason = result === 'win' ? 'player_win' : 'ai_win'; // 获胜原因
+          break;
+        case 'snake':
+          // 贪吃蛇游戏特有字段
+          record.score = aiGame.score || 0; // 游戏得分
+          record.maxLength = aiGame.maxLength || 0; // 蛇的最大长度
+          record.foodEaten = aiGame.foodEaten || 0; // 吃到的食物数量
+          break;
+      }
 
       await dataStore.add('games', record);
       logger.info('AI游戏记录已保存', { userId, gameType: aiGame.gameType, result });
