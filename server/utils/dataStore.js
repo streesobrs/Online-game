@@ -293,13 +293,43 @@ class DataStore {
     return await this.write(collection, data);
   }
 
+  // 处理嵌套字段更新
+  processNestedUpdates(item, updates) {
+    const updatedItem = { ...item };
+    
+    for (const [key, value] of Object.entries(updates)) {
+      if (key.includes('.')) {
+        // 处理嵌套字段，如 'stats.returnPlayer'
+        const parts = key.split('.');
+        let current = updatedItem;
+        
+        for (let i = 0; i < parts.length - 1; i++) {
+          const part = parts[i];
+          if (!current[part]) {
+            current[part] = {};
+          }
+          current = current[part];
+        }
+        
+        const lastPart = parts[parts.length - 1];
+        current[lastPart] = value;
+      } else {
+        // 普通字段直接更新
+        updatedItem[key] = value;
+      }
+    }
+    
+    return updatedItem;
+  }
+
   // 更新记录
   async update(collection, query, updates) {
     // 如果是按ID拆分的集合且query是字符串，直接更新单个文件
     if (this.isSplitById(collection) && typeof query === 'string') {
       const item = await this.readOne(collection, query);
       if (item) {
-        const updatedItem = { ...item, ...updates, updatedAt: Date.now() };
+        const updatedItem = this.processNestedUpdates(item, updates);
+        updatedItem.updatedAt = Date.now();
         return await this.writeOne(collection, query, updatedItem);
       }
       return false;
@@ -320,7 +350,8 @@ class DataStore {
     });
 
     if (index !== -1) {
-      data[index] = { ...data[index], ...updates, updatedAt: Date.now() };
+      data[index] = this.processNestedUpdates(data[index], updates);
+      data[index].updatedAt = Date.now();
       return await this.write(collection, data);
     }
     return false;

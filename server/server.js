@@ -229,6 +229,10 @@ const gameManager = new GameManager(userManager, accountManager, achievementMana
 const chatManager = new ChatManager(userManager, gameManager, accountManager);
 const adminManager = new AdminManager(userManager, gameManager, chatManager, accountManager);
 const versionManager = new VersionManager();
+
+// 服务器启动时增加构建版本号
+const newVersion = versionManager.incrementBuild();
+logger.info(`服务器版本更新: ${newVersion}`);
 const themeManager = new ThemeManager();
 
 const serverStartTime = Date.now();

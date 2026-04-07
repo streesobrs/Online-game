@@ -161,7 +161,7 @@ class AdminManager {
   }
 
   // 发送管理数据
-  sendAdminData(socket) {
+  async sendAdminData(socket) {
     const users = this.userManager.getAllUsers();
     const games = this.gameManager.getAllGames();
     const waitingUsers = this.gameManager.getWaitingUsers();
@@ -184,7 +184,8 @@ class AdminManager {
       byType: {
         gobang: games.filter(g => g.gameType === 'gobang').length,
         go: games.filter(g => g.gameType === 'go').length,
-        chess: games.filter(g => g.gameType === 'chess').length
+        chess: games.filter(g => g.gameType === 'chess').length,
+        snake: games.filter(g => g.gameType === 'snake').length
       }
     };
 
@@ -203,6 +204,21 @@ class AdminManager {
       platform: process.platform
     };
 
+    // 获取账号数据（如果账号管理器可用）
+    let accounts = [];
+    let accountMap = new Map();
+    if (this.accountManager) {
+      try {
+        accounts = await this.accountManager.getAllAccounts();
+        // 创建账号ID到账号对象的映射
+        accounts.forEach(account => {
+          accountMap.set(account.id, account);
+        });
+      } catch (err) {
+        console.error('获取账号数据失败:', err);
+      }
+    }
+
     socket.emit('admin_update', {
       timestamp: Date.now(),
       stats: {
@@ -220,6 +236,14 @@ class AdminManager {
           muteInfo = this.chatManager.muteList.get(u.userId);
           muted = !!muteInfo;
         }
+        
+        // 获取用户关联的账号信息
+        let account = null;
+        const accountId = this.userManager.getAccountIdByUserId(u.userId);
+        if (accountId) {
+          account = accountMap.get(accountId);
+        }
+        
         return {
           userId: u.userId,
           nickname: u.nickname,
@@ -235,7 +259,8 @@ class AdminManager {
             reason: muteInfo.reason,
             expiresAt: muteInfo.expiresAt,
             remainingMinutes: muteInfo.expiresAt ? Math.max(0, Math.ceil((muteInfo.expiresAt - Date.now()) / 1000 / 60)) : null
-          } : null
+          } : null,
+          account: account // 添加关联的账号信息
         };
       }),
       games: games.map(g => ({
@@ -249,7 +274,8 @@ class AdminManager {
         spectatorCount: g.spectatorCount
       })),
       spectatableGames,
-      waitingQueue: waitingUsers
+      waitingQueue: waitingUsers,
+      accounts: accounts
     });
   }
 

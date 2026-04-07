@@ -158,12 +158,14 @@ class AccountManager {
       const returnPlayer = daysSinceLastLogin >= 7;
       const longReturnPlayer = daysSinceLastLogin >= 30;
 
-      // 更新最后登录时间
+      // 更新最后登录时间和登录次数
+      const loginCount = (account.stats?.loginCount || 0) + 1;
       await dataStore.update('accounts', { id: account.id }, {
         lastLogin: now,
         lastSeen: now,
         'stats.returnPlayer': returnPlayer,
-        'stats.longReturnPlayer': longReturnPlayer
+        'stats.longReturnPlayer': longReturnPlayer,
+        'stats.loginCount': loginCount
       });
 
       // 获取权限配置
@@ -289,6 +291,15 @@ class AccountManager {
         };
       }
 
+      // 更新最后登录时间和登录次数
+      const now = Date.now();
+      const loginCount = (account.stats?.loginCount || 0) + 1;
+      await dataStore.update('accounts', { id: account.id }, {
+        lastLogin: now,
+        lastSeen: now,
+        'stats.loginCount': loginCount
+      });
+
       // 获取权限配置
       const config = require('../config');
       const permissions = config.permissions[account.type] || config.permissions.registered;
@@ -395,6 +406,10 @@ class AccountManager {
           level: 1,
           exp: 0
         },
+        stats: {
+          ...guestAccount.stats,
+          loginCount: 1 // 初始化登录次数为1
+        },
         lastLogin: now,
         lastSeen: now,
         updatedAt: now
@@ -474,7 +489,8 @@ class AccountManager {
           monthlyGames: 0,
           lowLevelWins: 0,
           returnPlayer: false,
-          invites: 0
+          invites: 0,
+          loginCount: 1 // 初始化登录次数为1
         },
         createdAt: now,
         lastLogin: now,
@@ -525,10 +541,12 @@ class AccountManager {
         };
       }
 
-      // 更新最后登录时间
+      // 更新最后登录时间和登录次数
+      const loginCount = (account.stats?.loginCount || 0) + 1;
       account.lastLogin = Date.now();
       await dataStore.update('accounts', account.id, {
-        lastLogin: Date.now()
+        lastLogin: Date.now(),
+        'stats.loginCount': loginCount
       });
 
       logger.info('账号登录', { id: account.id, username: account.username });

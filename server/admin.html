@@ -853,13 +853,15 @@
                     <th>昵称</th>
                     <th>状态</th>
                     <th>棋种</th>
+                    <th>账号类型</th>
+                    <th>等级</th>
                     <th>连接时间</th>
                     <th>操作</th>
                   </tr>
                 </thead>
                 <tbody id="online-users-body">
                   <tr>
-                    <td colspan="6">
+                    <td colspan="8">
                       <div class="empty-state">
                         <div class="empty-icon">👤</div>暂无在线用户
                       </div>
@@ -938,14 +940,18 @@
                     <th>用户名</th>
                     <th>昵称</th>
                     <th>类型</th>
+                    <th>等级</th>
+                    <th>经验值</th>
+                    <th>成就数量</th>
                     <th>游戏次数</th>
+                    <th>登录次数</th>
                     <th>注册时间</th>
                     <th>操作</th>
                   </tr>
                 </thead>
                 <tbody id="accounts-body">
                   <tr>
-                    <td colspan="7">
+                    <td colspan="11">
                       <div class="empty-state">
                         <div class="empty-icon">🔑</div>暂无账号
                       </div>
@@ -1258,14 +1264,16 @@
         adminData.stats = data.stats || {};
         adminData.users = data.users || [];
         adminData.games = data.games || [];
-        // accounts 和 leaderboard 通过单独接口获取，不要覆盖
-        // adminData.leaderboard = data.leaderboard || [];
-        // adminData.accounts = data.accounts || [];
+        // 现在从 admin_update 中获取账号数据
+        if (data.accounts) {
+          adminData.accounts = data.accounts;
+        }
 
         renderStats();
         if (currentView === 'users') renderOnlineUsers();
         if (currentView === 'games') renderGames();
         if (currentView === 'accounts') renderAccounts();
+        if (currentView === 'data') renderDataAccounts();
         if (currentView === 'dashboard') {
           renderLeaderboard();
           renderSystemInfo(data.stats?.system);
@@ -1379,22 +1387,15 @@
       const accounts = adminData.accounts || [];
 
       if (accounts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📋</div>暂无账号数据</div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📋</div>暂无账号数据</div></td></tr>';
         return;
       }
 
       tbody.innerHTML = accounts.map(acc => {
         const typeClass = acc.type === 'registered' ? 'badge-online' : 'badge-warning';
         const totalExp = acc.profile?.exp || 0;
-
-        // 计算等级和剩余经验值
-        let level = 1;
-        let exp = totalExp;
-
-        while (exp >= (adminData.levelExpConfig[level + 1] || level * 100)) {
-          exp -= adminData.levelExpConfig[level + 1] || level * 100;
-          level++;
-        }
+        const level = acc.profile?.level || 1;
+        const achievements = acc.achievements || [];
 
         return `
       <tr>
@@ -1406,7 +1407,8 @@
         <td>${totalExp}</td>
         <td>
           <div class="table-actions">
-            <button class="table-btn table-btn-primary" onclick="selectAccountForDataManagement('${acc.id}')">管理数据</button>
+            <button class="table-btn table-btn-info" onclick="selectAccountForDataManagement('${acc.id}')">管理</button>
+            <button class="table-btn table-btn-danger" onclick="deleteAccount('${acc.id}')">删除</button>
           </div>
         </td>
       </tr>
@@ -1438,15 +1440,8 @@
       tbody.innerHTML = filtered.map(acc => {
         const typeClass = acc.type === 'registered' ? 'badge-online' : 'badge-warning';
         const totalExp = acc.profile?.exp || 0;
-
-        // 计算等级和剩余经验值
-        let level = 1;
-        let exp = totalExp;
-
-        while (exp >= (adminData.levelExpConfig[level + 1] || level * 100)) {
-          exp -= adminData.levelExpConfig[level + 1] || level * 100;
-          level++;
-        }
+        const level = acc.profile?.level || 1;
+        const achievements = acc.achievements || [];
 
         return `
       <tr>
@@ -1458,7 +1453,8 @@
         <td>${totalExp}</td>
         <td>
           <div class="table-actions">
-            <button class="table-btn table-btn-primary" onclick="selectAccountForDataManagement('${acc.id}')">管理数据</button>
+            <button class="table-btn table-btn-info" onclick="selectAccountForDataManagement('${acc.id}')">管理</button>
+            <button class="table-btn table-btn-danger" onclick="deleteAccount('${acc.id}')">删除</button>
           </div>
         </td>
       </tr>
@@ -1636,7 +1632,7 @@
       const users = adminData.users || [];
 
       if (users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">👤</div>暂无在线用户</div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">👤</div>暂无在线用户</div></td></tr>';
         return;
       }
 
@@ -1661,12 +1657,17 @@
             statusText = '在线';
             break;
         }
+        const accountType = user.account?.type || '游客';
+        const accountLevel = user.account?.profile?.level || 1;
+
         return `
       <tr>
         <td>${user.userId}</td>
         <td>${user.nickname || '匿名'}</td>
         <td><span class="badge ${statusClass}">${statusText}</span></td>
         <td>${user.gameType || '-'}</td>
+        <td>${accountType === 'registered' ? '注册用户' : '游客'}</td>
+        <td>Lv.${accountLevel}</td>
         <td>${formatTime(user.connectedAt)}</td>
         <td>
           <div class="table-actions">
@@ -1715,19 +1716,27 @@
       const accounts = adminData.accounts || [];
 
       if (accounts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">🔑</div>暂无账号</div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="empty-icon">🔑</div>暂无账号</div></td></tr>';
         return;
       }
 
       tbody.innerHTML = accounts.map(acc => {
         const typeClass = acc.type === 'registered' ? 'badge-online' : 'badge-warning';
+        const level = acc.profile?.level || 1;
+        const exp = acc.profile?.exp || 0;
+        const achievementCount = acc.achievements?.length || 0;
+        const loginCount = acc.stats?.loginCount || 0;
         return `
       <tr>
         <td>${acc.id}</td>
         <td>${acc.username || '-'}</td>
         <td>${acc.nickname || '-'}</td>
         <td><span class="badge ${typeClass}">${acc.type === 'registered' ? '注册用户' : '游客'}</span></td>
+        <td>Lv.${level}</td>
+        <td>${exp}</td>
+        <td>${achievementCount}</td>
         <td>${acc.stats?.totalGames || 0}</td>
+        <td>${loginCount}</td>
         <td>${formatTime(acc.createdAt)}</td>
         <td>
           <div class="table-actions">
@@ -1788,10 +1797,10 @@
       tbody.innerHTML = board.map((item, i) => `
     <tr>
       <td>#${i + 1}</td>
-      <td>${item.nickname || item.userId}</td>
+      <td>${item.name || item.userId || '未知'}</td>
       <td>${item.wins || 0} / ${item.losses || 0} / ${item.draws || 0}</td>
       <td>${item.totalGames || 0}</td>
-      <td>${item.winRate || '0%'}</td>
+      <td>${item.winrate || '0%'}</td>
     </tr>
   `).join('');
     }

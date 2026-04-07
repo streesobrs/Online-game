@@ -7,7 +7,13 @@ echo.
 
 cd /d "%~dp0"
 
-set PACKAGE_NAME=game-server-%date:~0,4%%date:~5,2%%date:~8,2%
+REM Read version number from version.json using node
+for /f "delims=" %%a in ('node -e "const v = require('./server/version.json'); console.log(v.major + '.' + v.minor + '.' + v.patch + '.' + v.build)"') do set VERSION=%%a
+
+REM Get current date in YYYYMMDD format using PowerShell (locale independent)
+for /f %%i in ('powershell -Command "Get-Date -Format yyyyMMdd"') do set TODAY=%%i
+
+set PACKAGE_NAME=game-server-v%VERSION%-%TODAY%
 set ZIP_NAME=%PACKAGE_NAME%.zip
 
 echo Preparing package...
