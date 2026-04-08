@@ -64,7 +64,7 @@ class UserManager {
       try {
         const account = await this.accountManager.getUser(data.id);
         if (account) {
-          nickname = account.nickname || nickname;
+          nickname = account.account?.nickname || nickname;
           stats = account.stats || stats;
           logger.info('从账号恢复用户信息', { accountId: data.id, nickname });
         }

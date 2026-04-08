@@ -212,7 +212,7 @@ class AdminManager {
         accounts = await this.accountManager.getAllAccounts();
         // 创建账号ID到账号对象的映射
         accounts.forEach(account => {
-          accountMap.set(account.id, account);
+          accountMap.set(account.account?.id, account);
         });
       } catch (err) {
         console.error('获取账号数据失败:', err);
@@ -236,17 +236,18 @@ class AdminManager {
           muteInfo = this.chatManager.muteList.get(u.userId);
           muted = !!muteInfo;
         }
-        
+
         // 获取用户关联的账号信息
         let account = null;
         const accountId = this.userManager.getAccountIdByUserId(u.userId);
         if (accountId) {
-          account = accountMap.get(accountId);
+          const accountObj = accountMap.get(accountId);
+          account = accountObj?.account;
         }
-        
+
         return {
           userId: u.userId,
-          nickname: u.nickname,
+          nickname: account?.nickname || u.nickname,
           status: u.status,
           gameType: u.gameType,
           game: u.game,
