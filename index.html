@@ -2760,6 +2760,43 @@
             <button class="lobby-btn" id="snake-pause" onclick="pauseSnakeGame()">⏸️ 暂停</button>
             <button class="lobby-btn" id="snake-restart" onclick="restartSnakeGame()">🔄 重新开始</button>
           </div>
+
+          <!-- 虚拟按键 -->
+          <div class="virtual-controls"
+            style="display: none; flex-direction: column; align-items: center; margin-top: 30px;">
+            <div class="virtual-btn up-btn" onclick="handleVirtualKey('up')"
+              style="width: 80px; height: 80px; background: #4ecdc4; border: none; border-radius: 15px; color: white; font-size: 32px; margin-bottom: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);">
+              ↑</div>
+            <div style="display: flex; gap: 15px;">
+              <div class="virtual-btn left-btn" onclick="handleVirtualKey('left')"
+                style="width: 80px; height: 80px; background: #4ecdc4; border: none; border-radius: 15px; color: white; font-size: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);">
+                ←</div>
+              <div class="virtual-btn down-btn" onclick="handleVirtualKey('down')"
+                style="width: 80px; height: 80px; background: #4ecdc4; border: none; border-radius: 15px; color: white; font-size: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);">
+                ↓</div>
+              <div class="virtual-btn right-btn" onclick="handleVirtualKey('right')"
+                style="width: 80px; height: 80px; background: #4ecdc4; border: none; border-radius: 15px; color: white; font-size: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);">
+                →</div>
+            </div>
+          </div>
+
+          <!-- 媒体查询 - 在移动设备上显示虚拟按键 -->
+          <style>
+            @media (max-width: 768px) or (hover: none) {
+              .virtual-controls {
+                display: flex !important;
+              }
+            }
+
+            /* 禁用触摸设备上的默认行为，防止双击放大 */
+            .touch-disabled {
+              touch-action: manipulation !important;
+              -webkit-user-select: none !important;
+              -moz-user-select: none !important;
+              -ms-user-select: none !important;
+              user-select: none !important;
+            }
+          </style>
           <div class="game-rules">
             <div class="rules-title">📜 游戏规则</div>
             <div class="rules-content" id="snake-rules"></div>
@@ -5859,6 +5896,13 @@
       snakeGameState.lastDirection = 'right'; // 初始方向
       snakeGameState.lastFood = snakeGameState.food; // 初始食物位置
       snakeGameState.lastScore = 0; // 初始分数
+      snakeGameState.lastTime = Date.now(); // 用于控制游戏速度
+
+      // 禁用触摸默认行为，防止双击放大
+      const canvas = document.getElementById('snake-canvas');
+      const virtualControls = document.querySelector('.virtual-controls');
+      if (canvas) canvas.classList.add('touch-disabled');
+      if (virtualControls) virtualControls.classList.add('touch-disabled');
 
       // 记录初始状态（使用紧凑数组表示）
       snakeGameState.moveHistory.push([
@@ -5875,7 +5919,115 @@
       updateSnakeSpeed();
 
       // 启动游戏循环
-      snakeGameState.gameLoop = setInterval(snakeGameLoop, snakeGameState.speed);
+      function gameLoop() {
+        if (snakeGameState.isPaused) {
+          snakeGameState.gameLoop = requestAnimationFrame(gameLoop);
+          return;
+        }
+
+        // 控制游戏速度
+        const currentTime = Date.now();
+        const deltaTime = currentTime - snakeGameState.lastTime;
+
+        // 只有当时间差超过speed时才执行游戏逻辑
+        if (deltaTime >= snakeGameState.speed) {
+          // 更新方向
+          snakeGameState.direction = snakeGameState.nextDirection;
+
+          // 计算新头部位置
+          const head = { x: snakeGameState.snake[0].x, y: snakeGameState.snake[0].y };
+          switch (snakeGameState.direction) {
+            case 'up': head.y--; break;
+            case 'down': head.y++; break;
+            case 'left': head.x--; break;
+            case 'right': head.x++; break;
+          }
+
+          // 碰撞检测
+          if (checkSnakeCollision(head)) {
+            console.log('🐍 贪吃蛇碰撞检测', {
+              headPosition: head,
+              snakeLength: snakeGameState.snake.length,
+              score: snakeGameState.score,
+              reason: '墙壁或自身碰撞'
+            });
+            endSnakeGame();
+            return;
+          }
+
+          // 移动蛇
+          const tail = snakeGameState.snake[snakeGameState.snake.length - 1];
+          snakeGameState.snake.unshift(head);
+          snakeGameState.snakePositions.add(`${head.x},${head.y}`);
+
+          // 检查是否吃到食物
+          let ateFood = false;
+          let oldFood = null;
+          let newFood = null;
+
+          if (head.x === snakeGameState.food.x && head.y === snakeGameState.food.y) {
+            ateFood = true;
+            oldFood = snakeGameState.food;
+            snakeGameState.score += 10;
+            snakeGameState.foodEaten += 1; // 增加吃到的食物数量
+            updateSnakeScore();
+            newFood = generateSnakeFood();
+            snakeGameState.food = newFood;
+
+            // 更新蛇的最大长度
+            if (snakeGameState.snake.length > snakeGameState.maxLength) {
+              snakeGameState.maxLength = snakeGameState.snake.length;
+            }
+
+            console.log('🐍 贪吃蛇吃到食物', {
+              position: oldFood,
+              score: snakeGameState.score,
+              foodEaten: snakeGameState.foodEaten,
+              maxLength: snakeGameState.maxLength,
+              snakeLength: snakeGameState.snake.length,
+              newFood: newFood
+            });
+
+            // 加速（每100分加速一次）
+            if (snakeGameState.score % 100 === 0 && snakeGameState.speed > 50) {
+              snakeGameState.speed -= 10;
+              updateSnakeSpeed();
+              console.log('🐍 贪吃蛇加速', {
+                newSpeed: snakeGameState.speed,
+                score: snakeGameState.score
+              });
+            }
+          } else {
+            snakeGameState.snake.pop();
+            snakeGameState.snakePositions.delete(`${tail.x},${tail.y}`);
+          }
+
+          // 记录所有步骤（使用超紧凑格式）
+          // 只记录必要的信息：方向、头部坐标、是否吃到食物、新食物坐标（如果吃到）
+          const moveRecord = [
+            snakeGameState.direction, // 方向（1字符）
+            head.x, // 头部x坐标（数字）
+            head.y, // 头部y坐标（数字）
+            ateFood ? 1 : 0 // 是否吃到食物（0/1）
+          ];
+
+          // 只在吃到食物时添加新食物坐标
+          if (ateFood && newFood) {
+            moveRecord.push(newFood.x, newFood.y);
+          }
+
+          snakeGameState.moveHistory.push(moveRecord);
+
+          // 更新lastTime，确保游戏速度稳定
+          snakeGameState.lastTime = currentTime;
+        }
+
+        // 每次requestAnimationFrame都渲染，保证动画流畅
+        renderSnakeGame();
+        snakeGameState.gameLoop = requestAnimationFrame(gameLoop);
+      }
+
+      snakeGameState.gameLoop = requestAnimationFrame(gameLoop);
 
       console.log('🐍 贪吃蛇游戏开始', {
         initialSpeed: snakeGameState.speed,
@@ -5895,100 +6047,9 @@
       updateStatus('🎮 贪吃蛇游戏开始！');
     }
 
-    // 贪吃蛇游戏循环
+    // 贪吃蛇游戏循环（已整合到startSnakeGame函数中）
     function snakeGameLoop() {
-      if (snakeGameState.isPaused) return;
-
-      // 更新方向
-      snakeGameState.direction = snakeGameState.nextDirection;
-
-      // 计算新头部位置
-      const head = { x: snakeGameState.snake[0].x, y: snakeGameState.snake[0].y };
-      switch (snakeGameState.direction) {
-        case 'up': head.y--; break;
-        case 'down': head.y++; break;
-        case 'left': head.x--; break;
-        case 'right': head.x++; break;
-      }
-
-      // 碰撞检测
-      if (checkSnakeCollision(head)) {
-        console.log('🐍 贪吃蛇碰撞检测', {
-          headPosition: head,
-          snakeLength: snakeGameState.snake.length,
-          score: snakeGameState.score,
-          reason: '墙壁或自身碰撞'
-        });
-        endSnakeGame();
-        return;
-      }
-
-      // 移动蛇
-      const tail = snakeGameState.snake[snakeGameState.snake.length - 1];
-      snakeGameState.snake.unshift(head);
-      snakeGameState.snakePositions.add(`${head.x},${head.y}`);
-
-      // 检查是否吃到食物
-      let ateFood = false;
-      let oldFood = null;
-      let newFood = null;
-
-      if (head.x === snakeGameState.food.x && head.y === snakeGameState.food.y) {
-        ateFood = true;
-        oldFood = snakeGameState.food;
-        snakeGameState.score += 10;
-        snakeGameState.foodEaten += 1; // 增加吃到的食物数量
-        updateSnakeScore();
-        newFood = generateSnakeFood();
-        snakeGameState.food = newFood;
-
-        // 更新蛇的最大长度
-        if (snakeGameState.snake.length > snakeGameState.maxLength) {
-          snakeGameState.maxLength = snakeGameState.snake.length;
-        }
-
-        console.log('🐍 贪吃蛇吃到食物', {
-          position: oldFood,
-          score: snakeGameState.score,
-          foodEaten: snakeGameState.foodEaten,
-          maxLength: snakeGameState.maxLength,
-          snakeLength: snakeGameState.snake.length,
-          newFood: newFood
-        });
-
-        // 加速（每100分加速一次）
-        if (snakeGameState.score % 100 === 0 && snakeGameState.speed > 50) {
-          snakeGameState.speed -= 10;
-          clearInterval(snakeGameState.gameLoop);
-          snakeGameState.gameLoop = setInterval(snakeGameLoop, snakeGameState.speed);
-          updateSnakeSpeed();
-          console.log('🐍 贪吃蛇加速', {
-            newSpeed: snakeGameState.speed,
-            score: snakeGameState.score
-          });
-        }
-      } else {
-        snakeGameState.snake.pop();
-        snakeGameState.snakePositions.delete(`${tail.x},${tail.y}`);
-      }
-
-      // 记录所有步骤（使用超紧凑格式）
-      // 只记录必要的信息：方向、头部坐标、是否吃到食物、新食物坐标（如果吃到）
-      const moveRecord = [
-        snakeGameState.direction, // 方向（1字符）
-        head.x, // 头部x坐标（数字）
-        head.y, // 头部y坐标（数字）
-        ateFood ? 1 : 0 // 是否吃到食物（0/1）
-      ];
-
-      // 只在吃到食物时添加新食物坐标
-      if (ateFood && newFood) {
-        moveRecord.push(newFood.x, newFood.y);
-      }
-
-      snakeGameState.moveHistory.push(moveRecord);
-
-      renderSnakeGame();
+      // 已整合到startSnakeGame函数中
     }
 
     // 碰撞检测
@@ -6058,13 +6119,15 @@
       const offset = 1;
 
       // 批量绘制蛇身
-      ctx.fillStyle = snakeBodyColor;
-      ctx.beginPath();
-      for (let i = 1; i < snakeGameState.snake.length; i++) {
-        const segment = snakeGameState.snake[i];
-        ctx.rect(segment.x * cellSize + offset, segment.y * cellSize + offset, rectSize, rectSize);
+      if (snakeGameState.snake.length > 1) {
+        ctx.fillStyle = snakeBodyColor;
+        ctx.beginPath();
+        for (let i = 1; i < snakeGameState.snake.length; i++) {
+          const segment = snakeGameState.snake[i];
+          ctx.rect(segment.x * cellSize + offset, segment.y * cellSize + offset, rectSize, rectSize);
+        }
+        ctx.fill();
       }
-      ctx.fill();
 
       // 绘制蛇头
       if (snakeGameState.snake.length > 0) {
@@ -6113,6 +6176,32 @@
       e.preventDefault();
     }
 
+    // 虚拟按键控制
+    function handleVirtualKey(direction) {
+      switch (direction) {
+        case 'up':
+          if (snakeGameState.direction !== 'down') {
+            snakeGameState.nextDirection = 'up';
+          }
+          break;
+        case 'down':
+          if (snakeGameState.direction !== 'up') {
+            snakeGameState.nextDirection = 'down';
+          }
+          break;
+        case 'left':
+          if (snakeGameState.direction !== 'right') {
+            snakeGameState.nextDirection = 'left';
+          }
+          break;
+        case 'right':
+          if (snakeGameState.direction !== 'left') {
+            snakeGameState.nextDirection = 'right';
+          }
+          break;
+      }
+    }
+
     // 更新分数
     function updateSnakeScore() {
       document.getElementById('snake-score').textContent = snakeGameState.score;
@@ -6132,9 +6221,15 @@
     // 结束游戏
     function endSnakeGame() {
       if (snakeGameState.gameLoop) {
-        clearInterval(snakeGameState.gameLoop);
+        cancelAnimationFrame(snakeGameState.gameLoop);
         snakeGameState.gameLoop = null;
       }
+
+      // 恢复触摸默认行为
+      const canvas = document.getElementById('snake-canvas');
+      const virtualControls = document.querySelector('.virtual-controls');
+      if (canvas) canvas.classList.remove('touch-disabled');
+      if (virtualControls) virtualControls.classList.remove('touch-disabled');
 
       const winMsg = `游戏结束！得分：${snakeGameState.score}`;
       showWinAlert(winMsg);
