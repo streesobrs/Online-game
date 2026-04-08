@@ -85,7 +85,7 @@ class DataStore {
           } else {
             // 其他集合直接读取
             const files = await fs.readdir(dirPath);
-            const jsonFiles = files.filter(f => f.endsWith('.json'));
+            const jsonFiles = files.filter(f => f.endsWith('.json') && !f.endsWith('.backup'));
 
             for (const file of jsonFiles) {
               try {
@@ -296,13 +296,13 @@ class DataStore {
   // 处理嵌套字段更新
   processNestedUpdates(item, updates) {
     const updatedItem = { ...item };
-    
+
     for (const [key, value] of Object.entries(updates)) {
       if (key.includes('.')) {
         // 处理嵌套字段，如 'stats.returnPlayer'
         const parts = key.split('.');
         let current = updatedItem;
-        
+
         for (let i = 0; i < parts.length - 1; i++) {
           const part = parts[i];
           if (!current[part]) {
@@ -310,7 +310,7 @@ class DataStore {
           }
           current = current[part];
         }
-        
+
         const lastPart = parts[parts.length - 1];
         current[lastPart] = value;
       } else {
@@ -318,21 +318,37 @@ class DataStore {
         updatedItem[key] = value;
       }
     }
-    
+
     return updatedItem;
   }
 
   // 更新记录
   async update(collection, query, updates) {
-    // 如果是按ID拆分的集合且query是字符串，直接更新单个文件
-    if (this.isSplitById(collection) && typeof query === 'string') {
-      const item = await this.readOne(collection, query);
-      if (item) {
-        const updatedItem = this.processNestedUpdates(item, updates);
-        updatedItem.updatedAt = Date.now();
-        return await this.writeOne(collection, query, updatedItem);
+    // 如果是按ID拆分的集合，尝试提取ID并更新单个文件
+    if (this.isSplitById(collection)) {
+      let id;
+      if (typeof query === 'string') {
+        id = query;
+      } else if (typeof query === 'object') {
+        // 尝试从查询条件中提取ID
+        if (query.id) {
+          id = query.id;
+        } else if (query.userId) {
+          id = query.userId;
+        } else if (query['account.id']) {
+          id = query['account.id'];
+        }
       }
-      return false;
+
+      if (id) {
+        const item = await this.readOne(collection, id);
+        if (item) {
+          const updatedItem = this.processNestedUpdates(item, updates);
+          updatedItem.updatedAt = Date.now();
+          return await this.writeOne(collection, id, updatedItem);
+        }
+        return false;
+      }
     }
 
     // 普通集合，更新数组中的记录
@@ -342,7 +358,7 @@ class DataStore {
         return item.id === query || item.userId === query;
       } else if (typeof query === 'object') {
         for (const [key, value] of Object.entries(query)) {
-          if (item[key] !== value) return false;
+          if (this.getNestedValue(item, key) !== value) return false;
         }
         return true;
       }
@@ -432,6 +448,22 @@ class DataStore {
     return false;
   }
 
+  // 获取嵌套字段值
+  getNestedValue(item, key) {
+    if (key.includes('.')) {
+      const parts = key.split('.');
+      let current = item;
+      for (const part of parts) {
+        if (!current || typeof current !== 'object') {
+          return undefined;
+        }
+        current = current[part];
+      }
+      return current;
+    }
+    return item[key];
+  }
+
   // 查找记录
   async find(collection, query) {
     // 如果是按ID拆分的集合，读取所有文件后过滤
@@ -441,8 +473,8 @@ class DataStore {
         for (const [key, value] of Object.entries(query)) {
           // 支持 $ne 操作符
           if (value && typeof value === 'object' && value.$ne !== undefined) {
-            if (item[key] === value.$ne) return false;
-          } else if (item[key] !== value) {
+            if (this.getNestedValue(item, key) === value.$ne) return false;
+          } else if (this.getNestedValue(item, key) !== value) {
             return false;
           }
         }
@@ -456,8 +488,8 @@ class DataStore {
       for (const [key, value] of Object.entries(query)) {
         // 支持 $ne 操作符
         if (value && typeof value === 'object' && value.$ne !== undefined) {
-          if (item[key] === value.$ne) return false;
-        } else if (item[key] !== value) {
+          if (this.getNestedValue(item, key) === value.$ne) return false;
+        } else if (this.getNestedValue(item, key) !== value) {
           return false;
         }
       }

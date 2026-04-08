@@ -1392,23 +1392,23 @@
       }
 
       tbody.innerHTML = accounts.map(acc => {
-        const typeClass = acc.type === 'registered' ? 'badge-online' : 'badge-warning';
-        const totalExp = acc.profile?.exp || 0;
-        const level = acc.profile?.level || 1;
+        const typeClass = acc.account?.type === 'registered' ? 'badge-online' : 'badge-warning';
+        const totalExp = acc.account?.profile?.exp || 0;
+        const level = acc.account?.profile?.level || 1;
         const achievements = acc.achievements || [];
 
         return `
       <tr>
-        <td>${acc.id}</td>
-        <td>${acc.username || '-'}</td>
-        <td>${acc.nickname || '-'}</td>
-        <td><span class="badge ${typeClass}">${acc.type === 'registered' ? '注册用户' : '游客'}</span></td>
+        <td>${acc.account?.id || acc.id}</td>
+        <td>${acc.account?.username || '-'}</td>
+        <td>${acc.account?.nickname || '-'}</td>
+        <td><span class="badge ${typeClass}">${acc.account?.type === 'registered' ? '注册用户' : '游客'}</span></td>
         <td>Lv.${level}</td>
         <td>${totalExp}</td>
         <td>
           <div class="table-actions">
-            <button class="table-btn table-btn-info" onclick="selectAccountForDataManagement('${acc.id}')">管理</button>
-            <button class="table-btn table-btn-danger" onclick="deleteAccount('${acc.id}')">删除</button>
+            <button class="table-btn table-btn-info" onclick="selectAccountForDataManagement('${acc.account?.id || acc.id}')">管理</button>
+            <button class="table-btn table-btn-danger" onclick="deleteAccount('${acc.account?.id || acc.id}')">删除</button>
           </div>
         </td>
       </tr>
@@ -1425,9 +1425,9 @@
 
       if (keyword) {
         filtered = filtered.filter(a =>
-          (a.username && a.username.includes(keyword)) ||
-          (a.id && a.id.includes(keyword)) ||
-          (a.nickname && a.nickname.includes(keyword))
+          (a.account?.username && a.account.username.includes(keyword)) ||
+          (a.account?.id && a.account.id.includes(keyword)) ||
+          (a.account?.nickname && a.account.nickname.includes(keyword))
         );
       }
 
@@ -1438,23 +1438,23 @@
       }
 
       tbody.innerHTML = filtered.map(acc => {
-        const typeClass = acc.type === 'registered' ? 'badge-online' : 'badge-warning';
-        const totalExp = acc.profile?.exp || 0;
-        const level = acc.profile?.level || 1;
+        const typeClass = acc.account?.type === 'registered' ? 'badge-online' : 'badge-warning';
+        const totalExp = acc.account?.profile?.exp || 0;
+        const level = acc.account?.profile?.level || 1;
         const achievements = acc.achievements || [];
 
         return `
       <tr>
-        <td>${acc.id}</td>
-        <td>${acc.username || '-'}</td>
-        <td>${acc.nickname || '-'}</td>
-        <td><span class="badge ${typeClass}">${acc.type === 'registered' ? '注册用户' : '游客'}</span></td>
+        <td>${acc.account?.id || acc.id}</td>
+        <td>${acc.account?.username || '-'}</td>
+        <td>${acc.account?.nickname || '-'}</td>
+        <td><span class="badge ${typeClass}">${acc.account?.type === 'registered' ? '注册用户' : '游客'}</span></td>
         <td>Lv.${level}</td>
         <td>${totalExp}</td>
         <td>
           <div class="table-actions">
-            <button class="table-btn table-btn-info" onclick="selectAccountForDataManagement('${acc.id}')">管理</button>
-            <button class="table-btn table-btn-danger" onclick="deleteAccount('${acc.id}')">删除</button>
+            <button class="table-btn table-btn-info" onclick="selectAccountForDataManagement('${acc.account?.id || acc.id}')">管理</button>
+            <button class="table-btn table-btn-danger" onclick="deleteAccount('${acc.account?.id || acc.id}')">删除</button>
           </div>
         </td>
       </tr>
@@ -1489,7 +1489,7 @@
     function updateAccountData(account) {
       if (!account) return;
 
-      const totalExp = account.profile?.exp || 0;
+      const totalExp = account.account?.profile?.exp || 0;
 
       // 计算等级和剩余经验值
       let level = 1;
@@ -1500,15 +1500,15 @@
         level++;
       }
 
-      document.getElementById('account-id').value = account.id;
-      document.getElementById('account-username').value = account.username || '-';
-      document.getElementById('account-nickname').value = account.nickname || '-';
-      document.getElementById('account-type').value = account.type === 'registered' ? '注册用户' : '游客';
+      document.getElementById('account-id').value = account.account?.id || account.id;
+      document.getElementById('account-username').value = account.account?.username || '-';
+      document.getElementById('account-nickname').value = account.account?.nickname || '-';
+      document.getElementById('account-type').value = account.account?.type === 'registered' ? '注册用户' : '游客';
       document.getElementById('account-level').value = `Lv.${level}`;
       document.getElementById('account-exp').value = `${totalExp} (当前等级: ${exp})`;
       document.getElementById('account-achievements').value = account.achievements?.length || 0;
-      document.getElementById('account-created').value = formatTime(account.createdAt);
-      document.getElementById('current-account-title').textContent = `账号数据管理 - ${account.username || account.id}`;
+      document.getElementById('account-created').value = formatTime(account.account?.createdAt);
+      document.getElementById('current-account-title').textContent = `账号数据管理 - ${account.account?.username || account.account?.id || account.id}`;
 
       // 显示管理界面
       document.querySelector('#view-data .data-card').classList.add('hidden');
@@ -1721,28 +1721,28 @@
       }
 
       tbody.innerHTML = accounts.map(acc => {
-        const typeClass = acc.type === 'registered' ? 'badge-online' : 'badge-warning';
-        const level = acc.profile?.level || 1;
-        const exp = acc.profile?.exp || 0;
+        const typeClass = acc.account?.type === 'registered' ? 'badge-online' : 'badge-warning';
+        const level = acc.account?.profile?.level || 1;
+        const exp = acc.account?.profile?.exp || 0;
         const achievementCount = acc.achievements?.length || 0;
-        const loginCount = acc.stats?.loginCount || 0;
+        const loginCount = acc.account?.activity?.loginCount || 0;
         return `
       <tr>
-        <td>${acc.id}</td>
-        <td>${acc.username || '-'}</td>
-        <td>${acc.nickname || '-'}</td>
-        <td><span class="badge ${typeClass}">${acc.type === 'registered' ? '注册用户' : '游客'}</span></td>
+        <td>${acc.account?.id || acc.id}</td>
+        <td>${acc.account?.username || '-'}</td>
+        <td>${acc.account?.nickname || '-'}</td>
+        <td><span class="badge ${typeClass}">${acc.account?.type === 'registered' ? '注册用户' : '游客'}</span></td>
         <td>Lv.${level}</td>
         <td>${exp}</td>
         <td>${achievementCount}</td>
         <td>${acc.stats?.totalGames || 0}</td>
         <td>${loginCount}</td>
-        <td>${formatTime(acc.createdAt)}</td>
+        <td>${formatTime(acc.account?.createdAt)}</td>
         <td>
           <div class="table-actions">
-            <button class="table-btn table-btn-info" onclick="viewAccountDetail('${acc.id}')">查看</button>
-            <button class="table-btn table-btn-warning" onclick="resetPassword('${acc.id}')">重置密码</button>
-            <button class="table-btn table-btn-danger" onclick="deleteAccount('${acc.id}')">删除</button>
+            <button class="table-btn table-btn-info" onclick="viewAccountDetail('${acc.account?.id || acc.id}')">查看</button>
+            <button class="table-btn table-btn-warning" onclick="resetPassword('${acc.account?.id || acc.id}')">重置密码</button>
+            <button class="table-btn table-btn-danger" onclick="deleteAccount('${acc.account?.id || acc.id}')">删除</button>
           </div>
         </td>
       </tr>
@@ -1760,24 +1760,24 @@
       }
 
       tbody.innerHTML = accounts.map(acc => {
-        const typeClass = acc.type === 'registered' ? 'badge-online' : 'badge-warning';
-        const level = acc.profile?.level || 1;
-        const exp = acc.profile?.exp || 0;
+        const typeClass = acc.account?.type === 'registered' ? 'badge-online' : 'badge-warning';
+        const level = acc.account?.profile?.level || 1;
+        const exp = acc.account?.profile?.exp || 0;
         const achievementCount = acc.achievements?.length || 0;
         return `
       <tr>
-        <td>${acc.id}</td>
-        <td>${acc.username || '-'}</td>
-        <td>${acc.nickname || '-'}</td>
-        <td><span class="badge ${typeClass}">${acc.type === 'registered' ? '注册用户' : '游客'}</span></td>
+        <td>${acc.account?.id || acc.id}</td>
+        <td>${acc.account?.username || '-'}</td>
+        <td>${acc.account?.nickname || '-'}</td>
+        <td><span class="badge ${typeClass}">${acc.account?.type === 'registered' ? '注册用户' : '游客'}</span></td>
         <td>Lv.${level}</td>
         <td>${exp}</td>
         <td>${achievementCount}</td>
         <td>
           <div class="table-actions">
-            <button class="table-btn table-btn-info" onclick="viewAccountDetail('${acc.id}')">查看</button>
-            <button class="table-btn table-btn-primary" onclick="showExpManagement('${acc.id}')">经验</button>
-            <button class="table-btn table-btn-success" onclick="showAchievementManagement('${acc.id}')">成就</button>
+            <button class="table-btn table-btn-info" onclick="viewAccountDetail('${acc.account?.id || acc.id}')">查看</button>
+            <button class="table-btn table-btn-primary" onclick="showExpManagement('${acc.account?.id || acc.id}')">经验</button>
+            <button class="table-btn table-btn-success" onclick="showAchievementManagement('${acc.account?.id || acc.id}')">成就</button>
           </div>
         </td>
       </tr>

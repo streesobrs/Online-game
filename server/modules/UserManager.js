@@ -536,30 +536,43 @@ class UserManager {
     try {
       if (this.accountManager) {
         const accounts = await this.accountManager.getAllAccounts();
-        return accounts
+
+        // 去重，基于用户ID
+        const uniqueAccounts = [];
+        const seenIds = new Set();
+
+        for (const account of accounts) {
+          const accountId = account.account?.id;
+          if (accountId && !seenIds.has(accountId)) {
+            seenIds.add(accountId);
+            uniqueAccounts.push(account);
+          }
+        }
+
+        return uniqueAccounts
           .sort((a, b) => {
             let scoreA, scoreB;
             if (gameType && gameType !== 'all') {
               if (gameType === 'snake') {
                 // 贪吃蛇排行榜：基于最高分数
-                scoreA = a.stats?.snakeGames?.highScore || 0;
-                scoreB = b.stats?.snakeGames?.highScore || 0;
+                scoreA = a.games?.snake?.highScore || 0;
+                scoreB = b.games?.snake?.highScore || 0;
               } else {
                 // 其他游戏类型的排行榜：基于获胜次数
-                scoreA = a.stats?.gameTypeWins ? (a.stats.gameTypeWins[gameType] || 0) : 0;
-                scoreB = b.stats?.gameTypeWins ? (b.stats.gameTypeWins[gameType] || 0) : 0;
+                scoreA = a.games?.[gameType]?.wins || 0;
+                scoreB = b.games?.[gameType]?.wins || 0;
               }
             } else {
               // 总榜：计算所有游戏类型的获胜次数总和
               try {
-                scoreA = Object.values(a.stats?.gameTypeWins || {}).reduce((sum, val) => sum + (val || 0), 0);
+                scoreA = Object.values(a.games || {}).reduce((sum, game) => sum + (game.wins || 0), 0);
               } catch (e) {
-                scoreA = a.stats?.wins || 0;
+                scoreA = a.stats?.totalWins || 0;
               }
               try {
-                scoreB = Object.values(b.stats?.gameTypeWins || {}).reduce((sum, val) => sum + (val || 0), 0);
+                scoreB = Object.values(b.games || {}).reduce((sum, game) => sum + (game.wins || 0), 0);
               } catch (e) {
-                scoreB = b.stats?.wins || 0;
+                scoreB = b.stats?.totalWins || 0;
               }
             }
             return scoreB - scoreA;
@@ -570,33 +583,41 @@ class UserManager {
             if (gameType && gameType !== 'all') {
               if (gameType === 'snake') {
                 // 贪吃蛇排行榜：基于最高分数
-                score = account.stats?.snakeGames?.highScore || 0;
+                score = account.games?.snake?.highScore || 0;
                 wins = 0; // 贪吃蛇不计算胜利次数
               } else {
                 // 其他游戏类型的排行榜：基于获胜次数
-                wins = account.stats?.gameTypeWins ? (account.stats.gameTypeWins[gameType] || 0) : 0;
+                wins = account.games?.[gameType]?.wins || 0;
                 score = 0;
               }
             } else {
               // 总榜：计算所有游戏类型的获胜次数总和
               try {
-                wins = Object.values(account.stats?.gameTypeWins || {}).reduce((sum, val) => sum + (val || 0), 0);
+                wins = Object.values(account.games || {}).reduce((sum, game) => sum + (game.wins || 0), 0);
               } catch (e) {
-                wins = account.stats?.wins || 0;
+                wins = account.stats?.totalWins || 0;
               }
               score = 0;
             }
-            // 简单计算总游戏次数（这里可能需要根据实际数据结构调整）
-            const totalGames = account.stats?.totalGames || 0;
+            // 计算总游戏次数（从所有游戏类型中计算）
+            let totalGames = 0;
+            try {
+              totalGames = Object.values(account.games || {}).reduce((sum, game) => sum + (game.totalGames || 0), 0);
+            } catch (e) {
+              totalGames = account.stats?.totalGames || 0;
+            }
             // 优先使用nickname，如果没有则使用username，最后使用默认值
-            const name = account.nickname || account.username || `玩家${account.id.substr(0, 4)}`;
+            const name = account.account?.nickname || account.account?.username || `玩家${account.account?.id?.substr(0, 4) || '0000'}`;
             return {
               rank: index + 1,
-              id: account.id,
-              username: account.username,
+              id: account.account?.id,
+              username: account.account?.username,
               name: name,
-              level: account.profile?.level || 1,
+              level: account.account?.profile?.level || 1,
               wins: wins,
+              losses: 0, // 暂时设为0，后续可以从数据中获取
+              draws: 0, // 暂时设为0，后续可以从数据中获取
+              totalGames: totalGames,
               score: score,
               winrate: totalGames > 0 ? `${Math.round((wins / totalGames) * 100)}%` : '0%'
             };
@@ -609,24 +630,24 @@ class UserManager {
             if (gameType && gameType !== 'all') {
               if (gameType === 'snake') {
                 // 贪吃蛇排行榜：基于最高分数
-                scoreA = a.stats?.snakeGames?.highScore || 0;
-                scoreB = b.stats?.snakeGames?.highScore || 0;
+                scoreA = a.games?.snake?.highScore || 0;
+                scoreB = b.games?.snake?.highScore || 0;
               } else {
                 // 其他游戏类型的排行榜：基于获胜次数
-                scoreA = a.stats?.gameTypeWins ? (a.stats.gameTypeWins[gameType] || 0) : 0;
-                scoreB = b.stats?.gameTypeWins ? (b.stats.gameTypeWins[gameType] || 0) : 0;
+                scoreA = a.games?.[gameType]?.wins || 0;
+                scoreB = b.games?.[gameType]?.wins || 0;
               }
             } else {
               // 总榜：计算所有游戏类型的获胜次数总和
               try {
-                scoreA = Object.values(a.stats?.gameTypeWins || {}).reduce((sum, val) => sum + (val || 0), 0);
+                scoreA = Object.values(a.games || {}).reduce((sum, game) => sum + (game.wins || 0), 0);
               } catch (e) {
-                scoreA = a.stats?.wins || 0;
+                scoreA = a.stats?.totalWins || 0;
               }
               try {
-                scoreB = Object.values(b.stats?.gameTypeWins || {}).reduce((sum, val) => sum + (val || 0), 0);
+                scoreB = Object.values(b.games || {}).reduce((sum, game) => sum + (game.wins || 0), 0);
               } catch (e) {
-                scoreB = b.stats?.wins || 0;
+                scoreB = b.stats?.totalWins || 0;
               }
             }
             return scoreB - scoreA;
@@ -637,32 +658,41 @@ class UserManager {
             if (gameType && gameType !== 'all') {
               if (gameType === 'snake') {
                 // 贪吃蛇排行榜：基于最高分数
-                score = user.stats?.snakeGames?.highScore || 0;
+                score = user.games?.snake?.highScore || 0;
                 wins = 0; // 贪吃蛇不计算胜利次数
               } else {
                 // 其他游戏类型的排行榜：基于获胜次数
-                wins = user.stats?.gameTypeWins ? (user.stats.gameTypeWins[gameType] || 0) : 0;
+                wins = user.games?.[gameType]?.wins || 0;
                 score = 0;
               }
             } else {
               // 总榜：计算所有游戏类型的获胜次数总和
               try {
-                wins = Object.values(user.stats?.gameTypeWins || {}).reduce((sum, val) => sum + (val || 0), 0);
+                wins = Object.values(user.games || {}).reduce((sum, game) => sum + (game.wins || 0), 0);
               } catch (e) {
-                wins = user.stats?.wins || 0;
+                wins = user.stats?.totalWins || 0;
               }
               score = 0;
             }
-            // 简单计算总游戏次数（这里可能需要根据实际数据结构调整）
-            const totalGames = user.stats?.totalGames || 0;
-            // 优先使用nickname，最后使用默认值
-            const name = user.nickname || user.name || `玩家${user.userId?.substr(0, 4) || '未知'}`;
+            // 计算总游戏次数（从所有游戏类型中计算）
+            let totalGames = 0;
+            try {
+              totalGames = Object.values(user.games || {}).reduce((sum, game) => sum + (game.totalGames || 0), 0);
+            } catch (e) {
+              totalGames = user.stats?.totalGames || 0;
+            }
+            // 优先使用nickname，如果没有则使用username，最后使用默认值
+            const name = user.account?.nickname || user.account?.username || `玩家${user.account?.id?.substr(0, 4) || '0000'}`;
             return {
               rank: index + 1,
-              userId: user.userId,
+              id: user.account?.id,
+              username: user.account?.username,
               name: name,
-              level: 1,
+              level: user.account?.profile?.level || 1,
               wins: wins,
+              losses: 0, // 暂时设为0，后续可以从数据中获取
+              draws: 0, // 暂时设为0，后续可以从数据中获取
+              totalGames: totalGames,
               score: score,
               winrate: totalGames > 0 ? `${Math.round((wins / totalGames) * 100)}%` : '0%'
             };
