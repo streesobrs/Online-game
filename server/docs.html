@@ -1,0 +1,2768 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API文档 - 棋类大厅</title>
+    <link href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #141414;
+            --bg-secondary: #1e1e1e;
+            --bg-tertiary: #252525;
+            --bg-hover: #2a2d2e;
+            --bg-active: #374151;
+            --border-color: #3c3c3c;
+            --text-primary: #e5e7eb;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            --accent-blue: #3b82f6;
+            --accent-blue-hover: #2563eb;
+            --accent-green: #10b981;
+            --accent-orange: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-purple: #8b5cf6;
+            --success-bg: #064e3b;
+            --success-text: #34d399;
+            --error-bg: #450a0a;
+            --error-text: #f87171;
+            --warning-bg: #451a03;
+            --warning-text: #fbbf24;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            height: 100vh;
+            overflow: hidden;
+            font-size: 14px;
+        }
+
+        .top-nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 48px;
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            z-index: 1000;
+        }
+
+        .top-nav .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-right: 32px;
+        }
+
+        .top-nav .logo-icon {
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+        }
+
+        .top-nav .logo-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .top-nav .nav-actions {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .top-nav .version-badge {
+            padding: 3px 10px;
+            background-color: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 500;
+            border: 1px solid var(--border-color);
+        }
+
+        .main-container {
+            display: flex;
+            height: calc(100vh - 48px);
+            margin-top: 48px;
+        }
+
+        .sidebar-left {
+            width: 260px;
+            background-color: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .search-box {
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 8px 12px 8px 32px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 13px;
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            transition: all 0.2s;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            background-color: var(--bg-secondary);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .api-tree {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 0;
+        }
+
+        .api-category {
+            margin-bottom: 2px;
+        }
+
+        .category-header {
+            display: flex;
+            align-items: center;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            transition: all 0.15s;
+            user-select: none;
+        }
+
+        .category-header:hover {
+            background-color: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .category-header i:first-child {
+            width: 16px;
+            color: var(--text-muted);
+            transition: transform 0.2s;
+            font-size: 10px;
+            margin-right: 6px;
+        }
+
+        .category-header.collapsed i:first-child {
+            transform: rotate(-90deg);
+        }
+
+        .category-header .category-icon {
+            width: 18px;
+            text-align: center;
+            margin-right: 8px;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .category-name {
+            flex: 1;
+        }
+
+        .category-count {
+            color: var(--text-muted);
+            font-size: 11px;
+            background-color: var(--bg-tertiary);
+            padding: 1px 6px;
+            border-radius: 8px;
+        }
+
+        .api-items {
+            padding-left: 0;
+        }
+
+        .api-item {
+            display: flex;
+            align-items: center;
+            padding: 6px 16px 6px 40px;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--text-secondary);
+            transition: all 0.15s;
+            border-left: 2px solid transparent;
+        }
+
+        .api-item:hover {
+            background-color: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .api-item.active {
+            background-color: var(--bg-active);
+            color: var(--text-primary);
+            border-left-color: var(--accent-blue);
+        }
+
+        .method-badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            margin-right: 8px;
+            min-width: 48px;
+            text-align: center;
+            letter-spacing: 0.3px;
+        }
+
+        .method-get {
+            background-color: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+        }
+
+        .method-post {
+            background-color: rgba(59, 130, 246, 0.15);
+            color: var(--accent-blue);
+        }
+
+        .method-put {
+            background-color: rgba(245, 158, 11, 0.15);
+            color: var(--accent-orange);
+        }
+
+        .method-delete {
+            background-color: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+        }
+
+        .method-socket {
+            background-color: rgba(139, 92, 246, 0.15);
+            color: var(--accent-purple);
+        }
+
+        .content-main {
+            flex: 1;
+            overflow-y: auto;
+            background-color: var(--bg-primary);
+            border-right: 1px solid var(--border-color);
+        }
+
+        .content-wrapper {
+            padding: 24px 32px;
+            max-width: 800px;
+        }
+
+        .doc-header {
+            margin-bottom: 32px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .doc-header .method-path {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .doc-header .method-badge {
+            font-size: 11px;
+            padding: 5px 10px;
+            min-width: 60px;
+        }
+
+        .doc-header .path {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--text-primary);
+            flex: 1;
+            background-color: var(--bg-tertiary);
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        .doc-header h1 {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+
+        .doc-header .description {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .doc-section {
+            margin-bottom: 32px;
+        }
+
+        .doc-section h2 {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .doc-section h2 i {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .params-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            background-color: var(--bg-secondary);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .params-table th,
+        .params-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .params-table th {
+            background-color: var(--bg-tertiary);
+            font-weight: 600;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .params-table td {
+            color: var(--text-secondary);
+            vertical-align: top;
+        }
+
+        .params-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .params-table .param-required {
+            color: var(--accent-red);
+            font-weight: 600;
+            font-size: 11px;
+        }
+
+        .params-table .param-optional {
+            color: var(--text-muted);
+            font-size: 11px;
+        }
+
+        .params-table .param-type {
+            color: var(--accent-blue);
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            background-color: var(--bg-tertiary);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .code-wrapper {
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 16px;
+            border: 1px solid var(--border-color);
+        }
+
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 16px;
+            background-color: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .code-tabs {
+            display: flex;
+            gap: 4px;
+        }
+
+        .code-tab {
+            padding: 4px 12px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .code-tab:hover {
+            background-color: var(--bg-hover);
+            color: var(--text-secondary);
+        }
+
+        .code-tab.active {
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .code-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .code-action-btn {
+            padding: 4px 10px;
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .code-action-btn:hover {
+            background-color: var(--bg-hover);
+            color: var(--text-primary);
+            border-color: var(--text-muted);
+        }
+
+        .code-block pre {
+            margin: 0;
+            padding: 16px;
+            overflow: auto;
+            max-height: 400px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            background-color: #1e1e1e !important;
+        }
+
+        .code-block code {
+            background-color: transparent !important;
+        }
+
+        .empty-state {
+            color: var(--text-muted);
+            font-size: 13px;
+            padding: 16px;
+            background-color: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .sidebar-right {
+            width: 460px;
+            background-color: var(--bg-secondary);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .test-panel {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .test-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .test-header h3 {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .test-header h3 i {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .test-url {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .url-input-wrapper {
+            display: flex;
+            gap: 8px;
+        }
+
+        .method-select {
+            padding: 8px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+            background-color: var(--bg-tertiary);
+            cursor: pointer;
+            min-width: 70px;
+        }
+
+        .method-select:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .url-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            color: var(--text-primary);
+            background-color: var(--bg-tertiary);
+        }
+
+        .url-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            background-color: var(--bg-secondary);
+        }
+
+        .send-btn {
+            padding: 8px 16px;
+            background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .send-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .send-btn:active {
+            transform: translateY(0);
+        }
+
+        .test-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 16px;
+            background-color: var(--bg-tertiary);
+        }
+
+        .test-tab {
+            padding: 10px 0;
+            margin-right: 20px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 12px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .test-tab:hover {
+            color: var(--text-secondary);
+        }
+
+        .test-tab.active {
+            color: var(--text-primary);
+        }
+
+        .test-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background-color: var(--accent-blue);
+        }
+
+        .test-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .param-editor {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .param-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .param-input {
+            flex: 1;
+            padding: 8px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 12px;
+            color: var(--text-primary);
+            background-color: var(--bg-tertiary);
+        }
+
+        .param-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            background-color: var(--bg-secondary);
+        }
+
+        .param-input.key-input {
+            flex: 0.4;
+        }
+
+        .param-input.value-input {
+            flex: 0.6;
+        }
+
+        .param-checkbox {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: var(--accent-blue);
+        }
+
+        .delete-btn {
+            padding: 6px 10px;
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 12px;
+        }
+
+        .delete-btn:hover {
+            background-color: var(--error-bg);
+            border-color: var(--accent-red);
+            color: var(--error-text);
+        }
+
+        .add-btn {
+            align-self: flex-start;
+            padding: 8px 16px;
+            background: none;
+            border: 1px dashed var(--border-color);
+            color: var(--text-muted);
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .add-btn:hover {
+            border-color: var(--accent-blue);
+            color: var(--accent-blue);
+        }
+
+        .body-editor {
+            width: 100%;
+            min-height: 200px;
+            max-height: 400px;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 12px;
+            color: var(--text-primary);
+            background-color: var(--bg-tertiary);
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            resize: vertical;
+            overflow: auto;
+        }
+
+        .body-editor:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            background-color: var(--bg-secondary);
+        }
+
+        .response-panel {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .response-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            font-size: 12px;
+            padding: 10px 12px;
+            background-color: var(--bg-tertiary);
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        .status-success {
+            color: var(--success-text);
+            font-weight: 600;
+        }
+
+        .status-error {
+            color: var(--error-text);
+            font-weight: 600;
+        }
+
+        .time-info {
+            color: var(--text-muted);
+        }
+
+        .response-actions {
+            display: flex;
+            gap: 6px;
+            margin-left: auto;
+        }
+
+        .response-action-btn {
+            padding: 4px 8px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .response-action-btn:hover {
+            background-color: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #4a4a4a;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #5a5a5a;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.2s ease;
+        }
+
+        .auth-section {
+            margin-bottom: 16px;
+        }
+
+        .auth-section label {
+            display: block;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
+        .auth-input-wrapper {
+            display: flex;
+            gap: 8px;
+        }
+
+        .auth-input {
+            flex: 1;
+            padding: 8px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 12px;
+            color: var(--text-primary);
+            background-color: var(--bg-tertiary);
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        }
+
+        .auth-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            background-color: var(--bg-secondary);
+        }
+
+        .auth-btn {
+            padding: 8px 12px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .auth-btn:hover {
+            background-color: var(--bg-hover);
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="top-nav">
+        <div class="logo">
+            <div class="logo-icon">
+                <i class="fas fa-book"></i>
+            </div>
+            <span class="logo-title">API 文档</span>
+        </div>
+        <div class="nav-actions">
+            <span class="version-badge" id="version-badge">v1.3.0</span>
+        </div>
+    </nav>
+
+    <div class="main-container">
+        <aside class="sidebar-left">
+            <div class="sidebar-header">
+                <div class="search-box">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" placeholder="搜索 API..." id="search-input">
+                </div>
+            </div>
+            <div class="api-tree" id="api-tree"></div>
+        </aside>
+
+        <main class="content-main">
+            <div class="content-wrapper" id="content-wrapper">
+                <div class="doc-header">
+                    <div class="method-path">
+                        <span class="method-badge method-get">GET</span>
+                        <span class="path">/health</span>
+                    </div>
+                    <h1>健康检查</h1>
+                    <p class="description">用于监控服务器状态的健康检查接口，返回服务器的运行状态、时间戳和运行时间。</p>
+                </div>
+
+                <div class="doc-section">
+                    <h2><i class="fas fa-arrow-right"></i>请求参数</h2>
+                    <div class="empty-state">该接口无需请求参数</div>
+                </div>
+
+                <div class="doc-section">
+                    <h2><i class="fas fa-arrow-down"></i>返回结果</h2>
+                    <div class="code-wrapper">
+                        <div class="code-header">
+                            <div class="code-tabs">
+                                <button class="code-tab active">JSON</button>
+                            </div>
+                            <div class="code-actions">
+                                <button class="code-action-btn" onclick="copyCode(this)">
+                                    <i class="fas fa-copy"></i> 复制
+                                </button>
+                            </div>
+                        </div>
+                        <div class="code-block">
+                            <pre><code class="language-json">{
+  "status": "ok",
+  "timestamp": 1713456789000,
+  "uptime": 3600000
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <aside class="sidebar-right">
+            <div class="test-panel">
+                <div class="test-header">
+                    <h3><i class="fas fa-play"></i> 在线调试</h3>
+                </div>
+                <div class="test-url">
+                    <div class="url-input-wrapper">
+                        <select class="method-select" id="method-select">
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="DELETE">DELETE</option>
+                            <option value="SOCKET">SOCKET</option>
+                        </select>
+                        <input type="text" class="url-input" id="url-input" value="http://localhost:8080/health">
+                        <button class="send-btn" onclick="sendRequest()">
+                            <i class="fas fa-paper-plane"></i> 发送
+                        </button>
+                    </div>
+                </div>
+                <div class="test-tabs">
+                    <button class="test-tab active" data-tab="auth">Auth</button>
+                    <button class="test-tab" data-tab="params">Params</button>
+                    <button class="test-tab" data-tab="headers">Headers</button>
+                    <button class="test-tab" data-tab="body">Body</button>
+                    <button class="test-tab" data-tab="response">Response</button>
+                </div>
+                <div class="test-content" id="test-content">
+                    <div class="auth-section">
+                        <label>Admin Token</label>
+                        <div class="auth-input-wrapper">
+                            <input type="text" class="auth-input" id="token-input" placeholder="输入管理员 Token">
+                            <button class="auth-btn" onclick="loadToken()" title="从本地存储加载">
+                                <i class="fas fa-folder-open"></i>
+                            </button>
+                            <button class="auth-btn" onclick="saveToken()" title="保存到本地存储">
+                                <i class="fas fa-save"></i>
+                            </button>
+                            <button class="auth-btn" onclick="connectSocket()" title="连接Socket.IO"
+                                style="background-color: var(--accent-blue); color: white;">
+                                <i class="fas fa-plug"></i>
+                            </button>
+                        </div>
+                        <div class="socket-status" style="margin-top: 8px; font-size: 12px;"></div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        const apiData = {
+            categories: [
+                {
+                    name: '基础API',
+                    icon: 'fas fa-home',
+                    items: [
+                        {
+                            method: 'GET',
+                            path: '/admin',
+                            name: '管理后台页面',
+                            description: '管理后台页面，用于管理用户、游戏和系统设置',
+                            params: [],
+                            response: '{ /* 页面HTML */ }'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/docs',
+                            name: 'API文档页面',
+                            description: 'API文档页面，包含所有接口的详细说明',
+                            params: [],
+                            response: '{ /* 页面HTML */ }'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/health',
+                            name: '健康检查',
+                            description: '用于监控服务器状态的健康检查接口，返回服务器的运行状态、时间戳和运行时间。',
+                            params: [],
+                            response: '{\n  "status": "ok",\n  "timestamp": 1713456789000,\n  "uptime": 3600000\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/version',
+                            name: '版本信息',
+                            description: '返回服务器当前版本信息',
+                            params: [],
+                            response: '{\n  "version": "1.2.0",\n  "build": 1780,\n  "timestamp": 1713456789000\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/status',
+                            name: '系统状态',
+                            description: '返回在线用户数、等待用户数等系统信息',
+                            params: [],
+                            response: '{\n  "onlineUsers": 10,\n  "waitingUsers": 2,\n  "playingUsers": 5,\n  "totalConnections": 100,\n  "peakOnline": 15,\n  "timestamp": 1713456789000\n}'
+                        }
+                    ]
+                },
+                {
+                    name: '认证API',
+                    icon: 'fas fa-shield-alt',
+                    items: [
+                        {
+                            method: 'POST',
+                            path: '/api/auth/verify',
+                            name: '验证管理Token',
+                            description: '验证管理Token是否有效',
+                            params: [
+                                { name: 'token', type: 'string', required: true, description: '管理Token' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "Token有效"\n}'
+                        }
+                    ]
+                },
+                {
+                    name: '游戏API',
+                    icon: 'fas fa-gamepad',
+                    items: [
+                        {
+                            method: 'GET',
+                            path: '/api/leaderboard',
+                            name: '排行榜',
+                            description: '返回玩家排名信息',
+                            params: [
+                                { name: 'limit', type: 'number', required: false, default: '10', description: '返回数量' },
+                                { name: 'gameType', type: 'string', required: false, default: 'null', description: '游戏类型' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": [\n    {\n      "id": "user1",\n      "nickname": "玩家1",\n      "score": 1000,\n      "winrate": "80%"\n    }\n  ]\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/spectate/games',
+                            name: '可观战游戏列表',
+                            description: '返回当前可观看的游戏',
+                            params: [],
+                            response: '{\n  "success": true,\n  "data": [\n    {\n      "gameId": "game1",\n      "gameType": "chess",\n      "players": ["玩家1", "玩家2"],\n      "status": "playing"\n    }\n  ]\n}'
+                        }
+                    ]
+                },
+                {
+                    name: '主题API',
+                    icon: 'fas fa-palette',
+                    items: [
+                        {
+                            method: 'GET',
+                            path: '/api/themes',
+                            name: '获取所有主题',
+                            description: '获取所有可用的棋盘主题',
+                            params: [],
+                            response: '{\n  "success": true,\n  "data": [\n    {\n      "id": "default",\n      "name": "默认主题",\n      "description": "默认棋盘主题"\n    },\n    {\n      "id": "ocean",\n      "name": "海洋主题",\n      "description": "蓝色海洋风格"\n    }\n  ]\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/themes/:id',
+                            name: '获取单个主题',
+                            description: '获取指定ID的主题详情',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '主题ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": {\n    "id": "default",\n    "name": "默认主题",\n    "description": "默认棋盘主题",\n    "colors": {\n      "board": "#8B4513",\n      "piece": "#FFFFFF"\n    }\n  }\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/themes',
+                            name: '添加主题',
+                            description: '添加新的棋盘主题（需管理员权限）',
+                            params: [
+                                { name: 'name', type: 'string', required: true, description: '主题名称' },
+                                { name: 'description', type: 'string', required: false, description: '主题描述' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": {\n    "id": "theme2",\n    "name": "新主题",\n    "description": "新的棋盘主题"\n  }\n}'
+                        },
+                        {
+                            method: 'PUT',
+                            path: '/api/themes/:id',
+                            name: '更新主题',
+                            description: '更新指定ID的主题（需管理员权限）',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '主题ID' },
+                                { name: 'name', type: 'string', required: false, description: '主题名称' },
+                                { name: 'description', type: 'string', required: false, description: '主题描述' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "主题更新成功"\n}'
+                        },
+                        {
+                            method: 'DELETE',
+                            path: '/api/themes/:id',
+                            name: '删除主题',
+                            description: '删除指定ID的主题（需管理员权限）',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '主题ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "主题删除成功"\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/themes/reload',
+                            name: '重新加载主题',
+                            description: '重新加载所有主题配置（需管理员权限）',
+                            params: [],
+                            response: '{\n  "success": true,\n  "message": "主题重新加载成功"\n}'
+                        }
+                    ]
+                },
+                {
+                    name: '账号管理API',
+                    icon: 'fas fa-users-cog',
+                    items: [
+                        {
+                            method: 'GET',
+                            path: '/api/accounts',
+                            name: '获取所有账号',
+                            description: '获取所有账号列表，支持分页（需管理员权限）',
+                            params: [
+                                { name: 'limit', type: 'number', required: false, default: '50', description: '返回数量' },
+                                { name: 'offset', type: 'number', required: false, default: '0', description: '偏移量' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": [\n    {\n      "id": "account1",\n      "username": "user1",\n      "nickname": "玩家1",\n      "type": "player"\n    }\n  ],\n  "pagination": {\n    "limit": 50,\n    "offset": 0\n  }\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/accounts/search',
+                            name: '搜索账号',
+                            description: '根据关键词搜索账号（需管理员权限）',
+                            params: [
+                                { name: 'keyword', type: 'string', required: true, description: '搜索关键词' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": [],\n  "count": 0\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/accounts/:id',
+                            name: '获取账号详情',
+                            description: '获取指定账号的详细信息（需管理员权限）',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '账号ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": {\n    "id": "account1",\n    "username": "user1",\n    "nickname": "玩家1",\n    "profile": {\n      "exp": 1000,\n      "level": 5\n    }\n  }\n}'
+                        },
+                        {
+                            method: 'PUT',
+                            path: '/api/accounts/:id/exp',
+                            name: '修改用户经验',
+                            description: '增加或减少用户经验值（需管理员权限）',
+                            params: [
+                                { name: 'operation', type: 'string', required: true, description: '操作类型：add/subtract' },
+                                { name: 'amount', type: 'number', required: true, description: '经验数量' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "经验值修改成功"\n}'
+                        }
+                    ]
+                },
+                {
+                    name: '用户API',
+                    icon: 'fas fa-user-friends',
+                    items: [
+                        {
+                            method: 'GET',
+                            path: '/api/users/online',
+                            name: '获取在线用户',
+                            description: '获取当前在线的所有用户列表',
+                            params: [],
+                            response: '{\n  "success": true,\n  "data": [\n    {\n      "userId": "user1",\n      "nickname": "玩家1",\n      "loginType": "account",\n      "gameType": "chess",\n      "status": "playing"\n    }\n  ],\n  "count": 1\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/users/search',
+                            name: '搜索用户',
+                            description: '根据关键词搜索用户',
+                            params: [
+                                { name: 'keyword', type: 'string', required: true, description: '搜索关键词' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": [],\n  "count": 0\n}'
+                        }
+                    ]
+                },
+                {
+                    name: '游戏扩展API',
+                    icon: 'fas fa-chess',
+                    items: [
+                        {
+                            method: 'GET',
+                            path: '/api/games/history',
+                            name: '获取游戏历史',
+                            description: '获取用户的游戏历史记录',
+                            params: [
+                                { name: 'userId', type: 'string', required: false, description: '用户ID' },
+                                { name: 'limit', type: 'number', required: false, default: '20', description: '返回数量' },
+                                { name: 'offset', type: 'number', required: false, default: '0', description: '偏移量' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": [],\n  "pagination": {\n    "limit": 20,\n    "offset": 0\n  }\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/games/replay/:id',
+                            name: '获取游戏回放',
+                            description: '获取指定游戏的回放数据',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '游戏ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": {\n    "gameId": "game1",\n    "moves": []\n  }\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/games/stats',
+                            name: '获取游戏统计',
+                            description: '获取游戏统计数据',
+                            params: [],
+                            response: '{\n  "success": true,\n  "data": {\n    "activeGames": 5,\n    "onlineUsers": 10,\n    "timestamp": 1713456789000\n  }\n}'
+                        }
+                    ]
+                },
+                {
+                    name: '聊天API',
+                    icon: 'fas fa-comments',
+                    items: [
+                        {
+                            method: 'GET',
+                            path: '/api/chat/history',
+                            name: '获取聊天历史',
+                            description: '获取聊天历史记录',
+                            params: [
+                                { name: 'scope', type: 'string', required: false, default: 'global', description: '范围：global/game' },
+                                { name: 'gameId', type: 'string', required: false, description: '游戏ID（scope为game时必填）' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": [],\n  "scope": "global",\n  "gameId": null\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/chat/broadcast',
+                            name: '广播消息',
+                            description: '向所有用户发送广播消息（需管理员权限）',
+                            params: [
+                                { name: 'message', type: 'string', required: true, description: '广播消息内容' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "广播发送成功"\n}'
+                        }
+                    ]
+                },
+                {
+                    name: '系统管理API',
+                    icon: 'fas fa-server',
+                    items: [
+                        {
+                            method: 'GET',
+                            path: '/api/system/logs',
+                            name: '获取系统日志',
+                            description: '获取系统日志（需管理员权限）',
+                            params: [
+                                { name: 'type', type: 'string', required: false, description: '日志类型筛选' },
+                                { name: 'limit', type: 'number', required: false, default: '100', description: '返回数量' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": [],\n  "count": 0\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/system/maintenance',
+                            name: '设置维护模式',
+                            description: '开启或关闭服务器维护模式（需管理员权限）',
+                            params: [
+                                { name: 'enabled', type: 'boolean', required: true, description: '是否开启维护模式' },
+                                { name: 'message', type: 'string', required: false, description: '维护提示消息' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "服务器已进入维护模式"\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/system/stats',
+                            name: '获取详细系统统计',
+                            description: '获取详细的系统统计数据（需管理员权限）',
+                            params: [],
+                            response: '{\n  "success": true,\n  "data": {\n    "onlineUsers": 10,\n    "waitingUsers": 2,\n    "playingUsers": 5,\n    "totalAccounts": 100,\n    "timestamp": 1713456789000\n  }\n}'
+                        }
+                    ]
+                },
+                {
+                    name: '成就API',
+                    icon: 'fas fa-trophy',
+                    items: [
+                        {
+                            method: 'GET',
+                            path: '/api/achievements',
+                            name: '获取所有成就',
+                            description: '获取所有成就列表',
+                            params: [],
+                            response: '{\n  "success": true,\n  "data": [\n    {\n      "id": "first_win",\n      "name": "首胜",\n      "description": "赢得第一场游戏"\n    }\n  ],\n  "count": 1\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/achievements/:id',
+                            name: '获取成就详情',
+                            description: '获取指定成就的详细信息',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '成就ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": {\n    "id": "first_win",\n    "name": "首胜",\n    "description": "赢得第一场游戏",\n    "reward": 100\n  }\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/achievements/:id/award',
+                            name: '授予用户成就',
+                            description: '给用户添加成就（需管理员权限）',
+                            params: [
+                                { name: 'userId', type: 'string', required: true, description: '用户ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "成就添加成功"\n}'
+                        }
+                    ]
+                },
+                {
+                    name: '排行榜扩展API',
+                    icon: 'fas fa-list-ol',
+                    items: [
+                        {
+                            method: 'GET',
+                            path: '/api/leaderboard/games',
+                            name: '按游戏类型获取排行榜',
+                            description: '根据游戏类型获取排行榜',
+                            params: [
+                                { name: 'type', type: 'string', required: false, default: 'all', description: '游戏类型' },
+                                { name: 'limit', type: 'number', required: false, default: '20', description: '返回数量' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": [],\n  "gameType": "all"\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/leaderboard/daily',
+                            name: '获取每日排行榜',
+                            description: '获取每日排行榜',
+                            params: [
+                                { name: 'limit', type: 'number', required: false, default: '20', description: '返回数量' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": [],\n  "period": "daily"\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/leaderboard/weekly',
+                            name: '获取周排行榜',
+                            description: '获取周排行榜',
+                            params: [
+                                { name: 'limit', type: 'number', required: false, default: '20', description: '返回数量' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": [],\n  "period": "weekly"\n}'
+                        }
+                    ]
+                },
+                {
+                    name: 'Socket.IO - 连接',
+                    icon: 'fas fa-plug',
+                    items: [
+                        {
+                            method: 'SOCKET',
+                            path: 'client_connect',
+                            name: '客户端连接',
+                            description: '客户端建立连接时发送的初始事件',
+                            params: [
+                                { name: 'clientVersion', type: 'string', required: false, description: '客户端版本号' },
+                                { name: 'id', type: 'string', required: false, description: '账号ID（自动登录用）' }
+                            ],
+                            response: '// 事件: version_check\n{\n  "compatible": true,\n  "message": "版本兼容"\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'disconnect',
+                            name: '断开连接',
+                            description: '客户端断开连接事件',
+                            params: [],
+                            response: '// 无响应'
+                        }
+                    ]
+                },
+                {
+                    name: 'Socket.IO - 账号',
+                    icon: 'fas fa-user',
+                    items: [
+                        {
+                            method: 'SOCKET',
+                            path: 'account_register',
+                            name: '注册账号',
+                            description: '客户端发送注册账号请求',
+                            params: [
+                                { name: 'username', type: 'string', required: true, description: '用户名' },
+                                { name: 'password', type: 'string', required: true, description: '密码' },
+                                { name: 'nickname', type: 'string', required: false, description: '昵称' }
+                            ],
+                            response: '// 事件: account_action_result\n{\n  "action": "register",\n  "success": true,\n  "id": "account1",\n  "message": "注册成功"\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'guest_login',
+                            name: '游客登录',
+                            description: '游客模式登录',
+                            params: [],
+                            response: '// 事件: login_result\n{\n  "success": true,\n  "message": "游客登录成功",\n  "data": {\n    "account": {\n      "id": "guest1",\n      "nickname": "游客123"\n    },\n    "token": "token123"\n  }\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'account_login',
+                            name: '账号登录',
+                            description: '客户端发送账号密码登录请求',
+                            params: [
+                                { name: 'username', type: 'string', required: true, description: '用户名' },
+                                { name: 'password', type: 'string', required: true, description: '密码' }
+                            ],
+                            response: '// 事件: login_result\n{\n  "success": true,\n  "message": "登录成功",\n  "data": {\n    "account": {\n      "id": "account1",\n      "username": "user1",\n      "nickname": "玩家1"\n    },\n    "token": "token123"\n  }\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'account_update_profile',
+                            name: '更新账号资料',
+                            description: '更新账号昵称和资料',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '账号ID' },
+                                { name: 'nickname', type: 'string', required: false, description: '昵称' },
+                                { name: 'profile', type: 'object', required: false, description: '个人资料' }
+                            ],
+                            response: '// 事件: account_action_result\n{\n  "action": "update_profile",\n  "success": true,\n  "message": "资料更新成功"\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'account_change_password',
+                            name: '修改密码',
+                            description: '修改账号密码',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '账号ID' },
+                                { name: 'oldPassword', type: 'string', required: true, description: '旧密码' },
+                                { name: 'newPassword', type: 'string', required: true, description: '新密码' }
+                            ],
+                            response: '// 事件: account_action_result\n{\n  "action": "change_password",\n  "success": true,\n  "message": "密码修改成功"\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'account_reset_password',
+                            name: '重置密码',
+                            description: '找回密码/重置密码',
+                            params: [
+                                { name: 'username', type: 'string', required: true, description: '用户名' },
+                                { name: 'password', type: 'string', required: true, description: '新密码' }
+                            ],
+                            response: '// 事件: account_action_result\n{\n  "action": "reset_password",\n  "success": true,\n  "message": "密码重置成功"\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_account_by_token',
+                            name: '通过Token获取账号',
+                            description: '使用token获取账号信息',
+                            params: [
+                                { name: 'token', type: 'string', required: true, description: '登录token' }
+                            ],
+                            response: '// 事件: account_info\n{\n  "success": true,\n  "data": {\n    "id": "account1",\n    "username": "user1",\n    "nickname": "玩家1"\n  }\n}'
+                        }
+                    ]
+                },
+                {
+                    name: 'Socket.IO - 用户',
+                    icon: 'fas fa-users',
+                    items: [
+                        {
+                            method: 'SOCKET',
+                            path: 'user_login',
+                            name: '用户登录',
+                            description: '更新用户昵称',
+                            params: [
+                                { name: 'nickname', type: 'string', required: true, description: '昵称' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'user_status',
+                            name: '更新用户状态',
+                            description: '更新用户在线状态',
+                            params: [
+                                { name: 'status', type: 'string', required: true, description: '状态' },
+                                { name: 'game', type: 'string', required: false, description: '游戏类型' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_leaderboard',
+                            name: '获取排行榜',
+                            description: '获取排行榜数据',
+                            params: [
+                                { name: 'limit', type: 'number', required: false, default: '10', description: '返回数量' },
+                                { name: 'gameType', type: 'string', required: false, description: '游戏类型' }
+                            ],
+                            response: '// 事件: leaderboard\n{\n  "leaderboard": [\n    {\n      "id": "user1",\n      "nickname": "玩家1",\n      "score": 1000\n    }\n  ]\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_achievements',
+                            name: '获取成就列表',
+                            description: '获取用户成就列表',
+                            params: [],
+                            response: '// 事件: achievements_list\n{\n  "categories": {},\n  "userAchievements": [],\n  "totalAchievements": 10\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_game_history',
+                            name: '获取游戏历史',
+                            description: '获取用户游戏历史记录',
+                            params: [
+                                { name: 'limit', type: 'number', required: false, default: '10', description: '返回数量' }
+                            ],
+                            response: '// 事件: game_history\n{\n  "history": []\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_game_replay',
+                            name: '获取游戏回放',
+                            description: '获取指定游戏的回放数据',
+                            params: [
+                                { name: 'gameId', type: 'string', required: true, description: '游戏ID' }
+                            ],
+                            response: '// 事件: game_replay\n{\n  "replay": {}\n}'
+                        }
+                    ]
+                },
+                {
+                    name: 'Socket.IO - 匹配',
+                    icon: 'fas fa-random',
+                    items: [
+                        {
+                            method: 'SOCKET',
+                            path: 'match_request',
+                            name: '匹配请求',
+                            description: '发起游戏匹配请求',
+                            params: [
+                                { name: 'game', type: 'string', required: true, description: '游戏类型' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'challenge_request',
+                            name: '挑战请求',
+                            description: '向特定用户发起挑战',
+                            params: [
+                                { name: 'userId', type: 'string', required: true, description: '目标用户ID' },
+                                { name: 'gameType', type: 'string', required: true, description: '游戏类型' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'challenge_response',
+                            name: '挑战响应',
+                            description: '接受或拒绝挑战',
+                            params: [
+                                { name: 'accept', type: 'boolean', required: true, description: '是否接受' },
+                                { name: 'challengeId', type: 'string', required: true, description: '挑战ID' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'cancel_match',
+                            name: '取消匹配',
+                            description: '取消当前匹配请求',
+                            params: [],
+                            response: '// 无特定响应'
+                        }
+                    ]
+                },
+                {
+                    name: 'Socket.IO - 游戏',
+                    icon: 'fas fa-chess',
+                    items: [
+                        {
+                            method: 'SOCKET',
+                            path: 'move',
+                            name: '游戏移动',
+                            description: '发送游戏移动操作',
+                            params: [
+                                { name: 'position', type: 'object', required: true, description: '位置信息' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'reset',
+                            name: '游戏重置请求',
+                            description: '请求重新开始游戏',
+                            params: [],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'reset_confirm',
+                            name: '确认重置',
+                            description: '确认游戏重置',
+                            params: [
+                                { name: 'requestId', type: 'string', required: false, description: '请求ID' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'reset_reject',
+                            name: '拒绝重置',
+                            description: '拒绝游戏重置',
+                            params: [
+                                { name: 'requestId', type: 'string', required: false, description: '请求ID' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'game_result',
+                            name: '游戏结果',
+                            description: '提交游戏结果',
+                            params: [
+                                { name: 'winner', type: 'string', required: true, description: '获胜者ID' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'return_lobby',
+                            name: '返回大厅',
+                            description: '退出游戏返回大厅',
+                            params: [],
+                            response: '// 无特定响应'
+                        }
+                    ]
+                },
+                {
+                    name: 'Socket.IO - AI对战',
+                    icon: 'fas fa-robot',
+                    items: [
+                        {
+                            method: 'SOCKET',
+                            path: 'ai_game_start',
+                            name: '开始AI对战',
+                            description: '创建AI对战游戏',
+                            params: [
+                                { name: 'gameType', type: 'string', required: true, description: '游戏类型' },
+                                { name: 'difficulty', type: 'string', required: true, description: '难度' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'ai_move',
+                            name: 'AI对战移动',
+                            description: '在AI对战中进行移动',
+                            params: [
+                                { name: 'position', type: 'object', required: true, description: '位置信息' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'ai_game_result',
+                            name: 'AI游戏结果',
+                            description: '提交AI对战结果',
+                            params: [
+                                { name: 'result', type: 'string', required: true, description: '结果' },
+                                { name: 'gameType', type: 'string', required: true, description: '游戏类型' },
+                                { name: 'difficulty', type: 'string', required: true, description: '难度' },
+                                { name: 'duration', type: 'number', required: true, description: '时长' }
+                            ],
+                            response: '// 无特定响应'
+                        }
+                    ]
+                },
+                {
+                    name: 'Socket.IO - 贪吃蛇',
+                    icon: 'fas fa-dragon',
+                    items: [
+                        {
+                            method: 'SOCKET',
+                            path: 'snake_game_start',
+                            name: '贪吃蛇游戏开始',
+                            description: '开始贪吃蛇游戏',
+                            params: [
+                                { name: 'gameType', type: 'string', required: true, description: '游戏类型' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'snake_game_end',
+                            name: '贪吃蛇游戏结束',
+                            description: '结束贪吃蛇游戏',
+                            params: [
+                                { name: 'score', type: 'number', required: true, description: '得分' },
+                                { name: 'gameType', type: 'string', required: true, description: '游戏类型' },
+                                { name: 'moveHistory', type: 'array', required: true, description: '移动历史' }
+                            ],
+                            response: '// 无特定响应'
+                        }
+                    ]
+                },
+                {
+                    name: 'Socket.IO - 观战',
+                    icon: 'fas fa-eye',
+                    items: [
+                        {
+                            method: 'SOCKET',
+                            path: 'spectate_join',
+                            name: '开始观战',
+                            description: '加入观战',
+                            params: [
+                                { name: 'gameId', type: 'string', required: true, description: '游戏ID' }
+                            ],
+                            response: '// 事件: spectate_joined\n{\n  "gameId": "game1",\n  "gameType": "chess",\n  "players": []\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'spectate_leave',
+                            name: '结束观战',
+                            description: '退出观战',
+                            params: [],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_spectate_list',
+                            name: '获取观战列表',
+                            description: '获取可观战的游戏列表',
+                            params: [],
+                            response: '// 事件: spectate_list\n{\n  "games": []\n}'
+                        }
+                    ]
+                },
+                {
+                    name: 'Socket.IO - 聊天',
+                    icon: 'fas fa-comments',
+                    items: [
+                        {
+                            method: 'SOCKET',
+                            path: 'chat_global',
+                            name: '全局聊天',
+                            description: '发送全局聊天消息',
+                            params: [
+                                { name: 'message', type: 'string', required: true, description: '消息内容' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'chat_game',
+                            name: '游戏内聊天',
+                            description: '发送游戏内聊天消息',
+                            params: [
+                                { name: 'message', type: 'string', required: true, description: '消息内容' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'chat_private',
+                            name: '私聊',
+                            description: '发送私聊消息',
+                            params: [
+                                { name: 'userId', type: 'string', required: true, description: '目标用户ID' },
+                                { name: 'message', type: 'string', required: true, description: '消息内容' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_chat_history',
+                            name: '获取聊天历史',
+                            description: '获取聊天历史记录',
+                            params: [
+                                { name: 'scope', type: 'string', required: true, description: '范围' },
+                                { name: 'gameId', type: 'string', required: false, description: '游戏ID' }
+                            ],
+                            response: '// 事件: chat_history\n{\n  "scope": "global",\n  "history": []\n}'
+                        }
+                    ]
+                },
+                {
+                    name: 'Socket.IO - 管理员',
+                    icon: 'fas fa-cog',
+                    items: [
+                        {
+                            method: 'SOCKET',
+                            path: 'kick_user',
+                            name: '踢出用户',
+                            description: '踢出指定用户',
+                            params: [
+                                { name: 'userId', type: 'string', required: true, description: '用户ID' },
+                                { name: 'reason', type: 'string', required: false, description: '原因' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'end_game',
+                            name: '结束游戏',
+                            description: '强制结束指定游戏',
+                            params: [
+                                { name: 'gameId', type: 'string', required: true, description: '游戏ID' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'broadcast',
+                            name: '广播消息',
+                            description: '向所有用户发送广播',
+                            params: [
+                                { name: 'message', type: 'string', required: true, description: '消息内容' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'mute_user',
+                            name: '禁言用户',
+                            description: '禁言指定用户',
+                            params: [
+                                { name: 'userId', type: 'string', required: true, description: '用户ID' },
+                                { name: 'duration', type: 'number', required: true, description: '时长' },
+                                { name: 'reason', type: 'string', required: false, description: '原因' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'unmute_user',
+                            name: '解除禁言',
+                            description: '解除用户禁言',
+                            params: [
+                                { name: 'userId', type: 'string', required: true, description: '用户ID' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_all_accounts',
+                            name: '获取所有账号',
+                            description: '获取所有账号列表',
+                            params: [],
+                            response: '// 事件: accounts_list\n{\n  "accounts": []\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_account_detail',
+                            name: '获取账号详情',
+                            description: '获取指定账号详情',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '账号ID' }
+                            ],
+                            response: '// 事件: account_detail\n{\n  "account": {}\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'delete_account',
+                            name: '删除账号',
+                            description: '删除指定账号',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '账号ID' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'modify_user_exp',
+                            name: '修改用户经验',
+                            description: '修改用户经验值',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '账号ID' },
+                                { name: 'operation', type: 'string', required: true, description: '操作类型' },
+                                { name: 'amount', type: 'number', required: true, description: '数量' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'maintenance_mode',
+                            name: '维护模式',
+                            description: '设置维护模式',
+                            params: [
+                                { name: 'enabled', type: 'boolean', required: true, description: '是否启用' },
+                                { name: 'message', type: 'string', required: false, description: '维护消息' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_system_stats',
+                            name: '获取系统统计',
+                            description: '获取系统统计数据',
+                            params: [],
+                            response: '// 事件: system_stats\n{\n  "onlineUsers": 10,\n  "totalGames": 1000\n}'
+                        }
+                    ]
+                }
+            ]
+        };
+
+        let currentApi = apiData.categories[0].items[1];
+        let currentTab = 'auth';
+        let requestParams = [];
+        let requestHeaders = [];
+        let requestBody = '';
+        let socket = null;
+        let socketConnected = false;
+
+        function initApiTree() {
+            const treeContainer = document.getElementById('api-tree');
+            treeContainer.innerHTML = '';
+
+            apiData.categories.forEach((category, catIndex) => {
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'api-category';
+
+                const categoryHeader = document.createElement('div');
+                categoryHeader.className = 'category-header';
+                categoryHeader.innerHTML = `
+                    <i class="fas fa-chevron-down"></i>
+                    <i class="${category.icon} category-icon"></i>
+                    <span class="category-name">${category.name}</span>
+                    <span class="category-count">${category.items.length}</span>
+                `;
+
+                const itemsDiv = document.createElement('div');
+                itemsDiv.className = 'api-items';
+
+                category.items.forEach((item, itemIndex) => {
+                    const apiItem = document.createElement('div');
+                    apiItem.className = 'api-item';
+                    if (catIndex === 0 && itemIndex === 1) {
+                        apiItem.classList.add('active');
+                    }
+
+                    const methodClass = item.method === 'SOCKET' ? 'method-socket' : `method-${item.method.toLowerCase()}`;
+                    apiItem.innerHTML = `
+                        <span class="method-badge ${methodClass}">${item.method}</span>
+                        <span>${item.name}</span>
+                    `;
+
+                    apiItem.addEventListener('click', () => {
+                        document.querySelectorAll('.api-item').forEach(el => el.classList.remove('active'));
+                        apiItem.classList.add('active');
+                        currentApi = item;
+                        requestParams = item.params ? item.params.map(p => ({ key: p.name, value: p.default || '', enabled: true })) : [];
+                        requestHeaders = [{ key: 'Content-Type', value: 'application/json', enabled: true }];
+                        requestBody = '';
+                        updateContent(item, category);
+                        updateTestPanel(item);
+                    });
+
+                    itemsDiv.appendChild(apiItem);
+                });
+
+                categoryHeader.addEventListener('click', () => {
+                    categoryHeader.classList.toggle('collapsed');
+                    itemsDiv.style.display = itemsDiv.style.display === 'none' ? 'block' : 'none';
+                });
+
+                categoryDiv.appendChild(categoryHeader);
+                categoryDiv.appendChild(itemsDiv);
+                treeContainer.appendChild(categoryDiv);
+            });
+        }
+
+        function updateContent(api, category) {
+            const contentWrapper = document.getElementById('content-wrapper');
+            const methodClass = api.method === 'SOCKET' ? 'method-socket' : `method-${api.method.toLowerCase()}`;
+
+            let paramsHtml = '';
+            if (api.params && api.params.length > 0) {
+                paramsHtml = `
+                    <table class="params-table">
+                        <thead>
+                            <tr>
+                                <th>参数</th>
+                                <th>类型</th>
+                                <th>必填</th>
+                                <th>默认值</th>
+                                <th>描述</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${api.params.map(param => `
+                                <tr>
+                                    <td>${param.name}</td>
+                                    <td><span class="param-type">${param.type}</span></td>
+                                    <td>${param.required ? '<span class="param-required">必填</span>' : '<span class="param-optional">可选</span>'}</td>
+                                    <td>${param.default || '-'}</td>
+                                    <td>${param.description}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                paramsHtml = '<div class="empty-state">该接口无需请求参数</div>';
+            }
+
+            contentWrapper.innerHTML = `
+                <div class="doc-header fade-in">
+                    <div class="method-path">
+                        <span class="method-badge ${methodClass}">${api.method}</span>
+                        <span class="path">${api.path}</span>
+                    </div>
+                    <h1>${api.name}</h1>
+                    <p class="description">${api.description}</p>
+                </div>
+
+                <div class="doc-section fade-in">
+                    <h2><i class="fas fa-arrow-right"></i>请求参数</h2>
+                    ${paramsHtml}
+                </div>
+
+                <div class="doc-section fade-in">
+                    <h2><i class="fas fa-arrow-down"></i>返回结果</h2>
+                    <div class="code-wrapper">
+                        <div class="code-header">
+                            <div class="code-tabs">
+                                <button class="code-tab active">JSON</button>
+                            </div>
+                            <div class="code-actions">
+                                <button class="code-action-btn" onclick="copyCode(this)">
+                                    <i class="fas fa-copy"></i> 复制
+                                </button>
+                            </div>
+                        </div>
+                        <div class="code-block">
+                            <pre><code class="language-json">${escapeHtml(api.response)}</code></pre>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            if (typeof Prism !== 'undefined') {
+                Prism.highlightAll();
+            }
+        }
+
+        function updateTestPanel(api) {
+            if (api.method === 'SOCKET') {
+                document.getElementById('method-select').value = 'SOCKET';
+                document.getElementById('url-input').value = `socket.io: ${api.path}`;
+                // 为Socket.IO事件添加模拟测试界面
+                switchTab('params');
+            } else {
+                document.getElementById('method-select').value = api.method;
+                document.getElementById('url-input').value = `http://localhost:8080${api.path.startsWith('/') ? api.path : '/' + api.path}`;
+                switchTab('auth');
+            }
+        }
+
+        function renderParamsEditor() {
+            const testContent = document.getElementById('test-content');
+            testContent.innerHTML = `
+                <div class="param-editor">
+                    ${requestParams.map((param, index) => `
+                        <div class="param-row" data-index="${index}">
+                            <input type="checkbox" class="param-checkbox" ${param.enabled ? 'checked' : ''} onchange="toggleParam(${index})">
+                            <input type="text" class="param-input key-input" placeholder="参数名" value="${escapeHtml(param.key)}" onchange="updateParamKey(${index}, this.value)">
+                            <input type="text" class="param-input value-input" placeholder="参数值" value="${escapeHtml(param.value)}" onchange="updateParamValue(${index}, this.value)">
+                            <button class="delete-btn" onclick="deleteParam(${index})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    `).join('')}
+                    <button class="add-btn" onclick="addParam()">
+                        <i class="fas fa-plus"></i> 添加参数
+                    </button>
+                </div>
+            `;
+        }
+
+        function renderHeadersEditor() {
+            const testContent = document.getElementById('test-content');
+            testContent.innerHTML = `
+                <div class="param-editor">
+                    ${requestHeaders.map((header, index) => `
+                        <div class="param-row" data-index="${index}">
+                            <input type="checkbox" class="param-checkbox" ${header.enabled ? 'checked' : ''} onchange="toggleHeader(${index})">
+                            <input type="text" class="param-input key-input" placeholder="Header名" value="${escapeHtml(header.key)}" onchange="updateHeaderKey(${index}, this.value)">
+                            <input type="text" class="param-input value-input" placeholder="Header值" value="${escapeHtml(header.value)}" onchange="updateHeaderValue(${index}, this.value)">
+                            <button class="delete-btn" onclick="deleteHeader(${index})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    `).join('')}
+                    <button class="add-btn" onclick="addHeader()">
+                        <i class="fas fa-plus"></i> 添加Header
+                    </button>
+                </div>
+            `;
+        }
+
+        function renderBodyEditor() {
+            const testContent = document.getElementById('test-content');
+            testContent.innerHTML = `
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <label style="font-size: 12px; color: var(--text-secondary); font-weight: 500;">请求体 (JSON)</label>
+                    <textarea class="body-editor" id="body-textarea" placeholder='{\n  "key": "value"\n}' onchange="updateBody(this.value)">${escapeHtml(requestBody)}</textarea>
+                </div>
+            `;
+        }
+
+        function renderResponsePanel() {
+            const testContent = document.getElementById('test-content');
+            testContent.innerHTML = `
+                <div class="response-panel">
+                    <div class="response-info">
+                        <span class="status-success">等待请求...</span>
+                    </div>
+                    <div class="code-wrapper">
+                        <div class="code-header">
+                            <div class="code-tabs">
+                                <button class="code-tab active">Response</button>
+                            </div>
+                            <div class="code-actions">
+                                <button class="code-action-btn" onclick="copyCode(this)">
+                                    <i class="fas fa-copy"></i> 复制
+                                </button>
+                            </div>
+                        </div>
+                        <div class="code-block">
+                            <pre><code class="language-json">// 点击"发送"按钮查看响应</code></pre>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function switchTab(tabName) {
+            currentTab = tabName;
+            document.querySelectorAll('.test-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.tab === tabName);
+            });
+
+            const testContent = document.getElementById('test-content');
+            const token = localStorage.getItem('adminToken') || '';
+
+            if (tabName === 'auth') {
+                testContent.innerHTML = `
+                    <div class="auth-section">
+                        <label>Admin Token</label>
+                        <div class="auth-input-wrapper">
+                            <input type="text" class="auth-input" id="token-input" placeholder="输入管理员 Token" value="${escapeHtml(token)}">
+                            <button class="auth-btn" onclick="loadToken()" title="从本地存储加载">
+                                <i class="fas fa-folder-open"></i>
+                            </button>
+                            <button class="auth-btn" onclick="saveToken()" title="保存到本地存储">
+                                <i class="fas fa-save"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else if (tabName === 'params') {
+                renderParamsEditor();
+            } else if (tabName === 'headers') {
+                renderHeadersEditor();
+            } else if (tabName === 'body') {
+                renderBodyEditor();
+            } else if (tabName === 'response') {
+                renderResponsePanel();
+            }
+        }
+
+        function toggleParam(index) {
+            requestParams[index].enabled = !requestParams[index].enabled;
+        }
+
+        function updateParamKey(index, value) {
+            requestParams[index].key = value;
+        }
+
+        function updateParamValue(index, value) {
+            requestParams[index].value = value;
+        }
+
+        function addParam() {
+            requestParams.push({ key: '', value: '', enabled: true });
+            renderParamsEditor();
+        }
+
+        function deleteParam(index) {
+            requestParams.splice(index, 1);
+            renderParamsEditor();
+        }
+
+        function toggleHeader(index) {
+            requestHeaders[index].enabled = !requestHeaders[index].enabled;
+        }
+
+        function updateHeaderKey(index, value) {
+            requestHeaders[index].key = value;
+        }
+
+        function updateHeaderValue(index, value) {
+            requestHeaders[index].value = value;
+        }
+
+        function addHeader() {
+            requestHeaders.push({ key: '', value: '', enabled: true });
+            renderHeadersEditor();
+        }
+
+        function deleteHeader(index) {
+            requestHeaders.splice(index, 1);
+            renderHeadersEditor();
+        }
+
+        function updateBody(value) {
+            requestBody = value;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function copyCode(button) {
+            const codeBlock = button.closest('.code-wrapper');
+            const code = codeBlock.querySelector('code').textContent;
+
+            navigator.clipboard.writeText(code).then(() => {
+                button.innerHTML = '<i class="fas fa-check"></i> 已复制';
+                setTimeout(() => {
+                    button.innerHTML = '<i class="fas fa-copy"></i> 复制';
+                }, 2000);
+            });
+        }
+
+        function initSearch() {
+            const searchInput = document.getElementById('search-input');
+            searchInput.addEventListener('input', function () {
+                const searchTerm = this.value.toLowerCase();
+                const apiItems = document.querySelectorAll('.api-item');
+                const categories = document.querySelectorAll('.api-category');
+
+                categories.forEach(category => {
+                    const items = category.querySelectorAll('.api-item');
+                    let hasVisible = false;
+
+                    items.forEach(item => {
+                        const text = item.textContent.toLowerCase();
+                        if (text.includes(searchTerm)) {
+                            item.style.display = 'flex';
+                            hasVisible = true;
+                        } else {
+                            item.style.display = searchTerm ? 'none' : 'flex';
+                        }
+                    });
+
+                    if (searchTerm) {
+                        category.style.display = hasVisible ? 'block' : 'none';
+                        const header = category.querySelector('.category-header');
+                        const itemsDiv = category.querySelector('.api-items');
+                        if (hasVisible) {
+                            header.classList.remove('collapsed');
+                            itemsDiv.style.display = 'block';
+                        }
+                    } else {
+                        category.style.display = 'block';
+                    }
+                });
+            });
+        }
+
+        function sendRequest() {
+            const method = document.getElementById('method-select').value;
+            let url = document.getElementById('url-input').value;
+            const token = document.getElementById('token-input')?.value || '';
+
+            switchTab('response');
+            const testContent = document.getElementById('test-content');
+            const startTime = Date.now();
+
+            // 处理Socket.IO事件
+            if (method === 'SOCKET') {
+                if (!socketConnected) {
+                    const endTime = Date.now();
+                    const duration = endTime - startTime;
+
+                    // 从当前API获取响应示例
+                    const responseExample = currentApi.response || '// 无响应';
+
+                    testContent.innerHTML = `
+                        <div class="response-panel">
+                            <div class="response-info">
+                                <span class="status-success">模拟响应</span>
+                                <span class="time-info">${duration}ms</span>
+                                <div class="response-actions">
+                                    <button class="response-action-btn" onclick="copyCode(this)">
+                                        <i class="fas fa-copy"></i> 复制
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="code-wrapper">
+                                <div class="code-header">
+                                    <div class="code-tabs">
+                                        <button class="code-tab active">Socket.IO 响应</button>
+                                    </div>
+                                </div>
+                                <div class="code-block">
+                                    <pre><code class="language-json">${escapeHtml(responseExample)}</code></pre>
+                                </div>
+                            </div>
+                            <div style="margin-top: 12px; padding: 12px; background-color: var(--bg-tertiary); border-radius: 6px; border: 1px solid var(--border-color); font-size: 12px; color: var(--text-secondary);">
+                                <strong style="color: var(--text-primary);">Socket.IO 测试提示:</strong><br>
+                                • 这是模拟响应，实际使用需要通过WebSocket连接<br>
+                                • 点击"连接 Socket"按钮建立真实连接<br>
+                                • 客户端需要使用 socket.emit('${currentApi.path}', { /* 参数 */ })<br>
+                                • 服务器会通过相应的事件返回数据
+                            </div>
+                        </div>
+                    `;
+
+                    if (typeof Prism !== 'undefined') {
+                        Prism.highlightAll();
+                    }
+                    return;
+                }
+
+                // 真实的Socket.IO事件发送
+                try {
+                    // 构建参数对象
+                    const params = {};
+                    requestParams.forEach(p => {
+                        if (p.enabled && p.key) {
+                            params[p.key] = p.value;
+                        }
+                    });
+
+                    // 发送Socket.IO事件
+                    socket.emit(currentApi.path, params);
+
+                    testContent.innerHTML = `
+                        <div class="response-panel">
+                            <div class="response-info">
+                                <span class="status-success">事件已发送</span>
+                                <span class="time-info">${Date.now() - startTime}ms</span>
+                            </div>
+                            <div class="code-wrapper">
+                                <div class="code-header">
+                                    <div class="code-tabs">
+                                        <button class="code-tab active">Socket.IO 发送</button>
+                                    </div>
+                                </div>
+                                <div class="code-block">
+                                    <pre><code class="language-json">{
+  "event": "${currentApi.path}",
+  "params": ${JSON.stringify(params, null, 2)}
+}</code></pre>
+                                </div>
+                            </div>
+                            <div style="margin-top: 12px; padding: 12px; background-color: var(--bg-tertiary); border-radius: 6px; border: 1px solid var(--border-color); font-size: 12px; color: var(--text-secondary);">
+                                <strong style="color: var(--text-primary);">等待响应...</strong><br>
+                                • 服务器响应会显示在下方
+                                • 请检查控制台查看详细日志
+                            </div>
+                        </div>
+                    `;
+
+                    if (typeof Prism !== 'undefined') {
+                        Prism.highlightAll();
+                    }
+                } catch (error) {
+                    testContent.innerHTML = `
+                        <div class="response-panel">
+                            <div class="response-info">
+                                <span class="status-error">发送失败</span>
+                                <span class="time-info">${Date.now() - startTime}ms</span>
+                            </div>
+                            <div class="code-wrapper">
+                                <div class="code-header">
+                                    <div class="code-tabs">
+                                        <button class="code-tab active">Error</button>
+                                    </div>
+                                </div>
+                                <div class="code-block">
+                                    <pre><code class="language-json">${escapeHtml(error.message)}</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+                return;
+            }
+
+            // 处理HTTP请求
+            const enabledParams = requestParams.filter(p => p.enabled && p.key);
+            if (enabledParams.length > 0) {
+                const queryString = enabledParams.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&');
+                url += (url.includes('?') ? '&' : '?') + queryString;
+            }
+
+            const headers = {};
+            requestHeaders.filter(h => h.enabled && h.key).forEach(h => {
+                headers[h.key] = h.value;
+            });
+
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            const options = {
+                method: method,
+                headers: headers
+            };
+
+            if (requestBody && (method === 'POST' || method === 'PUT')) {
+                options.body = requestBody;
+            }
+
+            fetch(url, options)
+                .then(response => {
+                    const endTime = Date.now();
+                    const duration = endTime - startTime;
+
+                    return response.text().then(text => {
+                        let jsonData;
+                        try {
+                            jsonData = JSON.parse(text);
+                            text = JSON.stringify(jsonData, null, 2);
+                        } catch (e) {
+                        }
+
+                        const statusClass = response.ok ? 'status-success' : 'status-error';
+                        testContent.innerHTML = `
+                            <div class="response-panel">
+                                <div class="response-info">
+                                    <span class="${statusClass}">${response.status} ${response.statusText}</span>
+                                    <span class="time-info">${duration}ms</span>
+                                    <div class="response-actions">
+                                        <button class="response-action-btn" onclick="copyCode(this)">
+                                            <i class="fas fa-copy"></i> 复制
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="code-wrapper">
+                                    <div class="code-header">
+                                        <div class="code-tabs">
+                                            <button class="code-tab active">Response</button>
+                                        </div>
+                                    </div>
+                                    <div class="code-block">
+                                        <pre><code class="language-json">${escapeHtml(text)}</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+
+                        if (typeof Prism !== 'undefined') {
+                            Prism.highlightAll();
+                        }
+                    });
+                })
+                .catch(error => {
+                    const endTime = Date.now();
+                    const duration = endTime - startTime;
+
+                    testContent.innerHTML = `
+                        <div class="response-panel">
+                            <div class="response-info">
+                                <span class="status-error">请求失败</span>
+                                <span class="time-info">${duration}ms</span>
+                            </div>
+                            <div class="code-wrapper">
+                                <div class="code-header">
+                                    <div class="code-tabs">
+                                        <button class="code-tab active">Error</button>
+                                    </div>
+                                </div>
+                                <div class="code-block">
+                                    <pre><code class="language-json">${escapeHtml(error.message)}</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+        }
+
+        function saveToken() {
+            const token = document.getElementById('token-input').value;
+            if (token) {
+                localStorage.setItem('adminToken', token);
+                alert('Token 已保存到本地存储');
+            }
+        }
+
+        function loadToken() {
+            const token = localStorage.getItem('adminToken');
+            if (token) {
+                document.getElementById('token-input').value = token;
+            } else {
+                alert('本地存储中没有找到 Token');
+            }
+        }
+
+        function connectSocket() {
+            if (socket) {
+                socket.disconnect();
+            }
+
+            const token = document.getElementById('token-input')?.value || '';
+
+            socket = io('http://localhost:8080', {
+                query: { token: token },
+                transports: ['websocket', 'polling']
+            });
+
+            socket.on('connect', () => {
+                console.log('Socket.IO 连接成功');
+                socketConnected = true;
+                updateSocketStatus(true);
+            });
+
+            socket.on('disconnect', () => {
+                console.log('Socket.IO 连接断开');
+                socketConnected = false;
+                updateSocketStatus(false);
+            });
+
+            socket.on('error', (error) => {
+                console.error('Socket.IO 错误:', error);
+                socketConnected = false;
+                updateSocketStatus(false);
+            });
+
+            // 监听通用事件
+            socket.on('version_check', (data) => {
+                handleSocketResponse('version_check', data);
+            });
+            socket.on('login_result', (data) => {
+                handleSocketResponse('login_result', data);
+            });
+            socket.on('account_action_result', (data) => {
+                handleSocketResponse('account_action_result', data);
+            });
+            socket.on('account_info', (data) => {
+                handleSocketResponse('account_info', data);
+            });
+            socket.on('leaderboard', (data) => {
+                handleSocketResponse('leaderboard', data);
+            });
+            socket.on('achievements_list', (data) => {
+                handleSocketResponse('achievements_list', data);
+            });
+            socket.on('game_history', (data) => {
+                handleSocketResponse('game_history', data);
+            });
+            socket.on('game_replay', (data) => {
+                handleSocketResponse('game_replay', data);
+            });
+            socket.on('spectate_joined', (data) => {
+                handleSocketResponse('spectate_joined', data);
+            });
+            socket.on('spectate_list', (data) => {
+                handleSocketResponse('spectate_list', data);
+            });
+            socket.on('chat_history', (data) => {
+                handleSocketResponse('chat_history', data);
+            });
+            socket.on('accounts_list', (data) => {
+                handleSocketResponse('accounts_list', data);
+            });
+            socket.on('account_detail', (data) => {
+                handleSocketResponse('account_detail', data);
+            });
+            socket.on('system_stats', (data) => {
+                handleSocketResponse('system_stats', data);
+            });
+        }
+
+        function updateSocketStatus(connected) {
+            // 更新认证页面的状态
+            const testContent = document.getElementById('test-content');
+            const authSection = testContent.querySelector('.auth-section');
+            if (authSection) {
+                const statusElement = authSection.querySelector('.socket-status');
+                if (statusElement) {
+                    statusElement.innerHTML = connected
+                        ? '<span style="color: var(--success-text);"><i class="fas fa-check-circle"></i> 已连接</span>'
+                        : '<span style="color: var(--error-text);"><i class="fas fa-times-circle"></i> 未连接</span>';
+                } else {
+                    const statusDiv = document.createElement('div');
+                    statusDiv.className = 'socket-status';
+                    statusDiv.style.marginTop = '8px';
+                    statusDiv.innerHTML = connected
+                        ? '<span style="color: var(--success-text);"><i class="fas fa-check-circle"></i> 已连接</span>'
+                        : '<span style="color: var(--error-text);"><i class="fas fa-times-circle"></i> 未连接</span>';
+                    authSection.appendChild(statusDiv);
+                }
+            }
+
+            // 在测试面板顶部添加连接状态指示器
+            const methodSelect = document.getElementById('method-select');
+            if (methodSelect) {
+                let statusIndicator = document.getElementById('socket-status-indicator');
+                if (!statusIndicator) {
+                    statusIndicator = document.createElement('div');
+                    statusIndicator.id = 'socket-status-indicator';
+                    statusIndicator.style.position = 'absolute';
+                    statusIndicator.style.top = '12px';
+                    statusIndicator.style.right = '12px';
+                    statusIndicator.style.fontSize = '12px';
+                    statusIndicator.style.padding = '4px 8px';
+                    statusIndicator.style.borderRadius = '4px';
+                    statusIndicator.style.fontWeight = '500';
+                    methodSelect.parentElement.style.position = 'relative';
+                    methodSelect.parentElement.appendChild(statusIndicator);
+                }
+                statusIndicator.innerHTML = connected
+                    ? '<span style="color: var(--success-text);"><i class="fas fa-check-circle"></i> Socket已连接</span>'
+                    : '<span style="color: var(--error-text);"><i class="fas fa-times-circle"></i> Socket未连接</span>';
+                statusIndicator.style.backgroundColor = connected ? 'rgba(72, 187, 120, 0.1)' : 'rgba(229, 62, 62, 0.1)';
+            }
+        }
+
+        function handleSocketResponse(event, data) {
+            switchTab('response');
+            const testContent = document.getElementById('test-content');
+            const endTime = Date.now();
+
+            testContent.innerHTML = `
+                <div class="response-panel">
+                    <div class="response-info">
+                        <span class="status-success">Socket.IO 响应</span>
+                        <span class="time-info">${new Date().toLocaleTimeString()}</span>
+                        <div class="response-actions">
+                            <button class="response-action-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i> 复制
+                            </button>
+                        </div>
+                    </div>
+                    <div class="code-wrapper">
+                        <div class="code-header">
+                            <div class="code-tabs">
+                                <button class="code-tab active">事件: ${event}</button>
+                            </div>
+                        </div>
+                        <div class="code-block">
+                            <pre><code class="language-json">${escapeHtml(JSON.stringify(data, null, 2))}</code></pre>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            if (typeof Prism !== 'undefined') {
+                Prism.highlightAll();
+            }
+        }
+
+        function fetchVersion() {
+            fetch('/version')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.version) {
+                        document.getElementById('version-badge').textContent = 'v' + data.version;
+                    }
+                })
+                .catch(error => {
+                    console.error('获取版本信息失败:', error);
+                });
+        }
+
+        function initTestTabs() {
+            document.querySelectorAll('.test-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    switchTab(tab.dataset.tab);
+                });
+            });
+        }
+
+        window.onload = function () {
+            initApiTree();
+            initSearch();
+            initTestTabs();
+            fetchVersion();
+
+            if (typeof Prism !== 'undefined') {
+                Prism.highlightAll();
+            }
+
+            const savedToken = localStorage.getItem('adminToken');
+            if (savedToken) {
+                const tokenInput = document.getElementById('token-input');
+                if (tokenInput) {
+                    tokenInput.value = savedToken;
+                    // 自动尝试连接Socket.IO
+                    connectSocket();
+                }
+            }
+
+            // 监听方法选择变化
+            const methodSelect = document.getElementById('method-select');
+            if (methodSelect) {
+                methodSelect.addEventListener('change', function () {
+                    if (this.value === 'SOCKET' && !socketConnected) {
+                        alert('请先点击"连接 Socket"按钮建立WebSocket连接');
+                    }
+                });
+            }
+
+            requestParams = currentApi.params ? currentApi.params.map(p => ({ key: p.name, value: p.default || '', enabled: true })) : [];
+            requestHeaders = [{ key: 'Content-Type', value: 'application/json', enabled: true }];
+        };
+    </script>
+</body>
+
+</html>

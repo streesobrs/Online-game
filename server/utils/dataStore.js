@@ -337,6 +337,12 @@ class DataStore {
           id = query.userId;
         } else if (query['account.id']) {
           id = query['account.id'];
+        } else {
+          // 如果查询条件是其他字段，先查找记录获取ID
+          const items = await this.find(collection, query);
+          if (items.length > 0) {
+            id = items[0].id || items[0].userId;
+          }
         }
       }
 

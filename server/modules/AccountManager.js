@@ -71,6 +71,9 @@ class AccountManager {
 
   // 验证密码
   verifyPassword(password, salt, hash) {
+    if (!salt || !hash) {
+      return false;
+    }
     const hashToVerify = this.hashPassword(password, salt);
     return hashToVerify === hash;
   }
@@ -224,6 +227,50 @@ class AccountManager {
       return id;
     } catch (err) {
       return null;
+    }
+  }
+
+  // 重置密码
+  async resetPassword(username, newPassword) {
+    try {
+      // 查找账号
+      const accounts = await dataStore.read('accounts');
+      const accountIndex = accounts.findIndex(a => a.account.username === username);
+
+      if (accountIndex === -1) {
+        return {
+          success: false,
+          message: '账号不存在'
+        };
+      }
+
+      const account = accounts[accountIndex];
+
+      // 生成新的盐和哈希
+      const salt = crypto.randomBytes(16).toString('hex');
+      const hash = this.hashPassword(newPassword, salt);
+
+      // 更新账号信息
+      account.account.security = {
+        passwordSalt: salt,
+        passwordHash: hash
+      };
+      account.account.updatedAt = Date.now();
+      account.updatedAt = Date.now();
+
+      // 保存更新
+      await dataStore.writeOne('accounts', account.account.id, account);
+
+      return {
+        success: true,
+        message: '密码重置成功'
+      };
+    } catch (err) {
+      logger.error('重置密码失败', { username, error: err.message });
+      return {
+        success: false,
+        message: '重置密码失败，请稍后重试'
+      };
     }
   }
 

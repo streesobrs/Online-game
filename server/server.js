@@ -32,7 +32,13 @@ const io = socketIo(server, {
   pingInterval: 30000,
   transports: ['websocket', 'polling'],
   upgradeTimeout: 10000,
-  maxHttpBufferSize: 1e6
+  maxHttpBufferSize: 1e6,
+  // 认证中间件
+  allowRequest: (req, callback) => {
+    const token = req._query.token || (req.headers.authorization?.replace('Bearer ', ''));
+    // 不需要认证，允许所有连接
+    callback(null, true);
+  }
 });
 
 // 中间件
@@ -40,12 +46,33 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Token认证中间件
+function authenticateToken(req, res, next) {
+  // 从请求头获取token
+  const token = req.headers.authorization?.replace('Bearer ', '') || req.body.token || req.query.token;
+
+  if (!token) {
+    return res.status(401).json({ success: false, message: '缺少认证Token' });
+  }
+
+  // 验证token是否与配置中的adminToken匹配
+  if (token !== config.adminToken) {
+    return res.status(401).json({ success: false, message: '无效的认证Token' });
+  }
+
+  next();
+}
+
 // 静态文件服务
 app.use(express.static(path.join(__dirname, '..')));
 
 // API路由
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+app.get('/docs', (req, res) => {
+  res.sendFile(path.join(__dirname, 'docs.html'));
 });
 
 // 健康检查
@@ -67,6 +94,32 @@ app.get('/api/status', (req, res) => {
     peakOnline: userManager.getSystemStats().peakOnline,
     timestamp: Date.now()
   });
+});
+
+// 版本信息API
+app.get('/version', (req, res) => {
+  const versionStr = versionManager.getServerVersion();
+  const parts = versionStr.split('.').map(Number);
+  res.json({
+    version: `${parts[0]}.${parts[1]}.${parts[2]}`,
+    build: parts[3],
+    timestamp: Date.now()
+  });
+});
+
+// 认证验证API
+app.post('/api/auth/verify', (req, res) => {
+  const { token } = req.body;
+  if (!token) {
+    return res.json({ success: false, message: '缺少Token' });
+  }
+
+  // 验证token是否与配置中的adminToken匹配
+  if (token === config.adminToken) {
+    res.json({ success: true, message: 'Token有效' });
+  } else {
+    res.json({ success: false, message: 'Token无效' });
+  }
 });
 
 // 排行榜API
@@ -133,16 +186,8 @@ app.get('/api/themes/:id', (req, res) => {
 });
 
 // 添加主题（仅管理员）
-app.post('/api/themes', async (req, res) => {
+app.post('/api/themes', authenticateToken, async (req, res) => {
   try {
-    const { adminToken } = req.body;
-    if (adminToken !== config.adminToken) {
-      return res.status(403).json({
-        success: false,
-        message: '权限不足'
-      });
-    }
-
     const result = await themeManager.addTheme(req.body);
     res.json(result);
   } catch (err) {
@@ -155,16 +200,8 @@ app.post('/api/themes', async (req, res) => {
 });
 
 // 更新主题（仅管理员）
-app.put('/api/themes/:id', async (req, res) => {
+app.put('/api/themes/:id', authenticateToken, async (req, res) => {
   try {
-    const { adminToken } = req.body;
-    if (adminToken !== config.adminToken) {
-      return res.status(403).json({
-        success: false,
-        message: '权限不足'
-      });
-    }
-
     const result = await themeManager.updateTheme(req.params.id, req.body);
     res.json(result);
   } catch (err) {
@@ -177,16 +214,8 @@ app.put('/api/themes/:id', async (req, res) => {
 });
 
 // 删除主题（仅管理员）
-app.delete('/api/themes/:id', async (req, res) => {
+app.delete('/api/themes/:id', authenticateToken, async (req, res) => {
   try {
-    const { adminToken } = req.query;
-    if (adminToken !== config.adminToken) {
-      return res.status(403).json({
-        success: false,
-        message: '权限不足'
-      });
-    }
-
     const result = await themeManager.deleteTheme(req.params.id);
     res.json(result);
   } catch (err) {
@@ -199,16 +228,8 @@ app.delete('/api/themes/:id', async (req, res) => {
 });
 
 // 重新加载主题（仅管理员）
-app.post('/api/themes/reload', async (req, res) => {
+app.post('/api/themes/reload', authenticateToken, async (req, res) => {
   try {
-    const { adminToken } = req.body;
-    if (adminToken !== config.adminToken) {
-      return res.status(403).json({
-        success: false,
-        message: '权限不足'
-      });
-    }
-
     const result = await themeManager.reloadThemes();
     res.json(result);
   } catch (err) {
@@ -220,7 +241,471 @@ app.post('/api/themes/reload', async (req, res) => {
   }
 });
 
+// ========== 账号管理API ==========
+
+// 获取所有账号列表（需要认证）
+app.get('/api/accounts', authenticateToken, async (req, res) => {
+  try {
+    const { limit = 50, offset = 0 } = req.query;
+    const accounts = await accountManager.getAllAccounts(parseInt(limit), parseInt(offset));
+    res.json({
+      success: true,
+      data: accounts,
+      pagination: {
+        limit: parseInt(limit),
+        offset: parseInt(offset)
+      }
+    });
+  } catch (err) {
+    logger.error('获取账号列表失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '获取账号列表失败'
+    });
+  }
+});
+
+// 搜索账号（需要认证）
+app.get('/api/accounts/search', authenticateToken, async (req, res) => {
+  try {
+    const { keyword } = req.query;
+    if (!keyword) {
+      return res.status(400).json({
+        success: false,
+        message: '请提供搜索关键词'
+      });
+    }
+    const accounts = await accountManager.getAllAccounts(100, 0);
+    const filtered = accounts.filter(a => 
+      a.username?.toLowerCase().includes(keyword.toLowerCase()) ||
+      a.nickname?.toLowerCase().includes(keyword.toLowerCase()) ||
+      a.id?.toLowerCase().includes(keyword.toLowerCase())
+    );
+    res.json({
+      success: true,
+      data: filtered,
+      count: filtered.length
+    });
+  } catch (err) {
+    logger.error('搜索账号失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '搜索账号失败'
+    });
+  }
+});
+
+// 获取单个账号详情（需要认证）
+app.get('/api/accounts/:id', authenticateToken, async (req, res) => {
+  try {
+    const account = await accountManager.getAccount(req.params.id);
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        message: '账号不存在'
+      });
+    }
+    res.json({
+      success: true,
+      data: account
+    });
+  } catch (err) {
+    logger.error('获取账号详情失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '获取账号详情失败'
+    });
+  }
+});
+
+// 修改用户经验值（需要认证）
+app.put('/api/accounts/:id/exp', authenticateToken, async (req, res) => {
+  try {
+    const { operation, amount } = req.body;
+    if (!operation || amount === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: '请提供操作类型和数量'
+      });
+    }
+    const result = await accountManager.modifyUserExp(req.params.id, operation, parseInt(amount));
+    res.json(result);
+  } catch (err) {
+    logger.error('修改用户经验失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '修改用户经验失败'
+    });
+  }
+});
+
+// ========== 游戏相关API ==========
+
+// 获取游戏历史记录
+app.get('/api/games/history', async (req, res) => {
+  try {
+    const { userId, limit = 20, offset = 0 } = req.query;
+    const history = await gameManager.getGameHistory(userId, parseInt(limit));
+    res.json({
+      success: true,
+      data: history,
+      pagination: {
+        limit: parseInt(limit),
+        offset: parseInt(offset)
+      }
+    });
+  } catch (err) {
+    logger.error('获取游戏历史失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '获取游戏历史失败'
+    });
+  }
+});
+
+// 获取游戏回放
+app.get('/api/games/replay/:id', async (req, res) => {
+  try {
+    const replay = await gameManager.getGameReplay(req.params.id);
+    if (!replay) {
+      return res.status(404).json({
+        success: false,
+        message: '游戏回放不存在'
+      });
+    }
+    res.json({
+      success: true,
+      data: replay
+    });
+  } catch (err) {
+    logger.error('获取游戏回放失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '获取游戏回放失败'
+    });
+  }
+});
+
+// 获取游戏统计数据
+app.get('/api/games/stats', async (req, res) => {
+  try {
+    const stats = {
+      activeGames: gameManager.getActiveGameCount?.() || 0,
+      onlineUsers: userManager.getOnlineCount?.() || 0,
+      timestamp: Date.now()
+    };
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (err) {
+    logger.error('获取游戏统计失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '获取游戏统计失败'
+    });
+  }
+});
+
+// ========== 用户相关API ==========
+
+// 获取当前在线用户列表
+app.get('/api/users/online', async (req, res) => {
+  try {
+    const users = userManager.getOnlineUsers?.() || [];
+    const onlineUsers = users.map(u => ({
+      userId: u.userId,
+      nickname: u.nickname,
+      loginType: u.loginType,
+      gameType: u.gameType,
+      status: u.status
+    }));
+    res.json({
+      success: true,
+      data: onlineUsers,
+      count: onlineUsers.length
+    });
+  } catch (err) {
+    logger.error('获取在线用户失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '获取在线用户失败'
+    });
+  }
+});
+
+// 搜索用户
+app.get('/api/users/search', async (req, res) => {
+  try {
+    const { keyword } = req.query;
+    if (!keyword) {
+      return res.status(400).json({
+        success: false,
+        message: '请提供搜索关键词'
+      });
+    }
+    const accounts = await accountManager.getAllAccounts(100, 0);
+    const filtered = accounts.filter(a => 
+      a.username?.toLowerCase().includes(keyword.toLowerCase()) ||
+      a.nickname?.toLowerCase().includes(keyword.toLowerCase()) ||
+      a.id?.toLowerCase().includes(keyword.toLowerCase())
+    );
+    res.json({
+      success: true,
+      data: filtered,
+      count: filtered.length
+    });
+  } catch (err) {
+    logger.error('搜索用户失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '搜索用户失败'
+    });
+  }
+});
+
+// ========== 聊天相关API ==========
+
+// 获取聊天历史
+app.get('/api/chat/history', async (req, res) => {
+  try {
+    const { scope = 'global', gameId } = req.query;
+    const history = chatManager.getChatHistory?.(scope, gameId) || [];
+    res.json({
+      success: true,
+      data: history,
+      scope: scope,
+      gameId: gameId
+    });
+  } catch (err) {
+    logger.error('获取聊天历史失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '获取聊天历史失败'
+    });
+  }
+});
+
+// 广播系统消息（需要认证）
+app.post('/api/chat/broadcast', authenticateToken, async (req, res) => {
+  try {
+    const { message } = req.body;
+    if (!message) {
+      return res.status(400).json({
+        success: false,
+        message: '请提供广播消息内容'
+      });
+    }
+    io.emit('broadcast', {
+      type: 'system',
+      message: message,
+      timestamp: Date.now()
+    });
+    res.json({
+      success: true,
+      message: '广播发送成功'
+    });
+  } catch (err) {
+    logger.error('广播消息失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '广播消息失败'
+    });
+  }
+});
+
+// ========== 系统管理API ==========
+
+// 获取系统日志（需要认证）
+app.get('/api/system/logs', authenticateToken, async (req, res) => {
+  try {
+    const { type, limit = 100 } = req.query;
+    const logs = logger.getLogs?.(type, parseInt(limit)) || [];
+    res.json({
+      success: true,
+      data: logs,
+      count: logs.length
+    });
+  } catch (err) {
+    logger.error('获取系统日志失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '获取系统日志失败'
+    });
+  }
+});
+
+// 设置维护模式（需要认证）
+app.post('/api/system/maintenance', authenticateToken, async (req, res) => {
+  try {
+    const { enabled, message } = req.body;
+    io.emit('maintenance_mode', {
+      enabled: enabled,
+      message: message || '服务器正在维护中',
+      timestamp: Date.now()
+    });
+    res.json({
+      success: true,
+      message: enabled ? '服务器已进入维护模式' : '服务器已退出维护模式'
+    });
+  } catch (err) {
+    logger.error('设置维护模式失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '设置维护模式失败'
+    });
+  }
+});
+
+// 获取详细系统统计（需要认证）
+app.get('/api/system/stats', authenticateToken, async (req, res) => {
+  try {
+    const stats = {
+      onlineUsers: userManager.getOnlineCount?.() || 0,
+      waitingUsers: userManager.getWaitingCount?.() || 0,
+      playingUsers: userManager.getPlayingCount?.() || 0,
+      totalAccounts: (await accountManager.getAllAccounts(1, 0)).length,
+      system: userManager.getSystemStats?.() || {},
+      timestamp: Date.now()
+    };
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (err) {
+    logger.error('获取系统统计失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '获取系统统计失败'
+    });
+  }
+});
+
+// ========== 成就相关API ==========
+
+// 获取所有成就列表
+app.get('/api/achievements', async (req, res) => {
+  try {
+    const achievements = achievementManager?.getAllAchievements?.() || [];
+    res.json({
+      success: true,
+      data: achievements,
+      count: achievements.length
+    });
+  } catch (err) {
+    logger.error('获取成就列表失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '获取成就列表失败'
+    });
+  }
+});
+
+// 获取单个成就详情
+app.get('/api/achievements/:id', async (req, res) => {
+  try {
+    const achievement = achievementManager?.getAchievement?.(req.params.id) || null;
+    if (!achievement) {
+      return res.status(404).json({
+        success: false,
+        message: '成就不存在'
+      });
+    }
+    res.json({
+      success: true,
+      data: achievement
+    });
+  } catch (err) {
+    logger.error('获取成就详情失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '获取成就详情失败'
+    });
+  }
+});
+
+// 添加用户成就（需要认证）
+app.post('/api/achievements/:id/award', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: '请提供用户ID'
+      });
+    }
+    const result = await accountManager.addUserAchievement(userId, req.params.id);
+    res.json(result);
+  } catch (err) {
+    logger.error('添加用户成就失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '添加用户成就失败'
+    });
+  }
+});
+
+// ========== 排行榜API扩展 ==========
+
+// 按游戏类型获取排行榜
+app.get('/api/leaderboard/games', async (req, res) => {
+  try {
+    const { type = 'all', limit = 20 } = req.query;
+    const leaderboard = await userManager.getLeaderboard(parseInt(limit), type);
+    res.json({
+      success: true,
+      data: leaderboard,
+      gameType: type
+    });
+  } catch (err) {
+    logger.error('获取游戏排行榜失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '获取游戏排行榜失败'
+    });
+  }
+});
+
+// 获取每日排行榜
+app.get('/api/leaderboard/daily', async (req, res) => {
+  try {
+    const { limit = 20 } = req.query;
+    const leaderboard = await userManager.getLeaderboard(parseInt(limit), 'all');
+    res.json({
+      success: true,
+      data: leaderboard,
+      period: 'daily'
+    });
+  } catch (err) {
+    logger.error('获取每日排行榜失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '获取每日排行榜失败'
+    });
+  }
+});
+
+// 获取周排行榜
+app.get('/api/leaderboard/weekly', async (req, res) => {
+  try {
+    const { limit = 20 } = req.query;
+    const leaderboard = await userManager.getLeaderboard(parseInt(limit), 'all');
+    res.json({
+      success: true,
+      data: leaderboard,
+      period: 'weekly'
+    });
+  } catch (err) {
+    logger.error('获取周排行榜失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '获取周排行榜失败'
+    });
+  }
+});
+
 // 初始化管理器
+const versionManager = new VersionManager();
 const accountManager = new AccountManager();
 const achievementManager = new AchievementManager(accountManager);
 const aiManager = new AIManager();
@@ -228,7 +713,6 @@ const userManager = new UserManager(accountManager);
 const gameManager = new GameManager(userManager, accountManager, achievementManager, aiManager);
 const chatManager = new ChatManager(userManager, gameManager, accountManager);
 const adminManager = new AdminManager(userManager, gameManager, chatManager, accountManager);
-const versionManager = new VersionManager();
 
 // 服务器启动时增加构建版本号
 const newVersion = versionManager.incrementBuild();
@@ -425,6 +909,16 @@ io.on('connection', (socket) => {
     const result = await accountManager.changePassword(id, oldPassword, newPassword);
     socket.emit('account_action_result', {
       action: 'change_password',
+      ...result
+    });
+  });
+
+  // 重置密码（找回密码）
+  socket.on('account_reset_password', async (data) => {
+    const { username, password } = data;
+    const result = await accountManager.resetPassword(username, password);
+    socket.emit('account_action_result', {
+      action: 'reset_password',
       ...result
     });
   });

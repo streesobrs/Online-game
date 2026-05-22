@@ -270,7 +270,7 @@
     /* 内容区域 */
     .content-area {
       flex: 1;
-      padding: 24px;
+      padding: 18px;
       overflow-y: auto;
     }
 
@@ -286,14 +286,14 @@
     .stats-row {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 20px;
-      margin-bottom: 24px;
+      gap: 16px;
+      margin-bottom: 18px;
     }
 
     .stat-box {
       background: #1e293b;
-      border-radius: 16px;
-      padding: 24px;
+      border-radius: 12px;
+      padding: 18px;
       border: 1px solid #334155;
       transition: transform 0.2s, border-color 0.2s;
     }
@@ -307,22 +307,22 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
 
     .stat-name {
-      font-size: 14px;
+      font-size: 13px;
       color: #94a3b8;
     }
 
     .stat-icon-box {
-      width: 48px;
-      height: 48px;
-      border-radius: 12px;
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 24px;
+      font-size: 20px;
     }
 
     .stat-icon-blue {
@@ -342,22 +342,22 @@
     }
 
     .stat-number {
-      font-size: 32px;
+      font-size: 28px;
       font-weight: 700;
       color: #fff;
     }
 
     .stat-change {
-      font-size: 13px;
+      font-size: 12px;
       color: #22c55e;
-      margin-top: 8px;
+      margin-top: 6px;
     }
 
     /* 快捷操作 */
     .quick-actions {
       display: flex;
-      gap: 12px;
-      margin-bottom: 24px;
+      gap: 10px;
+      margin-bottom: 18px;
       flex-wrap: wrap;
     }
 
@@ -423,7 +423,7 @@
     }
 
     .card-header {
-      padding: 20px 24px;
+      padding: 14px 18px;
       border-bottom: 1px solid #334155;
       display: flex;
       align-items: center;
@@ -431,7 +431,7 @@
     }
 
     .card-title {
-      font-size: 16px;
+      font-size: 14px;
       font-weight: 600;
     }
 
@@ -522,6 +522,11 @@
       color: #f59e0b;
     }
 
+    .badge-info {
+      background: rgba(59, 130, 246, 0.2);
+      color: #3b82f6;
+    }
+
     .table-actions {
       display: flex;
       gap: 8px;
@@ -560,6 +565,104 @@
       padding: 60px;
       text-align: center;
       color: #64748b;
+    }
+
+    /* 卡片预览 */
+    .card-preview {
+      padding: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    /* 滚动条样式 */
+    .card-preview::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .card-preview::-webkit-scrollbar-track {
+      background: #1e293b;
+      border-radius: 3px;
+    }
+
+    .card-preview::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 3px;
+    }
+
+    .card-preview::-webkit-scrollbar-thumb:hover {
+      background: #64748b;
+    }
+
+    .preview-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 10px;
+      background: #252f47;
+      border-radius: 4px;
+      margin-bottom: 5px;
+      transition: all 0.2s;
+    }
+
+    .preview-item:hover {
+      background: #2d3a54;
+    }
+
+    .preview-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .preview-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .preview-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+    }
+
+    .preview-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .preview-title {
+      font-size: 12px;
+      font-weight: 500;
+      color: #e2e8f0;
+    }
+
+    .preview-subtitle {
+      font-size: 10px;
+      color: #94a3b8;
+      margin-top: 0;
+    }
+
+    .preview-right {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .preview-value {
+      font-size: 11px;
+      color: #cbd5e1;
+      font-weight: 500;
+    }
+
+    .preview-more {
+      text-align: center;
+      padding: 8px;
+      color: #64748b;
+      font-size: 11px;
     }
 
     .empty-icon {
@@ -693,6 +796,9 @@
       <div class="login-title">🔐 后台管理系统</div>
       <input type="password" id="admin-token" class="login-input" placeholder="请输入管理Token">
       <button class="login-btn" onclick="login()">登录系统</button>
+      <div style="text-align: center; margin-top: 16px; font-size: 12px; color: #64748b;">
+        <span id="server-version">加载版本中...</span>
+      </div>
     </div>
   </div>
 
@@ -725,10 +831,6 @@
           <span class="nav-icon">🔐</span>
           <span class="nav-text">账号管理</span>
         </div>
-        <div class="nav-item" onclick="switchView('data')">
-          <span class="nav-icon">📋</span>
-          <span class="nav-text">数据管理</span>
-        </div>
         <div class="nav-item" onclick="switchView('system')">
           <span class="nav-icon">⚙️</span>
           <span class="nav-text">系统设置</span>
@@ -738,6 +840,9 @@
         <div class="status-bar">
           <span class="status-dot"></span>
           <span id="server-status-text">服务器运行中</span>
+        </div>
+        <div style="text-align: center; margin-top: 8px; font-size: 12px; color: #64748b;">
+          <span id="server-version">加载版本中...</span>
         </div>
       </div>
     </aside>
@@ -803,33 +908,70 @@
             <button class="action-btn btn-danger" onclick="showCleanupModal()">🧹 清理数据</button>
           </div>
 
-          <div class="data-card">
-            <div class="card-header">
-              <span class="card-title">🏆 排行榜 Top 10</span>
-              <button class="action-btn btn-secondary" onclick="loadLeaderboard()"
-                style="padding: 8px 16px; font-size: 13px;">刷新</button>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px;">
+            <div class="data-card">
+              <div class="card-header">
+                <span class="card-title">🏆 排行榜</span>
+                <div style="display: flex; gap: 6px;">
+                  <button class="action-btn btn-primary" onclick="showLeaderboardDetail()"
+                    style="padding: 6px 12px; font-size: 12px;">详情</button>
+                  <button class="action-btn btn-secondary" onclick="loadLeaderboard()"
+                    style="padding: 6px 12px; font-size: 12px;">刷新</button>
+                </div>
+              </div>
+              <div id="leaderboard-preview" class="card-preview"></div>
             </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>排名</th>
-                    <th>用户</th>
-                    <th>胜/负/平</th>
-                    <th>总场次</th>
-                    <th>胜率</th>
-                  </tr>
-                </thead>
-                <tbody id="leaderboard-body">
-                  <tr>
-                    <td colspan="5">
-                      <div class="empty-state">
-                        <div class="empty-icon">📊</div>暂无数据
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+
+            <div class="data-card">
+              <div class="card-header">
+                <span class="card-title">👤 最近登录</span>
+                <div style="display: flex; gap: 6px;">
+                  <button class="action-btn btn-primary" onclick="showRecentLoginsDetail()"
+                    style="padding: 6px 12px; font-size: 12px;">详情</button>
+                  <button class="action-btn btn-secondary" onclick="loadRecentLogins()"
+                    style="padding: 6px 12px; font-size: 12px;">刷新</button>
+                </div>
+              </div>
+              <div id="recent-logins-preview" class="card-preview"></div>
+            </div>
+
+            <div class="data-card">
+              <div class="card-header">
+                <span class="card-title">🎮 最近游戏</span>
+                <div style="display: flex; gap: 6px;">
+                  <button class="action-btn btn-primary" onclick="showRecentGamesDetail()"
+                    style="padding: 6px 12px; font-size: 12px;">详情</button>
+                  <button class="action-btn btn-secondary" onclick="loadRecentGames()"
+                    style="padding: 6px 12px; font-size: 12px;">刷新</button>
+                </div>
+              </div>
+              <div id="recent-games-preview" class="card-preview"></div>
+            </div>
+
+            <div class="data-card">
+              <div class="card-header">
+                <span class="card-title">👥 在线用户</span>
+                <div style="display: flex; gap: 6px;">
+                  <button class="action-btn btn-primary" onclick="showOnlineUsersDetail()"
+                    style="padding: 6px 12px; font-size: 12px;">详情</button>
+                  <button class="action-btn btn-secondary" onclick="loadOnlineUsersDetail()"
+                    style="padding: 6px 12px; font-size: 12px;">刷新</button>
+                </div>
+              </div>
+              <div id="online-users-detail-preview" class="card-preview"></div>
+            </div>
+
+            <div class="data-card">
+              <div class="card-header">
+                <span class="card-title">📈 游戏统计</span>
+                <div style="display: flex; gap: 6px;">
+                  <button class="action-btn btn-primary" onclick="showGameStatsDetail()"
+                    style="padding: 6px 12px; font-size: 12px;">详情</button>
+                  <button class="action-btn btn-secondary" onclick="loadGameStats()"
+                    style="padding: 6px 12px; font-size: 12px;">刷新</button>
+                </div>
+              </div>
+              <div id="game-stats-preview" class="card-preview"></div>
             </div>
           </div>
         </section>
@@ -1006,133 +1148,7 @@
           </div>
         </section>
 
-        <!-- 数据管理 -->
-        <section id="view-data" class="content-section">
-          <div class="data-card">
-            <div class="card-header">
-              <span class="card-title">📋 用户数据管理</span>
-              <div class="card-tools">
-                <input type="text" id="data-account-search" class="search-input" placeholder="搜索账号ID/用户名/昵称"
-                  onkeyup="filterDataAccounts(this.value)">
-                <button class="action-btn btn-secondary" onclick="loadDataAccounts()"
-                  style="padding: 8px 16px; font-size: 13px;">刷新</button>
-              </div>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>用户名</th>
-                    <th>昵称</th>
-                    <th>类型</th>
-                    <th>等级</th>
-                    <th>总经验值</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody id="data-accounts-body">
-                  <tr>
-                    <td colspan="5">
-                      <div class="empty-state">
-                        <div class="empty-icon">📋</div>暂无账号数据
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
 
-          <div id="account-data-management" class="hidden">
-            <div class="data-card">
-              <div class="card-header">
-                <span class="card-title" id="current-account-title">账号数据管理</span>
-                <div class="card-tools">
-                  <button class="action-btn btn-secondary" onclick="backToAccountList()"
-                    style="padding: 8px 16px; font-size: 13px;">返回列表</button>
-                </div>
-              </div>
-              <div style="padding: 24px;">
-                <div class="grid grid-cols-2 gap-4">
-                  <!-- 基本信息 -->
-                  <div class="form-group">
-                    <label class="form-label">账号ID</label>
-                    <input type="text" id="account-id" class="form-input" readonly>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">用户名</label>
-                    <input type="text" id="account-username" class="form-input" readonly>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">昵称</label>
-                    <input type="text" id="account-nickname" class="form-input" readonly>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">账号类型</label>
-                    <input type="text" id="account-type" class="form-input" readonly>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">等级</label>
-                    <input type="text" id="account-level" class="form-input" readonly>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">经验值</label>
-                    <input type="text" id="account-exp" class="form-input" readonly>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">成就数</label>
-                    <input type="text" id="account-achievements" class="form-input" readonly>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">注册时间</label>
-                    <input type="text" id="account-created" class="form-input" readonly>
-                  </div>
-                </div>
-
-                <!-- 经验值管理 -->
-                <div class="form-group" style="margin-top: 24px;">
-                  <label class="form-label">经验值管理</label>
-                  <div style="background: #0f172a; padding: 16px; border-radius: 8px;">
-                    <div style="margin-bottom: 12px;">
-                      <label class="form-label">快捷操作</label>
-                      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button id="exp-add-100" class="btn-primary" style="padding: 8px 12px;">+100</button>
-                        <button id="exp-add-500" class="btn-primary" style="padding: 8px 12px;">+500</button>
-                        <button id="exp-subtract-100" class="btn-secondary" style="padding: 8px 12px;">-100</button>
-                        <button id="exp-reset" class="btn-danger" style="padding: 8px 12px;">重置</button>
-                      </div>
-                    </div>
-                    <div>
-                      <label class="form-label">自定义经验值</label>
-                      <div style="display: flex; gap: 10px;">
-                        <input type="number" id="custom-exp-amount" class="form-input" value="100" style="flex: 1;">
-                        <button id="exp-add-custom" class="btn-primary" style="padding: 8px 12px;">添加</button>
-                        <button id="exp-subtract-custom" class="btn-secondary" style="padding: 8px 12px;">减少</button>
-                        <button id="exp-set-custom" class="btn-warning" style="padding: 8px 12px;">设置</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 成就管理 -->
-                <div class="form-group" style="margin-top: 24px;">
-                  <label class="form-label">成就管理</label>
-                  <div style="background: #0f172a; padding: 16px; border-radius: 8px;">
-                    <div style="margin-bottom: 12px;">
-                      <label class="form-label">成就操作</label>
-                      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button id="add-achievement" class="btn-primary" style="padding: 8px 12px;">添加成就</button>
-                        <button id="remove-achievement" class="btn-secondary" style="padding: 8px 12px;">移除成就</button>
-                        <button id="reset-achievements" class="btn-danger" style="padding: 8px 12px;">重置所有成就</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
 
         <!-- 系统设置 -->
         <section id="view-system" class="content-section">
@@ -1202,6 +1218,14 @@
       levelExpConfig: {}
     };
 
+    // 页面加载时尝试自动登录
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedToken = localStorage.getItem('adminToken');
+      if (savedToken) {
+        connectSocket(savedToken);
+      }
+    });
+
     // ==================== 页面切换 ====================
     function switchView(view) {
       currentView = view;
@@ -1217,7 +1241,6 @@
         games: '游戏管理',
         chat: '聊天管理',
         accounts: '账号管理',
-        data: '数据管理',
         system: '系统设置'
       };
       document.getElementById('page-title').textContent = titles[view];
@@ -1232,31 +1255,66 @@
       if (view === 'games') loadGames();
       if (view === 'chat') loadChatMessages();
       if (view === 'accounts') loadAccounts();
-      if (view === 'data') loadUserData();
       if (view === 'system') loadSystemStats();
     }
 
-    // ==================== 登录/退出 ====================
+    // ==================== 登录/退出 ====================    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+    const reconnectDelay = 3000;
+
     function login() {
       const token = document.getElementById('admin-token').value.trim();
       if (!token) return showToast('请输入Token', 'error');
 
-      socket = io('/admin', { query: { token } });
+      // 存储 token 到 localStorage
+      localStorage.setItem('adminToken', token);
+
+      connectSocket(token);
+    }
+
+    function connectSocket(token) {
+      socket = io('/admin', {
+        query: { token },
+        reconnection: true,
+        reconnectionAttempts: maxReconnectAttempts,
+        reconnectionDelay: reconnectDelay
+      });
 
       socket.on('connect', () => {
+        reconnectAttempts = 0;
         document.getElementById('login-page').classList.add('hidden');
         document.getElementById('admin-app').classList.remove('hidden');
         showToast('登录成功', 'success');
         loadDashboardData();
+        loadServerVersion();
       });
 
       socket.on('auth_error', (data) => {
         showToast(data.message || '认证失败', 'error');
         socket.disconnect();
+        // 清除无效的 token
+        localStorage.removeItem('adminToken');
+        document.getElementById('login-page').classList.remove('hidden');
+        document.getElementById('admin-app').classList.add('hidden');
       });
 
-      socket.on('disconnect', () => {
-        showToast('连接已断开', 'warning');
+      socket.on('disconnect', (reason) => {
+        showToast('连接已断开，正在尝试重连...', 'warning');
+        if (reason === 'io server disconnect') {
+          // 服务器主动断开，需要重新登录
+          socket.connect();
+        }
+      });
+
+      socket.on('reconnect', (attemptNumber) => {
+        showToast(`重新连接成功 (尝试 ${attemptNumber})`, 'success');
+        loadDashboardData();
+      });
+
+      socket.on('reconnect_failed', () => {
+        showToast('重连失败，请重新登录', 'error');
+        document.getElementById('login-page').classList.remove('hidden');
+        document.getElementById('admin-app').classList.add('hidden');
       });
 
       // 统一数据更新接口
@@ -1273,9 +1331,12 @@
         if (currentView === 'users') renderOnlineUsers();
         if (currentView === 'games') renderGames();
         if (currentView === 'accounts') renderAccounts();
-        if (currentView === 'data') renderDataAccounts();
         if (currentView === 'dashboard') {
           renderLeaderboard();
+          renderRecentLogins();
+          renderRecentGames();
+          renderOnlineUsersDetail();
+          renderGameStats();
           renderSystemInfo(data.stats?.system);
         }
       });
@@ -1330,7 +1391,6 @@
       socket.on('admin_accounts_list', (data) => {
         adminData.accounts = data.accounts || [];
         if (currentView === 'accounts') renderAccounts();
-        if (currentView === 'data') renderDataAccounts();
       });
 
       // 等级经验配置
@@ -1350,7 +1410,24 @@
 
     function logout() {
       if (socket) socket.disconnect();
+      // 清除存储的 token
+      localStorage.removeItem('adminToken');
       location.reload();
+    }
+
+    // 加载服务器版本号
+    function loadServerVersion() {
+      fetch('/version')
+        .then(response => response.json())
+        .then(data => {
+          const versionElements = document.querySelectorAll('[id="server-version"]');
+          versionElements.forEach(element => {
+            element.textContent = `v${data.version} (build ${data.build})`;
+          });
+        })
+        .catch(error => {
+          console.error('获取版本号失败:', error);
+        });
     }
 
     // ==================== 数据加载 ====================
@@ -1359,6 +1436,30 @@
       socket.emit('get_leaderboard');
       socket.emit('get_system_stats');
       socket.emit('get_all_accounts');
+    }
+
+    // 加载最近登录用户
+    function loadRecentLogins() {
+      renderRecentLogins();
+      showToast('数据已刷新', 'success');
+    }
+
+    // 加载最近游戏记录
+    function loadRecentGames() {
+      renderRecentGames();
+      showToast('数据已刷新', 'success');
+    }
+
+    // 加载在线用户详情
+    function loadOnlineUsersDetail() {
+      renderOnlineUsersDetail();
+      showToast('数据已刷新', 'success');
+    }
+
+    // 加载游戏统计
+    function loadGameStats() {
+      renderGameStats();
+      showToast('数据已刷新', 'success');
     }
 
     function loadOnlineUsers() {
@@ -1375,177 +1476,7 @@
       socket.emit('get_all_accounts');
     }
 
-    let currentDataAccountId = null;
 
-    function loadDataAccounts() {
-      socket.emit('get_all_accounts');
-      socket.emit('get_level_exp_config');
-    }
-
-    function renderDataAccounts() {
-      const tbody = document.getElementById('data-accounts-body');
-      const accounts = adminData.accounts || [];
-
-      if (accounts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📋</div>暂无账号数据</div></td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = accounts.map(acc => {
-        const typeClass = acc.account?.type === 'registered' ? 'badge-online' : 'badge-warning';
-        const totalExp = acc.account?.profile?.exp || 0;
-        const level = acc.account?.profile?.level || 1;
-        const achievements = acc.achievements || [];
-
-        return `
-      <tr>
-        <td>${acc.account?.id || acc.id}</td>
-        <td>${acc.account?.username || '-'}</td>
-        <td>${acc.account?.nickname || '-'}</td>
-        <td><span class="badge ${typeClass}">${acc.account?.type === 'registered' ? '注册用户' : '游客'}</span></td>
-        <td>Lv.${level}</td>
-        <td>${totalExp}</td>
-        <td>
-          <div class="table-actions">
-            <button class="table-btn table-btn-info" onclick="selectAccountForDataManagement('${acc.account?.id || acc.id}')">管理</button>
-            <button class="table-btn table-btn-danger" onclick="deleteAccount('${acc.account?.id || acc.id}')">删除</button>
-          </div>
-        </td>
-      </tr>
-    `;
-      }).join('');
-    }
-
-    function filterDataAccounts() {
-      const keyword = document.getElementById('data-account-search')?.value || '';
-
-      // 前端过滤账号数据
-      const accounts = adminData.accounts || [];
-      let filtered = accounts;
-
-      if (keyword) {
-        filtered = filtered.filter(a =>
-          (a.account?.username && a.account.username.includes(keyword)) ||
-          (a.account?.id && a.account.id.includes(keyword)) ||
-          (a.account?.nickname && a.account.nickname.includes(keyword))
-        );
-      }
-
-      const tbody = document.getElementById('data-accounts-body');
-      if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📋</div>暂无匹配账号</div></td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = filtered.map(acc => {
-        const typeClass = acc.account?.type === 'registered' ? 'badge-online' : 'badge-warning';
-        const totalExp = acc.account?.profile?.exp || 0;
-        const level = acc.account?.profile?.level || 1;
-        const achievements = acc.achievements || [];
-
-        return `
-      <tr>
-        <td>${acc.account?.id || acc.id}</td>
-        <td>${acc.account?.username || '-'}</td>
-        <td>${acc.account?.nickname || '-'}</td>
-        <td><span class="badge ${typeClass}">${acc.account?.type === 'registered' ? '注册用户' : '游客'}</span></td>
-        <td>Lv.${level}</td>
-        <td>${totalExp}</td>
-        <td>
-          <div class="table-actions">
-            <button class="table-btn table-btn-info" onclick="selectAccountForDataManagement('${acc.account?.id || acc.id}')">管理</button>
-            <button class="table-btn table-btn-danger" onclick="deleteAccount('${acc.account?.id || acc.id}')">删除</button>
-          </div>
-        </td>
-      </tr>
-    `;
-      }).join('');
-    }
-
-    function selectAccountForDataManagement(accountId) {
-      currentDataAccountId = accountId;
-      socket.emit('get_account_detail', { id: accountId });
-
-      // 监听成功响应
-      socket.once('admin_account_detail', (data) => {
-        updateAccountData(data.account);
-      });
-
-      // 监听失败响应
-      socket.once('admin_action_result', (data) => {
-        if (data.action === 'get_account_detail' && !data.success) {
-          showToast(`获取账号详情失败: ${data.message || '未知错误'}`, 'error');
-          currentDataAccountId = null;
-        }
-      });
-    }
-
-    function backToAccountList() {
-      currentDataAccountId = null;
-      document.querySelector('#view-data .data-card').classList.remove('hidden');
-      document.getElementById('account-data-management').classList.add('hidden');
-    }
-
-    function updateAccountData(account) {
-      if (!account) return;
-
-      const totalExp = account.account?.profile?.exp || 0;
-
-      // 计算等级和剩余经验值
-      let level = 1;
-      let exp = totalExp;
-
-      while (exp >= (adminData.levelExpConfig[level + 1] || level * 100)) {
-        exp -= adminData.levelExpConfig[level + 1] || level * 100;
-        level++;
-      }
-
-      document.getElementById('account-id').value = account.account?.id || account.id;
-      document.getElementById('account-username').value = account.account?.username || '-';
-      document.getElementById('account-nickname').value = account.account?.nickname || '-';
-      document.getElementById('account-type').value = account.account?.type === 'registered' ? '注册用户' : '游客';
-      document.getElementById('account-level').value = `Lv.${level}`;
-      document.getElementById('account-exp').value = `${totalExp} (当前等级: ${exp})`;
-      document.getElementById('account-achievements').value = account.achievements?.length || 0;
-      document.getElementById('account-created').value = formatTime(account.account?.createdAt);
-      document.getElementById('current-account-title').textContent = `账号数据管理 - ${account.account?.username || account.account?.id || account.id}`;
-
-      // 显示管理界面
-      document.querySelector('#view-data .data-card').classList.add('hidden');
-      document.getElementById('account-data-management').classList.remove('hidden');
-
-      // 绑定事件监听器
-      bindDataManagementEvents();
-    }
-
-    function bindDataManagementEvents() {
-      if (!currentDataAccountId) return;
-
-      // 经验值快捷操作
-      document.getElementById('exp-add-100').onclick = () => modifyExp(currentDataAccountId, 'add', 100);
-      document.getElementById('exp-add-500').onclick = () => modifyExp(currentDataAccountId, 'add', 500);
-      document.getElementById('exp-subtract-100').onclick = () => modifyExp(currentDataAccountId, 'subtract', 100);
-      document.getElementById('exp-reset').onclick = () => modifyExp(currentDataAccountId, 'set', 0);
-
-      // 经验值自定义操作
-      document.getElementById('exp-add-custom').onclick = () => {
-        const amount = parseInt(document.getElementById('custom-exp-amount').value) || 0;
-        if (amount > 0) modifyExp(currentDataAccountId, 'add', amount);
-      };
-      document.getElementById('exp-subtract-custom').onclick = () => {
-        const amount = parseInt(document.getElementById('custom-exp-amount').value) || 0;
-        if (amount > 0) modifyExp(currentDataAccountId, 'subtract', amount);
-      };
-      document.getElementById('exp-set-custom').onclick = () => {
-        const amount = parseInt(document.getElementById('custom-exp-amount').value) || 0;
-        modifyExp(currentDataAccountId, 'set', amount);
-      };
-
-      // 成就操作
-      document.getElementById('add-achievement').onclick = () => showAddAchievementModal(currentDataAccountId);
-      document.getElementById('remove-achievement').onclick = () => showRemoveAchievementModal(currentDataAccountId);
-      document.getElementById('reset-achievements').onclick = () => resetAchievements(currentDataAccountId);
-    }
 
     function loadChatMessages() {
       socket.emit('get_chat_history_admin', { scope: 'all' });
@@ -1742,6 +1673,8 @@
           <div class="table-actions">
             <button class="table-btn table-btn-info" onclick="viewAccountDetail('${acc.account?.id || acc.id}')">查看</button>
             <button class="table-btn table-btn-warning" onclick="resetPassword('${acc.account?.id || acc.id}')">重置密码</button>
+            <button class="table-btn table-btn-success" onclick="showExpManagement('${acc.account?.id || acc.id}')">经验</button>
+            <button class="table-btn table-btn-primary" onclick="showAchievementManagement('${acc.account?.id || acc.id}')">成就</button>
             <button class="table-btn table-btn-danger" onclick="deleteAccount('${acc.account?.id || acc.id}')">删除</button>
           </div>
         </td>
@@ -1750,59 +1683,432 @@
       }).join('');
     }
 
-    function renderUserData() {
-      const tbody = document.getElementById('user-data-body');
-      const accounts = adminData.accounts || [];
 
-      if (accounts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📋</div>暂无用户数据</div></td></tr>';
-        return;
-      }
 
-      tbody.innerHTML = accounts.map(acc => {
-        const typeClass = acc.account?.type === 'registered' ? 'badge-online' : 'badge-warning';
-        const level = acc.account?.profile?.level || 1;
-        const exp = acc.account?.profile?.exp || 0;
-        const achievementCount = acc.achievements?.length || 0;
-        return `
-      <tr>
-        <td>${acc.account?.id || acc.id}</td>
-        <td>${acc.account?.username || '-'}</td>
-        <td>${acc.account?.nickname || '-'}</td>
-        <td><span class="badge ${typeClass}">${acc.account?.type === 'registered' ? '注册用户' : '游客'}</span></td>
-        <td>Lv.${level}</td>
-        <td>${exp}</td>
-        <td>${achievementCount}</td>
-        <td>
-          <div class="table-actions">
-            <button class="table-btn table-btn-info" onclick="viewAccountDetail('${acc.account?.id || acc.id}')">查看</button>
-            <button class="table-btn table-btn-primary" onclick="showExpManagement('${acc.account?.id || acc.id}')">经验</button>
-            <button class="table-btn table-btn-success" onclick="showAchievementManagement('${acc.account?.id || acc.id}')">成就</button>
-          </div>
-        </td>
-      </tr>
-    `;
-      }).join('');
-    }
-
+    // 渲染排行榜 - 卡片预览
     function renderLeaderboard() {
-      const tbody = document.getElementById('leaderboard-body');
+      const previewEl = document.getElementById('leaderboard-preview');
       const board = adminData.leaderboard || [];
 
       if (board.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📊</div>暂无数据</div></td></tr>';
+        previewEl.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div>暂无数据</div>';
         return;
       }
 
-      tbody.innerHTML = board.map((item, i) => `
-    <tr>
-      <td>#${i + 1}</td>
-      <td>${item.name || item.userId || '未知'}</td>
-      <td>${item.wins || 0} / ${item.losses || 0} / ${item.draws || 0}</td>
-      <td>${item.totalGames || 0}</td>
-      <td>${item.winrate || '0%'}</td>
-    </tr>
-  `).join('');
+      const medals = ['🥇', '🥈', '🥉'];
+      const avatars = ['🏆', '⭐', '🎯', '🎮', '🎪'];
+      previewEl.innerHTML = board.slice(0, 5).map((item, i) => {
+        const rankIcon = i < 3 ? medals[i] : `#${i + 1}`;
+        return `
+          <div class="preview-item">
+            <div class="preview-left">
+              <div class="preview-avatar" style="${i < 3 ? 'background: linear-gradient(135deg, ' + (i === 0 ? '#f59e0b, #d97706' : i === 1 ? '#94a3b8, #64748b' : '#d97706, #b45309') + ');' : ''}">${rankIcon}</div>
+              <div class="preview-info">
+                <div class="preview-title">${item.name || item.userId || '未知'}</div>
+                <div class="preview-subtitle">${item.wins || 0}胜 / ${item.losses || 0}负 / ${item.draws || 0}平</div>
+              </div>
+            </div>
+            <div class="preview-right">
+              <span class="badge badge-info">${item.winrate || '0%'}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 显示排行榜详情
+    function showLeaderboardDetail() {
+      const board = adminData.leaderboard || [];
+      const content = `
+        <div class="table-wrap" style="max-height: 400px; overflow-y: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>排名</th>
+                <th>用户</th>
+                <th>胜/负/平</th>
+                <th>总场次</th>
+                <th>胜率</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${board.length === 0 ? '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📊</div>暂无数据</div></td></tr>' :
+          board.map((item, i) => `
+                  <tr>
+                    <td>#${i + 1}</td>
+                    <td>${item.name || item.userId || '未知'}</td>
+                    <td>${item.wins || 0} / ${item.losses || 0} / ${item.draws || 0}</td>
+                    <td>${item.totalGames || 0}</td>
+                    <td>${item.winrate || '0%'}</td>
+                  </tr>
+                `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      showModal('🏆 排行榜 Top 10', content);
+    }
+
+    // 渲染最近登录用户 - 卡片预览
+    function renderRecentLogins() {
+      const previewEl = document.getElementById('recent-logins-preview');
+      const accounts = adminData.accounts || [];
+
+      const recentLogins = accounts
+        .filter(acc => acc.account?.lastLogin)
+        .sort((a, b) => (b.account?.lastLogin || 0) - (a.account?.lastLogin || 0))
+        .slice(0, 5);
+
+      if (recentLogins.length === 0) {
+        previewEl.innerHTML = '<div class="empty-state"><div class="empty-icon">⏰</div>暂无数据</div>';
+        return;
+      }
+
+      const avatars = ['👤', '👨', '👩', '🧑', '👱'];
+      previewEl.innerHTML = recentLogins.map((acc, i) => {
+        const level = acc.account?.profile?.level || 1;
+        return `
+          <div class="preview-item">
+            <div class="preview-left">
+              <div class="preview-avatar">${avatars[i % avatars.length]}</div>
+              <div class="preview-info">
+                <div class="preview-title">${acc.account?.nickname || acc.account?.username || '匿名'}</div>
+                <div class="preview-subtitle">Lv.${level} · ${formatTime(acc.account?.lastLogin)}</div>
+              </div>
+            </div>
+            <div class="preview-right">
+              <span class="badge ${acc.account?.type === 'registered' ? 'badge-online' : 'badge-warning'}">${acc.account?.type === 'registered' ? '注册' : '游客'}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 渲染最近游戏记录 - 卡片预览
+    function renderRecentGames() {
+      const previewEl = document.getElementById('recent-games-preview');
+      const games = adminData.games || [];
+
+      const recentGames = games
+        .filter(game => game.endTime)
+        .sort((a, b) => (b.endTime || 0) - (a.endTime || 0))
+        .slice(0, 5);
+
+      if (recentGames.length === 0) {
+        previewEl.innerHTML = '<div class="empty-state"><div class="empty-icon">🎯</div>暂无数据</div>';
+        return;
+      }
+
+      const gameIcons = { '五子棋': '⚫', '象棋': '♟', '围棋': '⚪', '国际象棋': '♔', '斗兽棋': '🐅' };
+      previewEl.innerHTML = recentGames.map(game => {
+        let result = '平局';
+        if (game.winner === 'player1') result = `${game.player1?.nickname?.substring(0, 6) || '玩家1'}胜`;
+        else if (game.winner === 'player2') result = `${game.player2?.nickname?.substring(0, 6) || '玩家2'}胜`;
+
+        return `
+          <div class="preview-item">
+            <div class="preview-left">
+              <div class="preview-avatar">${gameIcons[game.gameType] || '🎮'}</div>
+              <div class="preview-info">
+                <div class="preview-title">${game.player1?.nickname?.substring(0, 8) || '-'} VS ${game.player2?.nickname?.substring(0, 8) || '-'}</div>
+                <div class="preview-subtitle">${game.gameType} · ${formatTime(game.endTime)}</div>
+              </div>
+            </div>
+            <div class="preview-right">
+              <span class="badge badge-info">${result}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 渲染在线用户详情 - 卡片预览
+    function renderOnlineUsersDetail() {
+      const previewEl = document.getElementById('online-users-detail-preview');
+      const users = adminData.users || [];
+
+      if (users.length === 0) {
+        previewEl.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div>暂无在线用户</div>';
+        return;
+      }
+
+      const now = Date.now();
+      const avatars = ['😊', '😄', '🙂', '😎', '🤗'];
+      previewEl.innerHTML = users.slice(0, 5).map((user, i) => {
+        let statusText = '在线';
+        if (user.status === 'playing') statusText = '游戏中';
+        else if (user.status === 'waiting') statusText = '匹配中';
+        else if (user.status === 'spectating') statusText = '观战中';
+
+        const accountLevel = user.account?.profile?.level || 1;
+        const onlineSeconds = Math.floor((now - user.connectedAt) / 1000);
+        const onlineMinutes = Math.floor(onlineSeconds / 60);
+        let onlineDuration = onlineMinutes > 0 ? `${onlineMinutes}m` : `${onlineSeconds}s`;
+
+        return `
+          <div class="preview-item">
+            <div class="preview-left">
+              <div class="preview-avatar">${avatars[i % avatars.length]}</div>
+              <div class="preview-info">
+                <div class="preview-title">${user.nickname || '匿名'}</div>
+                <div class="preview-subtitle">Lv.${accountLevel} · ${onlineDuration}</div>
+              </div>
+            </div>
+            <div class="preview-right">
+              <span class="badge ${user.status === 'playing' ? 'badge-playing' : user.status === 'waiting' ? 'badge-waiting' : 'badge-online'}">${statusText}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 渲染游戏统计 - 卡片预览
+    function renderGameStats() {
+      const previewEl = document.getElementById('game-stats-preview');
+      const games = adminData.games || [];
+
+      const gameTypes = ['五子棋', '象棋', '围棋', '国际象棋', '斗兽棋'];
+      const gameIcons = { '五子棋': '⚫', '象棋': '♟', '围棋': '⚪', '国际象棋': '♔', '斗兽棋': '🐅' };
+      const stats = {};
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      gameTypes.forEach(type => {
+        stats[type] = { today: 0, total: 0, playing: 0, totalDuration: 0 };
+      });
+
+      games.forEach(game => {
+        const type = game.gameType;
+        if (stats[type]) {
+          stats[type].total++;
+          if (game.status === 'playing') stats[type].playing++;
+          if (game.startTime && game.endTime) stats[type].totalDuration += (game.endTime - game.startTime);
+          if (game.startTime && game.startTime > today.getTime()) stats[type].today++;
+        }
+      });
+
+      const statsArray = Object.entries(stats).filter(([_, data]) => data.total > 0);
+
+      if (statsArray.length === 0) {
+        previewEl.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div>暂无数据</div>';
+        return;
+      }
+
+      previewEl.innerHTML = statsArray.slice(0, 5).map(([gameType, data]) => `
+        <div class="preview-item">
+          <div class="preview-left">
+            <div class="preview-avatar">${gameIcons[gameType] || '🎮'}</div>
+            <div class="preview-info">
+              <div class="preview-title">${gameType}</div>
+              <div class="preview-subtitle">今日 ${data.today} · 总共 ${data.total}</div>
+            </div>
+          </div>
+          <div class="preview-right">
+            <span class="badge ${data.playing > 0 ? 'badge-playing' : 'badge-online'}">${data.playing} 进行中</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // 显示最近登录用户详情
+    function showRecentLoginsDetail() {
+      const accounts = adminData.accounts || [];
+      const recentLogins = accounts
+        .filter(acc => acc.account?.lastLogin)
+        .sort((a, b) => (b.account?.lastLogin || 0) - (a.account?.lastLogin || 0))
+        .slice(0, 20);
+
+      const content = `
+        <div class="table-wrap" style="max-height: 400px; overflow-y: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>用户</th>
+                <th>账号类型</th>
+                <th>等级</th>
+                <th>登录时间</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${recentLogins.length === 0 ? '<tr><td colspan="4"><div class="empty-state"><div class="empty-icon">⏰</div>暂无数据</div></td></tr>' :
+          recentLogins.map(acc => {
+            const typeClass = acc.account?.type === 'registered' ? 'badge-online' : 'badge-warning';
+            const level = acc.account?.profile?.level || 1;
+            return `
+                    <tr>
+                      <td>${acc.account?.nickname || acc.account?.username || '匿名'}</td>
+                      <td><span class="badge ${typeClass}">${acc.account?.type === 'registered' ? '注册用户' : '游客'}</span></td>
+                      <td>Lv.${level}</td>
+                      <td>${formatTime(acc.account?.lastLogin)}</td>
+                    </tr>
+                  `;
+          }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      showModal('👤 最近登录用户', content);
+    }
+
+    // 显示最近游戏记录详情
+    function showRecentGamesDetail() {
+      const games = adminData.games || [];
+      const recentGames = games
+        .filter(game => game.endTime)
+        .sort((a, b) => (b.endTime || 0) - (a.endTime || 0))
+        .slice(0, 20);
+
+      const content = `
+        <div class="table-wrap" style="max-height: 400px; overflow-y: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>棋种</th>
+                <th>玩家1</th>
+                <th>玩家2</th>
+                <th>结果</th>
+                <th>时间</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${recentGames.length === 0 ? '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">🎯</div>暂无数据</div></td></tr>' :
+          recentGames.map(game => {
+            let result = '平局';
+            const resultClass = 'badge-waiting';
+            if (game.winner === 'player1') result = `${game.player1?.nickname || '玩家1'} 获胜`;
+            else if (game.winner === 'player2') result = `${game.player2?.nickname || '玩家2'} 获胜`;
+
+            return `
+                    <tr>
+                      <td>${game.gameType}</td>
+                      <td>${game.player1?.nickname || '-'}</td>
+                      <td>${game.player2?.nickname || '-'}</td>
+                      <td><span class="badge ${resultClass}">${result}</span></td>
+                      <td>${formatTime(game.endTime)}</td>
+                    </tr>
+                  `;
+          }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      showModal('🎮 最近游戏记录', content);
+    }
+
+    // 显示在线用户详情
+    function showOnlineUsersDetail() {
+      const users = adminData.users || [];
+      const now = Date.now();
+
+      const content = `
+        <div class="table-wrap" style="max-height: 400px; overflow-y: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>用户ID</th>
+                <th>昵称</th>
+                <th>状态</th>
+                <th>棋种</th>
+                <th>等级</th>
+                <th>在线时长</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${users.length === 0 ? '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">👥</div>暂无在线用户</div></td></tr>' :
+          users.map(user => {
+            let statusClass, statusText;
+            switch (user.status) {
+              case 'playing': statusClass = 'badge-playing'; statusText = '游戏中'; break;
+              case 'waiting': statusClass = 'badge-waiting'; statusText = '匹配中'; break;
+              case 'spectating': statusClass = 'badge-offline'; statusText = '观战中'; break;
+              default: statusClass = 'badge-online'; statusText = '在线'; break;
+            }
+            const accountLevel = user.account?.profile?.level || 1;
+            const onlineSeconds = Math.floor((now - user.connectedAt) / 1000);
+            const onlineMinutes = Math.floor(onlineSeconds / 60);
+            const onlineHours = Math.floor(onlineMinutes / 60);
+            let onlineDuration;
+            if (onlineHours > 0) onlineDuration = `${onlineHours}h ${onlineMinutes % 60}m`;
+            else if (onlineMinutes > 0) onlineDuration = `${onlineMinutes}m ${onlineSeconds % 60}s`;
+            else onlineDuration = `${onlineSeconds}s`;
+
+            return `
+                    <tr>
+                      <td>${user.userId}</td>
+                      <td>${user.nickname || '匿名'}</td>
+                      <td><span class="badge ${statusClass}">${statusText}</span></td>
+                      <td>${user.gameType || '-'}</td>
+                      <td>Lv.${accountLevel}</td>
+                      <td>${onlineDuration}</td>
+                    </tr>
+                  `;
+          }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      showModal('👥 在线用户详情', content);
+    }
+
+    // 显示游戏统计详情
+    function showGameStatsDetail() {
+      const games = adminData.games || [];
+      const gameTypes = ['五子棋', '象棋', '围棋', '国际象棋', '斗兽棋'];
+      const stats = {};
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      gameTypes.forEach(type => {
+        stats[type] = { today: 0, total: 0, playing: 0, totalDuration: 0 };
+      });
+
+      games.forEach(game => {
+        const type = game.gameType;
+        if (stats[type]) {
+          stats[type].total++;
+          if (game.status === 'playing') stats[type].playing++;
+          if (game.startTime && game.endTime) stats[type].totalDuration += (game.endTime - game.startTime);
+          if (game.startTime && game.startTime > today.getTime()) stats[type].today++;
+        }
+      });
+
+      const statsArray = Object.entries(stats);
+
+      const content = `
+        <div class="table-wrap" style="max-height: 400px; overflow-y: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>棋种</th>
+                <th>今日对局</th>
+                <th>总对局</th>
+                <th>进行中</th>
+                <th>平均时长</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${statsArray.length === 0 ? '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📊</div>暂无数据</div></td></tr>' :
+          statsArray.map(([gameType, data]) => {
+            const avgDuration = data.total > 0 ? Math.floor(data.totalDuration / data.total / 1000) : 0;
+            const avgMinutes = Math.floor(avgDuration / 60);
+            const avgSeconds = avgDuration % 60;
+            const avgDurationStr = avgMinutes > 0 ? `${avgMinutes}m ${avgSeconds}s` : `${avgSeconds}s`;
+
+            return `
+                    <tr>
+                      <td>${gameType}</td>
+                      <td>${data.today}</td>
+                      <td>${data.total}</td>
+                      <td>${data.playing}</td>
+                      <td>${data.total > 0 ? avgDurationStr : '-'}</td>
+                    </tr>
+                  `;
+          }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      showModal('📈 游戏统计', content);
     }
 
     function renderChatMessages() {
@@ -1944,11 +2250,7 @@
         if (data.action === 'modify_user_exp' && data.success) {
           showToast(`经验值修改成功：${data.oldExp} -> ${data.newExp}`, 'success');
           closeModal();
-          if (currentView === 'data' && currentDataAccountId === accountId) {
-            selectAccountForDataManagement(accountId);
-          } else if (currentView === 'data') {
-            loadDataAccounts();
-          } else if (currentView === 'accounts') {
+          if (currentView === 'accounts') {
             loadAccounts();
           }
         }
@@ -2058,11 +2360,7 @@
         if (data.action === 'add_user_achievement' && data.success) {
           showToast('成就添加成功', 'success');
           closeModal();
-          if (currentView === 'data' && currentDataAccountId === accountId) {
-            selectAccountForDataManagement(accountId);
-          } else if (currentView === 'data') {
-            loadDataAccounts();
-          } else if (currentView === 'accounts') {
+          if (currentView === 'accounts') {
             loadAccounts();
           }
         }
@@ -2076,11 +2374,7 @@
         if (data.action === 'remove_user_achievement' && data.success) {
           showToast('成就移除成功', 'success');
           closeModal();
-          if (currentView === 'data' && currentDataAccountId === accountId) {
-            selectAccountForDataManagement(accountId);
-          } else if (currentView === 'data') {
-            loadDataAccounts();
-          } else if (currentView === 'accounts') {
+          if (currentView === 'accounts') {
             loadAccounts();
           }
         }
@@ -2096,11 +2390,7 @@
         if (data.action === 'reset_user_achievements' && data.success) {
           showToast('成就重置成功', 'success');
           closeModal();
-          if (currentView === 'data' && currentDataAccountId === accountId) {
-            selectAccountForDataManagement(accountId);
-          } else if (currentView === 'data') {
-            loadDataAccounts();
-          } else if (currentView === 'accounts') {
+          if (currentView === 'accounts') {
             loadAccounts();
           }
         }

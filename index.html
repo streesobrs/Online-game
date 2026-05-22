@@ -4099,6 +4099,20 @@
           } else {
             showToast('密码修改失败：' + data.message, 'error');
           }
+        } else if (data.action === 'reset_password') {
+          // 恢复重置按钮状态
+          const resetBtn = document.querySelector('#account-modal .btn-primary');
+          if (resetBtn && resetBtn.textContent === '重置中...') {
+            resetBtn.textContent = '重置密码';
+            resetBtn.disabled = false;
+          }
+          if (data.success) {
+            closeAccountModal();
+            showLoginModal();
+            showToast('密码重置成功，请使用新密码登录', 'success');
+          } else {
+            showToast('密码重置失败：' + data.message, 'error');
+          }
         }
       });
 
@@ -8948,6 +8962,9 @@
           <div class="account-switch-text">
             还没有账号？<span class="account-switch-link" onclick="closeAccountModal();showRegisterModal();">立即注册</span>
           </div>
+          <div class="account-switch-text" style="margin-top: 8px;">
+            忘记密码？<span class="account-switch-link" onclick="closeAccountModal();showResetPasswordModal();">找回密码</span>
+          </div>
         </div>
       `;
       document.body.appendChild(modal);
@@ -8988,6 +9005,37 @@
       document.body.appendChild(modal);
     }
 
+    function showResetPasswordModal() {
+      const modal = document.createElement('div');
+      modal.className = 'account-modal-overlay';
+      modal.id = 'account-modal';
+      modal.innerHTML = `
+        <div class="account-modal">
+          <div class="account-modal-title">🔄 找回密码</div>
+          <div class="account-form-group">
+            <label class="account-form-label">用户名</label>
+            <input type="text" class="account-form-input" id="reset-username" placeholder="请输入用户名">
+          </div>
+          <div class="account-form-group">
+            <label class="account-form-label">新密码</label>
+            <input type="password" class="account-form-input" id="reset-password" placeholder="至少6位新密码">
+          </div>
+          <div class="account-form-group">
+            <label class="account-form-label">确认新密码</label>
+            <input type="password" class="account-form-input" id="reset-password2" placeholder="再次输入新密码">
+          </div>
+          <div class="account-modal-footer">
+            <button class="account-btn" onclick="closeAccountModal();showAutoLoginModal();">取消</button>
+            <button class="account-btn btn-primary" onclick="doResetPassword()">重置密码</button>
+          </div>
+          <div class="account-switch-text">
+            想起密码了？<span class="account-switch-link" onclick="closeAccountModal();showLoginModal();">立即登录</span>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
     function closeAccountModal() {
       const modal = document.getElementById('account-modal');
       if (modal) {
@@ -9019,6 +9067,42 @@
         if (loginBtn.textContent === '登录中...') {
           loginBtn.textContent = originalText;
           loginBtn.disabled = false;
+        }
+      }, 3000);
+    }
+
+    function doResetPassword() {
+      const username = document.getElementById('reset-username').value.trim();
+      const password = document.getElementById('reset-password').value;
+      const password2 = document.getElementById('reset-password2').value;
+
+      // 验证表单
+      if (!username) {
+        showToast('请输入用户名', 'error');
+        return;
+      }
+      if (password.length < 6) {
+        showToast('密码至少6位', 'error');
+        return;
+      }
+      if (password !== password2) {
+        showToast('两次输入的密码不一致', 'error');
+        return;
+      }
+
+      // 显示加载状态
+      const resetBtn = document.querySelector('#account-modal .btn-primary');
+      const originalText = resetBtn.textContent;
+      resetBtn.textContent = '重置中...';
+      resetBtn.disabled = true;
+
+      socket.emit('account_reset_password', { username, password });
+
+      // 3秒后恢复按钮状态（如果服务器没有响应）
+      setTimeout(() => {
+        if (resetBtn.textContent === '重置中...') {
+          resetBtn.textContent = originalText;
+          resetBtn.disabled = false;
         }
       }, 3000);
     }
