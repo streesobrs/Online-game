@@ -1503,9 +1503,15 @@ class GameManager {
       });
     }
 
-    // AI思考并移动，根据难度设置不同的思考时间
-    const thinkTime = aiGame.difficulty === 'easy' ? 800 :
-      aiGame.difficulty === 'medium' ? 1500 : 2500;
+    // AI思考并移动，根据难度设置不同的随机思考时间
+    let thinkTime;
+    if (aiGame.difficulty === 'easy') {
+      thinkTime = Math.floor(Math.random() * 81) + 20; // 20-100ms
+    } else if (aiGame.difficulty === 'medium') {
+      thinkTime = Math.floor(Math.random() * 201) + 100; // 100-300ms
+    } else {
+      thinkTime = Math.floor(Math.random() * 301) + 200; // 200-500ms
+    }
     setTimeout(() => {
       this.handleAIAutoMove(userId, io);
     }, thinkTime);

@@ -250,10 +250,23 @@ class AIManager {
       return defensiveLiveThreeMove;
     }
 
+    // 统计棋盘上已有棋子数量
+    let pieceCount = 0;
+    for (let r = 0; r < board.length; r++) {
+      for (let c = 0; c < board[0].length; c++) {
+        if (board[r][c] !== 0) {
+          pieceCount++;
+        }
+      }
+    }
+
     // 积极进攻：寻找最佳进攻位置（优先于防守活二）
-    const bestAttackMove = this.findBestAttackMove(board, currentPlayer, opponent);
-    if (bestAttackMove && bestAttackMove.score >= 50) {
-      return { r: bestAttackMove.r, c: bestAttackMove.c };
+    // 但在开局阶段（棋子太少）时跳过，避免选择边缘位置
+    if (pieceCount > 3) {
+      const bestAttackMove = this.findBestAttackMove(board, currentPlayer, opponent);
+      if (bestAttackMove && bestAttackMove.score >= 50) {
+        return { r: bestAttackMove.r, c: bestAttackMove.c };
+      }
     }
 
     // ===== 基础防守 =====
@@ -263,8 +276,8 @@ class AIManager {
       return defensiveLiveTwoMove;
     }
 
-    // 使用最优位置选择（无随机性，始终选择最佳）
-    return this.getBestPositionByScoreHard(board, currentPlayer, opponent);
+    // 使用最优位置选择（添加随机性，避免固定落子）
+    return this.getBestPositionByScoreMedium(board, currentPlayer, opponent);
   }
 
   // 五子棋困难难度 - 基于 Minimax 算法（增强进攻版）
@@ -1456,6 +1469,22 @@ class AIManager {
   // 寻找最佳防守位置V2（更积极的防守）
   findBestDefensiveMoveV2(board, opponent, currentPlayer) {
     const emptyCells = this.getEmptyCells(board);
+    
+    // 统计棋盘上已有棋子数量
+    let pieceCount = 0;
+    for (let r = 0; r < board.length; r++) {
+      for (let c = 0; c < board[0].length; c++) {
+        if (board[r][c] !== 0) {
+          pieceCount++;
+        }
+      }
+    }
+    
+    // 如果棋子数量很少（开局阶段），不进行防守，让位置选择函数决定
+    if (pieceCount <= 2) {
+      return null;
+    }
+    
     let bestMove = null;
     let maxThreat = 0;
 
@@ -1840,6 +1869,106 @@ class AIManager {
 
     // 总是选择最佳位置 - 无任何随机性
     const selected = scoredCells[0];
+
+    return { r: selected.r, c: selected.c };
+  }
+
+  // 中等难度位置选择 - 在高分位置中随机选择
+  getBestPositionByScoreMedium(board, currentPlayer, opponent) {
+    const emptyCells = this.getEmptyCells(board);
+
+    if (emptyCells.length === 0) return null;
+
+    // 统计棋盘上已有棋子数量
+    let hasPieces = false;
+    for (let r = 0; r < board.length; r++) {
+      for (let c = 0; c < board[0].length; c++) {
+        if (board[r][c] !== 0) {
+          hasPieces = true;
+          break;
+        }
+      }
+      if (hasPieces) break;
+    }
+
+    // 如果棋盘为空（AI是先手），选择中心附近的位置
+    if (!hasPieces) {
+      const centerR = Math.floor(board.length / 2);
+      const centerC = Math.floor(board[0].length / 2);
+      const centerCandidates = [];
+      for (let dr = -2; dr <= 2; dr++) {
+        for (let dc = -2; dc <= 2; dc++) {
+          const nr = centerR + dr;
+          const nc = centerC + dc;
+          if (nr >= 0 && nr < board.length && nc >= 0 && nc < board[0].length && board[nr][nc] === 0) {
+            centerCandidates.push({ r: nr, c: nc });
+          }
+        }
+      }
+      const selected = centerCandidates[Math.floor(Math.random() * centerCandidates.length)];
+      return { r: selected.r, c: selected.c };
+    }
+
+    // 如果有棋子，优先选择靠近已有棋子的位置
+    const nearPieceCells = [];
+    const farPieceCells = [];
+    
+    for (const cell of emptyCells) {
+      let hasNearPiece = false;
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          const nr = cell.r + dr;
+          const nc = cell.c + dc;
+          if (nr >= 0 && nr < board.length && nc >= 0 && nc < board[0].length) {
+            if (board[nr][nc] !== 0) {
+              hasNearPiece = true;
+              break;
+            }
+          }
+        }
+        if (hasNearPiece) break;
+      }
+      
+      if (hasNearPiece) {
+        nearPieceCells.push(cell);
+      } else {
+        farPieceCells.push(cell);
+      }
+    }
+
+    // 优先从靠近棋子的位置中选择
+    const candidates = nearPieceCells.length > 0 ? nearPieceCells : farPieceCells;
+
+    // 评估候选位置
+    const scoredCells = candidates.map(cell => {
+      let score = 0;
+
+      // 进攻评分
+      board[cell.r][cell.c] = currentPlayer;
+      score += this.evaluatePositionV2(board, cell.r, cell.c, currentPlayer) * 3.0;
+      board[cell.r][cell.c] = 0;
+
+      // 防守评分
+      board[cell.r][cell.c] = opponent;
+      score += this.evaluatePositionV2(board, cell.r, cell.c, opponent) * 2.5;
+      board[cell.r][cell.c] = 0;
+
+      // 中心位置加分
+      const centerR = Math.floor(board.length / 2);
+      const centerC = Math.floor(board[0].length / 2);
+      const distanceToCenter = Math.abs(cell.r - centerR) + Math.abs(cell.c - centerC);
+      score += Math.max(0, 30 - distanceToCenter * 2);
+
+      return { r: cell.r, c: cell.c, score };
+    });
+
+    // 按分数排序
+    scoredCells.sort((a, b) => b.score - a.score);
+
+    // 从前3个最高分位置中随机选择
+    const topCandidates = scoredCells.slice(0, Math.min(3, scoredCells.length));
+    const selected = topCandidates[Math.floor(Math.random() * topCandidates.length)];
 
     return { r: selected.r, c: selected.c };
   }

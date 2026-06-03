@@ -7642,40 +7642,47 @@
         playAgainBtn.style.display = 'none';
       }
 
+      // 检查是否从AI对战返回
+      const isFromAI = gameState.difficulty !== null;
+
       // 隐藏所有页面
-      lobbyContainer.style.display = 'flex';
+      lobbyContainer.style.display = isFromAI ? 'none' : 'flex';
       infoContainer.style.display = 'none';
       gameControls.style.display = 'none';
       statusBox.style.display = 'none';
       moveLogPanel.style.display = 'none';
       chatContainer.classList.remove('show');
       document.getElementById('achievements-container').style.display = 'none';
-      document.getElementById('ai-game-container').style.display = 'none';
+      document.getElementById('ai-game-container').style.display = isFromAI ? 'block' : 'none';
 
       // 显示在线玩家面板（带动画）
-      const onlineUsersPanelEl = document.getElementById('online-users-panel');
-      onlineUsersPanelEl.style.opacity = '0';
-      onlineUsersPanelEl.style.transform = 'translateY(20px)';
-      onlineUsersPanelEl.style.display = 'block';
+      if (!isFromAI) {
+        const onlineUsersPanelEl = document.getElementById('online-users-panel');
+        onlineUsersPanelEl.style.opacity = '0';
+        onlineUsersPanelEl.style.transform = 'translateY(20px)';
+        onlineUsersPanelEl.style.display = 'block';
 
-      // 添加动画效果
-      setTimeout(() => {
-        onlineUsersPanelEl.style.opacity = '1';
-        onlineUsersPanelEl.style.transform = 'translateY(0)';
-      }, 10);
+        // 添加动画效果
+        setTimeout(() => {
+          onlineUsersPanelEl.style.opacity = '1';
+          onlineUsersPanelEl.style.transform = 'translateY(0)';
+        }, 10);
+      }
 
       // 隐藏所有棋盘
       document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
         board.style.display = 'none';
       });
 
-      // 显示当前选中的棋种棋盘（空棋盘）
-      if (currentGame === 'gobang') {
-        gobangBoard.style.display = 'grid';
-      } else if (currentGame === 'go') {
-        goBoard.style.display = 'grid';
-      } else if (currentGame === 'chess') {
-        chessBoard.style.display = 'block';
+      // 如果不是从AI对战返回，显示当前选中的棋种棋盘（空棋盘）
+      if (!isFromAI) {
+        if (currentGame === 'gobang') {
+          gobangBoard.style.display = 'grid';
+        } else if (currentGame === 'go') {
+          goBoard.style.display = 'grid';
+        } else if (currentGame === 'chess') {
+          chessBoard.style.display = 'block';
+        }
       }
 
       isMatching = false;
