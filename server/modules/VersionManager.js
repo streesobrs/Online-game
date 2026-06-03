@@ -12,9 +12,38 @@ class VersionManager {
         this.serverVersion = this.buildVersionString();
     }
 
+    // 获取 version.json 的存储路径（兼容开发和打包环境）
+    getVersionConfigPath() {
+        const isPkg = typeof process.pkg !== 'undefined';
+
+        if (isPkg) {
+            // pkg 打包环境：使用程序所在目录
+            return path.join(path.dirname(process.execPath), 'version.json');
+        } else {
+            // 开发环境：使用原始位置
+            return path.join(__dirname, '..', 'version.json');
+        }
+    }
+
     // 加载版本配置
     loadVersionConfig() {
-        const versionConfigPath = path.join(__dirname, '..', 'version.json');
+        const versionConfigPath = this.getVersionConfigPath();
+
+        // 如果打包环境且文件不存在，先从打包的资源中复制一份
+        const isPkg = typeof process.pkg !== 'undefined';
+        if (isPkg && !fs.existsSync(versionConfigPath)) {
+            try {
+                const internalPath = path.join(__dirname, '..', 'version.json');
+                if (fs.existsSync(internalPath)) {
+                    const data = fs.readFileSync(internalPath, 'utf8');
+                    fs.writeFileSync(versionConfigPath, data, 'utf8');
+                    logger.info('已从打包资源复制 version.json 到程序目录');
+                }
+            } catch (err) {
+                logger.warn('复制 version.json 失败，将使用默认配置', { error: err.message });
+            }
+        }
+
         try {
             if (fs.existsSync(versionConfigPath)) {
                 const data = fs.readFileSync(versionConfigPath, 'utf8');
@@ -41,7 +70,7 @@ class VersionManager {
 
     // 保存版本配置
     saveVersionConfig() {
-        const versionConfigPath = path.join(__dirname, '..', 'version.json');
+        const versionConfigPath = this.getVersionConfigPath();
         try {
             fs.writeFileSync(versionConfigPath, JSON.stringify(this.versionConfig, null, 2), 'utf8');
         } catch (err) {

@@ -279,6 +279,8 @@ class AccountManager {
     const guestId = this.generateUserId();
     const now = Date.now();
     const guestUser = {
+      id: guestId,
+      userId: guestId,
       account: {
         id: guestId,
         type: 'guest',
@@ -597,6 +599,8 @@ class AccountManager {
       // 没有游客账号，创建新账号
       const accountId = this.generateUserId();
       const account = {
+        id: accountId,
+        userId: accountId,
         account: {
           id: accountId,
           type: 'registered',

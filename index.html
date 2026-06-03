@@ -3,6 +3,11 @@
 
 <head>
   <meta charset="utf-8">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#667eea">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>多棋种联机大厅 🎮 - 五子棋/围棋/象棋/贪吃蛇</title>
   <style>
     /* 全局重置+基础样式 */
@@ -77,6 +82,26 @@
 
     .nav-btn.active:hover {
       background: #0056b3;
+    }
+
+    /* 快捷键提示样式 */
+    .shortcut-hint {
+      font-size: 10px;
+      font-weight: 600;
+      color: #6c757d;
+      margin-left: 4px;
+      padding: 2px 5px;
+      background: #e9ecef;
+      border-radius: 4px;
+      vertical-align: super;
+      min-width: 16px;
+      text-align: center;
+      display: inline-block;
+    }
+
+    .nav-btn.active .shortcut-hint {
+      color: rgba(255, 255, 255, 0.8);
+      background: rgba(255, 255, 255, 0.2);
     }
 
     /* 大厅样式 */
@@ -663,18 +688,44 @@
       transform: translateZ(0);
       will-change: transform;
       transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      animation: stoneDrop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      animation: stoneDrop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      position: relative;
     }
 
     @keyframes stoneDrop {
       0% {
-        transform: scale(1.3);
+        transform: scale(1.3) translateY(-15px);
         opacity: 0;
       }
 
       100% {
-        transform: scale(1);
+        transform: scale(1) translateY(0);
         opacity: 1;
+      }
+    }
+
+    /* 落子涟漪效果 */
+    .stone-ripple {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      animation: rippleEffect 0.8s ease-out forwards;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    @keyframes rippleEffect {
+      0% {
+        transform: scale(0);
+        opacity: 0.8;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.6) 0%, transparent 70%);
+      }
+
+      100% {
+        transform: scale(3);
+        opacity: 0;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, transparent 70%);
       }
     }
 
@@ -778,7 +829,19 @@
       position: relative;
       z-index: 4;
       transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      animation: stoneDrop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      animation: goStoneDrop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes goStoneDrop {
+      0% {
+        transform: scale(1.3) translateY(-15px);
+        opacity: 0;
+      }
+
+      100% {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+      }
     }
 
     .go-black {
@@ -908,23 +971,23 @@
       cursor: grab;
       position: absolute;
       z-index: 10;
-      transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       border: 2px solid rgba(255, 255, 255, 0.4);
       box-shadow:
         0 3px 10px rgba(0, 0, 0, 0.3),
         inset 0 2px 4px rgba(255, 255, 255, 0.3),
         inset 0 -2px 4px rgba(0, 0, 0, 0.2);
-      animation: piecePlace 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      animation: piecePlace 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
 
     @keyframes piecePlace {
       0% {
-        transform: scale(1.3);
+        transform: scale(1.3) translateY(-12px);
         opacity: 0;
       }
 
       100% {
-        transform: scale(1);
+        transform: scale(1) translateY(0);
         opacity: 1;
       }
     }
@@ -1189,23 +1252,65 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background: #ffffff;
-      padding: 20px 32px;
-      border-radius: 8px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-      font-size: 20px;
-      font-weight: 700;
-      color: #27ae60;
-      z-index: 100;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 30px 45px;
+      border-radius: 20px;
+      box-shadow:
+        0 20px 60px rgba(102, 126, 234, 0.5),
+        0 0 0 3px rgba(255, 255, 255, 0.1) inset,
+        0 10px 40px rgba(0, 0, 0, 0.3);
+      font-size: 28px;
+      font-weight: 800;
+      color: #ffffff;
+      z-index: 1000;
       display: none;
-      border: 1px solid #e8f5e8;
-      animation: winPopup 0.3s ease-out;
+      border: none;
+      animation: winPopup 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+      min-width: 280px;
+      text-align: center;
+    }
+
+    .win-alert::before {
+      content: '🏆';
+      display: block;
+      font-size: 48px;
+      margin-bottom: 10px;
+      animation: trophyBounce 0.6s ease-out;
+    }
+
+    @keyframes trophyBounce {
+      0% {
+        transform: scale(0) rotate(-180deg);
+        opacity: 0;
+      }
+
+      50% {
+        transform: scale(1.2) rotate(10deg);
+      }
+
+      70% {
+        transform: scale(0.9) rotate(-5deg);
+      }
+
+      100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+      }
     }
 
     @keyframes winPopup {
       0% {
-        transform: translate(-50%, -50%) scale(0.8);
+        transform: translate(-50%, -50%) scale(0.3) rotate(-10deg);
         opacity: 0;
+      }
+
+      50% {
+        transform: translate(-50%, -50%) scale(1.1) rotate(3deg);
+      }
+
+      70% {
+        transform: translate(-50%, -50%) scale(0.95) rotate(-1deg);
       }
 
       100% {
@@ -1464,6 +1569,25 @@
 
     .tip-popup-close:hover {
       color: #64748b;
+    }
+
+    /* 通用弹窗样式 */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal.show {
+      display: flex;
     }
 
     /* 系统广播样式 */
@@ -1905,6 +2029,163 @@
       .chess-cell {
         width: 35px;
         height: 35px;
+      }
+
+      .gobang-black,
+      .gobang-white {
+        width: 22px;
+        height: 22px;
+      }
+
+      .go-black,
+      .go-white {
+        width: 20px;
+        height: 20px;
+      }
+
+      .chess-piece {
+        width: 32px;
+        height: 32px;
+        font-size: 16px;
+      }
+
+      .game-info-panel {
+        padding: 10px;
+        font-size: 12px;
+      }
+
+      .nav-btn {
+        padding: 8px 12px;
+        font-size: 12px;
+        margin: 4px;
+      }
+
+      .lobby-title {
+        font-size: 18px;
+      }
+
+      .btn {
+        padding: 10px 20px;
+        font-size: 14px;
+      }
+
+      .win-alert {
+        padding: 20px 30px;
+        font-size: 22px;
+      }
+    }
+
+    /* 针对小屏幕手机的优化 */
+    @media (max-width: 480px) {
+      body {
+        padding: 5px;
+      }
+
+      .gobang-board {
+        grid-template-columns: repeat(15, 20px);
+      }
+
+      .gobang-cell {
+        width: 20px;
+        height: 20px;
+      }
+
+      .gobang-black,
+      .gobang-white {
+        width: 18px;
+        height: 18px;
+      }
+
+      .go-board {
+        grid-template-columns: repeat(19, 18px);
+        padding: 15px;
+      }
+
+      .go-cell {
+        width: 18px;
+        height: 18px;
+      }
+
+      .go-black,
+      .go-white {
+        width: 16px;
+        height: 16px;
+      }
+
+      .chess-board {
+        grid-template-columns: repeat(9, 30px);
+        grid-template-rows: repeat(10, 30px);
+      }
+
+      .chess-cell {
+        width: 30px;
+        height: 30px;
+      }
+
+      .chess-piece {
+        width: 28px;
+        height: 28px;
+        font-size: 14px;
+      }
+
+      .header {
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .user-info {
+        font-size: 12px;
+      }
+
+      .status-box {
+        font-size: 12px;
+        padding: 8px;
+      }
+
+      .win-alert {
+        padding: 15px 20px;
+        font-size: 18px;
+      }
+
+      .win-alert::before {
+        font-size: 36px;
+      }
+    }
+
+    /* 触控设备优化 */
+    @media (hover: none) {
+
+      .gobang-cell:hover::before,
+      .go-cell:hover::before {
+        opacity: 0;
+      }
+
+      .gobang-cell:active::before,
+      .go-cell:active::before {
+        opacity: 1;
+        transform: scale(0.8);
+      }
+
+      .nav-btn:active,
+      .btn:active {
+        transform: scale(0.95);
+      }
+
+      .chess-piece:active {
+        transform: scale(1.1);
+      }
+    }
+
+    /* 横屏模式优化 */
+    @media (orientation: landscape) and (max-width: 768px) {
+      .main-content-container {
+        flex-direction: row;
+      }
+
+      .left-panels-container {
+        flex-direction: column;
+        width: auto;
+        max-width: 200px;
       }
     }
 
@@ -2407,28 +2688,31 @@
   <!-- 新增：顶部导航栏 -->
   <div class="game-nav">
     <button class="nav-btn active" data-game="gobang" onclick="switchGame('gobang')">
-      🔴 五子棋
+      🔴 五子棋<sup class="shortcut-hint">1</sup>
     </button>
     <button class="nav-btn" data-game="go" onclick="switchGame('go')">
-      ⚪ 围棋
+      ⚪ 围棋<sup class="shortcut-hint">2</sup>
     </button>
     <button class="nav-btn" data-game="chess" onclick="switchGame('chess')">
-      🟥 象棋
+      🟥 象棋<sup class="shortcut-hint">3</sup>
     </button>
     <button class="nav-btn" data-game="snake" onclick="switchGame('snake')">
-      🐍 贪吃蛇
+      🐍 贪吃蛇<sup class="shortcut-hint">4</sup>
     </button>
     <button class="nav-btn" data-page="achievements" onclick="showAchievements()">
-      🏆 成就
+      🏆 成就<sup class="shortcut-hint">A</sup>
     </button>
     <button class="nav-btn" data-page="leaderboard" onclick="showLeaderboard()">
-      📊 排行榜
+      📊 排行榜<sup class="shortcut-hint">L</sup>
     </button>
     <button class="nav-btn" data-page="ai" onclick="showAIGame()">
-      🤖 AI对战
+      🤖 AI对战<sup class="shortcut-hint">G</sup>
     </button>
     <button class="nav-btn" data-page="theme" onclick="showThemeModal()">
-      🎨 主题
+      🎨 主题<sup class="shortcut-hint">V</sup>
+    </button>
+    <button class="nav-btn" data-page="shortcuts" onclick="showCustomShortcutsPanel()">
+      ⌨️ 快捷键<sup class="shortcut-hint">K</sup>
     </button>
   </div>
 
@@ -2903,14 +3187,14 @@
 
   <!-- 版本信息 -->
   <div class="version-info">
-    版本说明：多棋种联机大厅版 - 支持五子棋/围棋/象棋 | 智能提示系统 | 性能优化版 v<span id="client-version-display">1.3.0</span>
+    版本说明：多棋种联机大厅版 - 支持五子棋/围棋/象棋 | 智能提示系统 | 性能优化版 | 快捷键系统 v<span id="client-version-display">1.4.0</span>
     <span id="server-version-display" style="margin-left: 10px; font-size: 12px; color: #666;"></span>
   </div>
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>
     // 版本号 (语义化版本: MAJOR.MINOR.PATCH)
-    const CLIENT_VERSION = '1.3.0';
+    const CLIENT_VERSION = '1.4.0';
 
     // 全局游戏变量
     let currentGame = 'gobang'; // 当前选择的棋种：gobang, go, chess, snake
@@ -3129,6 +3413,403 @@
       }
     };
 
+    // ========== 快捷键系统 ==========
+    // 默认快捷键配置
+    const defaultShortcuts = {
+      // ========== 游戏切换 ==========
+      '1': { action: 'switchGame', args: ['gobang'], description: '切换到五子棋', category: '游戏切换' },
+      '2': { action: 'switchGame', args: ['go'], description: '切换到围棋', category: '游戏切换' },
+      '3': { action: 'switchGame', args: ['chess'], description: '切换到象棋', category: '游戏切换' },
+      '4': { action: 'switchGame', args: ['snake'], description: '切换到贪吃蛇', category: '游戏切换' },
+
+      // ========== 匹配系统 ==========
+      'm': { action: 'startMatch', description: '开始匹配', category: '匹配系统' },
+      'Escape': { action: 'cancelMatch', description: '取消匹配/关闭弹窗', category: '匹配系统' },
+      'r': { action: 'returnToLobby', description: '返回大厅', category: '匹配系统' },
+
+      // ========== 界面功能 ==========
+      't': { action: 'showGameTips', description: '显示游戏规则', category: '界面功能' },
+      'a': { action: 'showAchievements', description: '显示成就', category: '界面功能' },
+      'l': { action: 'showLeaderboard', description: '显示排行榜', category: '界面功能' },
+      'i': { action: 'showProfile', description: '个人资料', category: '界面功能' },
+      'h': { action: 'showGameHistory', description: '游戏历史', category: '界面功能' },
+      'g': { action: 'showAIGame', description: 'AI对战', category: '界面功能' },
+      'v': { action: 'showTheme', description: '主题设置', category: '界面功能' },
+      'k': { action: 'showCustomShortcuts', description: '自定义快捷键', category: '界面功能' },
+      '?': { action: 'showShortcuts', description: '显示快捷键帮助', category: '界面功能' },
+      's': { action: 'toggleSound', description: '切换音效', category: '界面功能' },
+      'q': { action: 'showLogin', description: '登录', category: '界面功能' },
+      'e': { action: 'showRegister', description: '注册', category: '界面功能' },
+
+      // ========== 游戏操作 ==========
+      'z': { action: 'undoMove', description: '悔棋', category: '游戏操作' },
+      'Shift+Z': { action: 'redoMove', description: '重做', category: '游戏操作' },
+      'u': { action: 'resign', description: '认输', category: '游戏操作' },
+      'n': { action: 'newGame', description: '新游戏', category: '游戏操作' },
+      'p': { action: 'togglePause', description: '暂停/继续', category: '游戏操作' },
+      'f5': { action: 'restartGame', description: '重新开始', category: '游戏操作' },
+
+      // 方向键（贪吃蛇）
+      'ArrowUp': { action: 'snakeUp', description: '贪吃蛇向上', category: '贪吃蛇操作' },
+      'ArrowDown': { action: 'snakeDown', description: '贪吃蛇向下', category: '贪吃蛇操作' },
+      'ArrowLeft': { action: 'snakeLeft', description: '贪吃蛇向左', category: '贪吃蛇操作' },
+      'ArrowRight': { action: 'snakeRight', description: '贪吃蛇向右', category: '贪吃蛇操作' },
+      'w': { action: 'snakeUp', description: '贪吃蛇向上(W)', category: '贪吃蛇操作' },
+      's': { action: 'snakeDown', description: '贪吃蛇向下(S)', category: '贪吃蛇操作' },
+      'a': { action: 'snakeLeft', description: '贪吃蛇向左(A)', category: '贪吃蛇操作' },
+      'd': { action: 'snakeRight', description: '贪吃蛇向右(D)', category: '贪吃蛇操作' },
+      ' ': { action: 'snakePause', description: '贪吃蛇暂停(空格)', category: '贪吃蛇操作' }
+    };
+
+    // 从本地存储加载自定义快捷键，没有则使用默认
+    let shortcuts = loadCustomShortcuts();
+    let soundMuted = false;
+
+    function loadCustomShortcuts() {
+      try {
+        const saved = localStorage.getItem('gameShortcuts');
+        if (saved) {
+          const custom = JSON.parse(saved);
+          return { ...defaultShortcuts, ...custom };
+        }
+      } catch (e) {
+        console.error('加载快捷键失败:', e);
+      }
+      return { ...defaultShortcuts };
+    }
+
+    function saveCustomShortcuts() {
+      try {
+        localStorage.setItem('gameShortcuts', JSON.stringify(shortcuts));
+      } catch (e) {
+        console.error('保存快捷键失败:', e);
+      }
+    }
+
+    function resetShortcuts() {
+      shortcuts = { ...defaultShortcuts };
+      saveCustomShortcuts();
+      updateStatus('✅ 快捷键已重置为默认');
+    }
+
+    function handleKeydown(e) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      const key = e.key === ' ' ? ' ' : e.key.toLowerCase();
+      const shortcut = shortcuts[key] || shortcuts[e.key];
+
+      if (shortcut) {
+        e.preventDefault();
+        executeShortcut(shortcut);
+      }
+    }
+
+    function executeShortcut(shortcut) {
+      switch (shortcut.action) {
+        // ========== 游戏切换 ==========
+        case 'switchGame':
+          switchGame(shortcut.args[0]);
+          break;
+
+        // ========== 匹配系统 ==========
+        case 'startMatch':
+          if (!isMatching) {
+            startMatching();
+          }
+          break;
+        case 'cancelMatch':
+          if (isMatching) {
+            cancelMatching();
+          } else {
+            document.querySelectorAll('.modal, .tip-popup, .win-alert').forEach(el => {
+              el.style.display = 'none';
+            });
+          }
+          break;
+        case 'returnToLobby':
+          returnToLobby();
+          break;
+
+        // ========== 界面功能 ==========
+        case 'showGameTips':
+          showGameTips();
+          break;
+        case 'showAchievements':
+          showAchievements();
+          break;
+        case 'showLeaderboard':
+          showLeaderboard();
+          break;
+        case 'showProfile':
+          showProfileModal();
+          break;
+        case 'showGameHistory':
+          showGameHistoryModal();
+          break;
+        case 'showAIGame':
+          showAIGame();
+          break;
+        case 'showTheme':
+          showThemeModal();
+          break;
+        case 'showCustomShortcuts':
+          showCustomShortcutsPanel();
+          break;
+        case 'showShortcuts':
+          showShortcutsHelp();
+          break;
+        case 'toggleSound':
+          soundMuted = !soundMuted;
+          Object.keys(soundEnabled).forEach(k => {
+            soundEnabled[k] = !soundMuted;
+          });
+          updateStatus(soundMuted ? '🔇 音效已关闭' : '🔊 音效已开启');
+          break;
+        case 'showLogin':
+          showLoginModal();
+          break;
+        case 'showRegister':
+          showRegisterModal();
+          break;
+        case 'showSettings':
+          showSettingsModal();
+          break;
+        case 'closeModals':
+          document.querySelectorAll('.modal, .tip-popup, .win-alert').forEach(el => {
+            el.style.display = 'none';
+          });
+          break;
+        case 'toggleTheme':
+          cycleTheme();
+          break;
+        case 'undoMove':
+          handleUndo();
+          break;
+        case 'redoMove':
+          handleRedo();
+          break;
+        case 'resign':
+          handleResign();
+          break;
+        case 'newGame':
+          handleNewGame();
+          break;
+        case 'togglePause':
+          togglePause();
+          break;
+        case 'restartGame':
+          restartCurrentGame();
+          break;
+        case 'snakeUp':
+        case 'snakeDown':
+        case 'snakeLeft':
+        case 'snakeRight':
+          handleSnakeDirection(shortcut.action.replace('snake', '').toLowerCase());
+          break;
+        case 'snakePause':
+          toggleSnakePause();
+          break;
+      }
+    }
+
+    function showShortcutsHelp() {
+      const categories = {};
+      Object.entries(shortcuts).forEach(([key, info]) => {
+        if (!categories[info.category]) {
+          categories[info.category] = [];
+        }
+        categories[info.category].push({ key, ...info });
+      });
+
+      const helpContent = `
+        <div style="padding: 20px; max-width: 500px; background: white; border-radius: 12px; max-height: 80vh; overflow-y: auto;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="color: #667eea;">⌨️ 快捷键帮助</h3>
+            <button onclick="showCustomShortcutsPanel()" style="padding: 6px 12px; font-size: 12px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer;">
+              ⚙️ 自定义
+            </button>
+          </div>
+          ${Object.entries(categories).map(([category, items]) => `
+            <div style="margin-bottom: 15px;">
+              <h4 style="color: #495057; margin-bottom: 8px; font-size: 13px; border-bottom: 1px solid #eee; padding-bottom: 4px;">${category}</h4>
+              <div style="display: grid; gap: 6px; font-size: 13px;">
+                ${items.map(({ key, description }) => `
+                  <div style="display: flex; justify-content: space-between; padding: 4px 8px; background: #f8f9fa; border-radius: 4px;">
+                    <kbd style="background: #e9ecef; padding: 3px 6px; border-radius: 3px; font-family: monospace; font-weight: bold; font-size: 11px;">${key === ' ' ? 'Space' : key.toUpperCase()}</kbd>
+                    <span style="color: #666;">${description}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.style.display = 'flex';
+      modal.innerHTML = helpContent;
+      document.body.appendChild(modal);
+
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.remove();
+        }
+      });
+    }
+
+    function showCustomShortcutsPanel() {
+      const categories = {};
+      Object.entries(defaultShortcuts).forEach(([key, info]) => {
+        if (!categories[info.category]) {
+          categories[info.category] = [];
+        }
+        categories[info.category].push({ key, ...info });
+      });
+
+      const panelContent = `
+        <div style="padding: 20px; max-width: 550px; background: white; border-radius: 12px; max-height: 85vh; overflow-y: auto;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="color: #667eea;">⚙️ 自定义快捷键</h3>
+            <div style="display: flex; gap: 8px;">
+              <button onclick="resetShortcuts(); showCustomShortcutsPanel()" style="padding: 6px 12px; font-size: 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                重置默认
+              </button>
+              <button onclick="document.querySelector('.modal').remove()" style="padding: 6px 12px; font-size: 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                关闭
+              </button>
+            </div>
+          </div>
+          <div style="font-size: 12px; color: #666; margin-bottom: 15px; padding: 10px; background: #fff3cd; border-radius: 6px;">
+            💡 提示：点击按键输入框后，直接按下想要设置的快捷键即可
+          </div>
+          ${Object.entries(categories).map(([category, items]) => `
+            <div style="margin-bottom: 18px;">
+              <h4 style="color: #495057; margin-bottom: 10px; font-size: 13px; border-bottom: 2px solid #667eea; padding-bottom: 4px;">${category}</h4>
+              <div style="display: grid; gap: 8px;">
+                ${items.map(({ key, description }) => {
+        const currentKey = Object.keys(shortcuts).find(k =>
+          shortcuts[k].action === defaultShortcuts[key].action &&
+          JSON.stringify(shortcuts[k].args) === JSON.stringify(defaultShortcuts[key].args)
+        ) || key;
+        return `
+                    <div style="display: flex; align-items: center; gap: 10px; padding: 8px; background: #f8f9fa; border-radius: 6px;">
+                      <span style="flex: 1; color: #495057; font-size: 13px;">${description}</span>
+                      <input type="text" 
+                        data-default="${key}" 
+                        value="${currentKey === ' ' ? 'Space' : currentKey}" 
+                        style="width: 60px; padding: 6px; text-align: center; border: 1px solid #ddd; border-radius: 4px; font-family: monospace;"
+                        onfocus="this.dataset.oldValue = this.value; this.value = '...'; this.style.borderColor = '#667eea';"
+                        onblur="if(this.value === '...') this.value = this.dataset.oldValue; this.style.borderColor = '#ddd';"
+                        onkeydown="handleKeyBind(event, this); return false;">
+                    </div>
+                  `;
+      }).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.style.display = 'flex';
+      modal.innerHTML = panelContent;
+      document.body.appendChild(modal);
+
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.remove();
+        }
+      });
+    }
+
+    function handleKeyBind(e, input) {
+      e.preventDefault();
+
+      let key = e.key;
+      if (key === ' ') key = ' ';
+      else if (key.length > 1) key = e.key;
+      else key = key.toLowerCase();
+
+      // 检查是否已被其他功能占用
+      const existingAction = Object.entries(shortcuts).find(([k, v]) => k === key);
+      if (existingAction && existingAction[0] !== input.dataset.oldValue) {
+        alert(`快捷键 ${key === ' ' ? 'Space' : key} 已被 "${existingAction[1].description}" 使用`);
+        input.value = input.dataset.oldValue;
+        return;
+      }
+
+      // 移除旧的绑定
+      if (input.dataset.oldValue !== key) {
+        delete shortcuts[input.dataset.oldValue];
+      }
+
+      // 设置新的绑定
+      const defaultKey = input.dataset.default;
+      shortcuts[key] = { ...defaultShortcuts[defaultKey] };
+
+      input.value = key === ' ' ? 'Space' : key;
+      saveCustomShortcuts();
+      updateStatus(`✅ 快捷键已更新: ${key === ' ' ? 'Space' : key.toUpperCase()}`);
+    }
+
+    // 游戏操作函数（空实现，可根据实际情况补充）
+    function handleUndo() {
+      updateStatus('⏪ 悔棋功能');
+    }
+
+    function handleRedo() {
+      updateStatus('⏩ 重做功能');
+    }
+
+    function handleResign() {
+      if (confirm('确定要认输吗？')) {
+        updateStatus('🏳️ 已认输');
+        // 实际认输逻辑
+      }
+    }
+
+    function restartCurrentGame() {
+      if (currentGame === 'snake') {
+        restartSnakeGame();
+      } else if (gameState && gameState.difficulty) {
+        restartAIGame();
+      } else {
+        if (confirm('确定要重新开始当前游戏吗？')) {
+          updateStatus('🔄 重新开始游戏');
+          // 实际重新开始逻辑
+        }
+      }
+    }
+
+    function handleNewGame() {
+      if (confirm('确定要开始新游戏吗？')) {
+        updateStatus('🆕 新游戏开始');
+        // 实际新游戏逻辑
+      }
+    }
+
+    function togglePause() {
+      updateStatus('⏸️ 游戏已暂停');
+    }
+
+    function handleSnakeDirection(dir) {
+      if (currentGame === 'snake') {
+        // 实际贪吃蛇方向控制
+      }
+    }
+
+    function toggleSnakePause() {
+      if (currentGame === 'snake') {
+        // 实际贪吃蛇暂停逻辑
+      }
+    }
+
+    document.addEventListener('keydown', handleKeydown);
+
     // 象棋棋子配置（正确的象棋棋子位置）
     const chessPieces = {
       red: [
@@ -3190,6 +3871,79 @@
 • 随着分数增加，蛇的移动速度会逐渐加快
 • 按空格键可以暂停/继续游戏`
     };
+
+    // ========== 音效系统 ==========
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const soundEnabled = {
+      stonePlace: true,
+      capture: true,
+      win: true,
+      error: true,
+      click: true
+    };
+
+    function playSound(type) {
+      if (!soundEnabled[type]) return;
+
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      switch (type) {
+        case 'stonePlace':
+          oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+          oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.15);
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.15);
+          break;
+        case 'capture':
+          oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
+          oscillator.frequency.exponentialRampToValueAtTime(200, audioContext.currentTime + 0.2);
+          gainNode.gain.setValueAtTime(0.35, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.2);
+          break;
+        case 'win':
+          oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime);
+          oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.15);
+          oscillator.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.3);
+          oscillator.frequency.setValueAtTime(1046.50, audioContext.currentTime + 0.45);
+          gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.6);
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.6);
+          break;
+        case 'error':
+          oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+          oscillator.frequency.setValueAtTime(150, audioContext.currentTime + 0.1);
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.2);
+          break;
+        case 'click':
+          oscillator.frequency.setValueAtTime(1000, audioContext.currentTime);
+          oscillator.frequency.exponentialRampToValueAtTime(500, audioContext.currentTime + 0.05);
+          gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.05);
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.05);
+          break;
+        case 'move':
+          oscillator.frequency.setValueAtTime(700, audioContext.currentTime);
+          oscillator.frequency.exponentialRampToValueAtTime(350, audioContext.currentTime + 0.1);
+          gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.1);
+          break;
+      }
+    }
 
     // ========== 初始化 ==========
     async function init() {
@@ -4714,6 +5468,9 @@
         gameState.maxChain = chain;
       }
 
+      // 播放落子音效
+      playSound('stonePlace');
+
       requestAnimationFrame(() => {
         updateTurnDisplay();
         updateLastMove(r, c, gameState.me);
@@ -4753,6 +5510,10 @@
         winnerEl.className = `info-value ${gameState.me === 1 ? 'value-black' : 'value-white'}`;
         gameStatusEl.textContent = '游戏结束';
         gameStatusEl.className = 'info-value value-waiting';
+
+        // 播放胜利音效
+        playSound('win');
+
         showWinAlert(winMsg);
         updateStatus(`🏆 ${winMsg} 游戏结束`);
         updateAdvancedStats();
@@ -6881,47 +7642,40 @@
         playAgainBtn.style.display = 'none';
       }
 
-      // 检查是否从AI对战返回
-      const isFromAI = gameState.difficulty !== null;
-
       // 隐藏所有页面
-      lobbyContainer.style.display = isFromAI ? 'none' : 'flex';
+      lobbyContainer.style.display = 'flex';
       infoContainer.style.display = 'none';
       gameControls.style.display = 'none';
       statusBox.style.display = 'none';
       moveLogPanel.style.display = 'none';
       chatContainer.classList.remove('show');
       document.getElementById('achievements-container').style.display = 'none';
-      document.getElementById('ai-game-container').style.display = isFromAI ? 'block' : 'none';
+      document.getElementById('ai-game-container').style.display = 'none';
 
       // 显示在线玩家面板（带动画）
-      if (!isFromAI) {
-        const onlineUsersPanelEl = document.getElementById('online-users-panel');
-        onlineUsersPanelEl.style.opacity = '0';
-        onlineUsersPanelEl.style.transform = 'translateY(20px)';
-        onlineUsersPanelEl.style.display = 'block';
+      const onlineUsersPanelEl = document.getElementById('online-users-panel');
+      onlineUsersPanelEl.style.opacity = '0';
+      onlineUsersPanelEl.style.transform = 'translateY(20px)';
+      onlineUsersPanelEl.style.display = 'block';
 
-        // 添加动画效果
-        setTimeout(() => {
-          onlineUsersPanelEl.style.opacity = '1';
-          onlineUsersPanelEl.style.transform = 'translateY(0)';
-        }, 10);
-      }
+      // 添加动画效果
+      setTimeout(() => {
+        onlineUsersPanelEl.style.opacity = '1';
+        onlineUsersPanelEl.style.transform = 'translateY(0)';
+      }, 10);
 
       // 隐藏所有棋盘
       document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
         board.style.display = 'none';
       });
 
-      // 如果不是从AI对战返回，显示当前选中的棋种棋盘（空棋盘）
-      if (!isFromAI) {
-        if (currentGame === 'gobang') {
-          gobangBoard.style.display = 'grid';
-        } else if (currentGame === 'go') {
-          goBoard.style.display = 'grid';
-        } else if (currentGame === 'chess') {
-          chessBoard.style.display = 'block';
-        }
+      // 显示当前选中的棋种棋盘（空棋盘）
+      if (currentGame === 'gobang') {
+        gobangBoard.style.display = 'grid';
+      } else if (currentGame === 'go') {
+        goBoard.style.display = 'grid';
+      } else if (currentGame === 'chess') {
+        chessBoard.style.display = 'block';
       }
 
       isMatching = false;

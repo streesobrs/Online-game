@@ -1,6 +1,27 @@
 // 服务器配置文件
 const path = require('path');
 
+// 获取数据存储的根目录（兼容开发和打包环境）
+function getStorageRoot() {
+  // 优先使用环境变量
+  if (process.env.STORAGE_ROOT) {
+    return process.env.STORAGE_ROOT;
+  }
+
+  // 检测是否是 pkg 打包环境
+  const isPkg = typeof process.pkg !== 'undefined';
+
+  if (isPkg) {
+    // pkg 打包环境：使用程序所在目录
+    return path.dirname(process.execPath);
+  } else {
+    // 开发环境：使用项目根目录的 server/data
+    return __dirname;
+  }
+}
+
+const storageRoot = getStorageRoot();
+
 module.exports = {
   // 版本号 (语义化版本：MAJOR.MINOR.PATCH)
   version: '1.2.0',
@@ -36,11 +57,11 @@ module.exports = {
 
   // 数据存储路径
   paths: {
-    data: path.join(__dirname, 'data'),
-    logs: path.join(__dirname, 'logs'),
-    users: path.join(__dirname, 'data', 'users.json'),
-    games: path.join(__dirname, 'data', 'games.json'),
-    stats: path.join(__dirname, 'data', 'stats.json')
+    data: path.join(storageRoot, 'data'),
+    logs: path.join(storageRoot, 'logs'),
+    users: path.join(storageRoot, 'data', 'users.json'),
+    games: path.join(storageRoot, 'data', 'games.json'),
+    stats: path.join(storageRoot, 'data', 'stats.json')
   },
 
   // 日志配置

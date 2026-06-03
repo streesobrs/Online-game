@@ -26,9 +26,9 @@ class DataStore {
   async init() {
     try {
       await fs.mkdir(this.dataDir, { recursive: true });
-      logger.info('数据存储目录初始化完成');
+      logger.info('数据存储目录初始化完成', { path: this.dataDir });
     } catch (err) {
-      logger.error('初始化数据目录失败', { error: err.message });
+      logger.error('初始化数据目录失败', { error: err.message, path: this.dataDir });
     }
   }
 
@@ -167,6 +167,7 @@ class DataStore {
         await fs.mkdir(path.join(this.dataDir, subDir), { recursive: true });
       }
 
+      logger.info('普通集合数据已保存', { collection, path: filePath });
       await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
       this.cache.set(collection, data);
       return true;
@@ -260,6 +261,8 @@ class DataStore {
       const filePath = path.join(dirPath, `${id}.json`);
       await fs.writeFile(filePath, JSON.stringify(item, null, 2), 'utf8');
 
+      logger.info('数据已保存到文件', { collection, id, path: filePath });
+
       // 更新缓存
       const cacheKey = `${collection}:${id}`;
       this.cache.set(cacheKey, item);
@@ -282,11 +285,26 @@ class DataStore {
       id = item.gameId;
     }
 
+    // 如果顶层没有 id，尝试从 account.id 获取
+    if (!id && item.account && item.account.id) {
+      id = item.account.id;
+    }
+
+    logger.info('准备添加数据', {
+      collection,
+      itemId: item.id,
+      itemUserId: item.userId,
+      computedId: id,
+      isSplitById: this.isSplitById(collection)
+    });
+
     // 如果是按ID拆分的集合，直接写入单个文件
     if (this.isSplitById(collection) && id) {
+      logger.info('使用 writeOne 保存数据', { collection, id });
       return await this.writeOne(collection, id, item);
     }
 
+    logger.info('使用普通 write 保存数据', { collection });
     // 普通集合，添加到数组
     const data = await this.read(collection);
     data.push(item);
