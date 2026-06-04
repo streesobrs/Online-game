@@ -59,8 +59,8 @@ module.exports = {
   paths: {
     data: path.join(storageRoot, 'data'),
     logs: path.join(storageRoot, 'logs'),
-    users: path.join(storageRoot, 'data', 'users.json'),
-    games: path.join(storageRoot, 'data', 'games.json'),
+    accounts: path.join(storageRoot, 'data', 'accounts'),
+    games: path.join(storageRoot, 'data', 'games'),
     stats: path.join(storageRoot, 'data', 'stats.json')
   },
 

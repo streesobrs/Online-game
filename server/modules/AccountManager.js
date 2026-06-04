@@ -83,6 +83,45 @@ class AccountManager {
     return crypto.randomBytes(8).toString('hex');
   }
 
+  // 生成会话token
+  generateSessionToken(accountId) {
+    const timestamp = Date.now();
+    const random = crypto.randomBytes(16).toString('hex');
+    const tokenData = `${accountId}|${timestamp}|${random}`;
+    return Buffer.from(tokenData).toString('base64');
+  }
+
+  // 验证会话token
+  verifySessionToken(token) {
+    try {
+      if (!token) return null;
+
+      const tokenData = Buffer.from(token, 'base64').toString('utf8');
+      const parts = tokenData.split('|');
+
+      if (parts.length !== 3) return null;
+
+      const [accountId, timestamp, random] = parts;
+
+      // 验证token格式
+      if (!accountId || !timestamp || !random) return null;
+
+      // 验证token时效性（24小时有效期）
+      const tokenAge = Date.now() - parseInt(timestamp);
+      const maxAge = 24 * 60 * 60 * 1000; // 24小时
+
+      if (tokenAge > maxAge) {
+        logger.warn('Token已过期', { accountId, tokenAge });
+        return null;
+      }
+
+      return accountId;
+    } catch (err) {
+      logger.error('验证token失败', { error: err.message });
+      return null;
+    }
+  }
+
   // 检查用户名是否已存在
   async usernameExists(username) {
     try {
@@ -133,6 +172,8 @@ class AccountManager {
   // 账号密码登录
   async accountLogin(username, password) {
     try {
+      logger.info('开始账号登录验证', { username });
+
       // 查找用户（用户名转小写匹配）
       const account = await dataStore.findOne('accounts', {
         'account.username': username.toLowerCase(),
@@ -140,14 +181,22 @@ class AccountManager {
       });
 
       if (!account) {
+        logger.warn('账号登录失败 - 用户不存在', { username });
         return {
           success: false,
           message: '用户名或密码错误'
         };
       }
 
+      logger.info('找到用户', { id: account.account?.id, username: account.account?.username });
+
       // 验证密码
+      const hasSalt = !!account.account?.security?.passwordSalt;
+      const hasHash = !!account.account?.security?.passwordHash;
+      logger.info('密码验证信息', { hasSalt, hasHash });
+
       if (!this.verifyPassword(password, account.account?.security?.passwordSalt, account.account?.security?.passwordHash)) {
+        logger.warn('账号登录失败 - 密码验证失败', { username, id: account.account?.id });
         return {
           success: false,
           message: '用户名或密码错误'
@@ -212,21 +261,223 @@ class AccountManager {
     return Buffer.from(tokenData).toString('base64');
   }
 
-  // 验证会话令牌
-  verifySessionToken(token) {
+  // 验证会话令牌并获取账号信息
+  async verifyTokenAndGetAccount(token) {
     try {
-      const tokenData = Buffer.from(token, 'base64').toString('utf8');
-      const [id, timestamp, random] = tokenData.split('|');
+      const accountId = this.verifySessionToken(token);
+      if (!accountId) {
+        return {
+          success: false,
+          message: 'Token无效或已过期'
+        };
+      }
 
-      // 检查令牌是否过期（24小时）
-      const tokenAge = Date.now() - parseInt(timestamp);
-      if (tokenAge > 24 * 60 * 60 * 1000) {
+      const account = await this.getAccount(accountId);
+      if (!account) {
+        return {
+          success: false,
+          message: '账号不存在'
+        };
+      }
+
+      // 更新最后登录时间
+      await this.updateLastSeen(accountId);
+
+      return {
+        success: true,
+        data: {
+          account: account,
+          loginType: account.account?.type || 'guest'
+        }
+      };
+    } catch (err) {
+      logger.error('验证token并获取账号信息失败', { error: err.message });
+      return {
+        success: false,
+        message: '验证失败'
+      };
+    }
+  }
+
+  // 更新最后在线时间
+  async updateLastSeen(accountId) {
+    try {
+      await dataStore.update('accounts', { 'account.id': accountId }, {
+        'account.lastSeen': Date.now(),
+        'account.updatedAt': Date.now()
+      });
+    } catch (err) {
+      logger.error('更新最后在线时间失败', { accountId, error: err.message });
+    }
+  }
+
+  // 获取账号信息
+  async getAccount(accountId) {
+    try {
+      const account = await dataStore.findOne('accounts', { 'account.id': accountId });
+      if (!account) {
         return null;
       }
 
-      return id;
+      // 不返回密码相关信息
+      return {
+        ...account,
+        account: {
+          ...account.account,
+          security: undefined
+        }
+      };
     } catch (err) {
+      logger.error('获取账号信息失败', { accountId, error: err.message });
       return null;
+    }
+  }
+
+  // 更新游戏统计
+  async updateGameStats(accountId, result, gameType = null, isAI = false, aiDifficulty = null, duration = null) {
+    try {
+      const account = await dataStore.findOne('accounts', { 'account.id': accountId });
+      if (!account) {
+        return {
+          success: false,
+          message: '账号不存在'
+        };
+      }
+
+      // 更新通用统计
+      account.stats.totalGames = (account.stats.totalGames || 0) + 1;
+
+      if (result === 'win') {
+        account.stats.totalWins = (account.stats.totalWins || 0) + 1;
+      } else if (result === 'loss') {
+        account.stats.totalLosses = (account.stats.totalLosses || 0) + 1;
+      } else if (result === 'draw') {
+        account.stats.totalDraws = (account.stats.totalDraws || 0) + 1;
+      }
+
+      // 更新游戏类型统计
+      if (gameType && account.games[gameType]) {
+        account.games[gameType].totalGames = (account.games[gameType].totalGames || 0) + 1;
+
+        if (result === 'win') {
+          account.games[gameType].wins = (account.games[gameType].wins || 0) + 1;
+          account.games[gameType].streak = (account.games[gameType].streak || 0) + 1;
+          account.games[gameType].maxStreak = Math.max(
+            account.games[gameType].maxStreak || 0,
+            account.games[gameType].streak
+          );
+        } else if (result === 'loss') {
+          account.games[gameType].losses = (account.games[gameType].losses || 0) + 1;
+          account.games[gameType].streak = 0;
+        } else if (result === 'draw') {
+          account.games[gameType].draws = (account.games[gameType].draws || 0) + 1;
+        }
+
+        // AI游戏统计
+        if (isAI && gameType !== 'snake') {
+          account.games[gameType].aiWins = (account.games[gameType].aiWins || 0) + (result === 'win' ? 1 : 0);
+          account.games[gameType].aiDifficulty = aiDifficulty;
+          account.games[gameType].aiResult = result;
+        }
+
+        account.games[gameType].lastPlayedAt = Date.now();
+      }
+
+      // 更新活动统计
+      const now = Date.now();
+      account.account.activity.dailyGames = (account.account.activity.dailyGames || 0) + 1;
+      account.account.activity.lastDailyReset = now;
+      account.stats.lastGamePlayedAt = now;
+
+      // 保存更新
+      await dataStore.update('accounts', { 'account.id': accountId }, account);
+
+      return {
+        success: true,
+        message: '统计更新成功'
+      };
+    } catch (err) {
+      logger.error('更新游戏统计失败', { accountId, error: err.message });
+      return {
+        success: false,
+        message: '更新统计失败'
+      };
+    }
+  }
+
+  // 获取排行榜
+  async getLeaderboard(limit = 10, gameType = 'all') {
+    try {
+      const accounts = await this.getAllAccounts();
+
+      // 去重，基于accountId
+      const uniqueAccounts = [];
+      const seenIds = new Set();
+
+      for (const account of accounts) {
+        const accountId = account.account?.id;
+        if (accountId && !seenIds.has(accountId)) {
+          seenIds.add(accountId);
+          uniqueAccounts.push(account);
+        }
+      }
+
+      return uniqueAccounts
+        .sort((a, b) => {
+          let scoreA, scoreB;
+          if (gameType && gameType !== 'all') {
+            if (gameType === 'snake') {
+              // 贪吃蛇排行榜：基于最高分数
+              scoreA = a.games?.snake?.highScore || 0;
+              scoreB = b.games?.snake?.highScore || 0;
+            } else {
+              // 其他游戏类型的排行榜：基于获胜次数
+              scoreA = a.games?.[gameType]?.wins || 0;
+              scoreB = b.games?.[gameType]?.wins || 0;
+            }
+          } else {
+            // 总榜：计算所有游戏类型的获胜次数总和
+            scoreA = Object.values(a.games || {}).reduce((sum, game) => sum + (game.wins || 0), 0);
+            scoreB = Object.values(b.games || {}).reduce((sum, game) => sum + (game.wins || 0), 0);
+          }
+          return scoreB - scoreA;
+        })
+        .slice(0, limit)
+        .map((account, index) => {
+          let wins, score;
+          if (gameType && gameType !== 'all') {
+            if (gameType === 'snake') {
+              score = account.games?.snake?.highScore || 0;
+              wins = 0;
+            } else {
+              wins = account.games?.[gameType]?.wins || 0;
+              score = 0;
+            }
+          } else {
+            wins = Object.values(account.games || {}).reduce((sum, game) => sum + (game.wins || 0), 0);
+            score = 0;
+          }
+
+          const totalGames = Object.values(account.games || {}).reduce((sum, game) => sum + (game.totalGames || 0), 0);
+          const name = account.account?.nickname || account.account?.username || `玩家${account.account?.id?.substr(0, 4) || '0000'}`;
+
+          return {
+            rank: index + 1,
+            id: account.account?.id,
+            username: account.account?.username,
+            name: name,
+            level: account.account?.profile?.level || 1,
+            wins: wins,
+            losses: account.stats?.totalLosses || 0,
+            draws: account.stats?.totalDraws || 0,
+            totalGames: totalGames,
+            score: score,
+            winrate: totalGames > 0 ? `${Math.round((wins / totalGames) * 100)}%` : '0%'
+          };
+        });
+    } catch (err) {
+      logger.error('获取排行榜失败', { error: err.message });
+      return [];
     }
   }
 
@@ -280,7 +531,6 @@ class AccountManager {
     const now = Date.now();
     const guestUser = {
       id: guestId,
-      userId: guestId,
       account: {
         id: guestId,
         type: 'guest',
@@ -402,9 +652,9 @@ class AccountManager {
   }
 
   // 获取用户信息（支持游客和注册用户）
-  async getUser(id) {
+  async getUser(accountId) {
     try {
-      const user = await dataStore.findOne('accounts', { 'account.id': id });
+      const user = await dataStore.findOne('accounts', { 'account.id': accountId });
       if (!user) {
         return null;
       }
@@ -419,7 +669,7 @@ class AccountManager {
       };
       return safeUser;
     } catch (err) {
-      logger.error('获取用户信息失败', { id, error: err.message });
+      logger.error('获取用户信息失败', { accountId, error: err.message });
       return null;
     }
   }
@@ -427,9 +677,9 @@ class AccountManager {
   // 通过token获取账号信息
   async getAccountByToken(token) {
     try {
-      // 验证token并获取用户ID
-      const userId = this.verifySessionToken(token);
-      if (!userId) {
+      // 验证token并获取账号ID
+      const accountId = this.verifySessionToken(token);
+      if (!accountId) {
         return {
           success: false,
           message: 'Token无效或已过期'
@@ -437,7 +687,7 @@ class AccountManager {
       }
 
       // 获取账号信息
-      const account = await this.getUser(userId);
+      const account = await this.getAccount(accountId);
       if (!account) {
         return {
           success: false,
@@ -507,7 +757,7 @@ class AccountManager {
   }
 
   // 注册新账号（支持游客升级）
-  async register(username, password, nickname = null, guestUserId = null) {
+  async register(username, password, nickname = null, guestAccountId = null) {
     // 验证用户名
     if (!this.validateUsername(username)) {
       return {
@@ -534,9 +784,9 @@ class AccountManager {
 
     // 检查是否有游客账号需要升级
     let guestAccount = null;
-    if (guestUserId) {
+    if (guestAccountId) {
       guestAccount = await dataStore.findOne('accounts', {
-        'account.id': guestUserId,
+        'account.id': guestAccountId,
         'account.type': 'guest'
       });
     }
@@ -575,15 +825,15 @@ class AccountManager {
 
       try {
         // 直接更新账号（保持 id 不变）
-        await dataStore.update('accounts', { 'account.id': guestUserId }, updatedAccount);
+        await dataStore.update('accounts', { 'account.id': guestAccountId }, updatedAccount);
         logger.info('游客账号升级为正式账号', {
-          id: guestUserId,
+          id: guestAccountId,
           username
         });
 
         return {
           success: true,
-          id: guestUserId,
+          id: guestAccountId,
           username: updatedAccount.account.username,
           nickname: updatedAccount.account.nickname,
           message: '注册成功'
@@ -600,7 +850,6 @@ class AccountManager {
       const accountId = this.generateUserId();
       const account = {
         id: accountId,
-        userId: accountId,
         account: {
           id: accountId,
           type: 'registered',
@@ -826,8 +1075,9 @@ class AccountManager {
   // 更新账号资料
   async updateProfile(id, updates) {
     try {
-      const account = await dataStore.findOne('accounts', { 'account.id': id });
+      const account = await dataStore.findOne('accounts', { id: id });
       if (!account) {
+        logger.warn('账号不存在', { id });
         return {
           success: false,
           message: '账号不存在'
@@ -848,7 +1098,7 @@ class AccountManager {
         updateData['account.updatedAt'] = Date.now();
       }
 
-      await dataStore.update('accounts', { 'account.id': id }, updateData);
+      await dataStore.update('accounts', { id: id }, updateData);
       logger.info('账号资料更新', { id, updates: Object.keys(updateData) });
 
       return {

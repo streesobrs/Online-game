@@ -1593,7 +1593,7 @@
 
         return `
       <tr>
-        <td>${user.userId}</td>
+        <td>${user.accountId}</td>
         <td>${user.nickname || '匿名'}</td>
         <td><span class="badge ${statusClass}">${statusText}</span></td>
         <td>${user.gameType || '-'}</td>
@@ -1602,9 +1602,9 @@
         <td>${formatTime(user.connectedAt)}</td>
         <td>
           <div class="table-actions">
-            <button class="table-btn table-btn-info" onclick="viewUserDetail('${user.userId}')">详情</button>
-            <button class="table-btn table-btn-warning" onclick="muteUser('${user.userId}')">禁言</button>
-            <button class="table-btn table-btn-danger" onclick="kickUser('${user.userId}')">踢出</button>
+            <button class="table-btn table-btn-info" onclick="viewUserDetail('${user.accountId}')">详情</button>
+            <button class="table-btn table-btn-warning" onclick="muteUser('${user.accountId}')">禁言</button>
+            <button class="table-btn table-btn-danger" onclick="kickUser('${user.accountId}')">踢出</button>
           </div>
         </td>
       </tr>
@@ -1704,7 +1704,7 @@
             <div class="preview-left">
               <div class="preview-avatar" style="${i < 3 ? 'background: linear-gradient(135deg, ' + (i === 0 ? '#f59e0b, #d97706' : i === 1 ? '#94a3b8, #64748b' : '#d97706, #b45309') + ');' : ''}">${rankIcon}</div>
               <div class="preview-info">
-                <div class="preview-title">${item.name || item.userId || '未知'}</div>
+                <div class="preview-title">${item.name || item.accountId || '未知'}</div>
                 <div class="preview-subtitle">${item.wins || 0}胜 / ${item.losses || 0}负 / ${item.draws || 0}平</div>
               </div>
             </div>
@@ -1736,7 +1736,7 @@
           board.map((item, i) => `
                   <tr>
                     <td>#${i + 1}</td>
-                    <td>${item.name || item.userId || '未知'}</td>
+                    <td>${item.name || item.accountId || '未知'}</td>
                     <td>${item.wins || 0} / ${item.losses || 0} / ${item.draws || 0}</td>
                     <td>${item.totalGames || 0}</td>
                     <td>${item.winrate || '0%'}</td>
@@ -2034,7 +2034,7 @@
 
             return `
                     <tr>
-                      <td>${user.userId}</td>
+                      <td>${user.accountId}</td>
                       <td>${user.nickname || '匿名'}</td>
                       <td><span class="badge ${statusClass}">${statusText}</span></td>
                       <td>${user.gameType || '-'}</td>
@@ -2670,7 +2670,7 @@
       const users = adminData.users || [];
       const filtered = users.filter(u =>
         (u.nickname && u.nickname.includes(keyword)) ||
-        u.userId.includes(keyword)
+        u.accountId.includes(keyword)
       );
       const tbody = document.getElementById('online-users-body');
       if (filtered.length === 0) {
@@ -2682,16 +2682,16 @@
         const statusText = user.status === 'playing' ? '游戏中' : '等待中';
         return `
           <tr>
-            <td>${user.userId}</td>
+            <td>${user.accountId}</td>
             <td>${user.nickname || '匿名'}</td>
             <td><span class="badge ${statusClass}">${statusText}</span></td>
             <td>${user.gameType || '-'}</td>
             <td>${formatTime(user.connectedAt)}</td>
             <td>
               <div class="table-actions">
-                <button class="table-btn table-btn-info" onclick="viewUserDetail('${user.userId}')">详情</button>
-                <button class="table-btn table-btn-warning" onclick="muteUser('${user.userId}')">禁言</button>
-                <button class="table-btn table-btn-danger" onclick="kickUser('${user.userId}')">踢出</button>
+                <button class="table-btn table-btn-info" onclick="viewUserDetail('${user.accountId}')">详情</button>
+                <button class="table-btn table-btn-warning" onclick="muteUser('${user.accountId}')">禁言</button>
+                <button class="table-btn table-btn-danger" onclick="kickUser('${user.accountId}')">踢出</button>
               </div>
             </td>
           </tr>
@@ -2711,7 +2711,7 @@
             <h3 style="margin-bottom: 15px; color: #60a5fa;">👤 在线用户信息</h3>
             <div class="form-group">
               <label class="form-label">用户ID</label>
-              <input type="text" class="form-input" value="${user.userId}" readonly>
+              <input type="text" class="form-input" value="${user.accountId}" readonly>
             </div>
             <div class="form-group">
               <label class="form-label">状态</label>

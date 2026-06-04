@@ -10,7 +10,7 @@ class DataStore {
     this.cache = new Map();
     // 按ID拆分的集合配置
     this.splitByIdCollections = {
-      'accounts': 'users',
+      'accounts': 'accounts',
       'games': 'games' // 游戏记录按ID拆分存储
     };
     // 普通集合的目录映射
@@ -531,6 +531,9 @@ class DataStore {
         }
         if (query.userId) {
           return await this.readOne(collection, query.userId);
+        }
+        if (query['account.id']) {
+          return await this.readOne(collection, query['account.id']);
         }
       }
     }

@@ -276,7 +276,7 @@ app.get('/api/accounts/search', authenticateToken, async (req, res) => {
       });
     }
     const accounts = await accountManager.getAllAccounts(100, 0);
-    const filtered = accounts.filter(a => 
+    const filtered = accounts.filter(a =>
       a.username?.toLowerCase().includes(keyword.toLowerCase()) ||
       a.nickname?.toLowerCase().includes(keyword.toLowerCase()) ||
       a.id?.toLowerCase().includes(keyword.toLowerCase())
@@ -414,7 +414,7 @@ app.get('/api/users/online', async (req, res) => {
   try {
     const users = userManager.getOnlineUsers?.() || [];
     const onlineUsers = users.map(u => ({
-      userId: u.userId,
+      userId: u.accountId,
       nickname: u.nickname,
       loginType: u.loginType,
       gameType: u.gameType,
@@ -445,7 +445,7 @@ app.get('/api/users/search', async (req, res) => {
       });
     }
     const accounts = await accountManager.getAllAccounts(100, 0);
-    const filtered = accounts.filter(a => 
+    const filtered = accounts.filter(a =>
       a.username?.toLowerCase().includes(keyword.toLowerCase()) ||
       a.nickname?.toLowerCase().includes(keyword.toLowerCase()) ||
       a.id?.toLowerCase().includes(keyword.toLowerCase())
@@ -727,34 +727,110 @@ const serverStartTime = Date.now();
 io.on('connection', (socket) => {
   logger.connectEvent(socket.id, { ip: socket.handshake.address });
 
-  // 处理客户端连接事件（包含版本号和savedUserId）
+  // 处理客户端连接事件（包含版本号和token）
   socket.on('client_connect', async (data) => {
     logger.info('收到客户端连接请求', {
       socketId: socket.id,
       clientVersion: data?.clientVersion,
-      id: data?.id
+      token: data?.token ? 'exists' : 'none'
     });
 
     // 检查版本兼容性
     const versionCheck = versionManager.checkCompatibility(data?.clientVersion || '1.0.0');
     socket.emit('version_check', versionCheck);
 
-    // 处理用户连接
-    await userManager.handleUserConnection(socket, data, io).catch(err => {
-      logger.error('用户连接处理错误', { socketId: socket.id, error: err.message });
+    // 处理用户连接（新的统一连接逻辑）
+    const userSession = await userManager.handleUserConnection(socket, data, io);
+
+    if (!userSession) {
+      logger.error('用户连接处理失败', { socketId: socket.id });
+      return;
+    }
+
+    // 如果是已登录的账号，发送登录结果
+    if (userSession.accountId && userSession.accountData && userSession.accountData.account?.type !== 'anonymous') {
+      const account = userSession.accountData;
+      const permissions = config.permissions[account.account?.type] || config.permissions.registered;
+
+      const result = {
+        success: true,
+        message: '自动登录成功',
+        data: {
+          account: account,
+          permissions: permissions,
+          token: userSession.token,
+          loginType: 'account'
+        }
+      };
+
+      socket.emit('login_result', result);
+      logger.info('自动登录成功', {
+        socketId: socket.id,
+        accountId: userSession.accountId
+      });
+    }
+  });
+
+  // ========== 登录相关事件 ==========
+
+  // 游客登录
+  socket.on('guest_login', async (data) => {
+    logger.info('收到游客登录请求', { socketId: socket.id });
+
+    const result = await userManager.handleGuestLogin(socket);
+
+    if (result.success) {
+      const account = result.data.account;
+      const permissions = config.permissions.guest;
+
+      socket.emit('login_result', {
+        success: true,
+        message: '游客登录成功',
+        data: {
+          account: account,
+          permissions: permissions,
+          token: result.data.token,
+          loginType: 'guest'
+        }
+      });
+
+      // 广播用户上线
+      userManager.broadcastUserStatus(result.data.account.account.id, 'online', io);
+    } else {
+      socket.emit('login_result', result);
+    }
+  });
+
+  // 账号登录
+  socket.on('account_login', async (data) => {
+    const { username, password } = data;
+
+    logger.info('收到账号登录请求', {
+      socketId: socket.id,
+      username
     });
 
-    // 如果有账号ID，关联用户和账号
-    if (data?.id) {
-      const user = userManager.getUserBySocketId(socket.id);
-      if (user) {
-        userManager.setUserAccount(user.userId, data.id);
-        logger.info('自动关联账号成功', {
-          socketId: socket.id,
-          userId: user.userId,
-          id: data.id
-        });
-      }
+    const result = await userManager.handleAccountLogin(socket, username, password);
+
+    if (result.success) {
+      const account = result.data.account;
+      const permissions = config.permissions[account.account?.type] || config.permissions.registered;
+
+      socket.emit('login_result', {
+        success: true,
+        message: '账号登录成功',
+        data: {
+          account: account,
+          permissions: permissions,
+          token: result.data.token,
+          loginType: 'account'
+        }
+      });
+
+      // 广播用户上线
+      userManager.broadcastUserStatus(result.data.account.account.id, 'online', io);
+    } else {
+      socket.emit('login_result', result);
     }
   });
 
@@ -763,15 +839,63 @@ io.on('connection', (socket) => {
   // 注册账号
   socket.on('account_register', async (data) => {
     const { username, password, nickname } = data;
-    // 获取当前用户（可能是游客）
-    const user = userManager.getUserBySocketId(socket.id);
-    const guestUserId = user?.userId;
-    const result = await accountManager.register(username, password, nickname, guestUserId);
 
-    // 如果注册成功且是游客升级，更新 userManager 中的用户信息
-    if (result.success && guestUserId && user) {
-      userManager.setUserAccount(user.userId, result.id);
-      user.loginType = 'account';
+    // 获取当前用户会话
+    const userSession = userManager.getUserBySocketId(socket.id);
+    const guestAccountId = userSession?.accountId;
+
+    logger.info('收到账号注册请求', {
+      socketId: socket.id,
+      guestAccountId,
+      username
+    });
+
+    const result = await accountManager.register(username, password, nickname, guestAccountId);
+
+    // 如果注册成功且是游客升级，更新用户会话
+    if (result.success && guestAccountId && userSession) {
+      // 获取更新后的账号信息
+      const updatedAccount = await accountManager.getAccount(guestAccountId);
+      if (updatedAccount) {
+        userSession.accountData = updatedAccount;
+        userSession.nickname = updatedAccount.account?.nickname || userSession.nickname;
+
+        // 发送更新后的用户信息
+        socket.emit('user_updated', {
+          accountId: guestAccountId,
+          nickname: userSession.nickname,
+          accountType: 'registered'
+        });
+      }
+    } else if (result.success && !guestAccountId) {
+      // 匿名用户直接注册，需要更新会话
+      const newAccountId = result.id;
+      const sessionToken = accountManager.generateSessionToken(newAccountId);
+
+      // 更新用户会话
+      if (userSession) {
+        // 删除旧的匿名会话
+        userManager.onlineUsers.delete(socket.id);
+
+        // 创建新的账号会话
+        userSession.accountId = newAccountId;
+        userSession.token = sessionToken;
+        userSession.nickname = result.nickname;
+        userSession.accountType = 'registered';
+
+        // 获取完整账号数据
+        const newAccount = await accountManager.getAccount(newAccountId);
+        if (newAccount) {
+          userSession.accountData = newAccount;
+        }
+
+        // 存储新的会话
+        userManager.socketToAccount.set(socket.id, newAccountId);
+        userManager.onlineUsers.set(newAccountId, userSession);
+      }
+
+      // 广播用户上线
+      userManager.broadcastUserStatus(newAccountId, 'online', io);
     }
 
     socket.emit('account_action_result', {
@@ -780,123 +904,113 @@ io.on('connection', (socket) => {
     });
   });
 
-  // 游客登录
-  socket.on('guest_login', async () => {
-    const user = userManager.getUserBySocketId(socket.id);
-
-    // 检查用户是否已经有账号关联
-    const accountId = user ? userManager.getAccountIdByUserId(user.userId) : null;
-
-    if (accountId) {
-      // 已经有账号，返回已有的账号信息
-      const account = await accountManager.getAccount(accountId);
-      if (account) {
-        const permissions = config.permissions[account.type] || config.permissions.guest;
-
-        const result = {
-          success: true,
-          message: '游客登录成功',
-          data: {
-            account: account,
-            permissions: permissions,
-            token: userManager.generateToken(),
-            loginType: 'guest'
-          }
-        };
-
-        socket.emit('login_result', result);
-        return;
-      }
-    }
-
-    // 创建游客用户
-    const userData = await userManager.createGuestUser(socket);
-
-    if (userData) {
-      // 获取权限配置
-      const permissions = config.permissions.guest;
-
-      const result = {
-        success: true,
-        message: '游客登录成功',
-        data: {
-          account: userData,
-          permissions: permissions,
-          token: userManager.generateToken(),
-          loginType: 'guest'
-        }
-      };
-
-      if (user) {
-        // 设置用户账号信息
-        userManager.setUserAccount(user.userId, userData.id);
-
-        // 设置用户权限
-        user.permissions = permissions;
-        user.loginType = 'guest';
-      }
-
-      socket.emit('login_result', result);
-    } else {
-      socket.emit('login_result', {
-        success: false,
-        message: '创建游客账号失败'
-      });
-    }
-  });
-
   // 账号密码登录
   socket.on('account_login', async (data) => {
     const { username, password } = data;
+    logger.info('收到账号登录请求', { socketId: socket.id, username });
+
     const result = await accountManager.accountLogin(username, password);
 
     if (result.success && result.data) {
-      const user = userManager.getUserBySocketId(socket.id);
-      if (user) {
-        // 设置用户账号信息
-        userManager.setUserAccount(user.userId, result.data.account.id);
+      // 获取当前用户会话
+      const userSession = userManager.getUserBySocketId(socket.id);
+      if (userSession) {
+        // 更新用户会话为登录账号
+        userSession.accountData = result.data.account;
+        userSession.token = result.data.token;
+        userSession.nickname = result.data.account.account?.nickname || userSession.nickname;
 
-        // 设置用户权限
-        user.permissions = result.data.permissions;
-        user.loginType = result.data.loginType;
-        user.token = result.data.token;
+        // 更新会话映射
+        const oldAccountId = userSession.accountId;
+        const newAccountId = result.data.account.account.id;
+
+        if (oldAccountId !== newAccountId) {
+          userManager.socketToAccount.set(socket.id, newAccountId);
+          userManager.onlineUsers.delete(oldAccountId);
+          userManager.onlineUsers.set(newAccountId, userSession);
+          userSession.accountId = newAccountId;
+        }
 
         // 检查回归玩家成就
-        const account = await accountManager.getAccount(result.data.account.id);
-        if (account && achievementManager) {
-          let level = 1;
-          if (account.profile && account.profile.exp) {
-            const totalExp = account.profile.exp;
-            let exp = totalExp;
-            while (exp >= accountManager.getExpForLevel(level + 1)) {
-              exp -= accountManager.getExpForLevel(level + 1);
-              level++;
-            }
-          }
+        if (achievementManager) {
+          const account = result.data.account;
+          const returnPlayer = account.account?.activity?.returnPlayer;
+          const longReturnPlayer = account.account?.activity?.longReturnPlayer;
 
-          const stats = {
-            ...account.stats,
-            level: level
-          };
-          const unlockedAchievements = await achievementManager.checkAchievements(result.data.account.id, stats);
-          if (unlockedAchievements.length > 0) {
-            socket.emit('achievements_unlocked', { achievements: unlockedAchievements });
+          if (returnPlayer) {
+            await achievementManager.checkAndAwardAchievement(newAccountId, 'return_player');
+          }
+          if (longReturnPlayer) {
+            await achievementManager.checkAndAwardAchievement(newAccountId, 'long_return_player');
           }
         }
+
+        logger.info('账号登录成功', {
+          socketId: socket.id,
+          accountId: newAccountId,
+          username
+        });
       }
     }
 
     socket.emit('login_result', result);
   });
 
+  // 游客登录（已弃用，现在自动处理）
+  socket.on('guest_login', async () => {
+    logger.warn('收到已弃用的guest_login事件', { socketId: socket.id });
+
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (userSession && userSession.accountData) {
+      const account = userSession.accountData;
+      const permissions = config.permissions[account.account?.type] || config.permissions.guest;
+
+      const result = {
+        success: true,
+        message: '游客登录成功',
+        data: {
+          account: account,
+          permissions: permissions,
+          token: userSession.token,
+          loginType: 'guest'
+        }
+      };
+
+      socket.emit('login_result', result);
+    } else {
+      socket.emit('login_result', {
+        success: false,
+        message: '游客登录失败，请重新连接'
+      });
+    }
+  });
+
   // 更新账号资料
   socket.on('account_update_profile', async (data) => {
-    const { id, nickname, profile } = data;
-    const result = await accountManager.updateProfile(id, { nickname, profile });
-    if (result.success) {
-      const account = await accountManager.getAccount(id);
-      result.account = account;
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (!userSession) {
+      socket.emit('account_action_result', {
+        action: 'update_profile',
+        success: false,
+        message: '用户未登录'
+      });
+      return;
     }
+
+    const { nickname, profile } = data;
+    const result = await accountManager.updateProfile(userSession.accountId, { nickname, profile });
+
+    if (result.success) {
+      const account = await accountManager.getAccount(userSession.accountId);
+      result.account = account;
+
+      // 更新用户会话
+      if (account) {
+        userSession.accountData = account;
+        userSession.nickname = account.account?.nickname || userSession.nickname;
+      }
+    }
+
     socket.emit('account_action_result', {
       action: 'update_profile',
       ...result
@@ -905,8 +1019,18 @@ io.on('connection', (socket) => {
 
   // 修改密码
   socket.on('account_change_password', async (data) => {
-    const { id, oldPassword, newPassword } = data;
-    const result = await accountManager.changePassword(id, oldPassword, newPassword);
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (!userSession) {
+      socket.emit('account_action_result', {
+        action: 'change_password',
+        success: false,
+        message: '用户未登录'
+      });
+      return;
+    }
+
+    const { oldPassword, newPassword } = data;
+    const result = await accountManager.changePassword(userSession.accountId, oldPassword, newPassword);
     socket.emit('account_action_result', {
       action: 'change_password',
       ...result
@@ -932,21 +1056,12 @@ io.on('connection', (socket) => {
 
   // ========== 用户相关事件 ==========
 
-  // 用户登录/更新昵称
-  socket.on('user_login', (data) => {
-    userManager.handleUserLogin(socket, data, io).catch(err => {
-      logger.error('用户登录处理错误', { socketId: socket.id, error: err.message });
-    });
-  });
-
   // 更新用户状态
   socket.on('user_status', (data) => {
-    const user = userManager.getUserBySocketId(socket.id);
-    if (user && data.status === 'online') {
-      user.status = 'online';
-      user.gameType = data.game || user.gameType;
-      user.lastActivity = Date.now();
-      userManager.broadcastUserStatus(user.userId, 'online', io);
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (userSession && userSession.accountId && data.status === 'online') {
+      userManager.updateUserStatus(userSession.accountId, 'online', data.game);
+      userManager.broadcastUserStatus(userSession.accountId, 'online', io);
     }
   });
 
@@ -960,35 +1075,32 @@ io.on('connection', (socket) => {
 
   // 获取成就列表
   socket.on('get_achievements', async (data) => {
-    const user = userManager.getUserBySocketId(socket.id);
-    if (user) {
-      const accountId = userManager.userIdToAccountId.get(user.userId);
-      if (accountId) {
-        const account = await accountManager.getAccount(accountId);
-        const stats = account?.stats || {};
-        const level = account?.profile?.level || 1;
-        const categories = achievementManager.getAchievementsByCategory({ ...stats, level });
-        const userAchievementIds = account?.achievements || [];
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (userSession && userSession.accountId) {
+      const account = await accountManager.getAccount(userSession.accountId);
+      const stats = account?.stats || {};
+      const level = account?.account?.profile?.level || 1;
+      const categories = achievementManager.getAchievementsByCategory({ ...stats, level });
+      const userAchievementIds = account?.achievements || [];
 
-        // 为每个成就添加解锁状态
-        Object.values(categories).forEach(category => {
-          category.achievements.forEach(achievement => {
-            achievement.isUnlocked = userAchievementIds.includes(achievement.id);
-          });
+      // 为每个成就添加解锁状态
+      Object.values(categories).forEach(category => {
+        category.achievements.forEach(achievement => {
+          achievement.isUnlocked = userAchievementIds.includes(achievement.id);
         });
+      });
 
-        const totalAchievements = achievementManager.achievements.length;
-        socket.emit('achievements_list', { categories, userAchievements: userAchievementIds, totalAchievements });
-      }
+      const totalAchievements = achievementManager.achievements.length;
+      socket.emit('achievements_list', { categories, userAchievements: userAchievementIds, totalAchievements });
     }
   });
 
   // 获取游戏历史
   socket.on('get_game_history', async (data) => {
-    const user = userManager.getUserBySocketId(socket.id);
-    if (user) {
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (userSession && userSession.accountId) {
       const limit = data?.limit || 10;
-      const history = await gameManager.getGameHistory(user.userId, limit);
+      const history = await gameManager.getGameHistory(userSession.accountId, limit);
       socket.emit('game_history', { history });
     }
   });
@@ -1013,9 +1125,9 @@ io.on('connection', (socket) => {
 
   // 匹配请求
   socket.on('match_request', (data) => {
-    const user = userManager.getUserBySocketId(socket.id);
-    if (!user) {
-      socket.emit('error', { message: '用户不存在' });
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (!userSession || !userSession.accountId) {
+      socket.emit('error', { message: '请先登录' });
       return;
     }
 
@@ -1033,6 +1145,11 @@ io.on('connection', (socket) => {
 
   // 挑战请求
   socket.on('challenge_request', (data) => {
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (!userSession || !userSession.accountId) {
+      socket.emit('error', { message: '请先登录' });
+      return;
+    }
     gameManager.handleChallengeRequest(socket.id, data, io);
   });
 
@@ -1093,7 +1210,7 @@ io.on('connection', (socket) => {
 
     const { gameType, difficulty } = data;
 
-    const success = gameManager.createAIGame(user.userId, gameType, difficulty, io);
+    const success = gameManager.createAIGame(user.accountId, gameType, difficulty, io);
     if (!success) {
       socket.emit('error', { message: '创建AI对战失败' });
     }
@@ -1109,7 +1226,7 @@ io.on('connection', (socket) => {
 
     const { position } = data;
 
-    const success = await gameManager.handleAIMove(user.userId, position, io);
+    const success = await gameManager.handleAIMove(user.accountId, position, io);
     if (!success) {
       socket.emit('error', { message: 'AI对战移动失败' });
     }
@@ -1129,12 +1246,12 @@ io.on('connection', (socket) => {
 
     try {
       // 结束AI游戏并保存记录（如果游戏还在进行中）
-      await gameManager.endAIGame(user.userId, result, io);
+      await gameManager.endAIGame(user.accountId, result, io);
 
       // 注意：endAIGame内部已经处理了用户统计更新
 
       logger.info('AI游戏结束', {
-        userId: user.userId,
+        userId: user.accountId,
         result,
         gameType,
         difficulty
@@ -1160,12 +1277,12 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const accountId = userManager.getAccountIdByUserId(user.userId);
+    const accountId = user.accountId;
     const { gameType } = data;
 
     try {
       logger.info('贪吃蛇游戏开始', {
-        userId: user.userId,
+        userId: user.accountId,
         accountId: accountId,
         gameType
       });
@@ -1185,13 +1302,13 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const accountId = userManager.getAccountIdByUserId(user.userId);
+    const accountId = user.accountId;
     const { score, gameType, moveHistory } = data;
 
     try {
       // 记录游戏结束日志（无论用户是否登录）
       logger.info('贪吃蛇游戏结束', {
-        userId: user.userId,
+        userId: user.accountId,
         accountId: accountId,
         score,
         moveCount: moveHistory ? moveHistory.length : 0
@@ -1200,7 +1317,7 @@ io.on('connection', (socket) => {
       // 保存游戏记录
       if (gameManager && gameManager.saveSnakeGameRecord) {
         await gameManager.saveSnakeGameRecord({
-          userId: user.userId,
+          userId: user.accountId,
           accountId: accountId,
           score: score,
           gameType: gameType,
@@ -1232,7 +1349,7 @@ io.on('connection', (socket) => {
 
             // 记录新高分
             logger.info('贪吃蛇游戏新高分', {
-              userId: user.userId,
+              userId: user.accountId,
               accountId: accountId,
               score: account.stats.snakeGames.highScore
             });
@@ -1272,7 +1389,7 @@ io.on('connection', (socket) => {
     }
 
     const { gameId } = data;
-    const result = gameManager.addSpectator(gameId, user.userId, io);
+    const result = gameManager.addSpectator(gameId, user.accountId, io);
 
     if (result.success) {
       socket.emit('spectate_joined', result.game);
@@ -1285,7 +1402,7 @@ io.on('connection', (socket) => {
   socket.on('spectate_leave', (data) => {
     const user = userManager.getUserBySocketId(socket.id);
     if (user && user.game) {
-      gameManager.removeSpectator(user.game, user.userId, io);
+      gameManager.removeSpectator(user.game, user.accountId, io);
     }
   });
 

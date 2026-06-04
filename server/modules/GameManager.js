@@ -44,13 +44,13 @@ class GameManager {
 
     // 验证游戏类型
     if (!Object.values(config.game.types).includes(gameType)) {
-      logger.warn('匹配请求失败：无效的游戏类型', { userId: user.userId, gameType });
+      logger.warn('匹配请求失败：无效的游戏类型', { userId: user.accountId, gameType });
       return false;
     }
 
     // 检查用户状态
     if (user.status !== 'online') {
-      logger.warn('匹配请求失败：用户状态不正确', { userId: user.userId, status: user.status });
+      logger.warn('匹配请求失败：用户状态不正确', { userId: user.accountId, status: user.status });
       return false;
     }
 
@@ -63,12 +63,12 @@ class GameManager {
     if (!this.waitingUsers.has(gameType)) {
       this.waitingUsers.set(gameType, new Set());
     }
-    this.waitingUsers.get(gameType).add(user.userId);
+    this.waitingUsers.get(gameType).add(user.accountId);
 
-    logger.matchEvent(user.userId, '开始匹配', { gameType });
+    logger.matchEvent(user.accountId, '开始匹配', { gameType });
 
     // 广播用户状态
-    this.userManager.broadcastUserStatus(user.userId, 'waiting', io);
+    this.userManager.broadcastUserStatus(user.accountId, 'waiting', io);
 
     // 检查匹配
     this.checkMatch(gameType, io);
@@ -84,7 +84,7 @@ class GameManager {
     if (user.status === 'waiting') {
       // 从等待列表移除
       if (this.waitingUsers.has(user.gameType)) {
-        this.waitingUsers.get(user.gameType).delete(user.userId);
+        this.waitingUsers.get(user.gameType).delete(user.accountId);
 
         // 清理空集合
         if (this.waitingUsers.get(user.gameType).size === 0) {
@@ -96,10 +96,10 @@ class GameManager {
       user.status = 'online';
       user.lastActivity = Date.now();
 
-      logger.matchEvent(user.userId, '取消匹配', { gameType: user.gameType });
+      logger.matchEvent(user.accountId, '取消匹配', { gameType: user.gameType });
 
       // 广播用户状态
-      this.userManager.broadcastUserStatus(user.userId, 'online', io);
+      this.userManager.broadcastUserStatus(user.accountId, 'online', io);
 
       return true;
     }
@@ -116,14 +116,14 @@ class GameManager {
     }
 
     const { to: challengedUserId, game: gameType } = data;
-    const challenged = this.userManager.getUserByUserId(challengedUserId);
+    const challenged = this.userManager.getUserByAccountId(challengedUserId);
 
     if (!challenged) {
       io.to(socketId).emit('error', { message: '挑战失败：对方不在线或用户不存在' });
       return;
     }
 
-    if (challenger.userId === challenged.userId) {
+    if (challenger.accountId === challenged.accountId) {
       io.to(socketId).emit('error', { message: '挑战失败：不能挑战自己' });
       return;
     }
@@ -139,38 +139,38 @@ class GameManager {
     }
 
     // 检查是否已有待处理的挑战
-    if (this.challengeRequests.has(challenger.userId)) {
+    if (this.challengeRequests.has(challenger.accountId)) {
       io.to(socketId).emit('error', { message: '您已发起一个挑战，请等待回应' });
       return;
     }
     // 检查对方是否已发起挑战
-    if (this.challengeRequests.has(challenged.userId) && this.challengeRequests.get(challenged.userId).challengedId === challenger.userId) {
+    if (this.challengeRequests.has(challenged.accountId) && this.challengeRequests.get(challenged.accountId).challengedId === challenger.accountId) {
       io.to(socketId).emit('error', { message: '对方已向您发起挑战，请先回应' });
       return;
     }
 
 
     // 存储挑战请求
-    this.challengeRequests.set(challenger.userId, {
-      challengedId: challenged.userId,
+    this.challengeRequests.set(challenger.accountId, {
+      challengedId: challenged.accountId,
       gameType,
       timestamp: Date.now()
     });
 
     // 通知被挑战者
-    const challengedSocket = this.userManager.getSocketByUserId(challenged.userId);
+    const challengedSocket = this.userManager.getSocketByAccountId(challenged.accountId);
     if (challengedSocket) {
       challengedSocket.emit('challenge_received', {
-        from: challenger.userId,
+        from: challenger.accountId,
         fromNickname: challenger.nickname,
         game: gameType,
         timestamp: Date.now()
       });
       io.to(socketId).emit('challenge_sent', { success: true, message: `已向 ${challenged.nickname} 发起挑战` });
-      logger.info('挑战请求已发送', { challenger: challenger.userId, challenged: challenged.userId, gameType });
+      logger.info('挑战请求已发送', { challenger: challenger.accountId, challenged: challenged.accountId, gameType });
     } else {
       io.to(socketId).emit('error', { message: '挑战失败：对方已离线' });
-      this.challengeRequests.delete(challenger.userId); // 清理请求
+      this.challengeRequests.delete(challenger.accountId); // 清理请求
     }
   }
 
@@ -183,22 +183,22 @@ class GameManager {
     }
 
     const { from: challengerId, accept } = data;
-    const challenger = this.userManager.getUserByUserId(challengerId);
+    const challenger = this.userManager.getUserByAccountId(challengerId);
 
     if (!challenger) {
       io.to(socketId).emit('error', { message: '响应失败：挑战者已离线' });
       return;
     }
 
-    const challenge = this.challengeRequests.get(challenger.userId);
+    const challenge = this.challengeRequests.get(challenger.accountId);
 
-    if (!challenge || challenge.challengedId !== challenged.userId) {
+    if (!challenge || challenge.challengedId !== challenged.accountId) {
       io.to(socketId).emit('error', { message: '响应失败：挑战请求不存在或已过期' });
       return;
     }
 
     // 移除挑战请求
-    this.challengeRequests.delete(challenger.userId);
+    this.challengeRequests.delete(challenger.accountId);
 
     if (accept) {
       // 检查双方状态是否仍然在线
@@ -209,19 +209,19 @@ class GameManager {
       }
 
       // 创建游戏
-      this.createGame(challenger.userId, challenged.userId, challenge.gameType, io);
-      io.to(challenged.socketId).emit('challenge_accepted', { from: challenger.userId, fromNickname: challenger.nickname, game: challenge.gameType });
-      io.to(challenger.socketId).emit('challenge_accepted', { to: challenged.userId, toNickname: challenged.nickname, game: challenge.gameType });
-      logger.info('挑战已接受，游戏开始', { challenger: challenger.userId, challenged: challenged.userId, gameType: challenge.gameType });
+      this.createGame(challenger.accountId, challenged.accountId, challenge.gameType, io);
+      io.to(challenged.socketId).emit('challenge_accepted', { from: challenger.accountId, fromNickname: challenger.nickname, game: challenge.gameType });
+      io.to(challenger.socketId).emit('challenge_accepted', { to: challenged.accountId, toNickname: challenged.nickname, game: challenge.gameType });
+      logger.info('挑战已接受，游戏开始', { challenger: challenger.accountId, challenged: challenged.accountId, gameType: challenge.gameType });
     } else {
       // 通知挑战者被拒绝
       io.to(challenger.socketId).emit('challenge_rejected', {
-        from: challenged.userId,
+        from: challenged.accountId,
         fromNickname: challenged.nickname,
         game: challenge.gameType
       });
       io.to(challenged.socketId).emit('challenge_rejected', { success: true, message: `已拒绝 ${challenger.nickname} 的挑战` });
-      logger.info('挑战已拒绝', { challenger: challenger.userId, challenged: challenged.userId, gameType: challenge.gameType });
+      logger.info('挑战已拒绝', { challenger: challenger.accountId, challenged: challenged.accountId, gameType: challenge.gameType });
     }
   }
 
@@ -251,8 +251,8 @@ class GameManager {
   // 创建游戏
   createGame(userId1, userId2, gameType, io) {
     const gameId = this.generateGameId(gameType);
-    const user1 = this.userManager.getUserByUserId(userId1);
-    const user2 = this.userManager.getUserByUserId(userId2);
+    const user1 = this.userManager.getUserByAccountId(userId1);
+    const user2 = this.userManager.getUserByAccountId(userId2);
 
     if (!user1 || !user2) {
       logger.error('创建游戏失败：用户不存在', { userId1, userId2 });
@@ -299,8 +299,8 @@ class GameManager {
     this.userManager.broadcastUserStatus(userId2, 'playing', io);
 
     // 通知玩家
-    const socket1 = this.userManager.getSocketByUserId(userId1);
-    const socket2 = this.userManager.getSocketByUserId(userId2);
+    const socket1 = this.userManager.getSocketByAccountId(userId1);
+    const socket2 = this.userManager.getSocketByAccountId(userId2);
 
     if (socket1) {
       socket1.emit('match_success', {
@@ -349,8 +349,8 @@ class GameManager {
       // 检查长时间未移动
       if (now - game.lastMoveTime > 300000) { // 5分钟
         // 通知玩家
-        const socket1 = this.userManager.getSocketByUserId(game.player1);
-        const socket2 = this.userManager.getSocketByUserId(game.player2);
+        const socket1 = this.userManager.getSocketByAccountId(game.player1);
+        const socket2 = this.userManager.getSocketByAccountId(game.player2);
 
         if (socket1) socket1.emit('game_warning', { message: '长时间未移动，游戏即将结束' });
         if (socket2) socket2.emit('game_warning', { message: '长时间未移动，游戏即将结束' });
@@ -382,8 +382,8 @@ class GameManager {
     }
 
     // 验证是否是当前玩家
-    const isPlayer1 = game.player1 === user.userId;
-    const isPlayer2 = game.player2 === user.userId;
+    const isPlayer1 = game.player1 === user.accountId;
+    const isPlayer2 = game.player2 === user.accountId;
 
     if ((game.currentPlayer === 1 && !isPlayer1) ||
       (game.currentPlayer === 2 && !isPlayer2)) {
@@ -392,7 +392,7 @@ class GameManager {
 
     // 记录移动
     const move = {
-      player: user.userId,
+      player: user.accountId,
       color: isPlayer1 ? 1 : 2,
       position: data.position || { r: data.r, c: data.c },
       timestamp: Date.now()
@@ -407,10 +407,10 @@ class GameManager {
     moves.push(move);
 
     // 更新用户活动
-    this.userManager.updateUserActivity(user.userId);
+    this.userManager.updateUserActivity(user.accountId);
 
     logger.gameEvent(game.gameId, '移动', {
-      player: user.userId,
+      player: user.accountId,
       position: move.position,
       isPlayer1: isPlayer1,
       isPlayer2: isPlayer2,
@@ -420,16 +420,16 @@ class GameManager {
 
     // 发送给对手（不发送给自己）
     const opponentId = isPlayer1 ? game.player2 : game.player1;
-    const opponentSocket = this.userManager.getSocketByUserId(opponentId);
+    const opponentSocket = this.userManager.getSocketByAccountId(opponentId);
     logger.info('发送移动消息', {
-      from: user.userId,
+      from: user.accountId,
       to: opponentId,
       hasOpponentSocket: !!opponentSocket
     });
     if (opponentSocket) {
       opponentSocket.emit('move', {
         ...data,
-        from: user.userId,
+        from: user.accountId,
         color: move.color
       });
     }
@@ -437,7 +437,7 @@ class GameManager {
     // 发送给观战者（不发送给玩家自己）
     this.broadcastToSpectators(game.gameId, 'move', {
       ...data,
-      from: user.userId,
+      from: user.accountId,
       color: move.color
     }, io);
 
@@ -458,7 +458,7 @@ class GameManager {
 
     // 检查是否已有待处理的请求
     if (game.pendingResetRequest) {
-      const userSocket = this.userManager.getSocketByUserId(user.userId);
+      const userSocket = this.userManager.getSocketByAccountId(user.accountId);
       if (userSocket) {
         userSocket.emit('reset_request_pending', {
           message: '已有重置请求待处理，请等待对方回应'
@@ -468,26 +468,26 @@ class GameManager {
     }
 
     // 转发给对手
-    const opponentId = game.player1 === user.userId ? game.player2 : game.player1;
-    const opponentSocket = this.userManager.getSocketByUserId(opponentId);
+    const opponentId = game.player1 === user.accountId ? game.player2 : game.player1;
+    const opponentSocket = this.userManager.getSocketByAccountId(opponentId);
 
     if (opponentSocket) {
       // 设置重置请求信息
       game.pendingResetRequest = {
-        requesterId: user.userId,
+        requesterId: user.accountId,
         requestTime: Date.now(),
         message: (data && data.message) ? data.message : '对方请求重置棋盘'
       };
 
       // 记录重置请求
       logger.gameEvent(game.gameId, '重置请求', {
-        requester: user.userId,
+        requester: user.accountId,
         opponent: opponentId,
         message: (data && data.message) ? data.message : '对方请求重置棋盘'
       });
 
       opponentSocket.emit('reset_request', {
-        from: user.userId,
+        from: user.accountId,
         fromNickname: user.nickname,
         message: (data && data.message) ? data.message : '对方请求重置棋盘',
         requestId: game.pendingResetRequest.requestTime
@@ -496,7 +496,7 @@ class GameManager {
       // 设置超时（30秒后自动取消）
       game.resetTimeout = setTimeout(() => {
         if (game.pendingResetRequest) {
-          const requesterSocket = this.userManager.getSocketByUserId(game.pendingResetRequest.requesterId);
+          const requesterSocket = this.userManager.getSocketByAccountId(game.pendingResetRequest.requesterId);
           if (requesterSocket) {
             requesterSocket.emit('reset_request_timeout', {
               message: '重置请求超时，对方未回应'
@@ -527,7 +527,7 @@ class GameManager {
 
     // 检查是否有待处理的请求
     if (!game.pendingResetRequest) {
-      const userSocket = this.userManager.getSocketByUserId(user.userId);
+      const userSocket = this.userManager.getSocketByAccountId(user.accountId);
       if (userSocket) {
         userSocket.emit('reset_request_invalid', {
           message: '没有待处理的重置请求'
@@ -538,7 +538,7 @@ class GameManager {
 
     // 验证请求ID（如果提供）
     if (requestId && game.pendingResetRequest.requestTime !== requestId) {
-      const userSocket = this.userManager.getSocketByUserId(user.userId);
+      const userSocket = this.userManager.getSocketByAccountId(user.accountId);
       if (userSocket) {
         userSocket.emit('reset_request_invalid', {
           message: '重置请求已过期'
@@ -571,8 +571,8 @@ class GameManager {
 
     // 重置移动历史
     this.moveHistory.set(gameId, []);
-    const user1 = this.userManager.getUserByUserId(game.player1);
-    const user2 = this.userManager.getUserByUserId(game.player2);
+    const user1 = this.userManager.getUserByAccountId(game.player1);
+    const user2 = this.userManager.getUserByAccountId(game.player2);
 
     if (user1) {
       user1.status = 'playing';
@@ -582,8 +582,8 @@ class GameManager {
     }
 
     // 通知双方重置游戏
-    const player1Socket = this.userManager.getSocketByUserId(game.player1);
-    const player2Socket = this.userManager.getSocketByUserId(game.player2);
+    const player1Socket = this.userManager.getSocketByAccountId(game.player1);
+    const player2Socket = this.userManager.getSocketByAccountId(game.player2);
 
     if (player1Socket) {
       player1Socket.emit('reset', {
@@ -597,7 +597,7 @@ class GameManager {
     }
 
     // 通知请求者重置成功
-    const requesterSocket = this.userManager.getSocketByUserId(requesterId);
+    const requesterSocket = this.userManager.getSocketByAccountId(requesterId);
     if (requesterSocket) {
       requesterSocket.emit('reset_accepted', {
         message: '对方已同意重置游戏'
@@ -609,7 +609,7 @@ class GameManager {
 
     logger.gameEvent(game.gameId, '游戏重置', {
       requester: requesterId,
-      responder: user.userId
+      responder: user.accountId
     });
 
     return true;
@@ -629,7 +629,7 @@ class GameManager {
 
     // 检查是否有待处理的请求
     if (!game.pendingResetRequest) {
-      const userSocket = this.userManager.getSocketByUserId(user.userId);
+      const userSocket = this.userManager.getSocketByAccountId(user.accountId);
       if (userSocket) {
         userSocket.emit('reset_request_invalid', {
           message: '没有待处理的重置请求'
@@ -640,7 +640,7 @@ class GameManager {
 
     // 验证请求ID（如果提供）
     if (requestId && game.pendingResetRequest.requestTime !== requestId) {
-      const userSocket = this.userManager.getSocketByUserId(user.userId);
+      const userSocket = this.userManager.getSocketByAccountId(user.accountId);
       if (userSocket) {
         userSocket.emit('reset_request_invalid', {
           message: '重置请求已过期'
@@ -658,10 +658,10 @@ class GameManager {
     const requesterId = game.pendingResetRequest.requesterId;
 
     // 通知请求者重置被拒绝
-    const requesterSocket = this.userManager.getSocketByUserId(requesterId);
+    const requesterSocket = this.userManager.getSocketByAccountId(requesterId);
     if (requesterSocket) {
       requesterSocket.emit('reset_rejected', {
-        from: user.userId,
+        from: user.accountId,
         fromNickname: user.nickname,
         message: '对方拒绝了重置请求'
       });
@@ -672,7 +672,7 @@ class GameManager {
 
     logger.gameEvent(game.gameId, '重置请求被拒绝', {
       requester: requesterId,
-      rejecter: user.userId
+      rejecter: user.accountId
     });
 
     return true;
@@ -702,11 +702,11 @@ class GameManager {
     let loser = null;
 
     if (result === 'win') {
-      winner = user.userId;
-      loser = game.player1 === user.userId ? game.player2 : game.player1;
+      winner = user.accountId;
+      loser = game.player1 === user.accountId ? game.player2 : game.player1;
     } else if (result === 'resign') {
-      loser = user.userId;
-      winner = game.player1 === user.userId ? game.player2 : game.player1;
+      loser = user.accountId;
+      winner = game.player1 === user.accountId ? game.player2 : game.player1;
     }
 
     // 结束游戏
@@ -776,15 +776,14 @@ class GameManager {
     // 为所有玩家检查成就
     try {
       const players = [game.player1, game.player2];
-      for (const player of players) {
-        const accountId = this.userManager.userIdToAccountId.get(player);
+      for (const accountId of players) {
         if (accountId && this.accountManager) {
           const account = await this.accountManager.getAccount(accountId);
           if (account) {
-            const isWinner = player === winner;
+            const isWinner = accountId === winner;
             const playerResult = isWinner ? 'win' : (result === 'draw' ? 'draw' : 'loss');
             const gameDuration = game.endTime - game.startTime;
-            const playerChatted = game.playerChatted && game.playerChatted[player];
+            const playerChatted = game.playerChatted && game.playerChatted[accountId];
             let level = 1;
             if (account.profile && account.profile.exp) {
               const totalExp = account.profile.exp;
@@ -806,7 +805,7 @@ class GameManager {
             };
             const unlockedAchievements = await this.achievementManager.checkAchievements(accountId, stats);
             if (unlockedAchievements.length > 0) {
-              const socket = this.userManager.getSocketByUserId(player);
+              const socket = this.userManager.getSocketByAccountId(player);
               if (socket) {
                 socket.emit('achievements_unlocked', { achievements: unlockedAchievements });
               }
@@ -819,8 +818,8 @@ class GameManager {
     }
 
     // 通知玩家
-    const socket1 = this.userManager.getSocketByUserId(game.player1);
-    const socket2 = this.userManager.getSocketByUserId(game.player2);
+    const socket1 = this.userManager.getSocketByAccountId(game.player1);
+    const socket2 = this.userManager.getSocketByAccountId(game.player2);
 
     const endData = {
       gameId,
@@ -933,7 +932,7 @@ class GameManager {
     }
 
     logger.info('用户返回大厅', {
-      userId: user.userId,
+      userId: user.accountId,
       userStatus: user.status,
       userGame: user.game,
       reason: reason
@@ -950,17 +949,17 @@ class GameManager {
 
     // 如果在游戏中，结束游戏
     if (user.status === 'playing' && user.game) {
-      logger.info('用户正在游戏中，准备结束游戏', { userId: user.userId, gameId: user.game });
+      logger.info('用户正在游戏中，准备结束游戏', { userId: user.accountId, gameId: user.game });
       const game = this.games.get(user.game);
       logger.info('检查游戏状态', {
-        userId: user.userId,
+        userId: user.accountId,
         gameId: user.game,
         gameExists: !!game,
         gameStatus: game ? game.status : 'no game'
       });
       if (game && game.status === 'playing') {
-        const opponentId = game.player1 === user.userId ? game.player2 : game.player1;
-        const opponent = this.userManager.getUserByUserId(opponentId);
+        const opponentId = game.player1 === user.accountId ? game.player2 : game.player1;
+        const opponent = this.userManager.getUserByAccountId(opponentId);
 
         // 根据游戏进度决定结算方式
         const gameDuration = Date.now() - game.startTime;
@@ -985,11 +984,11 @@ class GameManager {
         }
 
         // 通知对手
-        const opponentSocket = this.userManager.getSocketByUserId(opponentId);
+        const opponentSocket = this.userManager.getSocketByAccountId(opponentId);
         if (opponentSocket) {
           // 发送即时通知
           opponentSocket.emit('opponent_left', {
-            userId: user.userId,
+            userId: user.accountId,
             nickname: user.nickname,
             reason: reason,
             result: gameResult,
@@ -1023,7 +1022,7 @@ class GameManager {
 
         // 记录非正常结算
         logger.gameEvent(game.gameId, '非正常结算', {
-          leaver: user.userId,
+          leaver: user.accountId,
           opponent: opponentId,
           result: gameResult,
           reason: reason,
@@ -1039,7 +1038,7 @@ class GameManager {
     user.lastActivity = Date.now();
 
     // 通知用户返回大厅结果
-    const userSocket = this.userManager.getSocketByUserId(user.userId);
+    const userSocket = this.userManager.getSocketByAccountId(user.accountId);
     if (userSocket) {
       userSocket.emit('return_lobby_result', {
         success: true,
@@ -1049,14 +1048,14 @@ class GameManager {
       });
     }
 
-    logger.userAction(user.userId, '返回大厅', {
+    logger.userAction(user.accountId, '返回大厅', {
       reason: reason,
       gameEnded: gameEnded,
       result: gameResult
     });
 
     // 广播用户状态
-    this.userManager.broadcastUserStatus(user.userId, 'online', io);
+    this.userManager.broadcastUserStatus(user.accountId, 'online', io);
 
     return true;
   }
@@ -1075,15 +1074,15 @@ class GameManager {
     if (user.status === 'playing' && user.game) {
       const game = this.games.get(user.game);
       if (game && game.status === 'playing') {
-        const opponentId = game.player1 === user.userId ? game.player2 : game.player1;
+        const opponentId = game.player1 === user.accountId ? game.player2 : game.player1;
 
         // 延迟结束游戏（给用户重新连接的机会）
         setTimeout(() => {
           const currentGame = this.games.get(game.gameId);
           if (currentGame && currentGame.status === 'playing') {
             // 检查玩家是否重新连接
-            const user1 = this.userManager.getUserByUserId(game.player1);
-            const user2 = this.userManager.getUserByUserId(game.player2);
+            const user1 = this.userManager.getUserByAccountId(game.player1);
+            const user2 = this.userManager.getUserByAccountId(game.player2);
 
             if (!user1 || !user2) {
               // 有玩家离线，结束游戏
@@ -1112,7 +1111,7 @@ class GameManager {
     if (spectators) {
       spectators.add(userId);
 
-      const user = this.userManager.getUserByUserId(userId);
+      const user = this.userManager.getUserByAccountId(userId);
       if (user) {
         user.status = 'spectating';
         user.game = gameId;
@@ -1143,7 +1142,7 @@ class GameManager {
     if (spectators) {
       spectators.delete(userId);
 
-      const user = this.userManager.getUserByUserId(userId);
+      const user = this.userManager.getUserByAccountId(userId);
       if (user) {
         user.status = 'online';
         user.game = null;
@@ -1163,7 +1162,7 @@ class GameManager {
         if (data.from === userId) {
           continue;
         }
-        const socket = this.userManager.getSocketByUserId(userId);
+        const socket = this.userManager.getSocketByAccountId(userId);
         if (socket) {
           socket.emit(event, data);
         }
@@ -1249,8 +1248,8 @@ class GameManager {
   // 获取所有游戏
   getAllGames() {
     const pvpGames = Array.from(this.games.values()).map(game => {
-      const user1 = this.userManager.getUserByUserId(game.player1);
-      const user2 = this.userManager.getUserByUserId(game.player2);
+      const user1 = this.userManager.getUserByAccountId(game.player1);
+      const user2 = this.userManager.getUserByAccountId(game.player2);
       return {
         gameId: game.gameId,
         gameType: game.gameType,
@@ -1265,11 +1264,11 @@ class GameManager {
 
     // 添加AI对战游戏
     const aiGames = Array.from(this.aiGames.values()).map(aiGame => {
-      const user = this.userManager.getUserByUserId(aiGame.userId);
+      const user = this.userManager.getUserByAccountId(aiGame.userId);
       return {
         gameId: aiGame.gameId,
         gameType: aiGame.gameType,
-        player1: user ? { nickname: user.nickname, userId: user.userId } : null,
+        player1: user ? { nickname: user.nickname, userId: user.accountId } : null,
         player2: { nickname: 'AI', userId: 'ai' },
         status: aiGame.status === 'finished' ? 'ended' : aiGame.status,
         moveCount: aiGame.moves.length,
@@ -1323,8 +1322,8 @@ class GameManager {
       return false;
     }
 
-    const player1Socket = this.userManager.getSocketByUserId(game.player1);
-    const player2Socket = this.userManager.getSocketByUserId(game.player2);
+    const player1Socket = this.userManager.getSocketByAccountId(game.player1);
+    const player2Socket = this.userManager.getSocketByAccountId(game.player2);
 
     if (player1Socket) {
       player1Socket.emit('game_reset', {
@@ -1344,8 +1343,8 @@ class GameManager {
     this.games.delete(gameId);
     this.spectators.delete(gameId);
 
-    const user1 = this.userManager.getUserByUserId(game.player1);
-    const user2 = this.userManager.getUserByUserId(game.player2);
+    const user1 = this.userManager.getUserByAccountId(game.player1);
+    const user2 = this.userManager.getUserByAccountId(game.player2);
 
     if (user1) {
       user1.status = 'online';
@@ -1370,7 +1369,7 @@ class GameManager {
       return false;
     }
 
-    const user = this.userManager.getUserByUserId(userId);
+    const user = this.userManager.getUserByAccountId(userId);
     if (!user) {
       logger.warn('创建AI对战失败：用户不存在', { userId });
       return false;
@@ -1424,7 +1423,7 @@ class GameManager {
     logger.aiGameEvent(userId, '开始AI对战', { gameType, difficulty });
 
     // 发送游戏开始信息
-    const userSocket = this.userManager.getSocketByUserId(userId);
+    const userSocket = this.userManager.getSocketByAccountId(userId);
     if (userSocket) {
       userSocket.emit('ai_game_start', {
         gameType: gameType,
@@ -1448,7 +1447,7 @@ class GameManager {
     }
 
     // 获取用户信息
-    const user = this.userManager.getUserByUserId(userId);
+    const user = this.userManager.getUserByAccountId(userId);
     if (!user) {
       logger.warn('❌ AI对战移动失败：用户不存在', { userId });
       return false;
@@ -1494,7 +1493,7 @@ class GameManager {
     aiGame.currentPlayer = 2;
 
     // 发送移动结果
-    const userSocket = this.userManager.getSocketByUserId(userId);
+    const userSocket = this.userManager.getSocketByAccountId(userId);
     if (userSocket) {
       userSocket.emit('ai_move_result', {
         position: position,
@@ -1553,7 +1552,7 @@ class GameManager {
     aiGame.lastMoveTime = Date.now();
 
     // 更新用户活动时间
-    const user = this.userManager.getUserByUserId(userId);
+    const user = this.userManager.getUserByAccountId(userId);
     if (user) {
       user.lastActivity = Date.now();
     }
@@ -1569,7 +1568,7 @@ class GameManager {
     aiGame.currentPlayer = 1;
 
     // 发送AI移动结果
-    const userSocket = this.userManager.getSocketByUserId(userId);
+    const userSocket = this.userManager.getSocketByAccountId(userId);
     if (userSocket) {
       userSocket.emit('ai_move_result', {
         position: aiMove,
@@ -1593,7 +1592,7 @@ class GameManager {
     aiGame.result = result;
 
     // 获取用户信息
-    const user = this.userManager.getUserByUserId(userId);
+    const user = this.userManager.getUserByAccountId(userId);
     if (!user) return;
 
     // 保存AI游戏记录到 games.json
@@ -1606,7 +1605,7 @@ class GameManager {
         gameType: aiGame.gameType,
         player1: userId,
         player2: 'ai',
-        player1Nickname: user.nickname || user.userId,
+        player1Nickname: user.nickname || user.accountId,
         player2Nickname: 'AI',
         winner: result === 'win' ? userId : 'ai',
         result: result,
@@ -1650,7 +1649,7 @@ class GameManager {
     }
 
     // 发送游戏结束信息
-    const userSocket = this.userManager.getSocketByUserId(userId);
+    const userSocket = this.userManager.getSocketByAccountId(userId);
     if (userSocket) {
       userSocket.emit('ai_game_end', {
         result: result,
@@ -1663,11 +1662,11 @@ class GameManager {
     await this.userManager.updateUserStats(userId, result, aiGame.gameType, true, aiGame.difficulty, aiGame.duration);
 
     // 检查成就
-    const accountId = this.userManager.userIdToAccountId.get(userId);
+    const accountId = userId;
     if (accountId && this.accountManager && this.achievementManager) {
       const account = await this.accountManager.getAccount(accountId);
       if (account) {
-        const playerChatted = aiGame.playerChatted && aiGame.playerChatted[userId];
+        const playerChatted = aiGame.playerChatted && aiGame.playerChatted[accountId];
         let level = 1;
         if (account.profile && account.profile.exp) {
           const totalExp = account.profile.exp;

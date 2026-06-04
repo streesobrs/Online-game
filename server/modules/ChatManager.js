@@ -60,7 +60,7 @@ class ChatManager {
     if (!user) return { success: false, message: '用户不存在' };
 
     // 检查是否被禁言
-    const muteInfo = this.muteList.get(user.userId);
+    const muteInfo = this.muteList.get(user.accountId);
     if (muteInfo) {
       const remaining = Math.max(0, Math.ceil((muteInfo.expiresAt - Date.now()) / 1000 / 60));
       let message = '您已被禁言';
@@ -74,7 +74,7 @@ class ChatManager {
     }
 
     // 检查消息频率
-    if (!this.checkRateLimit(user.userId)) {
+    if (!this.checkRateLimit(user.accountId)) {
       return { success: false, message: '发送消息过于频繁，请稍后再试' };
     }
 
@@ -87,7 +87,7 @@ class ChatManager {
 
     const chatMessage = {
       messageId: this.generateMessageId(),
-      userId: user.userId,
+      userId: user.accountId,
       nickname: user.nickname,
       message: this.sanitizeMessage(message),
       type,
@@ -109,23 +109,22 @@ class ChatManager {
       ...chatMessage
     });
 
-    logger.chatEvent(user.userId, '大厅', { messageLength: message.length });
+    logger.chatEvent(user.accountId, '大厅', { messageLength: message.length });
 
     // 更新聊天消息统计
-    this.updateChatMessageCount(user.userId);
+    this.updateChatMessageCount(user.accountId);
 
     return { success: true };
   }
 
   // 更新用户聊天消息统计
-  async updateChatMessageCount(userId) {
+  async updateChatMessageCount(accountId) {
     try {
-      const accountId = this.userManager.userIdToAccountId.get(userId);
       if (accountId && this.accountManager) {
         await this.accountManager.updateChatMessages(accountId);
       }
     } catch (err) {
-      logger.error('更新聊天消息统计失败', { userId, error: err.message });
+      logger.error('更新聊天消息统计失败', { accountId, error: err.message });
     }
   }
 
@@ -140,7 +139,7 @@ class ChatManager {
     }
 
     // 检查是否被禁言
-    const muteInfo = this.muteList.get(user.userId);
+    const muteInfo = this.muteList.get(user.accountId);
     if (muteInfo) {
       const remaining = Math.max(0, Math.ceil((muteInfo.expiresAt - Date.now()) / 1000 / 60));
       let message = '您已被禁言';
@@ -158,7 +157,7 @@ class ChatManager {
 
     // 如果不是PvP游戏，检查是否是AI游戏
     if (!game) {
-      targetGame = this.gameManager.aiGames.get(user.userId);
+      targetGame = this.gameManager.aiGames.get(user.accountId);
     }
 
     if (!targetGame) {
@@ -174,7 +173,7 @@ class ChatManager {
 
     const chatMessage = {
       messageId: this.generateMessageId(),
-      userId: user.userId,
+      userId: user.accountId,
       nickname: user.nickname,
       message: this.sanitizeMessage(message),
       type,
@@ -197,15 +196,15 @@ class ChatManager {
     if (!targetGame.playerChatted) {
       targetGame.playerChatted = {};
     }
-    targetGame.playerChatted[user.userId] = true;
+    targetGame.playerChatted[user.accountId] = true;
 
     // 保存到文件
     this.saveChatHistory();
 
     // 发送给游戏内玩家和观战者（仅PvP游戏）
     if (game) {
-      const socket1 = this.userManager.getSocketByUserId(game.player1);
-      const socket2 = this.userManager.getSocketByUserId(game.player2);
+      const socket1 = this.userManager.getSocketByAccountId(game.player1);
+      const socket2 = this.userManager.getSocketByAccountId(game.player2);
 
       if (socket1) {
         socket1.emit('chat_message', {
@@ -230,7 +229,7 @@ class ChatManager {
       }, io);
     } else {
       // AI游戏，只发送给自己
-      const userSocket = this.userManager.getSocketByUserId(user.userId);
+      const userSocket = this.userManager.getSocketByAccountId(user.accountId);
       if (userSocket) {
         userSocket.emit('chat_message', {
           scope: 'game',
@@ -240,10 +239,10 @@ class ChatManager {
       }
     }
 
-    logger.chatEvent(user.userId, '局内', { gameId: targetGame.gameId, messageLength: message.length });
+    logger.chatEvent(user.accountId, '局内', { gameId: targetGame.gameId, messageLength: message.length });
 
     // 更新聊天消息统计
-    this.updateChatMessageCount(user.userId);
+    this.updateChatMessageCount(user.accountId);
 
     return { success: true };
   }
@@ -260,14 +259,14 @@ class ChatManager {
       return { success: false, message: '消息内容无效' };
     }
 
-    const targetSocket = this.userManager.getSocketByUserId(targetUserId);
+    const targetSocket = this.userManager.getSocketByAccountId(targetUserId);
     if (!targetSocket) {
       return { success: false, message: '对方不在线' };
     }
 
     const chatMessage = {
       messageId: this.generateMessageId(),
-      fromUserId: user.userId,
+      fromUserId: user.accountId,
       fromNickname: user.nickname,
       message: this.sanitizeMessage(message),
       timestamp: Date.now()
@@ -277,7 +276,7 @@ class ChatManager {
     targetSocket.emit('private_message', chatMessage);
 
     // 发送给自己（确认发送成功）
-    const senderSocket = this.userManager.getSocketByUserId(user.userId);
+    const senderSocket = this.userManager.getSocketByAccountId(user.accountId);
     if (senderSocket) {
       senderSocket.emit('private_message_sent', {
         toUserId: targetUserId,
@@ -389,7 +388,7 @@ class ChatManager {
   // 获取在线用户列表（用于@功能）
   getOnlineUsers() {
     return this.userManager.getAllUsers().map(u => ({
-      userId: u.userId,
+      userId: u.accountId,
       nickname: u.nickname
     }));
   }
