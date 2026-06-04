@@ -125,7 +125,7 @@ class AccountManager {
   // 检查用户名是否已存在
   async usernameExists(username) {
     try {
-      const account = await dataStore.findOne('accounts', { username: username.toLowerCase(), type: { $ne: 'guest' } });
+      const account = await dataStore.findOne('accounts', { 'account.username': username.toLowerCase(), 'account.type': { $ne: 'guest' } });
       return !!account;
     } catch (err) {
       logger.error('检查用户名失败', { username, error: err.message });
@@ -776,6 +776,7 @@ class AccountManager {
 
     // 检查用户名是否已存在
     if (await this.usernameExists(username)) {
+      logger.warn('账号注册失败 - 用户名已存在', { username, guestAccountId });
       return {
         success: false,
         message: '用户名已存在'
