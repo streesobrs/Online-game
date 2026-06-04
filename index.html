@@ -2275,6 +2275,26 @@
       margin-bottom: 10px;
     }
 
+    .account-level {
+      background: linear-gradient(135deg, #f39c12, #e74c3c);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 15px;
+      font-size: 12px;
+      font-weight: bold;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    .account-exp {
+      background: linear-gradient(135deg, #3498db, #2ecc71);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 15px;
+      font-size: 12px;
+      font-weight: bold;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
     /* 自动登录模态窗口样式 */
     .auto-login-modal {
       position: fixed;
@@ -4907,10 +4927,11 @@
       });
 
       socket.on('account_updated', (data) => {
-        console.log('收到账号更新:', data);
         if (data.account) {
-          const newExp = data.account.profile?.exp || 0;
-          const newLevel = data.account.profile?.level || 1;
+          // 处理不同的数据结构
+          const accountData = data.account.account || data.account;
+          const newExp = accountData?.profile?.exp || 0;
+          const newLevel = accountData?.profile?.level || 1;
 
           if (newExp > lastExp) {
             const expGained = newExp - lastExp;
@@ -9583,17 +9604,21 @@
       const accountBar = document.getElementById('account-bar');
       if (currentAccount) {
         // 处理不同的数据结构
-        let accountType, nickname, username;
+        let accountType, nickname, username, level, exp;
         if (currentAccount.account.account) {
           // 账号登录的数据结构
           accountType = currentAccount.account.account.type;
           nickname = currentAccount.account.account.nickname;
           username = currentAccount.account.account.username;
+          level = currentAccount.account.account.profile?.level || 1;
+          exp = currentAccount.account.account.profile?.exp || 0;
         } else {
           // 游客登录的数据结构
           accountType = currentAccount.account.type;
           nickname = currentAccount.account.nickname;
           username = currentAccount.account.username;
+          level = currentAccount.account.profile?.level || 1;
+          exp = currentAccount.account.profile?.exp || 0;
         }
 
         // 根据用户类型显示不同的退出按钮
@@ -9608,6 +9633,8 @@
         accountBar.innerHTML = `
           <div class="account-info">
             <span class="account-nickname">👤 ${nickname || username}</span>
+            <span class="account-level">Lv.${level}</span>
+            <span class="account-exp">${exp} EXP</span>
             ${profileButton}
             ${historyButton}
             <button class="account-btn" onclick="${logoutFunction}">${logoutText}</button>

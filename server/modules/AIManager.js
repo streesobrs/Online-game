@@ -23,16 +23,70 @@ class AIManager {
 
   // 五子棋 AI 移动
   getGobangAIMove(board, difficulty, currentPlayer) {
+    // 第一步时，所有难度都只下在用户棋子附近
+    if (this.isFirstMove(board)) {
+      const nearPositions = this.getPositionsNearUserPiece(board);
+      if (nearPositions.length > 0) {
+        // 随机选择一个附近的位置
+        const randomIndex = Math.floor(Math.random() * nearPositions.length);
+        return nearPositions[randomIndex];
+      }
+    }
+
     switch (difficulty) {
       case 'easy':
-        return this.getGobangEasyMove(board);
+        return this.getGobangEasyMove(board, currentPlayer);
       case 'medium':
         return this.getGobangMediumMove(board, currentPlayer);
       case 'hard':
         return this.getGobangHardMove(board, currentPlayer);
       default:
-        return this.getGobangEasyMove(board);
+        return this.getGobangEasyMove(board, currentPlayer);
     }
+  }
+
+  // 检查是否是第一步（棋盘上只有一个棋子）
+  isFirstMove(board) {
+    let count = 0;
+    for (let r = 0; r < board.length; r++) {
+      for (let c = 0; c < board[r].length; c++) {
+        if (board[r][c] !== 0) {
+          count++;
+          if (count > 1) return false;
+        }
+      }
+    }
+    return count === 1;
+  }
+
+  // 获取用户棋子附近的位置（3x3范围内）
+  getPositionsNearUserPiece(board) {
+    const positions = [];
+    const visited = new Set();
+
+    for (let r = 0; r < board.length; r++) {
+      for (let c = 0; c < board[r].length; c++) {
+        if (board[r][c] !== 0) {
+          // 找到用户棋子，获取周围3x3范围
+          for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+              const nr = r + dr;
+              const nc = c + dc;
+              const key = `${nr},${nc}`;
+
+              if (nr >= 0 && nr < board.length && nc >= 0 && nc < board[0].length &&
+                board[nr][nc] === 0 && !visited.has(key)) {
+                visited.add(key);
+                positions.push({ r: nr, c: nc });
+              }
+            }
+          }
+          return positions; // 只处理第一个找到的棋子
+        }
+      }
+    }
+
+    return positions;
   }
 
   // 五子棋简单难度 - 基于基础规则的AI（平衡攻防）
@@ -373,12 +427,13 @@ class AIManager {
       return { r: centerR, c: centerC };
     }
 
-    // 搜索深度8-10层（更深的搜索，实现3-5步预测）
+    // 搜索深度 4-6 层（优化性能，减少计算时间）
     // 根据棋盘复杂度动态调整深度
-    let depth = 8;
+    let depth = 4;  // 降低基础深度
     const emptyCount = this.getEmptyCells(board).length;
-    if (emptyCount < 20) depth = 10; // 残局时深度更深
-    if (emptyCount > 40) depth = 7;  // 开局时稍浅一点
+    if (emptyCount < 20) depth = 6;   // 残局时深度更深
+    else if (emptyCount < 100) depth = 5;  // 中局
+    else depth = 4;  // 开局时最浅，保证响应速度
 
     const result = this.minimaxOptimized(board, depth, currentPlayer, -Infinity, Infinity, true, candidateMoves);
 
@@ -387,7 +442,7 @@ class AIManager {
       return result.move;
     }
 
-    // 如果Minimax没有找到好棋，回退到中等难度
+    // 如果 Minimax 没有找到好棋，回退到中等难度
     return this.getGobangMediumMove(board, currentPlayer);
   }
 
@@ -470,6 +525,11 @@ class AIManager {
       let bestMove = null;
 
       for (const cell of moves) {
+        // 验证位置是否为空
+        if (board[cell.r][cell.c] !== 0) {
+          continue;
+        }
+
         board[cell.r][cell.c] = currentPlayer;
         const result = this.minimaxOptimized(board, depth - 1, currentPlayer, alpha, beta, false, null);
         board[cell.r][cell.c] = 0;
@@ -491,6 +551,11 @@ class AIManager {
       let bestMove = null;
 
       for (const cell of moves) {
+        // 验证位置是否为空
+        if (board[cell.r][cell.c] !== 0) {
+          continue;
+        }
+
         board[cell.r][cell.c] = opponent;
         const result = this.minimaxOptimized(board, depth - 1, currentPlayer, alpha, beta, true, null);
         board[cell.r][cell.c] = 0;
@@ -1469,7 +1534,7 @@ class AIManager {
   // 寻找最佳防守位置V2（更积极的防守）
   findBestDefensiveMoveV2(board, opponent, currentPlayer) {
     const emptyCells = this.getEmptyCells(board);
-    
+
     // 统计棋盘上已有棋子数量
     let pieceCount = 0;
     for (let r = 0; r < board.length; r++) {
@@ -1479,12 +1544,12 @@ class AIManager {
         }
       }
     }
-    
+
     // 如果棋子数量很少（开局阶段），不进行防守，让位置选择函数决定
     if (pieceCount <= 2) {
       return null;
     }
-    
+
     let bestMove = null;
     let maxThreat = 0;
 
@@ -1912,7 +1977,7 @@ class AIManager {
     // 如果有棋子，优先选择靠近已有棋子的位置
     const nearPieceCells = [];
     const farPieceCells = [];
-    
+
     for (const cell of emptyCells) {
       let hasNearPiece = false;
       for (let dr = -1; dr <= 1; dr++) {
@@ -1929,7 +1994,7 @@ class AIManager {
         }
         if (hasNearPiece) break;
       }
-      
+
       if (hasNearPiece) {
         nearPieceCells.push(cell);
       } else {
@@ -2473,8 +2538,8 @@ class AIManager {
     // 按分数排序，优先搜索高分位置
     candidates.sort((a, b) => b.score - a.score);
 
-    // 减少候选数量到15个（只保留最有威胁的位置）
-    return candidates.slice(0, Math.min(15, candidates.length));
+    // 减少候选数量到 10 个（优化性能，只保留最有威胁的位置）
+    return candidates.slice(0, Math.min(10, candidates.length));
   }
 
   // 增强版候选位置评估（更重视进攻）

@@ -699,7 +699,17 @@ class AchievementManager {
   // 给予奖励
   async giveReward(id, reward) {
     if (reward.exp) {
-      await this.accountManager.addExp(id, reward.exp);
+      const result = await this.accountManager.addExp(id, reward.exp);
+      
+      // 通知客户端经验值更新
+      if (result.success && this.userManager) {
+        const userSession = this.userManager.getUserByAccountId(id);
+        if (userSession && userSession.socket) {
+          // 获取更新后的账号信息
+          const updatedAccount = await this.accountManager.getAccount(id);
+          userSession.socket.emit('account_updated', { account: updatedAccount });
+        }
+      }
     }
 
     if (reward.badge) {

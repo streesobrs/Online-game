@@ -1316,17 +1316,25 @@ class AccountManager {
         return { success: false, message: '账号不存在' };
       }
 
-      const profile = account.account?.profile || { exp: 0 };
-      profile.exp += exp;
+      // 获取当前总经验值
+      const currentExp = account.account?.profile?.exp || 0;
+      const newTotalExp = currentExp + exp;
 
-      // 重新计算等级
-      const { level } = this.calculateLevelAndExp(profile.exp);
-      profile.level = level;
+      // 计算新的等级和当前等级剩余经验
+      const { level, exp: currentLevelExp } = this.calculateLevelAndExp(newTotalExp);
 
-      await dataStore.update('accounts', { 'account.id': id }, { 'account.profile': profile, 'account.updatedAt': Date.now() });
-      logger.info('添加经验值', { id, exp, newLevel: level });
+      // 保留原有 profile 属性，只更新 exp 和 level
+      const existingProfile = account.account?.profile || {};
+      const updatedProfile = {
+        ...existingProfile,
+        exp: newTotalExp,  // 保存总经验
+        level: level
+      };
 
-      return { success: true, level };
+      await dataStore.update('accounts', { 'account.id': id }, { 'account.profile': updatedProfile, 'account.updatedAt': Date.now() });
+      logger.info('添加经验值', { id, addedExp: exp, currentExp, newTotalExp, newLevel: level });
+
+      return { success: true, level, exp: currentLevelExp, totalExp: newTotalExp };
     } catch (err) {
       logger.error('添加经验值失败', { id, error: err.message });
       return { success: false, message: '添加失败' };
@@ -1489,7 +1497,15 @@ class AccountManager {
       // 重新计算等级
       const { level } = this.calculateLevelAndExp(exp);
 
-      await dataStore.update('accounts', { 'account.id': id }, { 'account.profile': { exp, level }, 'account.updatedAt': Date.now() });
+      // 保留原有profile属性，只更新exp和level
+      const existingProfile = account.account?.profile || {};
+      const updatedProfile = {
+        ...existingProfile,
+        exp: exp,
+        level: level
+      };
+
+      await dataStore.update('accounts', { 'account.id': id }, { 'account.profile': updatedProfile, 'account.updatedAt': Date.now() });
       logger.info('管理员修改用户经验值', { id, operation, amount, oldExp: profile.exp, newExp: exp, newLevel: level });
 
       return {

@@ -805,9 +805,33 @@ class GameManager {
             };
             const unlockedAchievements = await this.achievementManager.checkAchievements(accountId, stats);
             if (unlockedAchievements.length > 0) {
-              const socket = this.userManager.getSocketByAccountId(player);
+              const socket = this.userManager.getSocketByAccountId(accountId);
               if (socket) {
                 socket.emit('achievements_unlocked', { achievements: unlockedAchievements });
+              }
+            }
+
+            // 给予经验值奖励
+            let expReward = 0;
+            if (playerResult === 'win') {
+              expReward = 50; // 胜利奖励
+            } else if (playerResult === 'draw') {
+              expReward = 25; // 平局奖励
+            } else {
+              expReward = 10; // 失败安慰奖
+            }
+
+            // 添加经验值
+            if (expReward > 0) {
+              const expResult = await this.accountManager.addExp(accountId, expReward);
+
+              // 通知客户端
+              if (expResult.success) {
+                const socket = this.userManager.getSocketByAccountId(accountId);
+                if (socket) {
+                  const updatedAccount = await this.accountManager.getAccount(accountId);
+                  socket.emit('account_updated', { account: updatedAccount });
+                }
               }
             }
           }
@@ -1518,14 +1542,14 @@ class GameManager {
     return true;
   }
 
-  // AI自动移动
+  // AI 自动移动
   handleAIAutoMove(userId, io) {
     const aiGame = this.aiGames.get(userId);
     if (!aiGame || aiGame.status !== 'playing' || aiGame.currentPlayer !== 2) {
       return;
     }
 
-    // 获取AI移动
+    // 获取 AI 移动
     const aiMove = this.aiManager.getAIMove(
       aiGame.gameType,
       aiGame.board,
@@ -1534,11 +1558,11 @@ class GameManager {
     );
 
     if (!aiMove) {
-      logger.warn('AI移动失败：无法生成有效移动', { userId, gameType: aiGame.gameType });
+      logger.warn('AI 移动失败：无法生成有效移动', { userId, gameType: aiGame.gameType });
       return;
     }
 
-    // 执行AI移动
+    // 执行 AI 移动
     this.executeMove(aiGame.gameType, aiGame.board, aiMove, aiGame.currentPlayer);
 
     // 记录移动
@@ -1661,9 +1685,37 @@ class GameManager {
     // 更新用户统计
     await this.userManager.updateUserStats(userId, result, aiGame.gameType, true, aiGame.difficulty, aiGame.duration);
 
-    // 检查成就
+    // 给予经验值奖励
     const accountId = userId;
     if (accountId && this.accountManager && this.achievementManager) {
+      // 根据结果给予经验值
+      let expReward = 0;
+      if (result === 'win') {
+        expReward = 50; // 胜利奖励
+      } else if (result === 'draw') {
+        expReward = 25; // 平局奖励
+      } else {
+        expReward = 10; // 失败安慰奖
+      }
+
+      // 根据难度调整
+      if (aiGame.difficulty === 'hard') {
+        expReward = Math.floor(expReward * 1.5);
+      } else if (aiGame.difficulty === 'medium') {
+        expReward = Math.floor(expReward * 1.2);
+      }
+
+      // 添加经验值
+      if (expReward > 0) {
+        const expResult = await this.accountManager.addExp(accountId, expReward);
+
+        // 通知客户端
+        if (expResult.success && userSocket) {
+          const updatedAccount = await this.accountManager.getAccount(accountId);
+          userSocket.emit('account_updated', { account: updatedAccount });
+        }
+      }
+
       const account = await this.accountManager.getAccount(accountId);
       if (account) {
         const playerChatted = aiGame.playerChatted && aiGame.playerChatted[accountId];
