@@ -4284,6 +4284,7 @@
           onlineUsers.set(user.userId, {
             status: user.status,
             game: user.game,
+            nickname: user.nickname,
             lastUpdate: Date.now()
           });
         });
@@ -4295,7 +4296,8 @@
         if (data.userId !== userId) {
           onlineUsers.set(data.userId, {
             status: data.status,
-            game: data.game,
+            game: data.gameType,
+            nickname: data.nickname,
             lastUpdate: Date.now()
           });
           updateUserList();
@@ -7442,8 +7444,11 @@
           user.status === 'waiting' ? '等待中' :
             user.status === 'playing' ? '游戏中' : '';
 
-        html += `<div class="user-item ${statusClass} ${gameClass}">
-          ${isMe ? '👤' : '👥'} ${isMe ? '我' : '玩家' + uid.substring(0, 4)}
+        // 优先显示昵称，如果没有昵称则显示ID
+        const displayName = user.nickname || (isMe ? '我' : '玩家' + uid.substring(0, 4));
+
+        html += `<div class="user-item ${statusClass} ${gameClass} ${isMe ? 'me' : ''}">
+          ${isMe ? '👤' : '👥'} ${displayName}${isMe ? ' <span style="color: #48bb78; font-size: 11px;">(我)</span>' : ''}
           <span style="font-size: 11px; color: #718096;">胜: ${user.stats?.wins || 0}</span> - ${statusText}
           ${!isMe && user.status === 'online' ? `<button class="challenge-btn" onclick="sendChallenge('${uid}')">挑战</button>` : ''}
         </div>`;
