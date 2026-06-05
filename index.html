@@ -5001,7 +5001,7 @@
 
       socket.on('leaderboard', (data) => {
         console.log('收到排行榜数据:', data);
-        updateLeaderboard(data.leaderboard);
+        updateLeaderboard(data.leaderboard, currentLeaderboardGameType);
       });
 
       socket.on('game_history', (data) => {
@@ -5112,6 +5112,24 @@
             stats: data.account.stats || {}
           };
           updateAccountBar();
+
+          // 同步服务端的贪吃蛇最高分到客户端显示
+          const serverSnakeHighScore = currentAccount.account?.games?.snake?.highScore ||
+            currentAccount.stats?.snakeGames?.highScore || 0;
+          if (serverSnakeHighScore > 0) {
+            // 更新 localStorage 取两者中的最大值
+            const localHighScore = parseInt(localStorage.getItem('snakeHighScore') || '0');
+            if (serverSnakeHighScore > localHighScore) {
+              localStorage.setItem('snakeHighScore', String(serverSnakeHighScore));
+            }
+            // 如果贪吃蛇界面当前可见，更新显示
+            const highScoreEl = document.getElementById('snake-highscore');
+            if (highScoreEl) {
+              const displayScore = Math.max(serverSnakeHighScore, parseInt(localStorage.getItem('snakeHighScore') || '0'));
+              highScoreEl.textContent = displayScore;
+              snakeGameState.highScore = displayScore;
+            }
+          }
 
           // 如果资料模态框已打开，重新更新其内容
           const profileModal = document.getElementById('account-modal');
@@ -5227,7 +5245,10 @@
     }
 
     // 更新排行榜显示
-    function updateLeaderboard(leaderboard) {
+    // 当前排行榜选中的游戏类型
+    let currentLeaderboardGameType = 'all';
+
+    function updateLeaderboard(leaderboard, gameType) {
       const list = document.getElementById('leaderboard-list');
       if (!list) return;
 
@@ -5239,6 +5260,7 @@
       list.innerHTML = leaderboard.map(player => {
         const rankClass = player.rank <= 3 ? `top-${player.rank}` : '';
         const name = player.name || player.username || '未知玩家';
+        const isSnake = gameType === 'snake';
         return `
           <div class="leaderboard-item ${rankClass}">
             <div class="leaderboard-left">
@@ -5249,8 +5271,12 @@
               </div>
             </div>
             <div class="leaderboard-stats">
-              <div class="leaderboard-wins">${player.wins}胜</div>
-              <div class="leaderboard-winrate">胜率 ${player.winrate || '0%'}</div>
+              ${isSnake ?
+            `<div class="leaderboard-wins">${player.score || 0}分</div>
+                     <div class="leaderboard-winrate">最高分数</div>` :
+            `<div class="leaderboard-wins">${player.wins || 0}胜</div>
+                     <div class="leaderboard-winrate">胜率 ${player.winrate || '0%'}</div>`
+          }
             </div>
           </div>
         `;
@@ -6843,6 +6869,13 @@
         document.getElementById('snake-highscore').textContent = snakeGameState.highScore;
       }
 
+      // 同步客户端本地最高分到服务端（确保排行榜数据最新）
+      if (socket && socket.connected) {
+        socket.emit('snake_sync_highscore', {
+          highScore: parseInt(localStorage.getItem('snakeHighScore') || '0')
+        });
+      }
+
       // 显示游戏规则
       document.getElementById('snake-rules').textContent = snakeGameConfig.rules;
 
@@ -7782,6 +7815,7 @@
       if (socket && socket.connected) {
         socket.emit('snake_game_end', {
           score: snakeGameState.score,
+          highScore: snakeGameState.highScore,
           gameType: 'snake',
           moveHistory: snakeGameState.moveHistory,
           maxLength: snakeGameState.maxLength,
@@ -8680,47 +8714,14 @@
         document.querySelector('button[onclick="loadLeaderboard(\'snake\')"]').style.fontWeight = 'bold';
       }
 
+      // 保存当前选中的游戏类型，供 updateLeaderboard 使用
+      currentLeaderboardGameType = gameType;
+
       const leaderboardList = document.getElementById('leaderboard-list');
       leaderboardList.innerHTML = '加载中...';
 
-      // 从服务器获取排行榜数据
+      // 从服务器获取排行榜数据（由 socket.on('leaderboard') 统一处理响应）
       socket.emit('get_leaderboard', { limit: 10, gameType: gameType });
-
-      // 监听服务器返回的排行榜数据
-      socket.once('leaderboard', (data) => {
-        if (data && data.leaderboard) {
-          const leaderboardData = data.leaderboard;
-
-          // 生成排行榜HTML
-          let html = '';
-          leaderboardData.forEach((player, index) => {
-            const topClass = index < 3 ? `top-${index + 1}` : '';
-            html += `
-              <div class="leaderboard-item ${topClass}">
-                <div class="leaderboard-left">
-                  <div class="leaderboard-rank">${index + 1}</div>
-                  <div>
-                    <div class="leaderboard-name">${player.name || '未知玩家'}</div>
-                    <div class="leaderboard-level">Lv.${player.level || 1}</div>
-                  </div>
-                </div>
-                <div class="leaderboard-stats">
-                  ${gameType === 'snake' ?
-                `<div class="leaderboard-wins">${player.score || 0}分</div>
-                     <div class="leaderboard-winrate">最高分数</div>` :
-                `<div class="leaderboard-wins">${player.wins || 0}胜</div>
-                     <div class="leaderboard-winrate">胜率${player.winrate || '0%'}</div>`
-              }
-                </div>
-              </div>
-            `;
-          });
-
-          leaderboardList.innerHTML = html;
-        } else {
-          leaderboardList.innerHTML = '获取排行榜数据失败';
-        }
-      });
     }
 
     // 选择游戏类型

@@ -1503,7 +1503,7 @@ io.on('connection', (socket) => {
     }
 
     const accountId = user.accountId;
-    const { score, gameType, moveHistory } = data;
+    const { score, highScore: clientHighScore, gameType, moveHistory } = data;
 
     try {
       // 记录游戏结束日志（无论用户是否登录）
@@ -1543,8 +1543,20 @@ io.on('connection', (socket) => {
           account.stats.totalScore = (account.stats.totalScore || 0) + score;
           account.games.snake.totalScore += score;
 
-          if (score > account.games.snake.highScore) {
-            account.games.snake.highScore = score;
+          // 取当前分数、客户端本地最高分、服务端已有最高分中的最大值
+          const newHighScore = Math.max(
+            score || 0,
+            clientHighScore || 0,
+            account.games.snake.highScore || 0
+          );
+          if (newHighScore > account.games.snake.highScore) {
+            account.games.snake.highScore = newHighScore;
+
+            // 同步更新 stats.snakeGames 用于排行榜读取
+            if (!account.stats.snakeGames) {
+              account.stats.snakeGames = { totalGames: 0, highScore: 0, totalScore: 0 };
+            }
+            account.stats.snakeGames.highScore = newHighScore;
 
             // 记录新高分
             logger.info('贪吃蛇游戏新高分', {
@@ -1561,6 +1573,9 @@ io.on('connection', (socket) => {
           await gameManager.accountManager.updateGameStats(accountId, result, 'snake', false, null, null);
 
           await gameManager.accountManager.updateUser(accountId, account);
+
+          // 通知客户端账号数据已更新（同步服务端最高分到客户端）
+          socket.emit('account_updated', { account });
         }
       }
 
@@ -1575,6 +1590,50 @@ io.on('connection', (socket) => {
 
     } catch (err) {
       logger.error('处理贪吃蛇游戏结果失败', { error: err.message });
+    }
+  });
+
+  // 同步贪吃蛇最高分（客户端进入贪吃蛇页面时触发）
+  socket.on('snake_sync_highscore', async (data) => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user || !user.accountId) {
+      return; // 未登录用户不处理
+    }
+
+    const clientHighScore = data?.highScore || 0;
+    if (clientHighScore <= 0) return;
+
+    try {
+      const account = await gameManager.accountManager.getAccount(user.accountId);
+      if (account) {
+        if (!account.games.snake) {
+          account.games.snake = { totalGames: 0, highScore: 0, totalScore: 0, lastPlayedAt: null };
+        }
+
+        if (clientHighScore > account.games.snake.highScore) {
+          const previousHighScore = account.games.snake.highScore;
+          account.games.snake.highScore = clientHighScore;
+
+          // 同步更新 stats.snakeGames 用于排行榜读取
+          if (!account.stats.snakeGames) {
+            account.stats.snakeGames = { totalGames: 0, highScore: 0, totalScore: 0 };
+          }
+          account.stats.snakeGames.highScore = clientHighScore;
+
+          await gameManager.accountManager.updateUser(user.accountId, account);
+
+          logger.info('贪吃蛇高分已同步', {
+            accountId: user.accountId,
+            highScore: clientHighScore,
+            previousHighScore
+          });
+
+          // 通知客户端账号数据已更新
+          socket.emit('account_updated', { account });
+        }
+      }
+    } catch (err) {
+      logger.error('同步贪吃蛇高分失败', { error: err.message });
     }
   });
 
