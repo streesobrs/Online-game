@@ -1331,29 +1331,32 @@ io.on('connection', (socket) => {
       if (accountId && gameManager.accountManager) {
         const account = await gameManager.accountManager.getAccount(accountId);
         if (account) {
-          // 更新贪吃蛇游戏统计
-          if (!account.stats.snakeGames) {
-            account.stats.snakeGames = {
+          // 更新贪吃蛇游戏统计 - 使用正确的数据结构位置
+          if (!account.games.snake) {
+            account.games.snake = {
               totalGames: 0,
               highScore: 0,
-              totalScore: 0
+              totalScore: 0,
+              lastPlayedAt: null
             };
           }
 
-          account.stats.snakeGames.totalGames++;
+          account.games.snake.totalGames++;
           account.stats.totalScore = (account.stats.totalScore || 0) + score;
-          account.stats.snakeGames.totalScore += score;
+          account.games.snake.totalScore += score;
 
-          if (score > account.stats.snakeGames.highScore) {
-            account.stats.snakeGames.highScore = score;
+          if (score > account.games.snake.highScore) {
+            account.games.snake.highScore = score;
 
             // 记录新高分
             logger.info('贪吃蛇游戏新高分', {
               userId: user.accountId,
               accountId: accountId,
-              score: account.stats.snakeGames.highScore
+              score: account.games.snake.highScore
             });
           }
+
+          account.games.snake.lastPlayedAt = Date.now();
 
           // 更新游戏统计数据（用于排行榜）
           // 贪吃蛇游戏：如果分数大于100，则认为是获胜
@@ -1703,12 +1706,35 @@ server.listen(PORT, HOST, () => {
     adminToken: config.admin.token.substring(0, 8) + '...'
   });
 
+  // 获取本机IP地址
+  const os = require('os');
+  const interfaces = os.networkInterfaces();
+  const addresses = [];
+
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        addresses.push(iface.address);
+      }
+    }
+  }
+
+  // 如果没有找到外部IP，使用localhost
+  const displayHost = addresses.length > 0 ? addresses[0] : 'localhost';
+
   console.log(`=================================`);
   console.log(`🎮 游戏服务器已启动`);
-  console.log(`📍 地址: http://${HOST}:${PORT}`);
-  console.log(`🔧 管理后台: http://${HOST}:${PORT}/admin`);
+  console.log(`📍 地址: http://${displayHost}:${PORT}`);
+  console.log(`🔧 管理后台: http://${displayHost}:${PORT}/admin`);
   console.log(`🔑 管理员Token: ${config.admin.token}`);
   console.log(`=================================`);
+
+  if (addresses.length > 1) {
+    console.log(`📶 其他可用地址:`);
+    addresses.slice(1).forEach(addr => {
+      console.log(`   - http://${addr}:${PORT}`);
+    });
+  }
 });
 
 // 优雅关闭

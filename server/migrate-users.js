@@ -129,10 +129,14 @@ function migrateUserData(oldData) {
   // 计算各游戏的总数
   const gameTypes = ['gobang', 'chess', 'go'];
   gameTypes.forEach(gameType => {
-    const wins = newData.games[gameType].wins;
-    newData.games[gameType].totalGames = wins;
-    newData.stats.totalGames += wins;
+    const wins = newData.games[gameType].wins || 0;
+    const losses = newData.games[gameType].losses || 0;
+    const draws = newData.games[gameType].draws || 0;
+    newData.games[gameType].totalGames = wins + losses + draws;
+    newData.stats.totalGames += wins + losses + draws;
     newData.stats.totalWins += wins;
+    newData.stats.totalLosses += losses;
+    newData.stats.totalDraws += draws;
   });
 
   // 贪吃蛇游戏统计

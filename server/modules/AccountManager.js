@@ -355,6 +355,17 @@ class AccountManager {
         account.stats.totalDraws = (account.stats.totalDraws || 0) + 1;
       }
 
+      // 更新真人对战和AI对战统计
+      if (isAI) {
+        account.stats.aiWins = (account.stats.aiWins || 0) + (result === 'win' ? 1 : 0);
+        account.stats.aiLosses = (account.stats.aiLosses || 0) + (result === 'loss' ? 1 : 0);
+        account.stats.aiDraws = (account.stats.aiDraws || 0) + (result === 'draw' ? 1 : 0);
+      } else {
+        account.stats.humanWins = (account.stats.humanWins || 0) + (result === 'win' ? 1 : 0);
+        account.stats.humanLosses = (account.stats.humanLosses || 0) + (result === 'loss' ? 1 : 0);
+        account.stats.humanDraws = (account.stats.humanDraws || 0) + (result === 'draw' ? 1 : 0);
+      }
+
       // 更新游戏类型统计
       if (gameType && account.games[gameType]) {
         account.games[gameType].totalGames = (account.games[gameType].totalGames || 0) + 1;
@@ -376,6 +387,8 @@ class AccountManager {
         // AI游戏统计
         if (isAI && gameType !== 'snake') {
           account.games[gameType].aiWins = (account.games[gameType].aiWins || 0) + (result === 'win' ? 1 : 0);
+          account.games[gameType].aiLosses = (account.games[gameType].aiLosses || 0) + (result === 'loss' ? 1 : 0);
+          account.games[gameType].aiDraws = (account.games[gameType].aiDraws || 0) + (result === 'draw' ? 1 : 0);
           account.games[gameType].aiDifficulty = aiDifficulty;
           account.games[gameType].aiResult = result;
         }
@@ -428,8 +441,8 @@ class AccountManager {
           if (gameType && gameType !== 'all') {
             if (gameType === 'snake') {
               // 贪吃蛇排行榜：基于最高分数
-              scoreA = a.games?.snake?.highScore || 0;
-              scoreB = b.games?.snake?.highScore || 0;
+              scoreA = a.stats?.snakeGames?.highScore || a.games?.snake?.highScore || 0;
+              scoreB = b.stats?.snakeGames?.highScore || b.games?.snake?.highScore || 0;
             } else {
               // 其他游戏类型的排行榜：基于获胜次数
               scoreA = a.games?.[gameType]?.wins || 0;
@@ -447,7 +460,7 @@ class AccountManager {
           let wins, score;
           if (gameType && gameType !== 'all') {
             if (gameType === 'snake') {
-              score = account.games?.snake?.highScore || 0;
+              score = account.stats?.snakeGames?.highScore || account.games?.snake?.highScore || 0;
               wins = 0;
             } else {
               wins = account.games?.[gameType]?.wins || 0;
@@ -1266,6 +1279,17 @@ class AccountManager {
         stats.totalLosses += 1;
       } else if (result === 'draw') {
         stats.totalDraws += 1;
+      }
+
+      // 更新真人对战和AI对战统计
+      if (isAI) {
+        stats.aiWins = (stats.aiWins || 0) + (result === 'win' ? 1 : 0);
+        stats.aiLosses = (stats.aiLosses || 0) + (result === 'loss' ? 1 : 0);
+        stats.aiDraws = (stats.aiDraws || 0) + (result === 'draw' ? 1 : 0);
+      } else {
+        stats.humanWins = (stats.humanWins || 0) + (result === 'win' ? 1 : 0);
+        stats.humanLosses = (stats.humanLosses || 0) + (result === 'loss' ? 1 : 0);
+        stats.humanDraws = (stats.humanDraws || 0) + (result === 'draw' ? 1 : 0);
       }
 
       // 更新活动数据
