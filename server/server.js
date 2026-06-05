@@ -344,8 +344,8 @@ app.put('/api/accounts/:id/exp', authenticateToken, async (req, res) => {
 // 获取游戏历史记录
 app.get('/api/games/history', async (req, res) => {
   try {
-    const { userId, limit = 20, offset = 0 } = req.query;
-    const history = await gameManager.getGameHistory(userId, parseInt(limit));
+    const { accountId, limit = 20, offset = 0 } = req.query;
+    const history = await gameManager.getGameHistory(accountId, parseInt(limit));
     res.json({
       success: true,
       data: history,
@@ -627,14 +627,14 @@ app.get('/api/achievements/:id', async (req, res) => {
 // 添加用户成就（需要认证）
 app.post('/api/achievements/:id/award', authenticateToken, async (req, res) => {
   try {
-    const { userId } = req.body;
-    if (!userId) {
+    const { accountId } = req.body;
+    if (!accountId) {
       return res.status(400).json({
         success: false,
         message: '请提供用户ID'
       });
     }
-    const result = await accountManager.addUserAchievement(userId, req.params.id);
+    const result = await accountManager.addUserAchievement(accountId, req.params.id);
     res.json(result);
   } catch (err) {
     logger.error('添加用户成就失败', { error: err.message });
@@ -723,9 +723,13 @@ const serverStartTime = Date.now();
 
 // ========== Socket.IO 连接处理 ==========
 
+// 初始化贪吃蛇游戏存储（在连接回调外部，全局共享）
+io.snakeGames = new Map(); // 存储进行中的游戏
+
 // 主命名空间
 io.on('connection', (socket) => {
   logger.connectEvent(socket.id, { ip: socket.handshake.address });
+  const snakeGames = io.snakeGames;
 
   // 处理客户端连接事件（包含版本号和token）
   socket.on('client_connect', async (data) => {
@@ -1251,7 +1255,7 @@ io.on('connection', (socket) => {
       // 注意：endAIGame内部已经处理了用户统计更新
 
       logger.info('AI游戏结束', {
-        userId: user.accountId,
+        accountId: user.accountId,
         result,
         gameType,
         difficulty
@@ -1269,6 +1273,203 @@ io.on('connection', (socket) => {
 
   // ========== 贪吃蛇游戏相关事件 ==========
 
+  // 贪吃蛇游戏更新
+  socket.on('snake_update', (data) => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user) return;
+
+    const { matchId, playerId, snake, direction, score } = data;
+
+    try {
+      // 获取游戏
+      let game = snakeGames.get(matchId);
+      if (!game) {
+        game = {
+          matchId,
+          player1: null,
+          player2: null,
+          player1Snake: null,
+          player2Snake: null,
+          player1Score: 0,
+          player2Score: 0,
+          foods: data.foods || [],
+          gameTimeLeft: 120,
+          startTime: Date.now()
+        };
+        snakeGames.set(matchId, game);
+      }
+
+      // 更新玩家数据
+      let isNewPlayer = false;
+
+      // 确保playerId是字符串类型
+      const stringPlayerId = String(playerId);
+      const gamePlayer1 = game.player1 !== null ? String(game.player1) : null;
+      const gamePlayer2 = game.player2 !== null ? String(game.player2) : null;
+
+      if (gamePlayer1 === null) {
+        game.player1 = stringPlayerId;
+        game.player1Snake = snake;
+        game.player1Score = score;
+        game.foods = data.foods || game.foods;
+        game.gameTimeLeft = data.gameTimeLeft !== undefined ? data.gameTimeLeft : game.gameTimeLeft;
+        isNewPlayer = true;
+      } else if (gamePlayer1 === stringPlayerId) {
+        game.player1Snake = snake;
+        game.player1Score = score;
+        game.foods = data.foods || game.foods;
+        game.gameTimeLeft = data.gameTimeLeft !== undefined ? data.gameTimeLeft : game.gameTimeLeft;
+      }
+
+      if (gamePlayer2 === null && stringPlayerId !== gamePlayer1) {
+        game.player2 = stringPlayerId;
+        game.player2Snake = snake;
+        game.player2Score = score;
+        game.foods = data.foods || game.foods;
+        game.gameTimeLeft = data.gameTimeLeft !== undefined ? data.gameTimeLeft : game.gameTimeLeft;
+        isNewPlayer = true;
+      } else if (gamePlayer2 === stringPlayerId) {
+        game.player2Snake = snake;
+        game.player2Score = score;
+        game.foods = data.foods || game.foods;
+        game.gameTimeLeft = data.gameTimeLeft !== undefined ? data.gameTimeLeft : game.gameTimeLeft;
+      }
+
+      // 如果是新玩家加入，同步双方状态
+      if (isNewPlayer && game.player1 && game.player2) {
+        // 通知玩家1关于玩家2的状态
+        const player1User = userManager.getUserByAccountId(game.player1);
+        if (player1User && player1User.socketId) {
+          const player1Socket = io.sockets.sockets.get(player1User.socketId);
+          if (player1Socket) {
+            player1Socket.emit('snake_opponent_update', {
+              snake: game.player2Snake,
+              score: game.player2Score,
+              foods: game.foods,
+              gameTimeLeft: game.gameTimeLeft
+            });
+          }
+        }
+
+        // 通知玩家2关于玩家1的状态
+        const player2User = userManager.getUserByAccountId(game.player2);
+        if (player2User && player2User.socketId) {
+          const player2Socket = io.sockets.sockets.get(player2User.socketId);
+          if (player2Socket) {
+            player2Socket.emit('snake_opponent_update', {
+              snake: game.player1Snake,
+              score: game.player1Score,
+              foods: game.foods,
+              gameTimeLeft: game.gameTimeLeft
+            });
+          }
+        }
+      }
+
+      // 转发更新给对手
+      const opponentId = String(game.player1) === String(playerId) ? game.player2 : game.player1;
+
+      if (opponentId) {
+        try {
+          // 直接通过userManager查找对手socket并发送更新
+          const opponentUser = userManager.getUserByAccountId(opponentId);
+          if (opponentUser && opponentUser.socketId) {
+            const opponentSocket = io.sockets.sockets.get(opponentUser.socketId);
+            if (opponentSocket) {
+              const opponentSnake = String(game.player1) === String(opponentId) ? game.player1Snake : game.player2Snake;
+              const opponentScore = String(game.player1) === String(opponentId) ? game.player1Score : game.player2Score;
+
+              opponentSocket.emit('snake_opponent_update', {
+                snake: snake,
+                score: score,
+                foods: game.foods,
+                gameTimeLeft: game.gameTimeLeft,
+                opponentSnake: opponentSnake,
+                opponentScore: opponentScore
+              });
+            }
+          }
+        } catch (err) {
+          logger.error('转发贪吃蛇更新失败', { error: err.message });
+        }
+      }
+
+    } catch (err) {
+      logger.error('处理贪吃蛇更新失败', { error: err.message });
+    }
+  });
+
+  // 贪吃蛇食物更新
+  socket.on('snake_food_update', (data) => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user) return;
+
+    const { matchId, playerId, foods } = data;
+
+    try {
+      // 获取游戏
+      const game = snakeGames.get(matchId);
+      if (!game) return;
+
+      // 验证玩家身份
+      if (game.player1 !== playerId && game.player2 !== playerId) return;
+
+      // 更新食物状态
+      game.foods = foods;
+
+      // 转发食物更新给对手
+      const opponentId = game.player1 === playerId ? game.player2 : game.player1;
+      if (opponentId) {
+        const opponentUser = userManager.getUserByAccountId(opponentId);
+        if (opponentUser && opponentUser.socketId) {
+          const opponentSocket = io.sockets.sockets.get(opponentUser.socketId);
+          if (opponentSocket) {
+            opponentSocket.emit('snake_food_sync', {
+              foods: game.foods
+            });
+          }
+        }
+      }
+
+    } catch (err) {
+      logger.error('处理贪吃蛇食物更新失败', { error: err.message });
+    }
+  });
+
+  // 贪吃蛇全量状态请求
+  socket.on('snake_request_full_state', (data) => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user) return;
+
+    const { matchId } = data;
+
+    try {
+      // 获取游戏
+      const game = snakeGames.get(matchId);
+      if (!game) return;
+
+      // 确定玩家身份
+      const isPlayer1 = game.player1 === user.accountId;
+      const isPlayer2 = game.player2 === user.accountId;
+
+      if (!isPlayer1 && !isPlayer2) return;
+
+      // 发送全量状态
+      socket.emit('snake_full_state_sync', {
+        isPlayer1: isPlayer1,
+        player1Snake: game.player1Snake,
+        player1Score: game.player1Score,
+        player2Snake: game.player2Snake,
+        player2Score: game.player2Score,
+        foods: game.foods,
+        gameTimeLeft: game.gameTimeLeft
+      });
+
+    } catch (err) {
+      logger.error('处理贪吃蛇全量状态请求失败', { error: err.message });
+    }
+  });
+
   // 贪吃蛇游戏开始
   socket.on('snake_game_start', (data) => {
     const user = userManager.getUserBySocketId(socket.id);
@@ -1282,8 +1483,7 @@ io.on('connection', (socket) => {
 
     try {
       logger.info('贪吃蛇游戏开始', {
-        userId: user.accountId,
-        accountId: accountId,
+        accountId: user.accountId,
         gameType
       });
 
@@ -1308,8 +1508,7 @@ io.on('connection', (socket) => {
     try {
       // 记录游戏结束日志（无论用户是否登录）
       logger.info('贪吃蛇游戏结束', {
-        userId: user.accountId,
-        accountId: accountId,
+        accountId: user.accountId,
         score,
         moveCount: moveHistory ? moveHistory.length : 0
       });
@@ -1317,8 +1516,7 @@ io.on('connection', (socket) => {
       // 保存游戏记录
       if (gameManager && gameManager.saveSnakeGameRecord) {
         await gameManager.saveSnakeGameRecord({
-          userId: user.accountId,
-          accountId: accountId,
+          accountId: user.accountId,
           score: score,
           gameType: gameType,
           moveHistory: moveHistory,
@@ -1350,8 +1548,7 @@ io.on('connection', (socket) => {
 
             // 记录新高分
             logger.info('贪吃蛇游戏新高分', {
-              userId: user.accountId,
-              accountId: accountId,
+              accountId: user.accountId,
               score: account.games.snake.highScore
             });
           }
@@ -1482,7 +1679,7 @@ io.on('connection', (socket) => {
   socket.on('disconnect', (reason) => {
     logger.disconnectEvent(socket.id, { reason });
 
-    // 处理游戏断开
+    // 处理游戏断开（包含等待队列清理）
     gameManager.handleUserDisconnect(socket.id, io);
 
     // 处理用户断开
@@ -1511,8 +1708,8 @@ adminNamespace.on('connection', (socket) => {
 
   // 踢出用户
   socket.on('kick_user', (data) => {
-    const { userId, reason } = data;
-    adminManager.kickUser(socket, userId, reason);
+    const { accountId, reason } = data;
+    adminManager.kickUser(socket, accountId, reason);
   });
 
   // 结束游戏
@@ -1565,26 +1762,26 @@ adminNamespace.on('connection', (socket) => {
 
   // 禁言用户
   socket.on('mute_user', (data) => {
-    const { userId, duration, reason } = data;
-    adminManager.muteUser(socket, userId, duration, reason);
+    const { accountId, duration, reason } = data;
+    adminManager.muteUser(socket, accountId, duration, reason);
   });
 
   // 解除禁言
   socket.on('unmute_user', (data) => {
-    const { userId } = data;
-    adminManager.unmuteUser(socket, userId);
+    const { accountId } = data;
+    adminManager.unmuteUser(socket, accountId);
   });
 
   // 获取用户详情
   socket.on('get_user_detail', (data) => {
-    const { userId } = data;
-    adminManager.getUserDetail(socket, userId);
+    const { accountId } = data;
+    adminManager.getUserDetail(socket, accountId);
   });
 
   // 获取用户游戏历史
   socket.on('get_user_game_history', (data) => {
-    const { userId, limit } = data;
-    adminManager.getUserGameHistory(socket, userId, limit);
+    const { accountId, limit } = data;
+    adminManager.getUserGameHistory(socket, accountId, limit);
   });
 
   // 获取聊天记录
@@ -1594,8 +1791,8 @@ adminNamespace.on('connection', (socket) => {
 
   // 给特定用户发送消息
   socket.on('send_user_message', (data) => {
-    const { userId, message } = data;
-    adminManager.sendUserMessage(socket, userId, message);
+    const { accountId, message } = data;
+    adminManager.sendUserMessage(socket, accountId, message);
   });
 
   // 重置游戏

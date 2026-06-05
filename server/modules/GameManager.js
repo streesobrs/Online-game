@@ -44,13 +44,13 @@ class GameManager {
 
     // 验证游戏类型
     if (!Object.values(config.game.types).includes(gameType)) {
-      logger.warn('匹配请求失败：无效的游戏类型', { userId: user.accountId, gameType });
+      logger.warn('匹配请求失败：无效的游戏类型', { accountId: user.accountId, gameType });
       return false;
     }
 
     // 检查用户状态
     if (user.status !== 'online') {
-      logger.warn('匹配请求失败：用户状态不正确', { userId: user.accountId, status: user.status });
+      logger.warn('匹配请求失败：用户状态不正确', { accountId: user.accountId, status: user.status });
       return false;
     }
 
@@ -70,6 +70,25 @@ class GameManager {
     // 广播用户状态
     this.userManager.broadcastUserStatus(user.accountId, 'waiting', io);
 
+    // 设置匹配超时（30秒）
+    if (user.matchTimeout) {
+      clearTimeout(user.matchTimeout);
+    }
+    user.matchTimeout = setTimeout(() => {
+      if (user.status === 'waiting' && user.gameType === gameType) {
+        // 超时取消匹配
+        this.handleCancelMatch(socketId, io);
+        const socket = this.userManager.getSocketByAccountId(user.accountId);
+        if (socket) {
+          socket.emit('match_timeout', {
+            gameType,
+            message: '匹配超时，请稍后重试'
+          });
+        }
+        logger.matchEvent(user.accountId, '匹配超时', { gameType });
+      }
+    }, 30000);
+
     // 检查匹配
     this.checkMatch(gameType, io);
 
@@ -82,6 +101,12 @@ class GameManager {
     if (!user) return false;
 
     if (user.status === 'waiting') {
+      // 清除匹配超时定时器
+      if (user.matchTimeout) {
+        clearTimeout(user.matchTimeout);
+        user.matchTimeout = null;
+      }
+
       // 从等待列表移除
       if (this.waitingUsers.has(user.gameType)) {
         this.waitingUsers.get(user.gameType).delete(user.accountId);
@@ -94,6 +119,7 @@ class GameManager {
 
       // 更新用户状态
       user.status = 'online';
+      user.gameType = null;
       user.lastActivity = Date.now();
 
       logger.matchEvent(user.accountId, '取消匹配', { gameType: user.gameType });
@@ -232,12 +258,12 @@ class GameManager {
 
     // 获取前两个用户
     const users = Array.from(waitingList);
-    const userId1 = users[0];
-    const userId2 = users[1];
+    const accountId1 = users[0];
+    const accountId2 = users[1];
 
     // 从等待列表移除
-    waitingList.delete(userId1);
-    waitingList.delete(userId2);
+    waitingList.delete(accountId1);
+    waitingList.delete(accountId2);
 
     // 清理空集合
     if (waitingList.size === 0) {
@@ -245,25 +271,25 @@ class GameManager {
     }
 
     // 创建游戏
-    this.createGame(userId1, userId2, gameType, io);
+    this.createGame(accountId1, accountId2, gameType, io);
   }
 
   // 创建游戏
-  createGame(userId1, userId2, gameType, io) {
+  createGame(accountId1, accountId2, gameType, io) {
     const gameId = this.generateGameId(gameType);
-    const user1 = this.userManager.getUserByAccountId(userId1);
-    const user2 = this.userManager.getUserByAccountId(userId2);
+    const user1 = this.userManager.getUserByAccountId(accountId1);
+    const user2 = this.userManager.getUserByAccountId(accountId2);
 
     if (!user1 || !user2) {
-      logger.error('创建游戏失败：用户不存在', { userId1, userId2 });
+      logger.error('创建游戏失败：用户不存在', { accountId1, accountId2 });
       return null;
     }
 
     const game = {
       gameId,
       gameType,
-      player1: userId1,
-      player2: userId2,
+      player1: accountId1,
+      player2: accountId2,
       player1Nickname: user1.nickname,
       player2Nickname: user2.nickname,
       status: 'playing',
@@ -290,42 +316,127 @@ class GameManager {
 
     logger.gameEvent(gameId, '游戏开始', {
       gameType,
-      player1: userId1,
-      player2: userId2
+      player1: accountId1,
+      player2: accountId2
     });
 
     // 广播用户状态
-    this.userManager.broadcastUserStatus(userId1, 'playing', io);
-    this.userManager.broadcastUserStatus(userId2, 'playing', io);
+    this.userManager.broadcastUserStatus(accountId1, 'playing', io);
+    this.userManager.broadcastUserStatus(accountId2, 'playing', io);
 
     // 通知玩家
-    const socket1 = this.userManager.getSocketByAccountId(userId1);
-    const socket2 = this.userManager.getSocketByAccountId(userId2);
+    const socket1 = this.userManager.getSocketByAccountId(accountId1);
+    const socket2 = this.userManager.getSocketByAccountId(accountId2);
 
-    if (socket1) {
-      socket1.emit('match_success', {
-        gameId,
-        game: gameType,
-        opponentId: userId2,
-        opponentNickname: user2.nickname,
-        color: 1,
-        timestamp: Date.now()
-      });
+    // 贪吃蛇使用特殊的匹配成功事件
+    if (gameType === 'snake') {
+      // 生成贪吃蛇初始数据
+      const foods = [];
+      for (let i = 0; i < 8; i++) {
+        foods.push({
+          x: Math.floor(Math.random() * 30),
+          y: Math.floor(Math.random() * 30)
+        });
+      }
+
+      // 存储初始状态到snakeGames
+      if (io && typeof io.sockets !== 'undefined') {
+        // 获取server.js中的snakeGames
+        const snakeGames = io.snakeGames || new Map();
+        snakeGames.set(gameId, {
+          matchId: gameId,
+          player1: accountId1,
+          player2: accountId2,
+          player1Snake: [{ x: 5, y: 15 }],
+          player2Snake: [{ x: 24, y: 15 }],
+          player1Score: 0,
+          player2Score: 0,
+          foods: foods,
+          gameTimeLeft: 120,
+          startTime: Date.now()
+        });
+        // 保存回io对象
+        io.snakeGames = snakeGames;
+
+        // 主动同步双方状态
+        setTimeout(() => {
+          // 通知玩家1关于玩家2的状态
+          if (socket1) {
+            socket1.emit('snake_opponent_update', {
+              snake: [{ x: 24, y: 15 }],
+              score: 0,
+              foods: foods,
+              gameTimeLeft: 120
+            });
+          }
+
+          // 通知玩家2关于玩家1的状态
+          if (socket2) {
+            socket2.emit('snake_opponent_update', {
+              snake: [{ x: 5, y: 15 }],
+              score: 0,
+              foods: foods,
+              gameTimeLeft: 120
+            });
+          }
+        }, 500);
+      }
+
+      if (socket1) {
+        socket1.emit('snake_match_found', {
+          matchId: gameId,
+          playerId: accountId1,
+          opponentId: accountId2,
+          opponentNickname: user2.nickname,
+          snake: [{ x: 5, y: 15 }],
+          opponentSnake: [{ x: 24, y: 15 }],
+          foods,
+          gameTimeLeft: 120
+        });
+      }
+
+      if (socket2) {
+        socket2.emit('snake_match_found', {
+          matchId: gameId,
+          playerId: accountId2,
+          opponentId: accountId1,
+          opponentNickname: user1.nickname,
+          snake: [{ x: 24, y: 15 }],
+          opponentSnake: [{ x: 5, y: 15 }],
+          foods,
+          gameTimeLeft: 120
+        });
+      }
+
+      // 启动游戏计时器
+      this.startGameTimer(gameId, io);
+    } else {
+      // 其他棋类游戏使用标准匹配成功事件
+      if (socket1) {
+        socket1.emit('match_success', {
+          gameId,
+          game: gameType,
+          opponentId: accountId2,
+          opponentNickname: user2.nickname,
+          color: 1,
+          timestamp: Date.now()
+        });
+      }
+
+      if (socket2) {
+        socket2.emit('match_success', {
+          gameId,
+          game: gameType,
+          opponentId: accountId1,
+          opponentNickname: user1.nickname,
+          color: 2,
+          timestamp: Date.now()
+        });
+      }
+
+      // 启动游戏计时器
+      this.startGameTimer(gameId, io);
     }
-
-    if (socket2) {
-      socket2.emit('match_success', {
-        gameId,
-        game: gameType,
-        opponentId: userId1,
-        opponentNickname: user1.nickname,
-        color: 2,
-        timestamp: Date.now()
-      });
-    }
-
-    // 启动游戏计时器
-    this.startGameTimer(gameId, io);
 
     return game;
   }
@@ -857,6 +968,15 @@ class GameManager {
     if (socket1) socket1.emit('game_ended', endData);
     if (socket2) socket2.emit('game_ended', endData);
 
+    // 贪吃蛇游戏特殊处理：发送专用事件 + 清理snakeGames
+    if (game.gameType === 'snake') {
+      if (socket1) socket1.emit('snake_game_over', endData);
+      if (socket2) socket2.emit('snake_game_over', endData);
+      if (io && io.snakeGames) {
+        io.snakeGames.delete(gameId);
+      }
+    }
+
     // 通知观战者
     this.broadcastToSpectators(gameId, 'game_ended', endData, io);
 
@@ -923,11 +1043,11 @@ class GameManager {
       const record = {
         gameId: this.generateGameId('snake'),
         gameType: 'snake',
-        player1: data.userId,
+        player1: data.accountId,
         player2: 'computer', // 贪吃蛇是单人游戏
         player1Nickname: '玩家',
         player2Nickname: '电脑',
-        winner: data.score > 0 ? data.userId : 'computer',
+        winner: data.score > 0 ? data.accountId : 'computer',
         result: data.score > 0 ? 'win' : 'end',
         moves: data.moveHistory,
         score: data.score,
@@ -956,7 +1076,7 @@ class GameManager {
     }
 
     logger.info('用户返回大厅', {
-      userId: user.accountId,
+      accountId: user.accountId,
       userStatus: user.status,
       userGame: user.game,
       reason: reason
@@ -973,10 +1093,10 @@ class GameManager {
 
     // 如果在游戏中，结束游戏
     if (user.status === 'playing' && user.game) {
-      logger.info('用户正在游戏中，准备结束游戏', { userId: user.accountId, gameId: user.game });
+      logger.info('用户正在游戏中，准备结束游戏', { accountId: user.accountId, gameId: user.game });
       const game = this.games.get(user.game);
       logger.info('检查游戏状态', {
-        userId: user.accountId,
+        accountId: user.accountId,
         gameId: user.game,
         gameExists: !!game,
         gameStatus: game ? game.status : 'no game'
@@ -1100,6 +1220,12 @@ class GameManager {
       if (game && game.status === 'playing') {
         const opponentId = game.player1 === user.accountId ? game.player2 : game.player1;
 
+        // 贪吃蛇游戏立即结束，不等待重连
+        if (game.gameType === 'snake') {
+          this.endGame(game.gameId, 'resign', io, opponentId, '对手断开连接');
+          return;
+        }
+
         // 延迟结束游戏（给用户重新连接的机会）
         setTimeout(() => {
           const currentGame = this.games.get(game.gameId);
@@ -1120,29 +1246,29 @@ class GameManager {
   }
 
   // 添加观战者
-  addSpectator(gameId, userId, io) {
+  addSpectator(gameId, accountId, io) {
     const game = this.games.get(gameId);
     if (!game) {
       return { success: false, message: '游戏不存在' };
     }
 
     // 不能观战自己的游戏
-    if (game.player1 === userId || game.player2 === userId) {
+    if (game.player1 === accountId || game.player2 === accountId) {
       return { success: false, message: '不能观战自己的游戏' };
     }
 
     const spectators = this.spectators.get(gameId);
     if (spectators) {
-      spectators.add(userId);
+      spectators.add(accountId);
 
-      const user = this.userManager.getUserByAccountId(userId);
+      const user = this.userManager.getUserByAccountId(accountId);
       if (user) {
         user.status = 'spectating';
         user.game = gameId;
-        this.userManager.broadcastUserStatus(userId, 'spectating', io);
+        this.userManager.broadcastUserStatus(accountId, 'spectating', io);
       }
 
-      logger.userAction(userId, '开始观战', { gameId });
+      logger.userAction(accountId, '开始观战', { gameId });
 
       return {
         success: true,
@@ -1161,19 +1287,19 @@ class GameManager {
   }
 
   // 移除观战者
-  removeSpectator(gameId, userId, io) {
+  removeSpectator(gameId, accountId, io) {
     const spectators = this.spectators.get(gameId);
     if (spectators) {
-      spectators.delete(userId);
+      spectators.delete(accountId);
 
-      const user = this.userManager.getUserByAccountId(userId);
+      const user = this.userManager.getUserByAccountId(accountId);
       if (user) {
         user.status = 'online';
         user.game = null;
-        this.userManager.broadcastUserStatus(userId, 'online', io);
+        this.userManager.broadcastUserStatus(accountId, 'online', io);
       }
 
-      logger.userAction(userId, '结束观战', { gameId });
+      logger.userAction(accountId, '结束观战', { gameId });
     }
   }
 
@@ -1213,24 +1339,24 @@ class GameManager {
   }
 
   // 获取游戏历史
-  async getGameHistory(userId, limit = 10) {
+  async getGameHistory(accountId, limit = 10) {
     try {
       const games = await dataStore.read('games');
       return games
-        .filter(game => game.player1 === userId || game.player2 === userId)
+        .filter(game => game.player1 === accountId || game.player2 === accountId)
         .sort((a, b) => b.endTime - a.endTime)
         .slice(0, limit)
         .map(game => ({
           gameId: game.gameId,
           gameType: game.gameType,
-          opponent: game.player1 === userId ? game.player2Nickname : game.player1Nickname,
-          result: game.gameType === 'snake' ? game.result : (game.winner === userId ? 'win' : game.winner === null ? 'draw' : 'loss'),
+          opponent: game.player1 === accountId ? game.player2Nickname : game.player1Nickname,
+          result: game.gameType === 'snake' ? game.result : (game.winner === accountId ? 'win' : game.winner === null ? 'draw' : 'loss'),
           moves: game.moves?.length || 0,
           date: game.endTime,
           duration: game.duration
         }));
     } catch (err) {
-      logger.error('获取游戏历史失败', { userId, error: err.message });
+      logger.error('获取游戏历史失败', { accountId, error: err.message });
       return [];
     }
   }
@@ -1328,10 +1454,10 @@ class GameManager {
     }
 
     // 尝试结束AI游戏
-    for (const [userId, aiGame] of this.aiGames.entries()) {
+    for (const [accountId, aiGame] of this.aiGames.entries()) {
       if (aiGame.gameId === gameId && aiGame.status === 'playing') {
-        this.endAIGame(userId, 'loss', io);
-        logger.info('管理员结束AI游戏', { gameId, userId });
+        this.endAIGame(accountId, 'loss', io);
+        logger.info('管理员结束AI游戏', { gameId, accountId });
         return true;
       }
     }
@@ -1387,35 +1513,35 @@ class GameManager {
   // ========== AI对战功能 ==========
 
   // 创建AI对战游戏
-  createAIGame(userId, gameType, difficulty, io) {
+  createAIGame(accountId, gameType, difficulty, io) {
     if (!this.aiManager) {
       logger.warn('AI对战功能未启用：AIManager未初始化');
       return false;
     }
 
-    const user = this.userManager.getUserByAccountId(userId);
+    const user = this.userManager.getUserByAccountId(accountId);
     if (!user) {
-      logger.warn('创建AI对战失败：用户不存在', { userId });
+      logger.warn('创建AI对战失败：用户不存在', { accountId });
       return false;
     }
 
     // 验证游戏类型
     if (!Object.values(config.game.types).includes(gameType)) {
-      logger.warn('创建AI对战失败：无效的游戏类型', { userId, gameType });
+      logger.warn('创建AI对战失败：无效的游戏类型', { accountId, gameType });
       return false;
     }
 
     // 验证难度
     if (!['easy', 'medium', 'hard'].includes(difficulty)) {
-      logger.warn('创建AI对战失败：无效的难度', { userId, difficulty });
+      logger.warn('创建AI对战失败：无效的难度', { accountId, difficulty });
       return false;
     }
 
     // 如果存在旧游戏，先删除
-    const existingGame = this.aiGames.get(userId);
+    const existingGame = this.aiGames.get(accountId);
     if (existingGame) {
-      logger.info('删除已存在的AI游戏', { userId, status: existingGame.status });
-      this.aiGames.delete(userId);
+      logger.info('删除已存在的AI游戏', { accountId, status: existingGame.status });
+      this.aiGames.delete(accountId);
     }
 
     // 初始化棋盘
@@ -1424,7 +1550,7 @@ class GameManager {
     // 创建AI游戏对象
     const aiGame = {
       gameId: this.generateGameId(gameType),
-      userId: userId,
+      accountId: accountId,
       gameType: gameType,
       difficulty: difficulty,
       board: board,
@@ -1436,18 +1562,18 @@ class GameManager {
     };
 
     // 保存AI游戏
-    this.aiGames.set(userId, aiGame);
+    this.aiGames.set(accountId, aiGame);
 
     // 更新用户状态
     user.status = 'playing';
     user.game = 'ai';
     user.lastActivity = Date.now();
-    this.userManager.broadcastUserStatus(userId, 'playing', io);
+    this.userManager.broadcastUserStatus(accountId, 'playing', io);
 
-    logger.aiGameEvent(userId, '开始AI对战', { gameType, difficulty });
+    logger.aiGameEvent(accountId, '开始AI对战', { gameType, difficulty });
 
     // 发送游戏开始信息
-    const userSocket = this.userManager.getSocketByAccountId(userId);
+    const userSocket = this.userManager.getSocketByAccountId(accountId);
     if (userSocket) {
       userSocket.emit('ai_game_start', {
         gameType: gameType,
@@ -1461,32 +1587,32 @@ class GameManager {
   }
 
   // 处理AI对战移动
-  async handleAIMove(userId, position, io) {
-    logger.info('🎯 AI对战收到移动', { userId, position, gameType: this.aiGames.get(userId)?.gameType });
+  async handleAIMove(accountId, position, io) {
+    logger.info('🎯 AI对战收到移动', { accountId, position, gameType: this.aiGames.get(accountId)?.gameType });
 
-    const aiGame = this.aiGames.get(userId);
+    const aiGame = this.aiGames.get(accountId);
     if (!aiGame || aiGame.status !== 'playing') {
-      logger.warn('❌ AI对战移动失败：游戏不存在或不在进行中', { userId, game: !!aiGame, status: aiGame?.status });
+      logger.warn('❌ AI对战移动失败：游戏不存在或不在进行中', { accountId, game: !!aiGame, status: aiGame?.status });
       return false;
     }
 
     // 获取用户信息
-    const user = this.userManager.getUserByAccountId(userId);
+    const user = this.userManager.getUserByAccountId(accountId);
     if (!user) {
-      logger.warn('❌ AI对战移动失败：用户不存在', { userId });
+      logger.warn('❌ AI对战移动失败：用户不存在', { accountId });
       return false;
     }
 
     // 验证是否是玩家回合
     if (aiGame.currentPlayer !== 1) {
-      logger.warn('❌ AI对战移动失败：不是玩家回合', { userId, currentPlayer: aiGame.currentPlayer });
+      logger.warn('❌ AI对战移动失败：不是玩家回合', { accountId, currentPlayer: aiGame.currentPlayer });
       return false;
     }
 
     // 验证移动是否有效
     logger.info('🔍 验证移动有效性', { gameType: aiGame.gameType, position, boardSize: aiGame.board.length });
     if (!this.isValidMove(aiGame.gameType, aiGame.board, position, aiGame.currentPlayer)) {
-      logger.warn('❌ AI对战移动失败：无效的移动', { userId, position, gameType: aiGame.gameType });
+      logger.warn('❌ AI对战移动失败：无效的移动', { accountId, position, gameType: aiGame.gameType });
       return false;
     }
 
@@ -1495,7 +1621,7 @@ class GameManager {
 
     // 记录移动
     const move = {
-      player: userId,
+      player: accountId,
       color: aiGame.currentPlayer,
       position: position,
       timestamp: Date.now()
@@ -1509,7 +1635,7 @@ class GameManager {
     // 检查游戏是否结束
     const gameOver = this.checkGameOver(aiGame.gameType, aiGame.board, aiGame.currentPlayer);
     if (gameOver) {
-      await this.endAIGame(userId, 'win', io);
+      await this.endAIGame(accountId, 'win', io);
       return true;
     }
 
@@ -1517,7 +1643,7 @@ class GameManager {
     aiGame.currentPlayer = 2;
 
     // 发送移动结果
-    const userSocket = this.userManager.getSocketByAccountId(userId);
+    const userSocket = this.userManager.getSocketByAccountId(accountId);
     if (userSocket) {
       userSocket.emit('ai_move_result', {
         position: position,
@@ -1536,15 +1662,15 @@ class GameManager {
       thinkTime = Math.floor(Math.random() * 301) + 200; // 200-500ms
     }
     setTimeout(() => {
-      this.handleAIAutoMove(userId, io);
+      this.handleAIAutoMove(accountId, io);
     }, thinkTime);
 
     return true;
   }
 
   // AI 自动移动
-  handleAIAutoMove(userId, io) {
-    const aiGame = this.aiGames.get(userId);
+  handleAIAutoMove(accountId, io) {
+    const aiGame = this.aiGames.get(accountId);
     if (!aiGame || aiGame.status !== 'playing' || aiGame.currentPlayer !== 2) {
       return;
     }
@@ -1558,7 +1684,7 @@ class GameManager {
     );
 
     if (!aiMove) {
-      logger.warn('AI 移动失败：无法生成有效移动', { userId, gameType: aiGame.gameType });
+      logger.warn('AI 移动失败：无法生成有效移动', { accountId, gameType: aiGame.gameType });
       return;
     }
 
@@ -1576,7 +1702,7 @@ class GameManager {
     aiGame.lastMoveTime = Date.now();
 
     // 更新用户活动时间
-    const user = this.userManager.getUserByAccountId(userId);
+    const user = this.userManager.getUserByAccountId(accountId);
     if (user) {
       user.lastActivity = Date.now();
     }
@@ -1584,7 +1710,7 @@ class GameManager {
     // 检查游戏是否结束
     const gameOver = this.checkGameOver(aiGame.gameType, aiGame.board, aiGame.currentPlayer);
     if (gameOver) {
-      this.endAIGame(userId, 'loss', io);
+      this.endAIGame(accountId, 'loss', io);
       return;
     }
 
@@ -1592,7 +1718,7 @@ class GameManager {
     aiGame.currentPlayer = 1;
 
     // 发送AI移动结果
-    const userSocket = this.userManager.getSocketByAccountId(userId);
+    const userSocket = this.userManager.getSocketByAccountId(accountId);
     if (userSocket) {
       userSocket.emit('ai_move_result', {
         position: aiMove,
@@ -1603,8 +1729,8 @@ class GameManager {
   }
 
   // 结束AI对战
-  async endAIGame(userId, result, io) {
-    const aiGame = this.aiGames.get(userId);
+  async endAIGame(accountId, result, io) {
+    const aiGame = this.aiGames.get(accountId);
     if (!aiGame) return;
 
     // 如果游戏已经结束，直接返回，避免重复保存
@@ -1616,7 +1742,7 @@ class GameManager {
     aiGame.result = result;
 
     // 获取用户信息
-    const user = this.userManager.getUserByAccountId(userId);
+    const user = this.userManager.getUserByAccountId(accountId);
     if (!user) return;
 
     // 保存AI游戏记录到 games.json
@@ -1627,11 +1753,11 @@ class GameManager {
         id: gameId,
         gameId: gameId,
         gameType: aiGame.gameType,
-        player1: userId,
+        player1: accountId,
         player2: 'ai',
         player1Nickname: user.nickname || user.accountId,
         player2Nickname: 'AI',
-        winner: result === 'win' ? userId : 'ai',
+        winner: result === 'win' ? accountId : 'ai',
         result: result,
         moves: aiGame.moves,
         startTime: aiGame.startTime,
@@ -1660,20 +1786,20 @@ class GameManager {
       }
 
       await dataStore.add('games', record);
-      logger.info('AI游戏记录已保存', { userId, gameType: aiGame.gameType, result });
+      logger.info('AI游戏记录已保存', { accountId, gameType: aiGame.gameType, result });
     } catch (err) {
-      logger.error('保存AI游戏记录失败', { userId, error: err.message });
+      logger.error('保存AI游戏记录失败', { accountId, error: err.message });
     }
 
     // 更新用户状态
     if (user) {
       user.status = 'online';
       user.game = null;
-      this.userManager.broadcastUserStatus(userId, 'online', io);
+      this.userManager.broadcastUserStatus(accountId, 'online', io);
     }
 
     // 发送游戏结束信息
-    const userSocket = this.userManager.getSocketByAccountId(userId);
+    const userSocket = this.userManager.getSocketByAccountId(accountId);
     if (userSocket) {
       userSocket.emit('ai_game_end', {
         result: result,
@@ -1683,10 +1809,9 @@ class GameManager {
     }
 
     // 更新用户统计
-    await this.userManager.updateUserStats(userId, result, aiGame.gameType, true, aiGame.difficulty, aiGame.duration);
+    await this.userManager.updateUserStats(accountId, result, aiGame.gameType, true, aiGame.difficulty, aiGame.duration);
 
     // 给予经验值奖励
-    const accountId = userId;
     if (accountId && this.accountManager && this.achievementManager) {
       // 根据结果给予经验值
       let expReward = 0;
@@ -1747,7 +1872,7 @@ class GameManager {
       }
     }
 
-    logger.aiGameEvent(userId, 'AI对战结束', {
+    logger.aiGameEvent(accountId, 'AI对战结束', {
       gameType: aiGame.gameType,
       difficulty: aiGame.difficulty,
       result: result,
@@ -1757,11 +1882,11 @@ class GameManager {
     // 清理AI游戏 - 使用游戏开始时间作为标识，确保不会误删新游戏
     const gameStartTime = aiGame.startTime;
     setTimeout(() => {
-      const currentGame = this.aiGames.get(userId);
+      const currentGame = this.aiGames.get(accountId);
       // 只有当游戏仍然存在且是同一个游戏时才删除
       if (currentGame && currentGame.startTime === gameStartTime) {
-        this.aiGames.delete(userId);
-        logger.info('清理已结束的AI游戏', { userId, gameStartTime });
+        this.aiGames.delete(accountId);
+        logger.info('清理已结束的AI游戏', { accountId, gameStartTime });
       }
     }, 5000);
   }

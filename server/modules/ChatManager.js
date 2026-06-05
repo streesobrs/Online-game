@@ -299,9 +299,9 @@ class ChatManager {
   }
 
   // 禁言用户
-  muteUser(userId, duration = 3600000, reason = '') { // 默认1小时
+  muteUser(accountId, duration = 3600000, reason = '') { // 默认1小时
     // 如果用户已被禁言，先清理之前的定时器
-    const existingMute = this.muteList.get(userId);
+    const existingMute = this.muteList.get(accountId);
     if (existingMute && existingMute.timeoutId) {
       clearTimeout(existingMute.timeoutId);
     }
@@ -310,43 +310,43 @@ class ChatManager {
 
     // 定时解除禁言
     const timeoutId = setTimeout(() => {
-      this.muteList.delete(userId);
+      this.muteList.delete(accountId);
     }, duration);
 
-    this.muteList.set(userId, {
+    this.muteList.set(accountId, {
       reason: reason,
       expiresAt: expiresAt,
       timeoutId: timeoutId
     });
 
-    logger.info('用户被禁言', { userId, duration, reason });
+    logger.info('用户被禁言', { accountId, duration, reason });
     return true;
   }
 
   // 解除禁言
-  unmuteUser(userId) {
-    const muteInfo = this.muteList.get(userId);
+  unmuteUser(accountId) {
+    const muteInfo = this.muteList.get(accountId);
     if (muteInfo && muteInfo.timeoutId) {
       clearTimeout(muteInfo.timeoutId);
     }
-    this.muteList.delete(userId);
-    logger.info('用户解除禁言', { userId });
+    this.muteList.delete(accountId);
+    logger.info('用户解除禁言', { accountId });
     return true;
   }
 
   // 检查消息频率限制
-  checkRateLimit(userId) {
+  checkRateLimit(accountId) {
     const now = Date.now();
-    const userLimit = this.messageRateLimit.get(userId);
+    const userLimit = this.messageRateLimit.get(accountId);
 
     if (!userLimit) {
-      this.messageRateLimit.set(userId, { count: 1, lastTime: now });
+      this.messageRateLimit.set(accountId, { count: 1, lastTime: now });
       return true;
     }
 
     // 1分钟内最多发送20条消息
     if (now - userLimit.lastTime > 60000) {
-      this.messageRateLimit.set(userId, { count: 1, lastTime: now });
+      this.messageRateLimit.set(accountId, { count: 1, lastTime: now });
       return true;
     }
 

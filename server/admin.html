@@ -2164,12 +2164,12 @@
       socket.emit('maintenance_mode', { enabled: false });
     }
 
-    function kickUser(userId) {
-      if (!confirm(`确定要踢出用户 ${userId} 吗？`)) return;
-      socket.emit('kick_user', { userId, reason: '管理员操作' });
+    function kickUser(accountId) {
+      if (!confirm(`确定要踢出用户 ${accountId} 吗？`)) return;
+      socket.emit('kick_user', { accountId, reason: '管理员操作' });
     }
 
-    function muteUser(userId) {
+    function muteUser(accountId) {
       showModal('禁言用户', `
     <div class="form-group">
       <label class="form-label">禁言时长（分钟）</label>
@@ -2181,14 +2181,14 @@
     </div>
   `, [
         { text: '取消', class: 'btn-secondary', action: closeModal },
-        { text: '确认禁言', class: 'btn-warning', action: () => doMuteUser(userId) }
+        { text: '确认禁言', class: 'btn-warning', action: () => doMuteUser(accountId) }
       ]);
     }
 
-    function doMuteUser(userId) {
+    function doMuteUser(accountId) {
       const duration = parseInt(document.getElementById('mute-duration').value);
       const reason = document.getElementById('mute-reason').value;
-      socket.emit('mute_user', { userId, duration, reason });
+      socket.emit('mute_user', { accountId, duration, reason });
       closeModal();
     }
 
@@ -2197,8 +2197,8 @@
       socket.emit('end_game', { gameId });
     }
 
-    function viewUserDetail(userId) {
-      socket.emit('get_user_detail', { userId });
+    function viewUserDetail(accountId) {
+      socket.emit('get_user_detail', { accountId });
     }
 
     function viewGameDetail(gameId) {
@@ -2467,14 +2467,14 @@
       });
     }
 
-    function resetPassword(userId) {
-      if (!confirm(`确定要重置用户 ${userId} 的密码吗？`)) return;
+    function resetPassword(accountId) {
+      if (!confirm(`确定要重置用户 ${accountId} 的密码吗？`)) return;
       // 后端暂不支持此功能
       showToast('密码重置功能暂未实现', 'info');
     }
 
-    function deleteAccount(userId) {
-      if (!confirm(`确定要删除账号 ${userId} 吗？此操作不可恢复！`)) return;
+    function deleteAccount(accountId) {
+      if (!confirm(`确定要删除账号 ${accountId} 吗？此操作不可恢复！`)) return;
 
       socket.once('admin_action_result', (data) => {
         if (data.action === 'delete_account' && data.success) {
@@ -2482,7 +2482,7 @@
         }
       });
 
-      socket.emit('delete_account', { id: userId });
+      socket.emit('delete_account', { id: accountId });
     }
 
     function loadGameHistory() {
@@ -2524,9 +2524,9 @@
 
     function doLoadChatHistory() {
       const scope = document.getElementById('chat-scope').value;
-      const userId = document.getElementById('chat-user-id').value.trim();
+      const accountId = document.getElementById('chat-user-id').value.trim();
       const timeRange = document.getElementById('chat-time').value;
-      socket.emit('get_chat_history_admin', { scope, userId: userId || null, timeRange });
+      socket.emit('get_chat_history_admin', { scope, accountId: accountId || null, timeRange });
       closeModal();
     }
 

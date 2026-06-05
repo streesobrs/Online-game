@@ -3053,12 +3053,20 @@
               <span class="info-label">速度：</span>
               <span class="info-value" id="snake-speed">150</span>
             </div>
+            <div class="info-item">
+              <span class="info-label">⏱️ 时间：</span>
+              <span class="info-value" id="snake-time">2:00</span>
+            </div>
           </div>
           <canvas id="snake-canvas" width="400" height="400"></canvas>
           <div class="game-controls">
-            <button class="lobby-btn" id="snake-start" onclick="startSnakeGame()">🎮 开始游戏</button>
+            <button class="lobby-btn" id="snake-start" onclick="startSnakeGame()">🎮 单人模式</button>
+            <button class="lobby-btn" id="snake-dual" onclick="startSnakeDualGame()" style="background: #667eea;">⚔️
+              匹配对战</button>
             <button class="lobby-btn" id="snake-pause" onclick="pauseSnakeGame()">⏸️ 暂停</button>
             <button class="lobby-btn" id="snake-restart" onclick="restartSnakeGame()">🔄 重新开始</button>
+            <button class="lobby-btn" id="snake-quit" onclick="quitSnakeGame()" style="background: #e74c3c;">🚪
+              退出</button>
           </div>
 
           <!-- 虚拟按键 -->
@@ -3214,7 +3222,7 @@
 
     // 全局游戏变量
     let currentGame = 'gobang'; // 当前选择的棋种：gobang, go, chess, snake
-    let userId = null; // 由服务器分配
+    let accountId = null; // 由服务器分配
 
     // 从localStorage获取或生成用户ID
     function getSavedUserId() {
@@ -3888,6 +3896,34 @@
 • 按空格键可以暂停/继续游戏`
     };
 
+    // 双人模式配置
+    const snakeDualConfig = {
+      gridSize: 30,
+      cellSize: 18,
+      initialSpeed: 120,
+      canvasWidth: 540,
+      canvasHeight: 540,
+      gameDuration: 120, // 游戏时长（秒）
+      maxFoodCount: 8, // 最大食物数量
+      respawnDelay: 1000, // 复活延迟（毫秒）
+      colors: {
+        snake1Head: '#4ecdc4',
+        snake1Body: '#45b7d1',
+        snake2Head: '#ff6b6b',
+        snake2Body: '#ee5a24',
+        food: '#ffd93d',
+        grid: '#2d2d44',
+        background: '#1a1a2e'
+      },
+      rules: `双人模式规则：
+🎮 玩家1：使用方向键控制
+🎮 玩家2：使用WASD控制
+⏱️ 游戏时间：2分钟
+🔄 无限复活（死亡后1秒复活）
+🍎 地图中有更多食物
+🏆 时间结束后分数高者获胜！`
+    };
+
     // ========== 音效系统 ==========
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     const soundEnabled = {
@@ -4010,6 +4046,38 @@
           setTimeout(() => toast.remove(), 300);
         }
       }, duration);
+    }
+
+    // 非阻塞确认对话框
+    let pendingConfirmCallback = null;
+    function showConfirmDialog(message, onConfirm) {
+      const modal = document.getElementById('custom-confirm-modal');
+      const titleEl = document.getElementById('confirm-title');
+      const msgEl = document.getElementById('confirm-message');
+      const yesBtn = document.getElementById('confirm-yes');
+      const noBtn = document.getElementById('confirm-no');
+      if (!modal || !msgEl) return;
+
+      titleEl.textContent = '确认操作';
+      msgEl.textContent = message;
+      pendingConfirmCallback = onConfirm;
+      modal.style.display = 'block';
+
+      // 绑定按钮事件（先移除旧监听，避免重复）
+      const handleYes = () => {
+        modal.style.display = 'none';
+        pendingConfirmCallback = null;
+        if (typeof onConfirm === 'function') onConfirm();
+      };
+      const handleNo = () => {
+        modal.style.display = 'none';
+        pendingConfirmCallback = null;
+      };
+      yesBtn.onclick = handleYes;
+      noBtn.onclick = handleNo;
+      modal.onclick = (e) => {
+        if (e.target === modal) handleNo();
+      };
     }
 
     // 增强的输入验证函数
@@ -4293,21 +4361,23 @@
       });
 
       socket.on('user_connected', (data) => {
-        userId = data.userId;
-        console.log('获得用户ID:', userId);
+        accountId = data.accountId;
+        console.log('获得用户ID:', accountId);
         // 保存用户ID到localStorage
-        saveUserId(userId);
+        saveUserId(accountId);
         initUserStatus();
       });
 
       socket.on('online_users', (users) => {
         onlineUsers.clear();
         users.forEach(user => {
-          onlineUsers.set(user.userId, {
+          onlineUsers.set(user.accountId, {
             status: user.status,
-            game: user.game,
+            game: user.gameType,
             nickname: user.nickname,
-            lastUpdate: Date.now()
+            lastUpdate: Date.now(),
+            level: user.level,
+            accountType: user.accountType
           });
         });
         updateUserList();
@@ -4315,8 +4385,8 @@
       });
 
       socket.on('user_status', (data) => {
-        if (data.userId !== userId) {
-          onlineUsers.set(data.userId, {
+        if (data.accountId !== accountId) {
+          onlineUsers.set(data.accountId, {
             status: data.status,
             game: data.gameType,
             nickname: data.nickname,
@@ -4336,13 +4406,13 @@
 
       socket.on('move', (data) => {
         console.log('收到移动:', data);
-        console.log('当前userId:', userId);
+        console.log('当前accountId:', accountId);
         console.log('消息from:', data.from);
-        console.log('是否是自己的消息:', data.from === userId);
+        console.log('是否是自己的消息:', data.from === accountId);
         if (gameState.gameOver) return;
 
         // 检查是否是自己的落子，如果是则跳过
-        if (data.from === userId) {
+        if (data.from === accountId) {
           console.log('收到自己的落子消息，跳过');
           return;
         }
@@ -4405,7 +4475,7 @@
 
       socket.on('return_lobby', (data) => {
         if (matchedOpponentId === data.userId) {
-          alert('对手已返回大厅');
+          showToast('对手已返回大厅', 'warning');
           returnToLobby();
         }
         onlineUsers.set(data.userId, {
@@ -4447,7 +4517,7 @@
 
         let winMsg = '';
         if (data.result === 'win') {
-          if (data.winner === userId) {
+          if (data.winner === accountId) {
             winMsg = '🎉 你获胜了！';
           } else {
             winMsg = '😢 你输了！';
@@ -4455,7 +4525,7 @@
         } else if (data.result === 'draw') {
           winMsg = '🤝 平局！';
         } else if (data.result === 'resign') {
-          if (data.winner === userId) {
+          if (data.winner === accountId) {
             winMsg = '🎉 对方认输，你获胜了！';
           } else {
             winMsg = '😢 你认输了！';
@@ -4468,7 +4538,7 @@
           winMsg = '🛑 游戏已结束';
         }
 
-        winnerEl.textContent = data.winner === userId ? '你' : '对手';
+        winnerEl.textContent = data.winner === accountId ? '你' : '对手';
         gameStatusEl.textContent = '游戏结束';
         gameStatusEl.className = 'info-value value-waiting';
         showWinAlert(winMsg);
@@ -4661,7 +4731,7 @@
 
       socket.on('chat_message', (data) => {
         console.log('收到聊天消息:', data);
-        const isOther = data.userId !== userId;
+        const isOther = data.userId !== accountId;
         const scope = data.scope || 'global';
 
         // 保存到对应频道的历史记录
@@ -4937,6 +5007,83 @@
       socket.on('game_history', (data) => {
         console.log('收到游戏历史记录:', data);
         updateGameHistory(data.history);
+      });
+
+      // 贪吃蛇匹配相关事件
+      socket.on('snake_match_found', (data) => {
+        console.log('贪吃蛇匹配成功:', data);
+
+        // 先恢复游戏界面，再启动游戏
+        showSnakeGameInterface();
+
+        // 延迟启动游戏，确保DOM元素已创建
+        setTimeout(() => {
+          startMatchedSnakeGame(data);
+
+          // 请求全量状态同步
+          if (socket && socket.connected) {
+            socket.emit('snake_request_full_state', {
+              matchId: data.matchId
+            });
+          }
+
+          // 定期请求状态同步，确保状态一致
+          if (snakeGameState.syncInterval) {
+            clearInterval(snakeGameState.syncInterval);
+          }
+          snakeGameState.syncInterval = setInterval(() => {
+            if (socket && socket.connected && snakeGameState.isDualMode && snakeGameState.matchId) {
+              socket.emit('snake_request_full_state', {
+                matchId: snakeGameState.matchId
+              });
+            }
+          }, 2000);
+        }, 100);
+      });
+
+      socket.on('match_timeout', (data) => {
+        console.log('匹配超时:', data);
+        showToast(data.message || '匹配超时，请稍后重试', 'warning');
+        showSnakeGameInterface();
+        updateStatus('匹配已超时');
+      });
+
+      socket.on('snake_opponent_update', (data) => {
+        handleOpponentUpdate(data);
+      });
+
+      socket.on('snake_game_over', (data) => {
+        console.log('贪吃蛇游戏结束:', data);
+        endDualSnakeGame();
+      });
+
+      socket.on('snake_match_cancelled', () => {
+        console.log('贪吃蛇匹配已取消');
+        showSnakeGameInterface();
+        updateStatus('匹配已取消');
+      });
+
+      socket.on('snake_food_sync', (data) => {
+        console.log('同步食物状态:', data);
+        if (snakeGameState.isDualMode && data.foods) {
+          snakeGameState.foods = data.foods;
+        }
+      });
+
+      socket.on('snake_full_state_sync', (data) => {
+        console.log('全量同步游戏状态:', data);
+        if (snakeGameState.isDualMode) {
+          snakeGameState.snake = data.isPlayer1 ? data.player1Snake : data.player2Snake;
+          snakeGameState.score = data.isPlayer1 ? data.player1Score : data.player2Score;
+          snakeGameState.snake2 = data.isPlayer1 ? data.player2Snake : data.player1Snake;
+          snakeGameState.score2 = data.isPlayer1 ? data.player2Score : data.player1Score;
+          snakeGameState.foods = data.foods || snakeGameState.foods;
+          snakeGameState.gameTimeLeft = data.gameTimeLeft !== undefined ? data.gameTimeLeft : snakeGameState.gameTimeLeft;
+
+          // 更新UI
+          updateDualSnakeScore();
+          updateDualGameTime();
+        }
       });
 
       socket.on('account_updated', (data) => {
@@ -6477,10 +6624,10 @@
     function handleBoardMove(data) {
       console.log('处理对手落子:', data);
       console.log('当前棋盘状态:', gameState.board[data.r][data.c]);
-      console.log('是否是自己的消息:', data.from === userId);
+      console.log('是否是自己的消息:', data.from === accountId);
 
       // 检查是否是自己的落子，如果是则跳过
-      if (data.from === userId) {
+      if (data.from === accountId) {
         console.log('跳过自己的落子消息');
         return;
       }
@@ -6667,7 +6814,21 @@
       foodEaten: 0, // 吃到的食物数量
       lastDirection: 'right', // 上一次的方向
       lastFood: null, // 上一次的食物位置
-      lastScore: 0 // 上一次的分数
+      lastScore: 0, // 上一次的分数
+      isDualMode: false, // 是否为双人模式
+      // 双人模式状态
+      snake2: [],
+      direction2: 'left',
+      nextDirection2: 'left',
+      score2: 0,
+      snake2Positions: new Set(),
+      foods: [], // 多个食物
+      gameTimeLeft: 0, // 剩余时间（双人模式）
+      gameTimer: null, // 游戏计时器
+      isRespawning1: false, // 玩家1是否正在复活
+      isRespawning2: false, // 玩家2是否正在复活
+      respawnTimer1: null, // 玩家1复活计时器
+      respawnTimer2: null // 玩家2复活计时器
     };
 
     // 初始化贪吃蛇游戏
@@ -6689,6 +6850,11 @@
       document.addEventListener('keydown', handleSnakeKeydown);
 
       renderSnakeGame();
+    }
+
+    // 获取当前游戏配置
+    function getSnakeConfig() {
+      return snakeGameState.isDualMode ? snakeDualConfig : snakeGameConfig;
     }
 
     // 开始贪吃蛇游戏
@@ -6862,6 +7028,449 @@
       updateStatus('🎮 贪吃蛇游戏开始！');
     }
 
+    // 开始双人模式贪吃蛇游戏（匹配模式）
+    function startSnakeDualGame() {
+      if (!socket || !socket.connected) {
+        alert('请先登录！');
+        return;
+      }
+
+      // 发送匹配请求（使用统一的匹配系统）
+      socket.emit('match_request', {
+        game: 'snake'
+      });
+
+      // 显示匹配等待界面
+      showSnakeMatchWaiting();
+    }
+
+    // 显示匹配等待界面
+    function showSnakeMatchWaiting() {
+      const container = document.getElementById('snake-game-container');
+      container.innerHTML = `
+        <div style="text-align: center; padding: 40px;">
+          <div style="font-size: 48px; margin-bottom: 20px;">🔍</div>
+          <div style="font-size: 24px; font-weight: bold; color: #2d3748; margin-bottom: 10px;">
+            正在寻找对手...
+          </div>
+          <div style="font-size: 16px; color: #718096; margin-bottom: 30px;">
+            请稍候，系统正在为您匹配对手
+          </div>
+          <div style="width: 60px; height: 60px; margin: 0 auto; border: 4px solid #e2e8f0; border-top-color: #4299e1; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+          <button onclick="cancelSnakeMatch()" style="margin-top: 30px; padding: 12px 24px; background: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">
+            取消匹配
+          </button>
+        </div>
+        <style>
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        </style>
+      `;
+    }
+
+    // 取消匹配
+    function cancelSnakeMatch() {
+      if (socket && socket.connected) {
+        socket.emit('cancel_match');
+      }
+      // 恢复贪吃蛇界面
+      showSnakeGameInterface();
+    }
+
+    // 显示贪吃蛇游戏界面
+    function showSnakeGameInterface() {
+      const container = document.getElementById('snake-game-container');
+      container.innerHTML = `
+        <div class="game-info">
+          <div class="info-item">
+            <span class="info-label">分数：</span>
+            <span class="info-value" id="snake-score">0</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">最高分：</span>
+            <span class="info-value" id="snake-highscore">0</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">速度：</span>
+            <span class="info-value" id="snake-speed">150</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">⏱️ 时间：</span>
+            <span class="info-value" id="snake-time">2:00</span>
+          </div>
+        </div>
+        <canvas id="snake-canvas" width="400" height="400"></canvas>
+        <div class="game-rules">
+          <div class="rules-title">📜 游戏规则</div>
+          <div class="rules-content" id="snake-rules"></div>
+        </div>
+        <div class="game-controls">
+          <button class="lobby-btn" id="snake-start" onclick="startSnakeGame()">🎮 单人模式</button>
+          <button class="lobby-btn" id="snake-dual" onclick="startSnakeDualGame()" style="background: #667eea;">🐍🐍 双人模式</button>
+          <button class="lobby-btn" id="snake-pause" onclick="pauseSnakeGame()">⏸️ 暂停</button>
+          <button class="lobby-btn" id="snake-restart" onclick="restartSnakeGame()">🔄 重新开始</button>
+          <button class="lobby-btn" id="snake-quit" onclick="quitSnakeGame()" style="background: #e74c3c;">🚪 退出</button>
+        </div>
+      `;
+
+      // 重新初始化画布
+      snakeGameState.canvas = document.getElementById('snake-canvas');
+      snakeGameState.ctx = snakeGameState.canvas.getContext('2d');
+      renderSnakeGame();
+    }
+
+    // 开始匹配后的双人游戏
+    function startMatchedSnakeGame(gameData) {
+      // 设置为双人模式
+      snakeGameState.isDualMode = true;
+      snakeGameState.matchId = gameData.matchId;
+      snakeGameState.playerId = gameData.playerId;
+
+      // 调整画布大小
+      const config = snakeDualConfig;
+      const canvas = document.getElementById('snake-canvas');
+      canvas.width = config.canvasWidth;
+      canvas.height = config.canvasHeight;
+
+      // 重置游戏状态
+      snakeGameState.snake = gameData.snake || [{ x: 5, y: Math.floor(config.gridSize / 2) }];
+      snakeGameState.direction = 'right';
+      snakeGameState.nextDirection = 'right';
+      snakeGameState.score = 0;
+
+      // 确保snake2始终是有效的数组
+      if (gameData.opponentSnake && Array.isArray(gameData.opponentSnake) && gameData.opponentSnake.length > 0) {
+        snakeGameState.snake2 = gameData.opponentSnake;
+      } else {
+        snakeGameState.snake2 = [{ x: config.gridSize - 6, y: Math.floor(config.gridSize / 2) }];
+      }
+      snakeGameState.direction2 = 'left';
+      // 对手方向（仅用于显示）
+      snakeGameState.score2 = 0;
+
+      snakeGameState.isPaused = false;
+      snakeGameState.speed = config.initialSpeed;
+      snakeGameState.gameTimeLeft = config.gameDuration;
+
+      // 生成多个食物
+      snakeGameState.foods = gameData.foods || [];
+      snakeGameState.snakePositions = new Set();
+      snakeGameState.snake2Positions = new Set();
+      snakeGameState.snakePositions.add(`${snakeGameState.snake[0].x},${snakeGameState.snake[0].y}`);
+      snakeGameState.snake2Positions.add(`${snakeGameState.snake2[0].x},${snakeGameState.snake2[0].y}`);
+
+      snakeGameState.isRespawning1 = false;
+      snakeGameState.isRespawning2 = false;
+
+      // 更新UI
+      updateDualSnakeScore();
+      updateDualGameTime();
+      document.getElementById('snake-rules').textContent = config.rules;
+
+      // 匹配模式隐藏暂停和重新开始按钮，保留退出按钮
+      const pauseBtn = document.getElementById('snake-pause');
+      const restartBtn = document.getElementById('snake-restart');
+      if (pauseBtn) pauseBtn.style.display = 'none';
+      if (restartBtn) restartBtn.style.display = 'none';
+
+      // 启动游戏计时器
+      snakeGameState.gameTimer = setInterval(() => {
+        snakeGameState.gameTimeLeft--;
+        updateDualGameTime();
+
+        if (snakeGameState.gameTimeLeft <= 0) {
+          endDualSnakeGame();
+        }
+      }, 1000);
+
+      // 启动游戏循环
+      function gameLoop() {
+        if (snakeGameState.isPaused) {
+          snakeGameState.gameLoop = requestAnimationFrame(gameLoop);
+          return;
+        }
+
+        const currentTime = Date.now();
+        const deltaTime = currentTime - snakeGameState.lastTime;
+
+        if (deltaTime >= snakeGameState.speed) {
+          // 只更新自己的蛇
+          if (!snakeGameState.isRespawning1) {
+            updateSnakePlayer(1);
+            // 发送更新到服务器
+            sendSnakeUpdate();
+          }
+
+          snakeGameState.lastTime = currentTime;
+        }
+
+        renderDualSnakeGame();
+        snakeGameState.gameLoop = requestAnimationFrame(gameLoop);
+      }
+
+      snakeGameState.lastTime = Date.now();
+      snakeGameState.gameLoop = requestAnimationFrame(gameLoop);
+
+      console.log('🐍🐍 匹配成功，双人贪吃蛇游戏开始');
+      updateStatus('🎮 匹配成功！双人贪吃蛇游戏开始！');
+    }
+
+    // 发送蛇的更新到服务器
+    function sendSnakeUpdate() {
+      if (!socket || !socket.connected || !snakeGameState.matchId) return;
+
+      socket.emit('snake_update', {
+        matchId: snakeGameState.matchId,
+        playerId: snakeGameState.playerId,
+        snake: snakeGameState.snake,
+        direction: snakeGameState.direction,
+        score: snakeGameState.score,
+        foods: snakeGameState.foods,
+        gameTimeLeft: snakeGameState.gameTimeLeft
+      });
+    }
+
+    // 处理对手的更新
+    function handleOpponentUpdate(data) {
+      console.log('收到对手更新:', data);
+
+      snakeGameState.snake2 = data.snake;
+      snakeGameState.score2 = data.score;
+
+      // 同步食物和时间
+      if (data.foods) {
+        console.log('同步食物状态:', data.foods);
+        snakeGameState.foods = data.foods;
+      }
+      if (data.gameTimeLeft !== undefined) {
+        console.log('同步游戏时间:', data.gameTimeLeft);
+        snakeGameState.gameTimeLeft = data.gameTimeLeft;
+      }
+
+      updateDualSnakeScore();
+      updateDualGameTime();
+    }
+
+    // 更新单个玩家蛇的逻辑
+    function updateSnakePlayer(player) {
+      const config = snakeDualConfig;
+      const state = snakeGameState;
+      const isPlayer1 = player === 1;
+
+      // 获取玩家状态
+      const snake = isPlayer1 ? state.snake : state.snake2;
+      const positions = isPlayer1 ? state.snakePositions : state.snake2Positions;
+      let direction = isPlayer1 ? state.direction : state.direction2;
+      const nextDirection = isPlayer1 ? state.nextDirection : state.nextDirection2;
+
+      // 确保蛇状态有效
+      if (!snake || !Array.isArray(snake) || snake.length === 0) {
+        console.error(`玩家${player}的蛇状态无效:`, snake);
+        // 初始化默认蛇状态
+        const defaultSnake = isPlayer1 ?
+          [{ x: 5, y: Math.floor(config.gridSize / 2) }] :
+          [{ x: config.gridSize - 6, y: Math.floor(config.gridSize / 2) }];
+
+        if (isPlayer1) {
+          state.snake = defaultSnake;
+        } else {
+          state.snake2 = defaultSnake;
+        }
+        return;
+      }
+
+      // 确保方向有效
+      const validDirections = ['up', 'down', 'left', 'right'];
+      if (!validDirections.includes(direction)) {
+        direction = isPlayer1 ? 'right' : 'left';
+      }
+      if (!validDirections.includes(nextDirection)) {
+        nextDirection = direction;
+      }
+
+      // 更新方向
+      direction = nextDirection;
+      if (isPlayer1) {
+        state.direction = direction;
+      } else {
+        state.direction2 = direction;
+      }
+
+      // 计算新头部位置
+      const head = { x: snake[0].x, y: snake[0].y };
+      switch (direction) {
+        case 'up': head.y--; break;
+        case 'down': head.y++; break;
+        case 'left': head.x--; break;
+        case 'right': head.x++; break;
+      }
+
+      // 碰撞检测
+      if (checkDualCollision(head, player)) {
+        respawnPlayer(player);
+        return;
+      }
+
+      // 移动蛇
+      const tail = snake[snake.length - 1];
+      snake.unshift(head);
+      positions.add(`${head.x},${head.y}`);
+
+      // 检查是否吃到食物
+      let ateFood = false;
+      const foodIndex = state.foods.findIndex(f => f.x === head.x && f.y === head.y);
+
+      if (foodIndex !== -1) {
+        ateFood = true;
+        state.foods.splice(foodIndex, 1);
+        const newFood = generateDualFood();
+        state.foods.push(newFood);
+
+        // 发送食物更新到服务器
+        if (socket && socket.connected && state.matchId) {
+          socket.emit('snake_food_update', {
+            matchId: state.matchId,
+            playerId: state.playerId,
+            foods: state.foods
+          });
+        }
+
+        if (isPlayer1) {
+          state.score += 10;
+        } else {
+          state.score2 += 10;
+        }
+        updateDualSnakeScore();
+      } else {
+        snake.pop();
+        positions.delete(`${tail.x},${tail.y}`);
+      }
+    }
+
+    // 双人模式碰撞检测
+    function checkDualCollision(head, player) {
+      const config = snakeDualConfig;
+      const state = snakeGameState;
+
+      // 墙壁碰撞
+      if (head.x < 0 || head.x >= config.gridSize ||
+        head.y < 0 || head.y >= config.gridSize) {
+        return true;
+      }
+
+      // 自身碰撞
+      const selfPositions = player === 1 ? state.snakePositions : state.snake2Positions;
+      if (selfPositions.has(`${head.x},${head.y}`)) {
+        return true;
+      }
+
+      // 撞到对方蛇
+      const otherPositions = player === 1 ? state.snake2Positions : state.snakePositions;
+      if (otherPositions.has(`${head.x},${head.y}`)) {
+        return true;
+      }
+
+      return false;
+    }
+
+    // 玩家复活
+    function respawnPlayer(player) {
+      const config = snakeDualConfig;
+      const state = snakeGameState;
+      const isPlayer1 = player === 1;
+
+      if (isPlayer1) {
+        state.isRespawning1 = true;
+        state.snake = [];
+        state.snakePositions.clear();
+      } else {
+        state.isRespawning2 = true;
+        state.snake2 = [];
+        state.snake2Positions.clear();
+      }
+
+      setTimeout(() => {
+        if (!state.gameLoop) return;
+
+        if (isPlayer1) {
+          state.snake = [{ x: 5, y: Math.floor(config.gridSize / 2) }];
+          state.direction = 'right';
+          state.nextDirection = 'right';
+          state.snakePositions.add(`${state.snake[0].x},${state.snake[0].y}`);
+          state.isRespawning1 = false;
+        } else {
+          state.snake2 = [{ x: config.gridSize - 6, y: Math.floor(config.gridSize / 2) }];
+          state.direction2 = 'left';
+          state.nextDirection2 = 'left';
+          state.snake2Positions.add(`${state.snake2[0].x},${state.snake2[0].y}`);
+          state.isRespawning2 = false;
+        }
+      }, config.respawnDelay);
+    }
+
+    // 生成双人模式食物
+    function generateDualFood() {
+      const config = snakeDualConfig;
+      let food;
+      do {
+        food = {
+          x: Math.floor(Math.random() * config.gridSize),
+          y: Math.floor(Math.random() * config.gridSize)
+        };
+      } while (snakeGameState.snakePositions.has(`${food.x},${food.y}`) ||
+        snakeGameState.snake2Positions.has(`${food.x},${food.y}`));
+      return food;
+    }
+
+    // 结束双人模式游戏
+    function endDualSnakeGame() {
+      // 停止游戏循环
+      if (snakeGameState.gameLoop) {
+        cancelAnimationFrame(snakeGameState.gameLoop);
+        snakeGameState.gameLoop = null;
+      }
+
+      // 停止计时器
+      if (snakeGameState.gameTimer) {
+        clearInterval(snakeGameState.gameTimer);
+        snakeGameState.gameTimer = null;
+      }
+
+      // 判定胜负
+      let result;
+      if (snakeGameState.score > snakeGameState.score2) {
+        result = '玩家1获胜！';
+      } else if (snakeGameState.score2 > snakeGameState.score) {
+        result = '玩家2获胜！';
+      } else {
+        result = '平局！';
+      }
+
+      updateStatus(`⏰ 游戏结束！${result} 玩家1: ${snakeGameState.score}分, 玩家2: ${snakeGameState.score2}分`);
+      showToast(`游戏结束！${result} 玩家1: ${snakeGameState.score}分, 玩家2: ${snakeGameState.score2}分`, 'info', 5000);
+
+      // 重置为单人模式配置
+      resetSnakeCanvas();
+
+      // 恢复游戏界面（隐藏暂停/重新开始按钮，显示匹配/单人按钮）
+      showSnakeGameInterface();
+
+      // 告诉服务端返回大厅
+      if (socket && socket.connected) {
+        socket.emit('return_lobby');
+      }
+    }
+
+    // 重置画布为单人模式
+    function resetSnakeCanvas() {
+      snakeGameState.isDualMode = false;
+      const canvas = document.getElementById('snake-canvas');
+      canvas.width = snakeGameConfig.canvasWidth;
+      canvas.height = snakeGameConfig.canvasHeight;
+      document.getElementById('snake-rules').textContent = snakeGameConfig.rules;
+    }
+
     // 贪吃蛇游戏循环（已整合到startSnakeGame函数中）
     function snakeGameLoop() {
       // 已整合到startSnakeGame函数中
@@ -6869,9 +7478,10 @@
 
     // 碰撞检测
     function checkSnakeCollision(head) {
+      const config = getSnakeConfig();
       // 墙壁碰撞
-      if (head.x < 0 || head.x >= snakeGameConfig.gridSize ||
-        head.y < 0 || head.y >= snakeGameConfig.gridSize) {
+      if (head.x < 0 || head.x >= config.gridSize ||
+        head.y < 0 || head.y >= config.gridSize) {
         return true;
       }
 
@@ -6952,8 +7562,119 @@
       }
     }
 
+    // 双人模式渲染
+    function renderDualSnakeGame() {
+      const ctx = snakeGameState.ctx;
+      const config = snakeDualConfig;
+      const cellSize = config.cellSize;
+      const gridSize = config.gridSize;
+      const canvasWidth = snakeGameState.canvas.width;
+      const canvasHeight = snakeGameState.canvas.height;
+
+      // 清空画布
+      ctx.fillStyle = config.colors.background;
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+      // 绘制网格
+      ctx.strokeStyle = config.colors.grid;
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      for (let i = 0; i <= gridSize; i++) {
+        ctx.moveTo(i * cellSize, 0);
+        ctx.lineTo(i * cellSize, canvasHeight);
+        ctx.moveTo(0, i * cellSize);
+        ctx.lineTo(canvasWidth, i * cellSize);
+      }
+      ctx.stroke();
+
+      // 绘制多个食物
+      ctx.fillStyle = config.colors.food;
+      ctx.beginPath();
+      snakeGameState.foods.forEach(food => {
+        const fx = food.x * cellSize + cellSize / 2;
+        const fy = food.y * cellSize + cellSize / 2;
+        const fr = cellSize / 2 - 2;
+        ctx.moveTo(fx + fr, fy);
+        ctx.arc(fx, fy, fr, 0, Math.PI * 2);
+      });
+      ctx.fill();
+
+      // 绘制玩家1的蛇
+      const rectSize = cellSize - 2;
+      const offset = 1;
+
+      // 玩家1蛇身
+      if (snakeGameState.snake.length > 1) {
+        ctx.fillStyle = config.colors.snake1Body;
+        ctx.beginPath();
+        for (let i = 1; i < snakeGameState.snake.length; i++) {
+          const segment = snakeGameState.snake[i];
+          ctx.rect(segment.x * cellSize + offset, segment.y * cellSize + offset, rectSize, rectSize);
+        }
+        ctx.fill();
+      }
+
+      // 玩家1蛇头
+      if (snakeGameState.snake.length > 0) {
+        const head = snakeGameState.snake[0];
+        ctx.fillStyle = config.colors.snake1Head;
+        ctx.fillRect(head.x * cellSize + offset, head.y * cellSize + offset, rectSize, rectSize);
+      }
+
+      // 绘制玩家2的蛇
+      if (snakeGameState.snake2 && Array.isArray(snakeGameState.snake2)) {
+        // 玩家2蛇身
+        if (snakeGameState.snake2.length > 1) {
+          ctx.fillStyle = config.colors.snake2Body;
+          ctx.beginPath();
+          for (let i = 1; i < snakeGameState.snake2.length; i++) {
+            const segment = snakeGameState.snake2[i];
+            ctx.rect(segment.x * cellSize + offset, segment.y * cellSize + offset, rectSize, rectSize);
+          }
+          ctx.fill();
+        }
+
+        // 玩家2蛇头
+        if (snakeGameState.snake2.length > 0) {
+          const head = snakeGameState.snake2[0];
+          ctx.fillStyle = config.colors.snake2Head;
+          ctx.fillRect(head.x * cellSize + offset, head.y * cellSize + offset, rectSize, rectSize);
+        }
+      }
+    }
+
+    // 更新双人模式分数显示
+    function updateDualSnakeScore() {
+      const scoreElement = document.getElementById('snake-score');
+      if (scoreElement) {
+        scoreElement.innerHTML = `
+          <div style="display: flex; justify-content: space-around; gap: 20px;">
+            <div style="text-align: center;">
+              <div style="font-size: 14px; color: #6c757d; margin-bottom: 4px;">玩家1 🔵</div>
+              <div style="font-size: 20px; font-weight: 700; color: #4ecdc4;">${snakeGameState.score}</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 14px; color: #6c757d; margin-bottom: 4px;">玩家2 🔴</div>
+              <div style="font-size: 20px; font-weight: 700; color: #ff6b6b;">${snakeGameState.score2}</div>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    // 更新双人模式游戏时间
+    function updateDualGameTime() {
+      const timeElement = document.getElementById('snake-time');
+      if (timeElement) {
+        const minutes = Math.floor(snakeGameState.gameTimeLeft / 60);
+        const seconds = snakeGameState.gameTimeLeft % 60;
+        timeElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      }
+    }
+
     // 键盘控制
     function handleSnakeKeydown(e) {
+      // 单人模式和在线双人模式都使用相同的控制
       switch (e.key) {
         case 'ArrowUp':
         case 'w':
@@ -7083,6 +7804,22 @@
       document.getElementById('snake-pause').textContent =
         snakeGameState.isPaused ? '继续' : '暂停';
 
+      // 暂停/继续计时器（双人模式）
+      if (snakeGameState.gameTimer) {
+        if (snakeGameState.isPaused) {
+          clearInterval(snakeGameState.gameTimer);
+          snakeGameState.gameTimer = null;
+        } else {
+          snakeGameState.gameTimer = setInterval(() => {
+            snakeGameState.gameTimeLeft--;
+            updateDualGameTime();
+            if (snakeGameState.gameTimeLeft <= 0) {
+              endDualSnakeGame();
+            }
+          }, 1000);
+        }
+      }
+
       console.log('🐍 贪吃蛇游戏', {
         action: snakeGameState.isPaused ? '暂停' : '继续',
         score: snakeGameState.score,
@@ -7094,8 +7831,16 @@
 
     // 重新开始
     function restartSnakeGame() {
+      // 停止游戏循环
       if (snakeGameState.gameLoop) {
-        clearInterval(snakeGameState.gameLoop);
+        cancelAnimationFrame(snakeGameState.gameLoop);
+        snakeGameState.gameLoop = null;
+      }
+
+      // 停止计时器（双人模式）
+      if (snakeGameState.gameTimer) {
+        clearInterval(snakeGameState.gameTimer);
+        snakeGameState.gameTimer = null;
       }
 
       console.log('🐍 贪吃蛇游戏重新开始', {
@@ -7103,7 +7848,44 @@
         highScore: snakeGameState.highScore
       });
 
-      startSnakeGame();
+      // 根据当前模式重新开始
+      if (snakeGameState.isDualMode) {
+        startSnakeDualGame();
+      } else {
+        startSnakeGame();
+      }
+    }
+
+    // 退出游戏
+    function quitSnakeGame() {
+      showConfirmDialog('确定要退出当前游戏吗？', () => {
+        // 停止游戏循环
+        if (snakeGameState.gameLoop) {
+          cancelAnimationFrame(snakeGameState.gameLoop);
+          snakeGameState.gameLoop = null;
+        }
+
+        // 停止计时器（双人模式）
+        if (snakeGameState.gameTimer) {
+          clearInterval(snakeGameState.gameTimer);
+          snakeGameState.gameTimer = null;
+        }
+
+        // 如果是双人模式，通知服务器返回大厅
+        if (snakeGameState.isDualMode) {
+          if (socket && socket.connected) {
+            socket.emit('return_lobby');
+          }
+        }
+
+        // 重置为单人模式配置
+        resetSnakeCanvas();
+
+        // 恢复游戏界面
+        showSnakeGameInterface();
+
+        updateStatus('🚪 已退出游戏');
+      });
     }
 
     // ========== 渲染和更新函数 ==========
@@ -7243,6 +8025,7 @@
 
     function updateAdvancedStats() {
       const config = gameConfigs[currentGame];
+      if (!config) return;
       const totalCells = config.totalCells;
 
       totalCellsEl.textContent = totalCells;
@@ -7408,7 +8191,7 @@
       chatMessages.innerHTML = '';
       const history = channel === 'global' ? globalChatHistory : gameChatHistory;
       history.forEach(msg => {
-        addChatMessage(msg.nickname, msg.message, msg.userId !== userId, msg.scope);
+        addChatMessage(msg.nickname, msg.message, msg.userId !== accountId, msg.scope);
       });
     }
 
@@ -7452,7 +8235,7 @@
 
     // ========== 匹配和游戏逻辑 ==========
     function initUserStatus() {
-      onlineUsers.set(userId, {
+      onlineUsers.set(accountId, {
         status: 'online',
         game: currentGame,
         lastUpdate: Date.now()
@@ -7474,7 +8257,7 @@
 
       let html = '';
       onlineUsers.forEach((user, uid) => {
-        const isMe = uid === userId;
+        const isMe = uid === accountId;
         const statusClass = user.status === 'waiting' ? 'waiting' :
           user.status === 'playing' ? 'playing' : '';
         const gameClass = user.game || '';
@@ -7514,7 +8297,7 @@
         updateStatus('❌ 正在匹配中，无法发起挑战');
         return;
       }
-      if (opponentId === userId) {
+      if (opponentId === accountId) {
         updateStatus('❌ 不能挑战自己');
         return;
       }
@@ -7537,7 +8320,7 @@
       isMatching = true;
       userStatus = 'waiting';
 
-      onlineUsers.set(userId, {
+      onlineUsers.set(accountId, {
         status: 'waiting',
         game: currentGame,
         lastUpdate: Date.now()
@@ -7559,7 +8342,7 @@
       isMatching = false;
       userStatus = 'online';
 
-      onlineUsers.set(userId, {
+      onlineUsers.set(accountId, {
         status: 'online',
         game: currentGame,
         lastUpdate: Date.now()
@@ -7584,7 +8367,7 @@
       isMatching = false;
       userStatus = 'playing';
 
-      onlineUsers.set(userId, {
+      onlineUsers.set(accountId, {
         status: 'playing',
         game: currentGame,
         lastUpdate: Date.now()
@@ -7756,7 +8539,7 @@
         game: currentGame
       });
 
-      onlineUsers.set(userId, {
+      onlineUsers.set(accountId, {
         status: 'online',
         game: currentGame,
         lastUpdate: Date.now()
@@ -11941,9 +12724,9 @@
       <p id="confirm-message" style="font-size: 18px; margin: 20px 0; color: #666;"></p>
       <div style="display: flex; gap: 15px; justify-content: center;">
         <button id="confirm-yes"
-          style="padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">同意</button>
+          style="padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">确定</button>
         <button id="confirm-no"
-          style="padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">拒绝</button>
+          style="padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">取消</button>
       </div>
     </div>
   </div>

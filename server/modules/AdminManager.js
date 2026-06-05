@@ -285,18 +285,18 @@ class AdminManager {
     const success = this.userManager.kickUser(accountId, reason);
 
     if (success) {
-      logger.info('管理员踢出用户', { adminSocket: socket.id, userId, reason });
+      logger.info('管理员踢出用户', { adminSocket: socket.id, accountId, reason });
       socket.emit('admin_action_result', {
         action: 'kick_user',
         success: true,
-        userId,
-        message: `用户 ${userId} 已被踢出`
+        accountId,
+        message: `用户 ${accountId} 已被踢出`
       });
     } else {
       socket.emit('admin_action_result', {
         action: 'kick_user',
         success: false,
-        userId,
+        accountId,
         message: '踢出用户失败，用户可能已离线'
       });
     }
@@ -502,18 +502,18 @@ class AdminManager {
     const success = this.chatManager.muteUser(accountId, durationMs, reason);
 
     if (success) {
-      logger.info('管理员禁言用户', { adminSocket: socket.id, userId: accountId, duration, reason });
+      logger.info('管理员禁言用户', { adminSocket: socket.id, accountId, duration, reason });
       socket.emit('admin_action_result', {
         action: 'mute_user',
         success: true,
-        userId: accountId,
+        accountId,
         message: `用户 ${accountId} 已被禁言 ${duration} 分钟${reason ? `，原因：${reason}` : ''}`
       });
     } else {
       socket.emit('admin_action_result', {
         action: 'mute_user',
         success: false,
-        userId,
+        accountId,
         message: '禁言失败'
       });
     }
@@ -533,18 +533,18 @@ class AdminManager {
     const success = this.chatManager.unmuteUser(accountId);
 
     if (success) {
-      logger.info('管理员解除禁言', { adminSocket: socket.id, userId: accountId });
+      logger.info('管理员解除禁言', { adminSocket: socket.id, accountId });
       socket.emit('admin_action_result', {
         action: 'unmute_user',
         success: true,
-        userId: accountId,
+        accountId,
         message: `用户 ${accountId} 已解除禁言`
       });
     } else {
       socket.emit('admin_action_result', {
         action: 'unmute_user',
         success: false,
-        userId: accountId,
+        accountId,
         message: '解除禁言失败'
       });
     }
@@ -711,7 +711,7 @@ class AdminManager {
         .slice(0, limit);
 
       socket.emit('admin_user_game_history', {
-        userId: accountId,
+        accountId,
         games: userGames
       });
     } catch (err) {
@@ -802,12 +802,12 @@ class AdminManager {
       from: '管理员'
     });
 
-    logger.info('管理员给用户发送消息', { adminSocket: socket.id, userId, message });
+    logger.info('管理员给用户发送消息', { adminSocket: socket.id, accountId, message });
 
     socket.emit('admin_action_result', {
       action: 'send_user_message',
       success: true,
-      message: `消息已发送给用户 ${userId}`
+      message: `消息已发送给用户 ${accountId}`
     });
   }
 
@@ -870,164 +870,164 @@ class AdminManager {
         // 从在线用户中移除
         this.userManager.onlineUsers.delete(id);
       }
-    
 
-    logger.info('管理员删除账号', { adminSocket: socket.id, id });
-  }
+
+      logger.info('管理员删除账号', { adminSocket: socket.id, id });
+    }
     socket.emit('admin_action_result', {
-    action: 'delete_account',
-    ...result
-  });
+      action: 'delete_account',
+      ...result
+    });
 
     // 发送账号列表更新事件
-    socket.emit('admin_accounts_updated', { });
-}
+    socket.emit('admin_accounts_updated', {});
+  }
 
   // 获取账号详情
   async getAccountDetail(socket, id) {
-  if (!this.accountManager) {
-    socket.emit('admin_action_result', {
-      action: 'get_account_detail',
-      success: false,
-      message: '账号管理器不可用'
-    });
-    return;
-  }
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'get_account_detail',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
 
-  const account = await this.accountManager.getAccount(id);
-  if (!account) {
-    socket.emit('admin_action_result', {
-      action: 'get_account_detail',
-      success: false,
-      message: '账号不存在'
-    });
-    return;
-  }
+    const account = await this.accountManager.getAccount(id);
+    if (!account) {
+      socket.emit('admin_action_result', {
+        action: 'get_account_detail',
+        success: false,
+        message: '账号不存在'
+      });
+      return;
+    }
 
-  // 从UserManager获取用户信息
-  let user = null;
-  if (this.userManager) {
-    user = this.userManager.getUserByAccountId(id);
-  }
+    // 从UserManager获取用户信息
+    let user = null;
+    if (this.userManager) {
+      user = this.userManager.getUserByAccountId(id);
+    }
 
-  let muted = false;
-  let muteInfo = null;
-  if (user && this.chatManager) {
-    muteInfo = this.chatManager.muteList.get(id);
-    muted = !!muteInfo;
-  }
+    let muted = false;
+    let muteInfo = null;
+    if (user && this.chatManager) {
+      muteInfo = this.chatManager.muteList.get(id);
+      muted = !!muteInfo;
+    }
 
-  socket.emit('admin_account_detail', {
-    account: {
-      id: account.id,
-      type: account.type,
-      username: account.username,
-      nickname: account.nickname,
-      createdAt: account.createdAt,
-      lastSeen: account.lastSeen,
-      lastLogin: account.lastLogin,
-      stats: account.stats,
-      profile: account.profile
-    },
-    user: user ? {
-      userId: user.accountId,
-      nickname: user.nickname,
-      status: user.status,
-      gameType: user.gameType,
-      game: user.game,
-      connectedAt: user.connectedAt,
-      lastActivity: user.lastActivity,
-      ip: user.ip,
-      muted: muted,
-      muteInfo: muteInfo ? {
-        reason: muteInfo.reason,
-        expiresAt: muteInfo.expiresAt,
-        remainingMinutes: muteInfo.expiresAt ? Math.max(0, Math.ceil((muteInfo.expiresAt - Date.now()) / 1000 / 60)) : null
+    socket.emit('admin_account_detail', {
+      account: {
+        id: account.id,
+        type: account.type,
+        username: account.username,
+        nickname: account.nickname,
+        createdAt: account.createdAt,
+        lastSeen: account.lastSeen,
+        lastLogin: account.lastLogin,
+        stats: account.stats,
+        profile: account.profile
+      },
+      user: user ? {
+        userId: user.accountId,
+        nickname: user.nickname,
+        status: user.status,
+        gameType: user.gameType,
+        game: user.game,
+        connectedAt: user.connectedAt,
+        lastActivity: user.lastActivity,
+        ip: user.ip,
+        muted: muted,
+        muteInfo: muteInfo ? {
+          reason: muteInfo.reason,
+          expiresAt: muteInfo.expiresAt,
+          remainingMinutes: muteInfo.expiresAt ? Math.max(0, Math.ceil((muteInfo.expiresAt - Date.now()) / 1000 / 60)) : null
+        } : null
       } : null
-    } : null
-  });
-}
+    });
+  }
 
   // 修改用户经验值
   async modifyUserExp(socket, id, operation, amount) {
-  if (!this.accountManager) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'modify_user_exp',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+
+    const result = await this.accountManager.modifyUserExp(id, operation, amount);
+    logger.info('管理员修改用户经验值', { adminSocket: socket.id, id, operation, amount });
     socket.emit('admin_action_result', {
       action: 'modify_user_exp',
-      success: false,
-      message: '账号管理器不可用'
+      ...result
     });
-    return;
   }
-
-  const result = await this.accountManager.modifyUserExp(id, operation, amount);
-  logger.info('管理员修改用户经验值', { adminSocket: socket.id, id, operation, amount });
-  socket.emit('admin_action_result', {
-    action: 'modify_user_exp',
-    ...result
-  });
-}
 
   // 添加用户成就
   async addUserAchievement(socket, id, achievementId) {
-  if (!this.accountManager) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'add_user_achievement',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+
+    const result = await this.accountManager.addUserAchievement(id, achievementId);
+    logger.info('管理员添加用户成就', { adminSocket: socket.id, id, achievementId });
     socket.emit('admin_action_result', {
       action: 'add_user_achievement',
-      success: false,
-      message: '账号管理器不可用'
+      ...result
     });
-    return;
   }
-
-  const result = await this.accountManager.addUserAchievement(id, achievementId);
-  logger.info('管理员添加用户成就', { adminSocket: socket.id, id, achievementId });
-  socket.emit('admin_action_result', {
-    action: 'add_user_achievement',
-    ...result
-  });
-}
 
   // 移除用户成就
   async removeUserAchievement(socket, id, achievementId) {
-  if (!this.accountManager) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'remove_user_achievement',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+
+    const result = await this.accountManager.removeUserAchievement(id, achievementId);
+    logger.info('管理员移除用户成就', { adminSocket: socket.id, id, achievementId });
     socket.emit('admin_action_result', {
       action: 'remove_user_achievement',
-      success: false,
-      message: '账号管理器不可用'
+      ...result
     });
-    return;
   }
-
-  const result = await this.accountManager.removeUserAchievement(id, achievementId);
-  logger.info('管理员移除用户成就', { adminSocket: socket.id, id, achievementId });
-  socket.emit('admin_action_result', {
-    action: 'remove_user_achievement',
-    ...result
-  });
-}
 
   // 重置用户成就
   async resetUserAchievements(socket, id) {
-  if (!this.accountManager) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'reset_user_achievements',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+
+    const result = await this.accountManager.resetUserAchievements(id);
+    logger.info('管理员重置用户成就', { adminSocket: socket.id, id });
     socket.emit('admin_action_result', {
       action: 'reset_user_achievements',
-      success: false,
-      message: '账号管理器不可用'
+      ...result
     });
-    return;
   }
 
-  const result = await this.accountManager.resetUserAchievements(id);
-  logger.info('管理员重置用户成就', { adminSocket: socket.id, id });
-  socket.emit('admin_action_result', {
-    action: 'reset_user_achievements',
-    ...result
-  });
-}
-
-// 获取在线管理员数量
-getOnlineAdminCount() {
-  return this.adminSockets.size;
-}
+  // 获取在线管理员数量
+  getOnlineAdminCount() {
+    return this.adminSockets.size;
+  }
 }
 
 module.exports = AdminManager;
