@@ -707,9 +707,9 @@ app.get('/api/leaderboard/weekly', async (req, res) => {
 // 初始化管理器
 const versionManager = new VersionManager();
 const accountManager = new AccountManager();
-const achievementManager = new AchievementManager(accountManager);
-const aiManager = new AIManager();
 const userManager = new UserManager(accountManager);
+const achievementManager = new AchievementManager(accountManager, userManager);
+const aiManager = new AIManager();
 const gameManager = new GameManager(userManager, accountManager, achievementManager, aiManager);
 const chatManager = new ChatManager(userManager, gameManager, accountManager);
 const adminManager = new AdminManager(userManager, gameManager, chatManager, accountManager);
@@ -930,10 +930,18 @@ io.on('connection', (socket) => {
 
         if (oldAccountId !== newAccountId) {
           userManager.socketToAccount.set(socket.id, newAccountId);
+          // 删除匿名会话条目（key 为 socket.id）和旧账号条目
+          userManager.onlineUsers.delete(socket.id);
           userManager.onlineUsers.delete(oldAccountId);
           userManager.onlineUsers.set(newAccountId, userSession);
           userSession.accountId = newAccountId;
         }
+
+        // 刷新在线用户列表给此客户端（清除旧的匿名条目）
+        userManager.sendOnlineUsers(socket, io);
+
+        // 广播用户上线
+        userManager.broadcastUserStatus(newAccountId, 'online', io);
 
         // 检查回归玩家成就
         if (achievementManager) {
@@ -1082,10 +1090,40 @@ io.on('connection', (socket) => {
     const userSession = userManager.getUserBySocketId(socket.id);
     if (userSession && userSession.accountId) {
       const account = await accountManager.getAccount(userSession.accountId);
+      if (!account) return;
+
       const stats = account?.stats || {};
+      const activity = account?.account?.activity || {};
       const level = account?.account?.profile?.level || 1;
-      const categories = achievementManager.getAchievementsByCategory({ ...stats, level });
-      const userAchievementIds = account?.achievements || [];
+
+      // 聚合所有游戏类型的连胜数据
+      let bestStreak = 0;
+      let bestMaxStreak = 0;
+      if (account?.games) {
+        Object.values(account.games).forEach(g => {
+          bestStreak = Math.max(bestStreak, g.streak || 0);
+          bestMaxStreak = Math.max(bestMaxStreak, g.maxStreak || 0);
+        });
+      }
+
+      // 兼容新旧成就格式：统一转为纯ID数组
+      const rawAchievements = account?.achievements || [];
+      const userAchievementIds = Array.isArray(rawAchievements)
+        ? (rawAchievements.length > 0 && typeof rawAchievements[0] === 'object'
+          ? rawAchievements.map(a => a.id)
+          : rawAchievements.slice())
+        : [];
+
+      const categories = achievementManager.getAchievementsByCategory({
+        ...stats,
+        ...(stats.flags || {}),       // 展开 flags：firstGame, nightGame 等
+        ...activity,                   // activity 字段：chatMessages, dailyGames, weeklyGames, monthlyGames
+        level,
+        streak: bestStreak,            // 当前连胜
+        maxStreak: bestMaxStreak,      // 历史最大连胜
+        achievementCount: userAchievementIds.length,
+        badges: stats.badges || 0,
+      });
 
       // 为每个成就添加解锁状态
       Object.values(categories).forEach(category => {
@@ -1529,63 +1567,95 @@ io.on('connection', (socket) => {
       if (accountId && gameManager.accountManager) {
         const account = await gameManager.accountManager.getAccount(accountId);
         if (account) {
-          // 更新贪吃蛇游戏统计 - 使用正确的数据结构位置
-          if (!account.games.snake) {
-            account.games.snake = {
-              totalGames: 0,
-              highScore: 0,
-              totalScore: 0,
-              lastPlayedAt: null
-            };
-          }
+          // 读取当前值，计算新值
+          const currentSnake = account.games.snake || {};
+          const currentScore = currentSnake.totalScore || 0;
+          const currentGames = currentSnake.totalGames || 0;
+          const currentHigh = currentSnake.highScore || 0;
+          const currentSnakeStats = account.stats?.snakeGames || {};
 
-          account.games.snake.totalGames++;
-          account.stats.totalScore = (account.stats.totalScore || 0) + score;
-          account.games.snake.totalScore += score;
-
-          // 取当前分数、客户端本地最高分、服务端已有最高分中的最大值
           const newHighScore = Math.max(
             score || 0,
             clientHighScore || 0,
-            account.games.snake.highScore || 0
+            currentHigh
           );
-          if (newHighScore > account.games.snake.highScore) {
-            account.games.snake.highScore = newHighScore;
 
-            // 同步更新 stats.snakeGames 用于排行榜读取
-            if (!account.stats.snakeGames) {
-              account.stats.snakeGames = { totalGames: 0, highScore: 0, totalScore: 0 };
-            }
-            account.stats.snakeGames.highScore = newHighScore;
+          // 只更新具体字段，避免覆盖 security 等敏感字段
+          const snakeUpdates = {
+            'games.snake.totalGames': currentGames + 1,
+            'games.snake.totalScore': currentScore + score,
+            'games.snake.highScore': newHighScore,
+            'games.snake.lastPlayedAt': Date.now(),
+            'stats.totalScore': (account.stats?.totalScore || 0) + score
+          };
+
+          if (newHighScore > currentHigh) {
+            snakeUpdates['stats.snakeGames.totalGames'] = (currentSnakeStats.totalGames || 0) + 1;
+            snakeUpdates['stats.snakeGames.totalScore'] = (currentSnakeStats.totalScore || 0) + score;
+            snakeUpdates['stats.snakeGames.highScore'] = newHighScore;
 
             // 记录新高分
             logger.info('贪吃蛇游戏新高分', {
               accountId: user.accountId,
-              score: account.games.snake.highScore
+              score: newHighScore
             });
           }
 
-          account.games.snake.lastPlayedAt = Date.now();
+          await gameManager.accountManager.updateUser(accountId, snakeUpdates);
 
           // 更新游戏统计数据（用于排行榜）
           // 贪吃蛇游戏：如果分数大于100，则认为是获胜
           const result = score > 100 ? 'win' : 'loss';
           await gameManager.accountManager.updateGameStats(accountId, result, 'snake', false, null, null);
 
-          await gameManager.accountManager.updateUser(accountId, account);
-
-          // 通知客户端账号数据已更新（同步服务端最高分到客户端）
-          socket.emit('account_updated', { account });
+          // 通知客户端账号数据已更新（使用 getAccount 重新读取，自动剥离 security）
+          const updatedAccount = await gameManager.accountManager.getAccount(accountId);
+          socket.emit('account_updated', { account: updatedAccount });
         }
       }
 
       // 检查成就（如果用户已登录）
       if (accountId && gameManager.achievementManager) {
-        await gameManager.achievementManager.checkAchievements(accountId, {
-          gameType: 'snake',
-          score: score,
-          timestamp: Date.now()
-        });
+        // 读取更新后的账号数据，构建完整 stats 供成就检查
+        const postAccount = await gameManager.accountManager.getAccount(accountId);
+        if (postAccount) {
+          const snakeLevel = postAccount.account?.profile?.level || 1;
+          const isWinner = score > 100;
+          const playedGameTypes = postAccount.games ? Object.keys(postAccount.games).filter(k => postAccount.games[k].totalGames > 0).length : 0;
+
+          // 聚合所有游戏类型的连胜数据
+          let snakeBestStreak = 0;
+          let snakeBestMaxStreak = 0;
+          if (postAccount.games) {
+            Object.values(postAccount.games).forEach(g => {
+              snakeBestStreak = Math.max(snakeBestStreak, g.streak || 0);
+              snakeBestMaxStreak = Math.max(snakeBestMaxStreak, g.maxStreak || 0);
+            });
+          }
+
+          await gameManager.achievementManager.checkAchievements(accountId, {
+            ...postAccount.stats,
+            ...(postAccount.stats?.flags || {}),
+            // 用当前游戏时间覆盖持久标志位
+            nightGame: (() => { const h = new Date().getHours(); return h >= 2 && h <= 6; })(),
+            weekendGame: (() => { const d = new Date().getDay(); return d === 0 || d === 6; })(),
+            ...(postAccount.account?.activity || {}),
+            gameType: 'snake',
+            score: score,
+            level: snakeLevel,
+            streak: snakeBestStreak,
+            maxStreak: snakeBestMaxStreak,
+            result: isWinner ? 'win' : 'loss',
+            silentWin: true,
+            lonerWin: true,
+            allGameTypes: playedGameTypes >= 3,
+            singleGameType: playedGameTypes === 1 && (postAccount.stats?.totalGames || 0) > 1,
+            quickGame: score < 50,
+            slowGame: score > 300,
+            maxMoves: moveHistory ? moveHistory.length : 0,
+            timestamp: Date.now()
+          });
+        }
       }
 
     } catch (err) {
@@ -1606,30 +1676,25 @@ io.on('connection', (socket) => {
     try {
       const account = await gameManager.accountManager.getAccount(user.accountId);
       if (account) {
-        if (!account.games.snake) {
-          account.games.snake = { totalGames: 0, highScore: 0, totalScore: 0, lastPlayedAt: null };
-        }
+        const currentHighScore = account.games.snake?.highScore || 0;
 
-        if (clientHighScore > account.games.snake.highScore) {
-          const previousHighScore = account.games.snake.highScore;
-          account.games.snake.highScore = clientHighScore;
-
-          // 同步更新 stats.snakeGames 用于排行榜读取
-          if (!account.stats.snakeGames) {
-            account.stats.snakeGames = { totalGames: 0, highScore: 0, totalScore: 0 };
-          }
-          account.stats.snakeGames.highScore = clientHighScore;
-
-          await gameManager.accountManager.updateUser(user.accountId, account);
+        if (clientHighScore > currentHighScore) {
+          // 只更新具体字段，避免覆盖 security
+          const updates = {
+            'games.snake.highScore': clientHighScore,
+            'stats.snakeGames.highScore': clientHighScore
+          };
+          await gameManager.accountManager.updateUser(user.accountId, updates);
 
           logger.info('贪吃蛇高分已同步', {
             accountId: user.accountId,
             highScore: clientHighScore,
-            previousHighScore
+            previousHighScore: currentHighScore
           });
 
           // 通知客户端账号数据已更新
-          socket.emit('account_updated', { account });
+          const updatedAccount = await gameManager.accountManager.getAccount(user.accountId);
+          socket.emit('account_updated', { account: updatedAccount });
         }
       }
     } catch (err) {

@@ -4,8 +4,9 @@ const logger = require('../utils/logger');
 const dataStore = require('../utils/dataStore');
 
 class AchievementManager {
-  constructor(accountManager = null) {
+  constructor(accountManager = null, userManager = null) {
     this.accountManager = accountManager;
+    this.userManager = userManager;
     this.achievements = this.loadAchievements();
   }
 
@@ -64,10 +65,10 @@ class AchievementManager {
       {
         id: 7,
         name: '千场不败',
-        description: '获得一千场胜利',
+        description: '获得两百场胜利',
         type: 'game',
-        condition: { wins: 1000 },
-        reward: { exp: 10000, badge: 'thousand_wins' }
+        condition: { wins: 200 },
+        reward: { exp: 5000, badge: 'thousand_wins' }
       },
       // 游戏类型成就
       {
@@ -97,10 +98,10 @@ class AchievementManager {
       {
         id: 13,
         name: '五子棋传奇',
-        description: '在五子棋中获得100场胜利',
+        description: '在五子棋中获得50场胜利',
         type: 'game_type',
-        condition: { gameType: 'gobang', wins: 100 },
-        reward: { exp: 2000, badge: 'gobang_legend' }
+        condition: { gameType: 'gobang', wins: 50 },
+        reward: { exp: 1000, badge: 'gobang_legend' }
       },
       {
         id: 20,
@@ -129,10 +130,10 @@ class AchievementManager {
       {
         id: 23,
         name: '象棋传奇',
-        description: '在象棋中获得100场胜利',
+        description: '在象棋中获得50场胜利',
         type: 'game_type',
-        condition: { gameType: 'chess', wins: 100 },
-        reward: { exp: 2000, badge: 'chess_legend' }
+        condition: { gameType: 'chess', wins: 50 },
+        reward: { exp: 1000, badge: 'chess_legend' }
       },
       {
         id: 30,
@@ -161,10 +162,10 @@ class AchievementManager {
       {
         id: 33,
         name: '围棋传奇',
-        description: '在围棋中获得100场胜利',
+        description: '在围棋中获得50场胜利',
         type: 'game_type',
-        condition: { gameType: 'go', wins: 100 },
-        reward: { exp: 2000, badge: 'go_legend' }
+        condition: { gameType: 'go', wins: 50 },
+        reward: { exp: 1000, badge: 'go_legend' }
       },
       // 等级成就
       {
@@ -267,10 +268,10 @@ class AchievementManager {
       {
         id: 55,
         name: '永恒传奇',
-        description: '获得50连胜',
+        description: '获得30连胜',
         type: 'streak',
-        condition: { streak: 50 },
-        reward: { exp: 5000, badge: 'streak_50' }
+        condition: { streak: 30 },
+        reward: { exp: 3000, badge: 'streak_50' }
       },
       // 特殊成就
       {
@@ -300,10 +301,10 @@ class AchievementManager {
       {
         id: 63,
         name: '百场平局',
-        description: '获得一百场平局',
+        description: '获得十场平局',
         type: 'game',
-        condition: { draws: 100 },
-        reward: { exp: 500, badge: 'hundred_draws' }
+        condition: { draws: 10 },
+        reward: { exp: 200, badge: 'hundred_draws' }
       },
       // AI 相关成就
       {
@@ -349,10 +350,10 @@ class AchievementManager {
       {
         id: 75,
         name: 'AI终结者',
-        description: '在人机对战中获得100场胜利',
+        description: '在人机对战中获得50场胜利',
         type: 'ai',
-        condition: { wins: 100 },
-        reward: { exp: 10000, badge: 'ai_terminator' }
+        condition: { wins: 50 },
+        reward: { exp: 5000, badge: 'ai_terminator' }
       },
       // 创意成就
       {
@@ -382,9 +383,9 @@ class AchievementManager {
       {
         id: 103,
         name: '话痨',
-        description: '发送100条聊天消息',
+        description: '发送50条聊天消息',
         type: 'creative',
-        condition: { chatMessages: 100 },
+        condition: { chatMessages: 50 },
         reward: { exp: 200, badge: 'chatty_cathy' }
       },
       {
@@ -430,7 +431,7 @@ class AchievementManager {
       {
         id: 109,
         name: '慢玩家',
-        description: '完成一场超过1小时的游戏',
+        description: '完成一场超过15分钟的游戏',
         type: 'creative',
         condition: { slowGame: true },
         reward: { exp: 100, badge: 'slow_play' }
@@ -454,9 +455,9 @@ class AchievementManager {
       {
         id: 114,
         name: '成就猎人',
-        description: '解锁15个成就',
+        description: '解锁10个成就',
         type: 'creative',
-        condition: { achievements: 15 },
+        condition: { achievements: 10 },
         reward: { exp: 500, badge: 'achievement_hunter' }
       },
       {
@@ -494,49 +495,49 @@ class AchievementManager {
       {
         id: 121,
         name: '游戏达人',
-        description: '一周内进行50场游戏',
+        description: '一周内进行30场游戏',
         type: 'creative',
-        condition: { weeklyGames: 50 },
-        reward: { exp: 2000, badge: 'game_daily' }
+        condition: { weeklyGames: 30 },
+        reward: { exp: 1000, badge: 'game_daily' }
       },
       {
         id: 122,
         name: '游戏宗师',
-        description: '一个月内进行200场游戏',
+        description: '一个月内进行100场游戏',
         type: 'creative',
-        condition: { monthlyGames: 200 },
-        reward: { exp: 5000, badge: 'game_monthly' }
+        condition: { monthlyGames: 100 },
+        reward: { exp: 2000, badge: 'game_monthly' }
       },
       {
         id: 125,
         name: '聊天之王',
-        description: '发送1000条聊天消息',
+        description: '发送200条聊天消息',
         type: 'creative',
-        condition: { chatMessages: 1000 },
-        reward: { exp: 1000, badge: 'chat_king' }
+        condition: { chatMessages: 200 },
+        reward: { exp: 500, badge: 'chat_king' }
       },
       {
         id: 127,
         name: '逆转之王',
-        description: '连续10场在落后情况下获得胜利',
+        description: '连续5场在落后情况下获得胜利',
         type: 'creative',
-        condition: { comebackStreak: 10 },
-        reward: { exp: 1000, badge: 'comeback_king' }
+        condition: { comebackStreak: 5 },
+        reward: { exp: 500, badge: 'comeback_king' }
       },
       {
         id: 128,
         name: '完美之王',
-        description: '在5步内获得胜利',
+        description: '在8步内获得胜利',
         type: 'creative',
-        condition: { maxMoves: 5, result: 'win' },
+        condition: { maxMoves: 8, result: 'win' },
         reward: { exp: 200, badge: 'perfect_king' }
       },
       {
         id: 129,
         name: '持久战之王',
-        description: '完成一场超过3小时的游戏',
+        description: '完成一场超过30分钟的游戏',
         type: 'creative',
-        condition: { slowGame: true },
+        condition: { slowGame: true, minDuration: 30 },
         reward: { exp: 200, badge: 'long_game_king' }
       },
       {
@@ -566,6 +567,15 @@ class AchievementManager {
     ];
   }
 
+  // 将成就数据统一转为纯ID数组（兼容旧格式 [{id, unlockedAt}]）
+  _normalizeAchievements(achievements) {
+    if (!achievements || achievements.length === 0) return [];
+    if (typeof achievements[0] === 'number' || typeof achievements[0] === 'string') {
+      return achievements.slice();
+    }
+    return achievements.map(a => a.id);
+  }
+
   // 检查成就
   async checkAchievements(id, stats) {
     const account = await this.accountManager.getAccount(id);
@@ -574,7 +584,8 @@ class AchievementManager {
     }
 
     const unlockedAchievements = [];
-    const currentAchievements = [...(account.achievements || [])];
+    // 兼容新旧格式
+    const currentAchievements = this._normalizeAchievements(account.achievements || []);
 
     // 添加成就数量到统计数据
     stats.achievementCount = currentAchievements.length;
@@ -658,7 +669,7 @@ class AchievementManager {
         return false;
       case 'creative':
         const condition = achievement.condition;
-        if (condition.firstGame !== undefined) return stats.firstGame && stats.totalGames === 1;
+        if (condition.firstGame !== undefined) return stats.firstGame;
         if (condition.nightGame !== undefined) return stats.nightGame;
         if (condition.weekendGame !== undefined) return stats.weekendGame;
         if (condition.chatMessages !== undefined) return stats.chatMessages >= condition.chatMessages;
@@ -667,7 +678,13 @@ class AchievementManager {
         if (condition.allGameTypes !== undefined) return stats.allGameTypes;
         if (condition.singleGameType !== undefined) return stats.singleGameType;
         if (condition.quickGame !== undefined) return stats.quickGame;
-        if (condition.slowGame !== undefined) return stats.slowGame;
+        if (condition.slowGame !== undefined) {
+          // 支持 minDuration（分钟）阈值，如持久战之王需要 180 分钟
+          if (condition.minDuration && stats.gameDuration) {
+            return stats.slowGame && stats.gameDuration >= condition.minDuration;
+          }
+          return stats.slowGame;
+        }
         if (condition.luckyWin !== undefined) return stats.luckyWin && stats.result === 'win';
         if (condition.unluckyLoss !== undefined) return stats.unluckyLoss && stats.result === 'loss';
         if (condition.friends !== undefined) return stats.friends >= condition.friends;
@@ -700,7 +717,7 @@ class AchievementManager {
   async giveReward(id, reward) {
     if (reward.exp) {
       const result = await this.accountManager.addExp(id, reward.exp);
-      
+
       // 通知客户端经验值更新
       if (result.success && this.userManager) {
         const userSession = this.userManager.getUserByAccountId(id);
@@ -724,7 +741,7 @@ class AchievementManager {
       return [];
     }
 
-    const userAchievements = account.achievements || [];
+    const userAchievements = this._normalizeAchievements(account.achievements || []);
     return this.achievements.filter(a => userAchievements.includes(a.id));
   }
 

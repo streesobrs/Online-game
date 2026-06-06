@@ -198,6 +198,9 @@ class ChatManager {
     }
     targetGame.playerChatted[user.accountId] = true;
 
+    // 更新聊天消息统计（游戏内聊天也计入话痨成就）
+    this.updateChatMessageCount(user.accountId);
+
     // 保存到文件
     this.saveChatHistory();
 

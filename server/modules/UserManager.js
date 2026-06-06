@@ -242,7 +242,7 @@ class UserManager {
   // 发送在线用户列表
   sendOnlineUsers(socket, io) {
     const onlineUsers = Array.from(this.onlineUsers.values())
-      .filter(userSession => userSession.accountId !== userSession.socketId) // 过滤匿名用户
+      .filter(userSession => userSession.accountId && userSession.accountId !== userSession.socketId) // 过滤匿名用户（accountId 为 null 或等于 socketId）
       .map(userSession => ({
         accountId: userSession.accountId,
         nickname: userSession.nickname,

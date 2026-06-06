@@ -890,61 +890,90 @@ class GameManager {
       for (const accountId of players) {
         if (accountId && this.accountManager) {
           const account = await this.accountManager.getAccount(accountId);
-          if (account) {
-            const isWinner = accountId === winner;
-            const playerResult = isWinner ? 'win' : (result === 'draw' ? 'draw' : 'loss');
-            const gameDuration = game.endTime - game.startTime;
-            const playerChatted = game.playerChatted && game.playerChatted[accountId];
-            let level = 1;
-            if (account.profile && account.profile.exp) {
-              const totalExp = account.profile.exp;
-              let exp = totalExp;
-              while (exp >= this.accountManager.getExpForLevel(level + 1)) {
-                exp -= this.accountManager.getExpForLevel(level + 1);
-                level++;
-              }
-            }
+          if (!account) continue;
 
-            const stats = {
-              ...account.stats,
-              level: level,
-              result: playerResult,
-              silentWin: isWinner && !playerChatted,
-              quickGame: gameDuration <= 5 * 60 * 1000,
-              slowGame: gameDuration >= 60 * 60 * 1000,
-              maxMoves: game.moves ? game.moves.length : 0
-            };
-            const unlockedAchievements = await this.achievementManager.checkAchievements(accountId, stats);
-            if (unlockedAchievements.length > 0) {
-              const socket = this.userManager.getSocketByAccountId(accountId);
-              if (socket) {
-                socket.emit('achievements_unlocked', { achievements: unlockedAchievements });
-              }
-            }
+          const isWinner = accountId === winner;
+          const playerResult = isWinner ? 'win' : (result === 'draw' ? 'draw' : 'loss');
+          const gameDuration = game.endTime - game.startTime;
+          const playerChatted = game.playerChatted && game.playerChatted[accountId];
 
-            // 给予经验值奖励
-            let expReward = 0;
-            if (playerResult === 'win') {
-              expReward = 50; // 胜利奖励
-            } else if (playerResult === 'draw') {
-              expReward = 25; // 平局奖励
-            } else {
-              expReward = 10; // 失败安慰奖
-            }
+          // 先给予经验值奖励（更新等级），再检查成就
+          let expReward = 0;
+          if (playerResult === 'win') {
+            expReward = 50;
+          } else if (playerResult === 'draw') {
+            expReward = 25;
+          } else {
+            expReward = 10;
+          }
 
-            // 添加经验值
-            if (expReward > 0) {
-              const expResult = await this.accountManager.addExp(accountId, expReward);
+          if (expReward > 0) {
+            await this.accountManager.addExp(accountId, expReward);
+          }
 
-              // 通知客户端
-              if (expResult.success) {
-                const socket = this.userManager.getSocketByAccountId(accountId);
-                if (socket) {
-                  const updatedAccount = await this.accountManager.getAccount(accountId);
-                  socket.emit('account_updated', { account: updatedAccount });
-                }
-              }
+          // 重新读取账号，获取最新等级
+          const postExpAccount = await this.accountManager.getAccount(accountId);
+          if (!postExpAccount) continue;
+
+          // 计算最新等级
+          let newLevel = 1;
+          if (postExpAccount.account && postExpAccount.account.profile && postExpAccount.account.profile.exp) {
+            const totalExp = postExpAccount.account.profile.exp;
+            let exp = totalExp;
+            while (exp >= this.accountManager.getExpForLevel(newLevel + 1)) {
+              exp -= this.accountManager.getExpForLevel(newLevel + 1);
+              newLevel++;
             }
+          }
+
+          const now = new Date();
+          const currentHour = now.getHours();
+          const currentDay = now.getDay();
+
+          // 聚合所有游戏类型的连胜数据
+          let bestStreak = 0;
+          let bestMaxStreak = 0;
+          if (postExpAccount.games) {
+            Object.values(postExpAccount.games).forEach(g => {
+              bestStreak = Math.max(bestStreak, g.streak || 0);
+              bestMaxStreak = Math.max(bestMaxStreak, g.maxStreak || 0);
+            });
+          }
+
+          const stats = {
+            ...postExpAccount.stats,
+            ...(postExpAccount.stats?.flags || {}),
+            ...(postExpAccount.account?.activity || {}),
+            // 用当前游戏时间覆盖持久标志位
+            nightGame: currentHour >= 2 && currentHour <= 6,
+            weekendGame: currentDay === 0 || currentDay === 6,
+            level: newLevel,
+            streak: bestStreak,
+            maxStreak: bestMaxStreak,
+            result: playerResult,
+            silentWin: isWinner && !playerChatted,
+            quickGame: gameDuration <= 5 * 60 * 1000,
+            slowGame: gameDuration >= 15 * 60 * 1000,
+            gameDuration: gameDuration / 60000,
+            maxMoves: game.moves ? game.moves.length : 0,
+            allGameTypes: postExpAccount.games && Object.keys(postExpAccount.games).filter(k => postExpAccount.games[k].totalGames > 0).length >= 3,
+            singleGameType: postExpAccount.games && Object.keys(postExpAccount.games).filter(k => postExpAccount.games[k].totalGames > 0).length === 1 && (postExpAccount.stats?.totalGames || 0) > 1,
+            lonerWin: isWinner && (game.gameType === 'snake' || reason === 'resign'),
+          };
+
+          const unlockedAchievements = await this.achievementManager.checkAchievements(accountId, stats);
+          if (unlockedAchievements.length > 0) {
+            const socket = this.userManager.getSocketByAccountId(accountId);
+            if (socket) {
+              socket.emit('achievements_unlocked', { achievements: unlockedAchievements });
+            }
+          }
+
+          // 通知客户端最终账号状态（包含基础经验奖励 + 成就奖励）
+          const socket = this.userManager.getSocketByAccountId(accountId);
+          if (socket) {
+            const finalAccount = await this.accountManager.getAccount(accountId);
+            socket.emit('account_updated', { account: finalAccount });
           }
         }
       }
@@ -1845,8 +1874,8 @@ class GameManager {
       if (account) {
         const playerChatted = aiGame.playerChatted && aiGame.playerChatted[accountId];
         let level = 1;
-        if (account.profile && account.profile.exp) {
-          const totalExp = account.profile.exp;
+        if (account.account && account.account.profile && account.account.profile.exp) {
+          const totalExp = account.account.profile.exp;
           let exp = totalExp;
           while (exp >= this.accountManager.getExpForLevel(level + 1)) {
             exp -= this.accountManager.getExpForLevel(level + 1);
@@ -1854,16 +1883,42 @@ class GameManager {
           }
         }
 
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentDay = now.getDay();
+
+        // 聚合所有游戏类型的连胜数据
+        let bestStreak = 0;
+        let bestMaxStreak = 0;
+        if (account.games) {
+          Object.values(account.games).forEach(g => {
+            bestStreak = Math.max(bestStreak, g.streak || 0);
+            bestMaxStreak = Math.max(bestMaxStreak, g.maxStreak || 0);
+          });
+        }
+
         const stats = {
           ...account.stats,
+          // 展开 flags 子对象到顶层（nightGame, weekendGame, firstGame 等）
+          ...(account.stats?.flags || {}),
+          ...(account.account?.activity || {}),
+          // 用当前游戏时间覆盖持久标志位
+          nightGame: currentHour >= 2 && currentHour <= 6,
+          weekendGame: currentDay === 0 || currentDay === 6,
           level: level,
+          streak: bestStreak,
+          maxStreak: bestMaxStreak,
           result: result,
+          gameDuration: aiGame.duration / 60000,
           aiDifficulty: aiGame.difficulty,
           aiResult: result,
           silentWin: result === 'win' && !playerChatted,
           quickGame: aiGame.duration <= 5 * 60 * 1000,
           slowGame: aiGame.duration >= 60 * 60 * 1000,
-          maxMoves: aiGame.moves ? aiGame.moves.length : 0
+          maxMoves: aiGame.moves ? aiGame.moves.length : 0,
+          allGameTypes: account.games && Object.keys(account.games).filter(k => account.games[k].totalGames > 0).length >= 3,
+          singleGameType: account.games && Object.keys(account.games).filter(k => account.games[k].totalGames > 0).length === 1 && (account.stats?.totalGames || 0) > 1,
+          lonerWin: result === 'win',
         };
         const unlockedAchievements = await this.achievementManager.checkAchievements(accountId, stats);
         if (unlockedAchievements.length > 0 && userSocket) {

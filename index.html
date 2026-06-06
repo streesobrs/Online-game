@@ -2682,6 +2682,15 @@
     .account-switch-link:hover {
       color: #2b6cb0;
     }
+
+    /* 禁用触摸设备上的默认行为，防止双击放大 */
+    .touch-disabled {
+      touch-action: manipulation !important;
+      -webkit-user-select: none !important;
+      -moz-user-select: none !important;
+      -ms-user-select: none !important;
+      user-select: none !important;
+    }
   </style>
 </head>
 
@@ -3063,14 +3072,15 @@
             <button class="lobby-btn" id="snake-start" onclick="startSnakeGame()">🎮 单人模式</button>
             <button class="lobby-btn" id="snake-dual" onclick="startSnakeDualGame()" style="background: #667eea;">⚔️
               匹配对战</button>
-            <button class="lobby-btn" id="snake-pause" onclick="pauseSnakeGame()">⏸️ 暂停</button>
             <button class="lobby-btn" id="snake-restart" onclick="restartSnakeGame()">🔄 重新开始</button>
+            <button class="lobby-btn" id="snake-virt-btn" onclick="toggleVirtualControls()"
+              style="background: #9b59b6;">🕹️ 按键</button>
             <button class="lobby-btn" id="snake-quit" onclick="quitSnakeGame()" style="background: #e74c3c;">🚪
               退出</button>
           </div>
 
           <!-- 虚拟按键 -->
-          <div class="virtual-controls"
+          <div class="virtual-controls" id="snake-virtual-controls"
             style="display: none; flex-direction: column; align-items: center; margin-top: 30px;">
             <div class="virtual-btn up-btn" onclick="handleVirtualKey('up')"
               style="width: 80px; height: 80px; background: #4ecdc4; border: none; border-radius: 15px; color: white; font-size: 32px; margin-bottom: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);">
@@ -3088,23 +3098,6 @@
             </div>
           </div>
 
-          <!-- 媒体查询 - 在移动设备上显示虚拟按键 -->
-          <style>
-            @media (max-width: 768px) or (hover: none) {
-              .virtual-controls {
-                display: flex !important;
-              }
-            }
-
-            /* 禁用触摸设备上的默认行为，防止双击放大 */
-            .touch-disabled {
-              touch-action: manipulation !important;
-              -webkit-user-select: none !important;
-              -moz-user-select: none !important;
-              -ms-user-select: none !important;
-              user-select: none !important;
-            }
-          </style>
           <div class="game-rules">
             <div class="rules-title">📜 游戏规则</div>
             <div class="rules-content" id="snake-rules"></div>
@@ -6879,6 +6872,13 @@
       // 显示游戏规则
       document.getElementById('snake-rules').textContent = snakeGameConfig.rules;
 
+      // 恢复虚拟按键的显示状态
+      const savedVirt = localStorage.getItem('snakeVirtualControls');
+      const virtEl = document.getElementById('snake-virtual-controls');
+      if (savedVirt === 'visible' && virtEl) {
+        virtEl.style.display = 'flex';
+      }
+
       // 绑定键盘事件
       document.addEventListener('keydown', handleSnakeKeydown);
 
@@ -7134,6 +7134,26 @@
           </div>
         </div>
         <canvas id="snake-canvas" width="400" height="400"></canvas>
+
+        <!-- 虚拟按键 -->
+        <div class="virtual-controls" id="snake-virtual-controls"
+          style="display: none; flex-direction: column; align-items: center; margin-top: 30px;">
+          <div class="virtual-btn up-btn" onclick="handleVirtualKey('up')"
+            style="width: 80px; height: 80px; background: #4ecdc4; border: none; border-radius: 15px; color: white; font-size: 32px; margin-bottom: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);">
+            ↑</div>
+          <div style="display: flex; gap: 15px;">
+            <div class="virtual-btn left-btn" onclick="handleVirtualKey('left')"
+              style="width: 80px; height: 80px; background: #4ecdc4; border: none; border-radius: 15px; color: white; font-size: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);">
+              ←</div>
+            <div class="virtual-btn down-btn" onclick="handleVirtualKey('down')"
+              style="width: 80px; height: 80px; background: #4ecdc4; border: none; border-radius: 15px; color: white; font-size: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);">
+              ↓</div>
+            <div class="virtual-btn right-btn" onclick="handleVirtualKey('right')"
+              style="width: 80px; height: 80px; background: #4ecdc4; border: none; border-radius: 15px; color: white; font-size: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);">
+              →</div>
+          </div>
+        </div>
+
         <div class="game-rules">
           <div class="rules-title">📜 游戏规则</div>
           <div class="rules-content" id="snake-rules"></div>
@@ -7141,8 +7161,8 @@
         <div class="game-controls">
           <button class="lobby-btn" id="snake-start" onclick="startSnakeGame()">🎮 单人模式</button>
           <button class="lobby-btn" id="snake-dual" onclick="startSnakeDualGame()" style="background: #667eea;">🐍🐍 双人模式</button>
-          <button class="lobby-btn" id="snake-pause" onclick="pauseSnakeGame()">⏸️ 暂停</button>
           <button class="lobby-btn" id="snake-restart" onclick="restartSnakeGame()">🔄 重新开始</button>
+          <button class="lobby-btn" id="snake-virt-btn" onclick="toggleVirtualControls()" style="background: #9b59b6;">🕹️ 按键</button>
           <button class="lobby-btn" id="snake-quit" onclick="quitSnakeGame()" style="background: #e74c3c;">🚪 退出</button>
         </div>
       `;
@@ -7151,6 +7171,28 @@
       snakeGameState.canvas = document.getElementById('snake-canvas');
       snakeGameState.ctx = snakeGameState.canvas.getContext('2d');
       renderSnakeGame();
+
+      // 恢复虚拟按键的显示状态
+      const savedVirt = localStorage.getItem('snakeVirtualControls');
+      if (savedVirt === 'visible') {
+        const virtEl = document.getElementById('snake-virtual-controls');
+        if (virtEl) {
+          virtEl.style.display = 'flex';
+        }
+      }
+    }
+
+    // 切换虚拟按键显示/隐藏
+    function toggleVirtualControls() {
+      const virtEl = document.getElementById('snake-virtual-controls');
+      if (!virtEl) return;
+      if (virtEl.style.display === 'none' || virtEl.style.display === '') {
+        virtEl.style.display = 'flex';
+        localStorage.setItem('snakeVirtualControls', 'visible');
+      } else {
+        virtEl.style.display = 'none';
+        localStorage.setItem('snakeVirtualControls', 'hidden');
+      }
     }
 
     // 开始匹配后的双人游戏
@@ -7737,9 +7779,6 @@
             snakeGameState.nextDirection = 'right';
           }
           break;
-        case ' ':
-          pauseSnakeGame();
-          break;
       }
 
       e.preventDefault();
@@ -7828,39 +7867,6 @@
           moveCount: snakeGameState.moveHistory.length
         });
       }
-    }
-
-    // 暂停游戏
-    function pauseSnakeGame() {
-      if (!snakeGameState.gameLoop) return;
-
-      snakeGameState.isPaused = !snakeGameState.isPaused;
-      document.getElementById('snake-pause').textContent =
-        snakeGameState.isPaused ? '继续' : '暂停';
-
-      // 暂停/继续计时器（双人模式）
-      if (snakeGameState.gameTimer) {
-        if (snakeGameState.isPaused) {
-          clearInterval(snakeGameState.gameTimer);
-          snakeGameState.gameTimer = null;
-        } else {
-          snakeGameState.gameTimer = setInterval(() => {
-            snakeGameState.gameTimeLeft--;
-            updateDualGameTime();
-            if (snakeGameState.gameTimeLeft <= 0) {
-              endDualSnakeGame();
-            }
-          }, 1000);
-        }
-      }
-
-      console.log('🐍 贪吃蛇游戏', {
-        action: snakeGameState.isPaused ? '暂停' : '继续',
-        score: snakeGameState.score,
-        speed: snakeGameState.speed
-      });
-
-      updateStatus(snakeGameState.isPaused ? '⏸️ 游戏已暂停' : '▶️ 游戏继续');
     }
 
     // 重新开始
@@ -8303,8 +8309,10 @@
         const displayName = user.nickname || (isMe ? '我' : '玩家' + uid.substring(0, 4));
 
         html += `<div class="user-item ${statusClass} ${gameClass} ${isMe ? 'me' : ''}">
-          ${isMe ? '👤' : '👥'} ${displayName}${isMe ? ' <span style="color: #48bb78; font-size: 11px;">(我)</span>' : ''}
-          <span style="font-size: 11px; color: #718096;">胜: ${user.stats?.wins || 0}</span> - ${statusText}
+          <span>${isMe ? '👤' : '👥'}</span>
+          <span>${displayName}${isMe ? ' (我)' : ''}</span>
+          <span style="color: #718096;">胜: ${user.stats?.wins || 0}</span>
+          <span>${statusText}</span>
           ${!isMe && user.status === 'online' ? `<button class="challenge-btn" onclick="sendChallenge('${uid}')">挑战</button>` : ''}
         </div>`;
       });

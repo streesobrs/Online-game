@@ -1302,9 +1302,9 @@ class AccountManager {
         stats.flags.firstGame = true;
       }
 
-      // 检查是否是夜间游戏
+      // 检查是否是夜间游戏（匹配成就描述：凌晨2点到6点）
       const hour = new Date().getHours();
-      if (hour >= 22 || hour <= 6) {
+      if (hour >= 2 && hour <= 6) {
         stats.flags.nightGame = true;
       }
 
@@ -1559,15 +1559,16 @@ class AccountManager {
         };
       }
 
-      const achievements = account.achievements || [];
-      if (achievements.some(ach => ach.id === achievementId)) {
+      // 兼容新旧格式：统一转为纯ID数组
+      let achievements = this._normalizeAchievements(account.achievements || []);
+      if (achievements.includes(achievementId)) {
         return {
           success: false,
           message: '该成就已解锁'
         };
       }
 
-      achievements.push({ id: achievementId, unlockedAt: Date.now() });
+      achievements.push(achievementId);
       await dataStore.update('accounts', { 'account.id': id }, { achievements, 'account.updatedAt': Date.now() });
       logger.info('管理员添加用户成就', { id, achievementId });
 
@@ -1585,6 +1586,16 @@ class AccountManager {
     }
   }
 
+  // 将成就数据统一转为纯ID数组（兼容旧格式 [{id, unlockedAt}]）
+  _normalizeAchievements(achievements) {
+    if (!achievements || achievements.length === 0) return [];
+    if (typeof achievements[0] === 'number' || typeof achievements[0] === 'string') {
+      return achievements.slice(); // 已经是纯ID数组
+    }
+    // 旧格式：对象数组，提取 id 字段
+    return achievements.map(a => a.id);
+  }
+
   // 管理员移除用户成就
   async removeUserAchievement(id, achievementId) {
     try {
@@ -1596,8 +1607,9 @@ class AccountManager {
         };
       }
 
-      const achievements = account.achievements || [];
-      const index = achievements.findIndex(ach => ach.id === achievementId);
+      // 兼容新旧格式
+      const achievements = this._normalizeAchievements(account.achievements || []);
+      const index = achievements.indexOf(achievementId);
       if (index === -1) {
         return {
           success: false,

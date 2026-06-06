@@ -259,7 +259,10 @@ class DataStore {
       await fs.mkdir(dirPath, { recursive: true });
 
       const filePath = path.join(dirPath, `${id}.json`);
-      await fs.writeFile(filePath, JSON.stringify(item, null, 2), 'utf8');
+      // 先写临时文件，再重命名，避免写入过程中崩溃导致文件损坏
+      const tmpPath = filePath + '.tmp';
+      await fs.writeFile(tmpPath, JSON.stringify(item, null, 2), 'utf8');
+      await fs.rename(tmpPath, filePath);
 
       logger.info('数据已保存到文件', { collection, id, path: filePath });
 
