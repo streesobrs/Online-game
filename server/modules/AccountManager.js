@@ -1342,6 +1342,7 @@ class AccountManager {
 
       // 获取当前总经验值
       const currentExp = account.account?.profile?.exp || 0;
+      const oldLevel = account.account?.profile?.level || 1;
       const newTotalExp = currentExp + exp;
 
       // 计算新的等级和当前等级剩余经验
@@ -1358,7 +1359,30 @@ class AccountManager {
       await dataStore.update('accounts', { 'account.id': id }, { 'account.profile': updatedProfile, 'account.updatedAt': Date.now() });
       logger.info('添加经验值', { id, addedExp: exp, currentExp, newTotalExp, newLevel: level });
 
-      return { success: true, level, exp: currentLevelExp, totalExp: newTotalExp };
+      // 每获得10点经验，奖励1星钻
+      const currencyReward = Math.max(1, Math.floor(exp / 10));
+      if (currencyReward > 0) {
+        await this.addCurrency(id, currencyReward, `获得${exp}经验值奖励`, 'exp_reward');
+      }
+
+      // 升级时额外奖励星钻并检查等级奖励
+      let levelUpCurrency = 0;
+      if (level > oldLevel) {
+        levelUpCurrency = (level - oldLevel) * 50; // 每升1级奖励50星钻
+        await this.addCurrency(id, levelUpCurrency, `从${oldLevel}级升到${level}级奖励`, 'level_up');
+        await this.checkLevelRewards(id);
+      }
+
+      return {
+        success: true,
+        level,
+        exp: currentLevelExp,
+        totalExp: newTotalExp,
+        levelUp: level > oldLevel,
+        oldLevel,
+        currencyReward,
+        levelUpCurrency
+      };
     } catch (err) {
       logger.error('添加经验值失败', { id, error: err.message });
       return { success: false, message: '添加失败' };
@@ -1635,30 +1659,241 @@ class AccountManager {
     }
   }
 
-  // 管理员重置用户成就
-  async resetUserAchievements(id) {
+  // ========== 星钻货币系统 ==========
+
+  // 货币名称配置
+  static get CURRENCY_NAME() { return '星钻'; }
+  static get CURRENCY_ICON() { return '💎'; }
+
+  // 等级奖励配置
+  getLevelRewards() {
+    return [
+      { level: 5, rewards: [{ type: 'currency', amount: 100 }, { type: 'title', name: '棋坛新秀' }], description: '获得100💎 + 称号"棋坛新秀"' },
+      { level: 10, rewards: [{ type: 'currency', amount: 250 }, { type: 'title', name: '对弈达人' }], description: '获得250💎 + 称号"对弈达人"' },
+      { level: 15, rewards: [{ type: 'currency', amount: 500 }, { type: 'title', name: '棋艺高手' }], description: '获得500💎 + 称号"棋艺高手"' },
+      { level: 20, rewards: [{ type: 'currency', amount: 800 }, { type: 'badge', name: 'level_20_reward' }], description: '获得800💎 + 限定徽章' },
+      { level: 25, rewards: [{ type: 'currency', amount: 1200 }, { type: 'title', name: '棋坛精英' }], description: '获得1200💎 + 称号"棋坛精英"' },
+      { level: 30, rewards: [{ type: 'currency', amount: 1800 }, { type: 'badge', name: 'level_30_reward' }], description: '获得1800💎 + 限定徽章' },
+      { level: 40, rewards: [{ type: 'currency', amount: 3000 }, { type: 'title', name: '传奇大师' }], description: '获得3000💎 + 称号"传奇大师"' },
+      { level: 50, rewards: [{ type: 'currency', amount: 5000 }, { type: 'badge', name: 'level_50_reward' }, { type: 'title', name: '至尊棋圣' }], description: '获得5000💎 + 限定徽章 + 称号"至尊棋圣"' }
+    ];
+  }
+
+  // 获取用户星钻余额
+  async getCurrency(accountId) {
     try {
-      const account = await dataStore.findOne('accounts', { 'account.id': id });
-      if (!account) {
-        return {
-          success: false,
-          message: '账号不存在'
-        };
+      const account = await dataStore.findOne('accounts', { 'account.id': accountId });
+      if (!account) return { success: false, message: '账号不存在', balance: 0 };
+
+      const currency = account.currency || { starCoins: 0 };
+      return { success: true, balance: currency.starCoins || 0 };
+    } catch (err) {
+      logger.error('获取星钻余额失败', { accountId, error: err.message });
+      return { success: false, message: '获取失败', balance: 0 };
+    }
+  }
+
+  // 获取用户交易记录
+  async getTransactionRecords(accountId) {
+    try {
+      const records = await dataStore.readOne('currencyTransactions', accountId);
+      return records || { userId: accountId, transactions: [] };
+    } catch (err) {
+      logger.error('获取交易记录失败', { accountId, error: err.message });
+      return { userId: accountId, transactions: [] };
+    }
+  }
+
+  // 添加星钻（带交易记录）
+  async addCurrency(accountId, amount, reason, source = 'system') {
+    try {
+      if (amount <= 0) return { success: false, message: '数量必须大于0' };
+
+      const account = await dataStore.findOne('accounts', { 'account.id': accountId });
+      if (!account) return { success: false, message: '账号不存在' };
+
+      // 更新余额
+      const currency = account.currency || { starCoins: 0 };
+      const newBalance = (currency.starCoins || 0) + amount;
+      currency.starCoins = newBalance;
+      await dataStore.update('accounts', { 'account.id': accountId }, { currency, 'account.updatedAt': Date.now() });
+
+      // 添加交易记录到独立集合
+      const transactionRecords = await this.getTransactionRecords(accountId);
+      transactionRecords.transactions.push({
+        id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+        type: 'earn',
+        amount,
+        balance: newBalance,
+        source,
+        reason,
+        timestamp: Date.now()
+      });
+
+      // 限制交易记录数量，只保留最近1000条
+      if (transactionRecords.transactions.length > 1000) {
+        transactionRecords.transactions = transactionRecords.transactions.slice(-1000);
       }
 
-      await dataStore.update('accounts', { 'account.id': id }, { achievements: [], 'account.updatedAt': Date.now() });
-      logger.info('管理员重置用户成就', { id });
+      await dataStore.writeOne('currencyTransactions', accountId, transactionRecords);
+      logger.info('添加星钻', { accountId, amount, reason, balance: newBalance });
+
+      return { success: true, balance: newBalance, added: amount };
+    } catch (err) {
+      logger.error('添加星钻失败', { accountId, error: err.message });
+      return { success: false, message: '添加失败' };
+    }
+  }
+
+  // 使用星钻（预留接口）
+  async useCurrency(accountId, amount, reason) {
+    try {
+      if (amount <= 0) return { success: false, message: '数量必须大于0' };
+
+      const account = await dataStore.findOne('accounts', { 'account.id': accountId });
+      if (!account) return { success: false, message: '账号不存在' };
+
+      const currency = account.currency || { starCoins: 0 };
+      const currentBalance = currency.starCoins || 0;
+
+      if (currentBalance < amount) {
+        return { success: false, message: '星钻不足', balance: currentBalance };
+      }
+
+      const newBalance = currentBalance - amount;
+      currency.starCoins = newBalance;
+      await dataStore.update('accounts', { 'account.id': accountId }, { currency, 'account.updatedAt': Date.now() });
+
+      // 添加交易记录到独立集合
+      const transactionRecords = await this.getTransactionRecords(accountId);
+      transactionRecords.transactions.push({
+        id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+        type: 'spend',
+        amount,
+        balance: newBalance,
+        source: 'spend',
+        reason,
+        timestamp: Date.now()
+      });
+
+      if (transactionRecords.transactions.length > 1000) {
+        transactionRecords.transactions = transactionRecords.transactions.slice(-1000);
+      }
+
+      await dataStore.writeOne('currencyTransactions', accountId, transactionRecords);
+      logger.info('使用星钻', { accountId, amount, reason, balance: newBalance });
+
+      return { success: true, balance: newBalance, used: amount };
+    } catch (err) {
+      logger.error('使用星钻失败', { accountId, error: err.message });
+      return { success: false, message: '使用失败' };
+    }
+  }
+
+  // 获取星钻交易记录
+  async getCurrencyTransactions(accountId, limit = 50) {
+    try {
+      const [account, transactionRecords] = await Promise.all([
+        dataStore.findOne('accounts', { 'account.id': accountId }),
+        this.getTransactionRecords(accountId)
+      ]);
+
+      if (!account) return { success: false, message: '账号不存在', transactions: [] };
+
+      const currency = account.currency || { starCoins: 0 };
+      const transactions = (transactionRecords.transactions || []).slice(-limit).reverse();
+      return { success: true, transactions, balance: currency.starCoins || 0 };
+    } catch (err) {
+      logger.error('获取星钻交易记录失败', { accountId, error: err.message });
+      return { success: false, message: '获取失败', transactions: [] };
+    }
+  }
+
+  // 检查并领取等级奖励
+  async checkLevelRewards(accountId) {
+    try {
+      const account = await dataStore.findOne('accounts', { 'account.id': accountId });
+      if (!account) return { success: false, message: '账号不存在', rewards: [] };
+
+      const currentLevel = account.account?.profile?.level || 1;
+      const claimedRewards = account.claimedLevelRewards || [];
+      const availableRewards = [];
+
+      const levelRewards = this.getLevelRewards();
+      for (const rewardConfig of levelRewards) {
+        if (currentLevel >= rewardConfig.level && !claimedRewards.includes(rewardConfig.level)) {
+          // 发放奖励
+          for (const reward of rewardConfig.rewards) {
+            if (reward.type === 'currency') {
+              await this.addCurrency(accountId, reward.amount, `达到${rewardConfig.level}级奖励`, 'level_reward');
+            }
+            // title 和 badge 类型预留，未来可扩展
+          }
+
+          claimedRewards.push(rewardConfig.level);
+          availableRewards.push(rewardConfig);
+        }
+      }
+
+      if (availableRewards.length > 0) {
+        await dataStore.update('accounts', { 'account.id': accountId }, {
+          claimedLevelRewards: claimedRewards,
+          'account.updatedAt': Date.now()
+        });
+        logger.info('发放等级奖励', { accountId, levels: availableRewards.map(r => r.level) });
+      }
+
+      return { success: true, rewards: availableRewards, claimedLevels: claimedRewards };
+    } catch (err) {
+      logger.error('检查等级奖励失败', { accountId, error: err.message });
+      return { success: false, message: '检查失败', rewards: [] };
+    }
+  }
+
+  // 获取可领取的等级奖励列表
+  async getAvailableLevelRewards(accountId) {
+    try {
+      const account = await dataStore.findOne('accounts', { 'account.id': accountId });
+      if (!account) return { success: false, message: '账号不存在', rewards: [], claimedLevels: [] };
+
+      const currentLevel = account.account?.profile?.level || 1;
+      const claimedRewards = account.claimedLevelRewards || [];
+      const levelRewards = this.getLevelRewards();
+      const available = levelRewards.filter(r => currentLevel >= r.level && !claimedRewards.includes(r.level));
+      const future = levelRewards.filter(r => currentLevel < r.level);
 
       return {
         success: true,
-        message: '成就重置成功'
+        available,
+        future,
+        claimedLevels: claimedRewards,
+        totalClaimed: claimedRewards.length
       };
     } catch (err) {
-      logger.error('重置用户成就失败', { id, error: err.message });
-      return {
-        success: false,
-        message: '重置失败，请稍后重试'
-      };
+      logger.error('获取等级奖励列表失败', { accountId, error: err.message });
+      return { success: false, message: '获取失败', rewards: [] };
+    }
+  }
+
+  // ========== 批量更新账号数据（为新老账号添加货币字段） ==========
+
+  // 为所有账号初始化货币字段（用于数据迁移）
+  async initializeCurrencyForAllAccounts() {
+    try {
+      const accounts = await dataStore.read('accounts');
+      let updated = 0;
+      for (const account of accounts) {
+        if (!account.currency) {
+          account.currency = { starCoins: 0, transactions: [] };
+          await dataStore.writeOne('accounts', account.account?.id || account.id, account);
+          updated++;
+        }
+      }
+      logger.info('初始化账号货币字段', { total: accounts.length, updated });
+      return { success: true, total: accounts.length, updated };
+    } catch (err) {
+      logger.error('初始化货币字段失败', { error: err.message });
+      return { success: false, message: '初始化失败' };
     }
   }
 }

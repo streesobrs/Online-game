@@ -18,6 +18,7 @@ const AccountManager = require('./modules/AccountManager');
 const AchievementManager = require('./modules/AchievementManager');
 const AIManager = require('./modules/AIManager');
 const ThemeManager = require('./modules/ThemeManager');
+const FeedbackManager = require('./modules/FeedbackManager');
 
 // 初始化Express应用
 const app = express();
@@ -363,6 +364,93 @@ app.get('/api/games/history', async (req, res) => {
   }
 });
 
+// ========== 反馈相关API ==========
+
+// 获取反馈列表
+app.get('/api/feedbacks', async (req, res) => {
+  try {
+    const feedbacks = await feedbackManager.getFeedbackList();
+    res.json({
+      success: true,
+      data: feedbacks
+    });
+  } catch (err) {
+    logger.error('获取反馈列表失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '获取反馈列表失败'
+    });
+  }
+});
+
+// 提交反馈
+app.post('/api/feedbacks', async (req, res) => {
+  try {
+    const { accountId, nickname, type, title, content } = req.body;
+    if (!accountId || !nickname || !title || !content) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少必要参数'
+      });
+    }
+
+    const result = await feedbackManager.submitFeedback(accountId, nickname, type, title, content);
+    res.json(result);
+  } catch (err) {
+    logger.error('提交反馈失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '提交反馈失败'
+    });
+  }
+});
+
+// 投票
+app.post('/api/feedbacks/:id/vote', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { accountId, voteType = 'up' } = req.body;
+    if (!accountId) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少必要参数'
+      });
+    }
+
+    const result = await feedbackManager.voteFeedback(id, accountId, voteType);
+    res.json(result);
+  } catch (err) {
+    logger.error('投票失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '投票失败'
+    });
+  }
+});
+
+// 添加评论
+app.post('/api/feedbacks/:id/comments', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { accountId, nickname, content } = req.body;
+    if (!accountId || !nickname || !content) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少必要参数'
+      });
+    }
+
+    const result = await feedbackManager.addComment(id, accountId, nickname, content);
+    res.json(result);
+  } catch (err) {
+    logger.error('添加评论失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '添加评论失败'
+    });
+  }
+});
+
 // 获取游戏回放
 app.get('/api/games/replay/:id', async (req, res) => {
   try {
@@ -704,6 +792,142 @@ app.get('/api/leaderboard/weekly', async (req, res) => {
   }
 });
 
+// ========== 星钻货币系统 API ==========
+
+// 获取用户星钻余额
+app.get('/api/currency/:accountId', async (req, res) => {
+  try {
+    const result = await accountManager.getCurrency(req.params.accountId);
+    res.json(result);
+  } catch (err) {
+    logger.error('获取星钻余额失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取星钻余额失败' });
+  }
+});
+
+// 获取星钻交易记录
+app.get('/api/currency/:accountId/transactions', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const result = await accountManager.getCurrencyTransactions(req.params.accountId, limit);
+    res.json(result);
+  } catch (err) {
+    logger.error('获取星钻交易记录失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取星钻交易记录失败' });
+  }
+});
+
+// ========== 等级奖励系统 API ==========
+
+// 获取可领取的等级奖励列表
+app.get('/api/level-rewards/:accountId', async (req, res) => {
+  try {
+    const result = await accountManager.getAvailableLevelRewards(req.params.accountId);
+    res.json(result);
+  } catch (err) {
+    logger.error('获取等级奖励列表失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取等级奖励列表失败' });
+  }
+});
+
+// 领取所有可领取的等级奖励
+app.post('/api/level-rewards/:accountId/claim', async (req, res) => {
+  try {
+    const result = await accountManager.checkLevelRewards(req.params.accountId);
+    res.json(result);
+  } catch (err) {
+    logger.error('领取等级奖励失败', { error: err.message });
+    res.status(500).json({ success: false, message: '领取等级奖励失败' });
+  }
+});
+
+// ========== 个人资料 API ==========
+
+// 获取完整的个人资料信息（含等级、成就、货币）
+app.get('/api/profile/:accountId', async (req, res) => {
+  try {
+    const accountId = req.params.accountId;
+    const account = await accountManager.getAccount(accountId);
+    if (!account) {
+      return res.status(404).json({ success: false, message: '账号不存在' });
+    }
+
+    // 获取货币信息
+    const currency = await accountManager.getCurrency(accountId);
+
+    // 获取等级奖励信息
+    const levelRewards = await accountManager.getAvailableLevelRewards(accountId);
+
+    // 获取成就信息
+    const achievements = achievementManager?.getAllAchievements?.() || [];
+    const userAchievements = accountManager._normalizeAchievements
+      ? accountManager._normalizeAchievements(account.achievements || [])
+      : (account.achievements || []);
+
+    // 计算已解锁成就
+    const unlockedAchievements = achievements.filter(a => userAchievements.includes(a.id));
+    const achievementProgress = {
+      total: achievements.length,
+      unlocked: unlockedAchievements.length,
+      percentage: achievements.length > 0 ? Math.round((unlockedAchievements.length / achievements.length) * 100) : 0
+    };
+
+    // 获取游戏统计数据
+    const games = account.games || {};
+    let totalGames = 0;
+    let totalWins = 0;
+    let totalDraws = 0;
+    let totalLosses = 0;
+    let bestStreak = 0;
+    for (const g of Object.values(games)) {
+      totalGames += g.played || 0;
+      totalWins += g.wins || 0;
+      totalDraws += g.draws || 0;
+      totalLosses += g.losses || 0;
+      if ((g.bestStreak || 0) > bestStreak) bestStreak = g.bestStreak;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        account: {
+          id: account.account?.id,
+          username: account.account?.username,
+          nickname: account.account?.nickname,
+          type: account.account?.type,
+          createdAt: account.account?.createdAt,
+          loginCount: account.account?.loginCount || 0
+        },
+        profile: account.account?.profile || { level: 1, exp: 0 },
+        currency: currency.balance || 0,
+        levelRewards: levelRewards.success ? {
+          available: levelRewards.available || [],
+          future: levelRewards.future || [],
+          claimedLevels: levelRewards.claimedLevels || [],
+          totalClaimed: levelRewards.totalClaimed || 0
+        } : { available: [], future: [], claimedLevels: [], totalClaimed: 0 },
+        achievements: {
+          unlocked: unlockedAchievements,
+          progress: achievementProgress,
+          badges: account.badges || []
+        },
+        stats: {
+          totalGames,
+          totalWins,
+          totalDraws,
+          totalLosses,
+          bestStreak,
+          winRate: totalGames > 0 ? Math.round((totalWins / totalGames) * 100) : 0
+        },
+        games
+      }
+    });
+  } catch (err) {
+    logger.error('获取个人资料失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取个人资料失败' });
+  }
+});
+
 // 初始化管理器
 const versionManager = new VersionManager();
 const accountManager = new AccountManager();
@@ -713,6 +937,7 @@ const aiManager = new AIManager();
 const gameManager = new GameManager(userManager, accountManager, achievementManager, aiManager);
 const chatManager = new ChatManager(userManager, gameManager, accountManager);
 const adminManager = new AdminManager(userManager, gameManager, chatManager, accountManager);
+const feedbackManager = FeedbackManager;
 
 // 服务器启动时增加构建版本号
 const newVersion = versionManager.incrementBuild();
@@ -1066,6 +1291,50 @@ io.on('connection', (socket) => {
     socket.emit('account_info', result);
   });
 
+  // ========== 星钻货币系统 Socket 事件 ==========
+
+  // 获取星钻信息
+  socket.on('get_currency', async (data) => {
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (userSession && userSession.accountId) {
+      const result = await accountManager.getCurrency(userSession.accountId);
+      socket.emit('currency_info', result);
+    }
+  });
+
+  // 获取星钻交易记录
+  socket.on('get_currency_transactions', async (data) => {
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (userSession && userSession.accountId) {
+      const limit = data?.limit || 50;
+      const result = await accountManager.getCurrencyTransactions(userSession.accountId, limit);
+      socket.emit('currency_transactions', result);
+    }
+  });
+
+  // 获取等级奖励
+  socket.on('get_level_rewards', async (data) => {
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (userSession && userSession.accountId) {
+      const result = await accountManager.getAvailableLevelRewards(userSession.accountId);
+      socket.emit('level_rewards', result);
+    }
+  });
+
+  // 领取等级奖励
+  socket.on('claim_level_rewards', async (data) => {
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (userSession && userSession.accountId) {
+      const result = await accountManager.checkLevelRewards(userSession.accountId);
+      socket.emit('level_rewards_claimed', result);
+      // 通知客户端账号信息已更新
+      if (result.success && result.rewards.length > 0) {
+        const updatedAccount = await accountManager.getAccount(userSession.accountId);
+        socket.emit('account_updated', { account: updatedAccount });
+      }
+    }
+  });
+
   // ========== 用户相关事件 ==========
 
   // 更新用户状态
@@ -1083,6 +1352,89 @@ io.on('connection', (socket) => {
     const gameType = data?.gameType || null;
     const leaderboard = await userManager.getLeaderboard(limit, gameType);
     socket.emit('leaderboard', { leaderboard });
+  });
+
+  // ========== 反馈相关事件 ==========
+
+  // 获取反馈列表
+  socket.on('get_feedbacks', async () => {
+    const feedbacks = await feedbackManager.getFeedbackList();
+    socket.emit('feedbacks_list', { feedbacks });
+  });
+
+  // 提交反馈
+  socket.on('submit_feedback', async (data) => {
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (!userSession || !userSession.accountId) {
+      socket.emit('error', { message: '请先登录' });
+      return;
+    }
+
+    const result = await feedbackManager.submitFeedback(
+      userSession.accountId,
+      userSession.nickname,
+      data.type,
+      data.title,
+      data.content
+    );
+
+    if (result.success) {
+      socket.emit('feedback_submitted', { feedback: result.feedback });
+      // 广播给所有用户更新反馈列表
+      const allFeedbacks = await feedbackManager.getFeedbackList();
+      io.emit('feedbacks_list', { feedbacks: allFeedbacks });
+    } else {
+      socket.emit('error', { message: result.message });
+    }
+  });
+
+  // 投票
+  socket.on('vote_feedback', async (data) => {
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (!userSession || !userSession.accountId) {
+      socket.emit('error', { message: '请先登录' });
+      return;
+    }
+
+    const result = await feedbackManager.voteFeedback(
+      data.feedbackId,
+      userSession.accountId,
+      data.voteType || 'up'
+    );
+
+    if (result.success) {
+      socket.emit('feedback_voted', { feedback: result.feedback });
+      // 广播给所有用户更新反馈列表
+      const allFeedbacks = await feedbackManager.getFeedbackList();
+      io.emit('feedbacks_list', { feedbacks: allFeedbacks });
+    } else {
+      socket.emit('error', { message: result.message });
+    }
+  });
+
+  // 添加评论
+  socket.on('add_comment', async (data) => {
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (!userSession || !userSession.accountId) {
+      socket.emit('error', { message: '请先登录' });
+      return;
+    }
+
+    const result = await feedbackManager.addComment(
+      data.feedbackId,
+      userSession.accountId,
+      userSession.nickname,
+      data.content
+    );
+
+    if (result.success) {
+      socket.emit('comment_added', { feedback: result.feedback });
+      // 广播给所有用户更新反馈列表
+      const allFeedbacks = await feedbackManager.getFeedbackList();
+      io.emit('feedbacks_list', { feedbacks: allFeedbacks });
+    } else {
+      socket.emit('error', { message: result.message });
+    }
   });
 
   // 获取成就列表

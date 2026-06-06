@@ -20,7 +20,7 @@ class AchievementManager {
         description: '获得第一场胜利',
         type: 'game',
         condition: { wins: 1 },
-        reward: { exp: 50, badge: 'first_win' }
+        reward: { exp: 100, badge: 'first_win' }
       },
       {
         id: 2,
@@ -28,7 +28,7 @@ class AchievementManager {
         description: '获得五场胜利',
         type: 'game',
         condition: { wins: 5 },
-        reward: { exp: 100, badge: 'five_wins' }
+        reward: { exp: 200, badge: 'five_wins' }
       },
       {
         id: 3,
@@ -36,7 +36,7 @@ class AchievementManager {
         description: '获得十场胜利',
         type: 'game',
         condition: { wins: 10 },
-        reward: { exp: 200, badge: 'ten_wins' }
+        reward: { exp: 400, badge: 'ten_wins' }
       },
       {
         id: 4,
@@ -44,7 +44,7 @@ class AchievementManager {
         description: '获得二十场胜利',
         type: 'game',
         condition: { wins: 20 },
-        reward: { exp: 400, badge: 'twenty_wins' }
+        reward: { exp: 800, badge: 'twenty_wins' }
       },
       {
         id: 5,
@@ -52,7 +52,7 @@ class AchievementManager {
         description: '获得五十场胜利',
         type: 'game',
         condition: { wins: 50 },
-        reward: { exp: 1000, badge: 'fifty_wins' }
+        reward: { exp: 2000, badge: 'fifty_wins' }
       },
       {
         id: 6,
@@ -60,7 +60,7 @@ class AchievementManager {
         description: '获得一百场胜利',
         type: 'game',
         condition: { wins: 100 },
-        reward: { exp: 2000, badge: 'hundred_wins' }
+        reward: { exp: 3500, badge: 'hundred_wins' }
       },
       {
         id: 7,
@@ -68,7 +68,7 @@ class AchievementManager {
         description: '获得两百场胜利',
         type: 'game',
         condition: { wins: 200 },
-        reward: { exp: 5000, badge: 'thousand_wins' }
+        reward: { exp: 10000, badge: 'thousand_wins' }
       },
       // 游戏类型成就
       {
@@ -77,7 +77,7 @@ class AchievementManager {
         description: '在五子棋中获得5场胜利',
         type: 'game_type',
         condition: { gameType: 'gobang', wins: 5 },
-        reward: { exp: 100, badge: 'gobang_beginner' }
+        reward: { exp: 200, badge: 'gobang_beginner' }
       },
       {
         id: 11,
@@ -85,7 +85,7 @@ class AchievementManager {
         description: '在五子棋中获得20场胜利',
         type: 'game_type',
         condition: { gameType: 'gobang', wins: 20 },
-        reward: { exp: 500, badge: 'gobang_expert' }
+        reward: { exp: 1000, badge: 'gobang_expert' }
       },
       {
         id: 12,
@@ -93,7 +93,7 @@ class AchievementManager {
         description: '在五子棋中获得50场胜利',
         type: 'game_type',
         condition: { gameType: 'gobang', wins: 50 },
-        reward: { exp: 1000, badge: 'gobang_master' }
+        reward: { exp: 2000, badge: 'gobang_master' }
       },
       {
         id: 13,
@@ -101,7 +101,7 @@ class AchievementManager {
         description: '在五子棋中获得50场胜利',
         type: 'game_type',
         condition: { gameType: 'gobang', wins: 50 },
-        reward: { exp: 1000, badge: 'gobang_legend' }
+        reward: { exp: 3500, badge: 'gobang_legend' }
       },
       {
         id: 20,
@@ -109,7 +109,7 @@ class AchievementManager {
         description: '在象棋中获得5场胜利',
         type: 'game_type',
         condition: { gameType: 'chess', wins: 5 },
-        reward: { exp: 100, badge: 'chess_beginner' }
+        reward: { exp: 200, badge: 'chess_beginner' }
       },
       {
         id: 21,
@@ -117,7 +117,7 @@ class AchievementManager {
         description: '在象棋中获得20场胜利',
         type: 'game_type',
         condition: { gameType: 'chess', wins: 20 },
-        reward: { exp: 500, badge: 'chess_expert' }
+        reward: { exp: 1000, badge: 'chess_expert' }
       },
       {
         id: 22,
@@ -125,7 +125,7 @@ class AchievementManager {
         description: '在象棋中获得50场胜利',
         type: 'game_type',
         condition: { gameType: 'chess', wins: 50 },
-        reward: { exp: 1000, badge: 'chess_master' }
+        reward: { exp: 2000, badge: 'chess_master' }
       },
       {
         id: 23,
@@ -133,7 +133,7 @@ class AchievementManager {
         description: '在象棋中获得50场胜利',
         type: 'game_type',
         condition: { gameType: 'chess', wins: 50 },
-        reward: { exp: 1000, badge: 'chess_legend' }
+        reward: { exp: 3500, badge: 'chess_legend' }
       },
       {
         id: 30,
@@ -141,7 +141,7 @@ class AchievementManager {
         description: '在围棋中获得5场胜利',
         type: 'game_type',
         condition: { gameType: 'go', wins: 5 },
-        reward: { exp: 100, badge: 'go_beginner' }
+        reward: { exp: 200, badge: 'go_beginner' }
       },
       {
         id: 31,
@@ -149,7 +149,7 @@ class AchievementManager {
         description: '在围棋中获得20场胜利',
         type: 'game_type',
         condition: { gameType: 'go', wins: 20 },
-        reward: { exp: 500, badge: 'go_expert' }
+        reward: { exp: 1000, badge: 'go_expert' }
       },
       {
         id: 32,
@@ -157,7 +157,7 @@ class AchievementManager {
         description: '在围棋中获得50场胜利',
         type: 'game_type',
         condition: { gameType: 'go', wins: 50 },
-        reward: { exp: 1000, badge: 'go_master' }
+        reward: { exp: 2000, badge: 'go_master' }
       },
       {
         id: 33,
@@ -165,7 +165,7 @@ class AchievementManager {
         description: '在围棋中获得50场胜利',
         type: 'game_type',
         condition: { gameType: 'go', wins: 50 },
-        reward: { exp: 1000, badge: 'go_legend' }
+        reward: { exp: 3500, badge: 'go_legend' }
       },
       // 等级成就
       {
@@ -174,7 +174,7 @@ class AchievementManager {
         description: '达到5级',
         type: 'level',
         condition: { level: 5 },
-        reward: { exp: 200, badge: 'level_5' }
+        reward: { exp: 400, badge: 'level_5' }
       },
       {
         id: 41,
@@ -182,7 +182,7 @@ class AchievementManager {
         description: '达到10级',
         type: 'level',
         condition: { level: 10 },
-        reward: { exp: 500, badge: 'level_10' }
+        reward: { exp: 1000, badge: 'level_10' }
       },
       {
         id: 42,
@@ -190,7 +190,7 @@ class AchievementManager {
         description: '达到15级',
         type: 'level',
         condition: { level: 15 },
-        reward: { exp: 800, badge: 'level_15' }
+        reward: { exp: 1500, badge: 'level_15' }
       },
       {
         id: 43,
@@ -198,7 +198,7 @@ class AchievementManager {
         description: '达到20级',
         type: 'level',
         condition: { level: 20 },
-        reward: { exp: 1000, badge: 'level_20' }
+        reward: { exp: 2000, badge: 'level_20' }
       },
       {
         id: 44,
@@ -206,7 +206,7 @@ class AchievementManager {
         description: '达到25级',
         type: 'level',
         condition: { level: 25 },
-        reward: { exp: 1500, badge: 'level_25' }
+        reward: { exp: 3000, badge: 'level_25' }
       },
       {
         id: 45,
@@ -214,7 +214,7 @@ class AchievementManager {
         description: '达到30级',
         type: 'level',
         condition: { level: 30 },
-        reward: { exp: 2000, badge: 'level_30' }
+        reward: { exp: 3500, badge: 'level_30' }
       },
       {
         id: 46,
@@ -222,7 +222,7 @@ class AchievementManager {
         description: '达到50级',
         type: 'level',
         condition: { level: 50 },
-        reward: { exp: 5000, badge: 'level_50' }
+        reward: { exp: 10000, badge: 'level_50' }
       },
       // 连胜成就
       {
@@ -231,7 +231,7 @@ class AchievementManager {
         description: '获得3连胜',
         type: 'streak',
         condition: { streak: 3 },
-        reward: { exp: 50, badge: 'streak_3' }
+        reward: { exp: 300, badge: 'streak_3' }
       },
       {
         id: 51,
@@ -239,7 +239,7 @@ class AchievementManager {
         description: '获得5连胜',
         type: 'streak',
         condition: { streak: 5 },
-        reward: { exp: 100, badge: 'streak_5' }
+        reward: { exp: 500, badge: 'streak_5' }
       },
       {
         id: 52,
@@ -247,7 +247,7 @@ class AchievementManager {
         description: '获得10连胜',
         type: 'streak',
         condition: { streak: 10 },
-        reward: { exp: 300, badge: 'streak_10' }
+        reward: { exp: 600, badge: 'streak_10' }
       },
       {
         id: 53,
@@ -255,7 +255,7 @@ class AchievementManager {
         description: '获得15连胜',
         type: 'streak',
         condition: { streak: 15 },
-        reward: { exp: 500, badge: 'streak_15' }
+        reward: { exp: 1000, badge: 'streak_15' }
       },
       {
         id: 54,
@@ -263,7 +263,7 @@ class AchievementManager {
         description: '获得20连胜',
         type: 'streak',
         condition: { streak: 20 },
-        reward: { exp: 1000, badge: 'streak_20' }
+        reward: { exp: 2000, badge: 'streak_20' }
       },
       {
         id: 55,
@@ -271,7 +271,7 @@ class AchievementManager {
         description: '获得30连胜',
         type: 'streak',
         condition: { streak: 30 },
-        reward: { exp: 3000, badge: 'streak_50' }
+        reward: { exp: 5000, badge: 'streak_50' }
       },
       // 特殊成就
       {
@@ -280,7 +280,7 @@ class AchievementManager {
         description: '在10步内获得胜利',
         type: 'game',
         condition: { maxMoves: 10, result: 'win' },
-        reward: { exp: 100, badge: 'perfect_win' }
+        reward: { exp: 300, badge: 'perfect_win' }
       },
       {
         id: 61,
@@ -288,7 +288,7 @@ class AchievementManager {
         description: '在落后情况下获得胜利',
         type: 'game',
         condition: { comeback: true, result: 'win' },
-        reward: { exp: 150, badge: 'comeback_win' }
+        reward: { exp: 400, badge: 'comeback_win' }
       },
       {
         id: 62,
@@ -296,7 +296,7 @@ class AchievementManager {
         description: '获得第一场平局',
         type: 'game',
         condition: { draws: 1 },
-        reward: { exp: 50, badge: 'first_draw' }
+        reward: { exp: 200, badge: 'first_draw' }
       },
       {
         id: 63,
@@ -304,7 +304,7 @@ class AchievementManager {
         description: '获得十场平局',
         type: 'game',
         condition: { draws: 10 },
-        reward: { exp: 200, badge: 'hundred_draws' }
+        reward: { exp: 600, badge: 'hundred_draws' }
       },
       // AI 相关成就
       {
@@ -321,7 +321,7 @@ class AchievementManager {
         description: '在人机对战中战胜中等难度AI',
         type: 'ai',
         condition: { difficulty: 'medium', result: 'win' },
-        reward: { exp: 200, badge: 'beat_ai_medium' }
+        reward: { exp: 500, badge: 'beat_ai_medium' }
       },
       {
         id: 72,
@@ -329,7 +329,7 @@ class AchievementManager {
         description: '在人机对战中战胜困难难度AI',
         type: 'ai',
         condition: { difficulty: 'hard', result: 'win' },
-        reward: { exp: 500, badge: 'beat_ai_hard' }
+        reward: { exp: 1000, badge: 'beat_ai_hard' }
       },
       {
         id: 73,
@@ -337,7 +337,7 @@ class AchievementManager {
         description: '在人机对战中获得10场胜利',
         type: 'ai',
         condition: { wins: 10 },
-        reward: { exp: 1000, badge: 'ai_killer' }
+        reward: { exp: 2000, badge: 'ai_killer' }
       },
       {
         id: 74,
@@ -345,7 +345,7 @@ class AchievementManager {
         description: '在人机对战中获得20场胜利',
         type: 'ai',
         condition: { wins: 20 },
-        reward: { exp: 2000, badge: 'ai_master' }
+        reward: { exp: 3500, badge: 'ai_master' }
       },
       {
         id: 75,
@@ -353,7 +353,7 @@ class AchievementManager {
         description: '在人机对战中获得50场胜利',
         type: 'ai',
         condition: { wins: 50 },
-        reward: { exp: 5000, badge: 'ai_terminator' }
+        reward: { exp: 10000, badge: 'ai_terminator' }
       },
       // 创意成就
       {
@@ -362,7 +362,7 @@ class AchievementManager {
         description: '进行第一场游戏',
         type: 'creative',
         condition: { firstGame: true },
-        reward: { exp: 50, badge: 'first_move' }
+        reward: { exp: 200, badge: 'first_move' }
       },
       {
         id: 101,
@@ -370,7 +370,7 @@ class AchievementManager {
         description: '在凌晨2点到6点之间进行游戏',
         type: 'creative',
         condition: { nightGame: true },
-        reward: { exp: 100, badge: 'night_owl' }
+        reward: { exp: 300, badge: 'night_owl' }
       },
       {
         id: 102,
@@ -378,7 +378,7 @@ class AchievementManager {
         description: '在周末进行游戏',
         type: 'creative',
         condition: { weekendGame: true },
-        reward: { exp: 100, badge: 'weekend_warrior' }
+        reward: { exp: 300, badge: 'weekend_warrior' }
       },
       {
         id: 103,
@@ -386,7 +386,7 @@ class AchievementManager {
         description: '发送50条聊天消息',
         type: 'creative',
         condition: { chatMessages: 50 },
-        reward: { exp: 200, badge: 'chatty_cathy' }
+        reward: { exp: 600, badge: 'chatty_cathy' }
       },
       {
         id: 104,
@@ -394,7 +394,7 @@ class AchievementManager {
         description: '在游戏中不发送任何消息并获得胜利',
         type: 'creative',
         condition: { silentWin: true },
-        reward: { exp: 150, badge: 'silent_killer' }
+        reward: { exp: 400, badge: 'silent_killer' }
       },
       {
         id: 105,
@@ -402,7 +402,7 @@ class AchievementManager {
         description: '连续3场在落后情况下获得胜利',
         type: 'creative',
         condition: { comebackStreak: 3 },
-        reward: { exp: 300, badge: 'comeback_kid' }
+        reward: { exp: 800, badge: 'comeback_kid' }
       },
       {
         id: 106,
@@ -418,7 +418,7 @@ class AchievementManager {
         description: '只玩一种棋种并获得20场胜利',
         type: 'creative',
         condition: { singleGameType: true },
-        reward: { exp: 500, badge: 'specialist' }
+        reward: { exp: 1000, badge: 'specialist' }
       },
       {
         id: 108,
@@ -434,7 +434,7 @@ class AchievementManager {
         description: '完成一场超过15分钟的游戏',
         type: 'creative',
         condition: { slowGame: true },
-        reward: { exp: 100, badge: 'slow_play' }
+        reward: { exp: 300, badge: 'slow_play' }
       },
       {
         id: 110,
@@ -442,7 +442,7 @@ class AchievementManager {
         description: '在游戏中获得一次幸运胜利',
         type: 'creative',
         condition: { luckyWin: true },
-        reward: { exp: 100, badge: 'lucky_star' }
+        reward: { exp: 300, badge: 'lucky_star' }
       },
       {
         id: 111,
@@ -450,7 +450,7 @@ class AchievementManager {
         description: '在游戏中获得一次不幸失败',
         type: 'creative',
         condition: { unluckyLoss: true },
-        reward: { exp: 50, badge: 'unlucky' }
+        reward: { exp: 200, badge: 'unlucky' }
       },
       {
         id: 114,
@@ -458,7 +458,7 @@ class AchievementManager {
         description: '解锁10个成就',
         type: 'creative',
         condition: { achievements: 10 },
-        reward: { exp: 500, badge: 'achievement_hunter' }
+        reward: { exp: 1000, badge: 'achievement_hunter' }
       },
       {
         id: 115,
@@ -474,7 +474,7 @@ class AchievementManager {
         description: '收集10个徽章',
         type: 'creative',
         condition: { badges: 10 },
-        reward: { exp: 500, badge: 'badge_collector' }
+        reward: { exp: 1000, badge: 'badge_collector' }
       },
       {
         id: 119,
@@ -490,7 +490,7 @@ class AchievementManager {
         description: '一天内进行10场游戏',
         type: 'creative',
         condition: { dailyGames: 10 },
-        reward: { exp: 500, badge: 'game_maniac' }
+        reward: { exp: 1000, badge: 'game_maniac' }
       },
       {
         id: 121,
@@ -498,7 +498,7 @@ class AchievementManager {
         description: '一周内进行30场游戏',
         type: 'creative',
         condition: { weeklyGames: 30 },
-        reward: { exp: 1000, badge: 'game_daily' }
+        reward: { exp: 2000, badge: 'game_daily' }
       },
       {
         id: 122,
@@ -506,7 +506,7 @@ class AchievementManager {
         description: '一个月内进行100场游戏',
         type: 'creative',
         condition: { monthlyGames: 100 },
-        reward: { exp: 2000, badge: 'game_monthly' }
+        reward: { exp: 4000, badge: 'game_monthly' }
       },
       {
         id: 125,
@@ -522,7 +522,7 @@ class AchievementManager {
         description: '连续5场在落后情况下获得胜利',
         type: 'creative',
         condition: { comebackStreak: 5 },
-        reward: { exp: 500, badge: 'comeback_king' }
+        reward: { exp: 1000, badge: 'comeback_king' }
       },
       {
         id: 128,
@@ -546,7 +546,7 @@ class AchievementManager {
         description: '在10级以下获得10场胜利',
         type: 'creative',
         condition: { lowLevelWins: 10 },
-        reward: { exp: 200, badge: 'newbie_protection' }
+        reward: { exp: 600, badge: 'newbie_protection' }
       },
       {
         id: 131,
@@ -562,7 +562,7 @@ class AchievementManager {
         description: '30天未登录后回归游戏',
         type: 'creative',
         condition: { longReturnPlayer: true },
-        reward: { exp: 500, badge: 'long_return_player' }
+        reward: { exp: 1000, badge: 'long_return_player' }
       }
     ];
   }

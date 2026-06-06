@@ -1,0 +1,1539 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#007bff">
+  <title>个人资料 - 多棋种联机大厅</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    /* ===== 全局 ===== */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      transition: all 0.25s ease;
+    }
+
+    body {
+      font-family: 'Microsoft Yahei', Arial, sans-serif;
+      background: #f0f2f5;
+      color: #2d3748;
+      min-height: 100vh;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ===== 顶部导航 ===== */
+    .game-nav {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+      background: white;
+      padding: 8px 16px;
+      border-radius: 10px;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+      width: 100%;
+      max-width: 1100px;
+    }
+
+    .nav-btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 7px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 15px;
+      background: #f8f9fa;
+      color: #495057;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .nav-btn:hover {
+      background: #e9ecef;
+      transform: translateY(-2px);
+    }
+
+    .nav-btn.active {
+      background: #007bff;
+      color: white;
+    }
+
+    .nav-btn.active:hover {
+      background: #0056b3;
+    }
+
+    /* ===== 主容器 ===== */
+    .container {
+      width: 100%;
+      max-width: 1100px;
+    }
+
+    /* ===== 头部 ===== */
+    .profile-header {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      background: white;
+      padding: 24px 28px;
+      border-radius: 12px;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+      margin-bottom: 16px;
+    }
+
+    .avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #007bff, #0056b3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      color: white;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+    }
+
+    .header-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .header-info h1 {
+      font-size: 22px;
+      color: #2d3748;
+    }
+
+    .header-info .subtitle {
+      font-size: 13px;
+      color: #6c757d;
+      margin-top: 2px;
+    }
+
+    .header-meta {
+      display: flex;
+      gap: 20px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .header-meta span {
+      font-size: 13px;
+      color: #6c757d;
+    }
+
+    .header-meta strong {
+      color: #2d3748;
+    }
+
+    /* 经验条 */
+    .exp-section {
+      margin-top: 10px;
+    }
+
+    .exp-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: #6c757d;
+      margin-bottom: 4px;
+    }
+
+    .exp-labels strong {
+      color: #007bff;
+    }
+
+    .exp-bar {
+      height: 8px;
+      background: #e9ecef;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .exp-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #007bff, #00a2ff);
+      border-radius: 4px;
+      transition: width 0.6s ease;
+    }
+
+    /* 右侧统计摘要 */
+    .header-stats {
+      display: flex;
+      gap: 16px;
+    }
+
+    .header-stat {
+      text-align: center;
+      padding: 10px 18px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      min-width: 80px;
+    }
+
+    .header-stat .num {
+      font-size: 22px;
+      font-weight: bold;
+      color: #007bff;
+    }
+
+    .header-stat .label {
+      font-size: 11px;
+      color: #6c757d;
+      margin-top: 2px;
+    }
+
+    /* ===== 卡片 ===== */
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+      margin-bottom: 16px;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: bold;
+      color: #2d3748;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 12px;
+      margin-bottom: 14px;
+      border-bottom: 2px solid #f0f0f0;
+      justify-content: space-between;
+    }
+
+    .card-title .right {
+      font-weight: normal;
+      font-size: 13px;
+      color: #6c757d;
+    }
+
+    /* ===== 双栏 ===== */
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    /* ===== 游戏统计网格 ===== */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .stat-item {
+      text-align: center;
+      padding: 16px;
+      border-radius: 10px;
+      background: #f8f9fa;
+    }
+
+    .stat-item .num {
+      font-size: 24px;
+      font-weight: bold;
+      color: #2d3748;
+    }
+
+    .stat-item .label {
+      font-size: 12px;
+      color: #6c757d;
+      margin-top: 2px;
+    }
+
+    /* 各棋种详细统计 */
+    .game-type-stats {
+      margin-top: 12px;
+    }
+
+    .game-type-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      background: #f8f9fa;
+      font-size: 13px;
+    }
+
+    .game-type-row .type-icon {
+      font-size: 20px;
+      min-width: 30px;
+      text-align: center;
+    }
+
+    .game-type-row .type-name {
+      width: 50px;
+      font-weight: bold;
+    }
+
+    .game-type-row .type-stat {
+      flex: 1;
+      text-align: center;
+      color: #6c757d;
+    }
+
+    .game-type-row .type-stat strong {
+      color: #2d3748;
+    }
+
+    /* ===== 星钻 ===== */
+    .currency-box {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px;
+      background: linear-gradient(135deg, #ffc107, #ff9800);
+      border-radius: 10px;
+      color: white;
+      margin-bottom: 14px;
+    }
+
+    .currency-icon {
+      font-size: 36px;
+    }
+
+    .currency-amount {
+      font-size: 30px;
+      font-weight: bold;
+    }
+
+    .currency-label {
+      font-size: 13px;
+      opacity: 0.85;
+    }
+
+    .tx-list {
+      max-height: 260px;
+      overflow-y: auto;
+    }
+
+    .tx-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 13px;
+    }
+
+    .tx-item:last-child {
+      border-bottom: none;
+    }
+
+    .tx-amount.earn {
+      color: #28a745;
+      font-weight: bold;
+      min-width: 70px;
+      text-align: right;
+    }
+
+    .tx-amount.spend {
+      color: #dc3545;
+      font-weight: bold;
+      min-width: 70px;
+      text-align: right;
+    }
+
+    .tx-time {
+      color: #adb5bd;
+      font-size: 12px;
+      min-width: 80px;
+      text-align: right;
+    }
+
+    .tx-reason {
+      flex: 1;
+      color: #495057;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ===== 等级奖励 ===== */
+    .reward-progress {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .reward-dot {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: bold;
+      border: 2px solid #dee2e6;
+      color: #adb5bd;
+      background: white;
+    }
+
+    .reward-dot.claimed {
+      border-color: #28a745;
+      color: #28a745;
+      background: #f0fdf4;
+    }
+
+    .reward-dot.available {
+      border-color: #007bff;
+      color: #007bff;
+      background: #e6f2ff;
+      cursor: pointer;
+    }
+
+    .reward-dot.available:hover {
+      background: #007bff;
+      color: white;
+    }
+
+    .reward-dot.active {
+      border-color: #007bff;
+      color: #007bff;
+    }
+
+    .reward-line {
+      flex: 1;
+      height: 2px;
+      background: #dee2e6;
+    }
+
+    .reward-line.claimed {
+      background: #28a745;
+    }
+
+    .reward-list {
+      margin-top: 8px;
+    }
+
+    .reward-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      border: 1px solid #e9ecef;
+    }
+
+    .reward-row.claimed {
+      background: #f0fdf4;
+      border-color: #c3e6cb;
+    }
+
+    .reward-row.available {
+      background: #e6f2ff;
+      border-color: #b3d7ff;
+      cursor: pointer;
+    }
+
+    .reward-row.available:hover {
+      border-color: #007bff;
+    }
+
+    .reward-row.future {
+      opacity: 0.6;
+    }
+
+    .reward-lv {
+      font-size: 18px;
+      font-weight: bold;
+      color: #007bff;
+      min-width: 50px;
+      text-align: center;
+    }
+
+    .reward-desc {
+      flex: 1;
+      font-size: 13px;
+      color: #495057;
+    }
+
+    .reward-badge {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 5px;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    .reward-badge.claimed-badge {
+      background: #28a745;
+      color: white;
+    }
+
+    .reward-badge.grab-badge {
+      background: #007bff;
+      color: white;
+    }
+
+    .reward-badge.locked-badge {
+      background: #adb5bd;
+      color: white;
+    }
+
+    .claim-all-btn {
+      padding: 6px 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 13px;
+      background: #007bff;
+      color: white;
+    }
+
+    .claim-all-btn:hover {
+      background: #0056b3;
+    }
+
+    .claim-all-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* ===== 成就 ===== */
+    .achieve-summary {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 14px;
+      padding: 14px;
+      background: #f8f9fa;
+      border-radius: 10px;
+    }
+
+    .achieve-summary .as-item {
+      text-align: center;
+      flex: 1;
+    }
+
+    .achieve-summary .as-num {
+      font-size: 24px;
+      font-weight: bold;
+      color: #007bff;
+    }
+
+    .achieve-summary .as-label {
+      font-size: 12px;
+      color: #6c757d;
+      margin-top: 2px;
+    }
+
+    .achieve-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 8px;
+      max-height: 360px;
+      overflow-y: auto;
+    }
+
+    .achieve-card {
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #e9ecef;
+      text-align: center;
+      background: #fafafa;
+    }
+
+    .achieve-card.unlocked {
+      border-color: #ffc107;
+      background: #fffbe6;
+    }
+
+    .achieve-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .achieve-icon {
+      font-size: 28px;
+      margin-bottom: 4px;
+    }
+
+    .achieve-name {
+      font-size: 13px;
+      font-weight: bold;
+      color: #2d3748;
+    }
+
+    .achieve-desc {
+      font-size: 11px;
+      color: #adb5bd;
+      margin-top: 2px;
+    }
+
+    .achieve-exp {
+      font-size: 11px;
+      color: #007bff;
+      margin-top: 4px;
+      font-weight: bold;
+    }
+
+    /* ===== 勋章 ===== */
+    .badge-grid {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .badge-item {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: #f8f9fa;
+      border: 2px solid #dee2e6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      cursor: default;
+    }
+
+    .badge-item.unlocked {
+      border-color: #ffc107;
+      background: #fffbe6;
+    }
+
+    /* ===== 状态 ===== */
+    .loading {
+      text-align: center;
+      padding: 60px 20px;
+      color: #6c757d;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 20px;
+      color: #adb5bd;
+      font-size: 13px;
+    }
+
+    /* ===== Toast ===== */
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      border-radius: 8px;
+      color: white;
+      font-weight: bold;
+      font-size: 14px;
+      z-index: 9999;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+      animation: slideInRight 0.3s ease;
+      max-width: 360px;
+    }
+
+    .toast.success {
+      background: #28a745;
+    }
+
+    .toast.info {
+      background: #007bff;
+    }
+
+    .toast.warning {
+      background: #ffc107;
+      color: #212529;
+    }
+
+    .toast.error {
+      background: #dc3545;
+    }
+
+    @keyframes slideInRight {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    /* ===== 响应式 ===== */
+    @media (max-width: 768px) {
+      body {
+        padding: 12px;
+      }
+
+      .content-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .profile-header {
+        flex-direction: column;
+        text-align: center;
+        padding: 20px;
+      }
+
+      .header-stats {
+        justify-content: center;
+      }
+
+      .header-meta {
+        justify-content: center;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+      }
+
+      .stat-item .num {
+        font-size: 20px;
+      }
+
+      .currency-amount {
+        font-size: 24px;
+      }
+
+      .achieve-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .reward-progress {
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #ced4da;
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #adb5bd;
+    }
+
+    /* ===== 模态框 ===== */
+    .settings-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .settings-modal {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .settings-modal h2 {
+      font-size: 18px;
+      color: #2d3748;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .settings-modal h2 .close-btn {
+      margin-left: auto;
+      background: none;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      color: #6c757d;
+      padding: 0 4px;
+    }
+
+    .settings-modal h2 .close-btn:hover {
+      color: #2d3748;
+    }
+
+    .settings-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #f0f0f0;
+      padding-bottom: 0;
+    }
+
+    .settings-tab {
+      padding: 8px 16px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      color: #6c757d;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+    }
+
+    .settings-tab.active {
+      color: #007bff;
+      border-bottom-color: #007bff;
+    }
+
+    .settings-tab:hover {
+      color: #007bff;
+    }
+
+    .settings-panel {
+      display: none;
+    }
+
+    .settings-panel.active {
+      display: block;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-group label {
+      display: block;
+      font-weight: 500;
+      color: #4a5568;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #3182ce;
+    }
+
+    .form-group .hint {
+      font-size: 12px;
+      color: #6c757d;
+      margin-top: 4px;
+    }
+
+    .btn-primary {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 14px;
+      background: #007bff;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #0056b3;
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- 导航栏 -->
+  <div class="game-nav">
+    <button class="nav-btn" onclick="window.location.href='/'">🏠 游戏大厅</button>
+    <button class="nav-btn active">👤 个人资料</button>
+    <button class="nav-btn" onclick="window.location.href='/games-history.html'">📊 游戏记录</button>
+    <button class="nav-btn" onclick="window.location.href='/shop.html'">🛒 星钻消费</button>
+    <button class="nav-btn" onclick="window.location.href='/feedback.html'">💬 帮助/反馈</button>
+    <button class="nav-btn" onclick="openSettings()">⚙️ 账号设置</button>
+  </div>
+
+  <div class="container">
+
+    <!-- 加载中 -->
+    <div class="loading" id="loadingState">
+      <div style="font-size: 40px; margin-bottom: 12px;">⏳</div>
+      <div>加载中，请稍候...</div>
+    </div>
+
+    <!-- 未登录 -->
+    <div class="card" id="loginRequired" style="display:none; text-align:center; padding:60px 40px;">
+      <div style="font-size: 48px; margin-bottom: 16px;">🔒</div>
+      <h2 style="margin-bottom: 8px;">未登录</h2>
+      <p style="color: #6c757d; margin-bottom: 24px;">请先在游戏大厅登录后再查看个人资料</p>
+      <button class="claim-all-btn" style="padding:12px 32px; font-size:15px;"
+        onclick="window.location.href='/'">返回游戏大厅</button>
+    </div>
+
+    <!-- 内容区 -->
+    <div id="profileContent" style="display:none;">
+
+      <!-- 头部 -->
+      <div class="profile-header">
+        <div class="avatar" id="avatarDisplay">👤</div>
+        <div class="header-info">
+          <h1 id="displayName">加载中...</h1>
+          <div class="subtitle" id="userMeta">ID: -</div>
+          <div class="header-meta">
+            <span>注册时间: <strong id="regTime">-</strong></span>
+            <span>账号类型: <strong id="accountType">-</strong></span>
+            <span>登录次数: <strong id="loginCount">-</strong></span>
+          </div>
+          <div class="exp-section">
+            <div class="exp-labels">
+              <span>等级 <strong id="levelDisplay">1</strong></span>
+              <span id="expDisplay">经验: 0 / 100</span>
+            </div>
+            <div class="exp-bar">
+              <div class="exp-bar-fill" id="expBarFill" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+        <div class="header-stats">
+          <div class="header-stat">
+            <div class="num" id="hTotalGames">0</div>
+            <div class="label">总局数</div>
+          </div>
+          <div class="header-stat">
+            <div class="num" id="hWins">0</div>
+            <div class="label">胜利</div>
+          </div>
+          <div class="header-stat">
+            <div class="num" id="hWinRate">0%</div>
+            <div class="label">胜率</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 双栏 -->
+      <div class="content-grid">
+        <!-- 左栏 -->
+        <div>
+          <!-- 星钻 -->
+          <div class="card">
+            <div class="card-title">
+              <span>💎 星钻</span>
+              <span class="right" id="txCount">共 0 笔记录</span>
+            </div>
+            <div class="currency-box">
+              <span class="currency-icon">💎</span>
+              <span class="currency-amount" id="currencyBalance">0</span>
+              <span class="currency-label">星钻</span>
+            </div>
+            <div
+              style="padding: 10px 14px; background: #fff3cd; border-radius: 8px; margin-bottom: 14px; font-size: 13px; color: #856404;">
+              💡 <strong>星钻获取规则</strong>：
+              <ul style="margin: 6px 0 0 20px; padding: 0;">
+                <li>每获得10点经验奖励1星钻</li>
+                <li>每升1级奖励50星钻</li>
+                <li>等级奖励额外赠送大量星钻</li>
+              </ul>
+            </div>
+            <div class="tx-list" id="txList">
+              <div class="empty">暂无星钻变动记录</div>
+            </div>
+          </div>
+
+          <!-- 等级奖励 -->
+          <div class="card">
+            <div class="card-title">
+              <span>🎁 等级奖励</span>
+              <button class="claim-all-btn" id="claimAllBtn" onclick="claimAllRewards()"
+                style="display:none">领取全部</button>
+            </div>
+            <div class="reward-progress" id="rewardProgress"></div>
+            <div class="reward-list" id="rewardList">
+              <div class="empty">加载中...</div>
+            </div>
+          </div>
+
+          <!-- 勋章 -->
+          <div class="card">
+            <div class="card-title">
+              <span>🏅 勋章</span>
+              <span class="right" id="badgeCount">0 个</span>
+            </div>
+            <div class="badge-grid" id="badgeGrid">
+              <div class="empty">暂无勋章</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右栏 -->
+        <div>
+          <!-- 游戏统计 -->
+          <div class="card">
+            <div class="card-title">📊 游戏统计</div>
+            <div class="stats-grid">
+              <div class="stat-item">
+                <div class="num" id="statGames">0</div>
+                <div class="label">总局数</div>
+              </div>
+              <div class="stat-item">
+                <div class="num" id="statWins">0</div>
+                <div class="label">胜利</div>
+              </div>
+              <div class="stat-item">
+                <div class="num" id="statDraws">0</div>
+                <div class="label">平局</div>
+              </div>
+              <div class="stat-item">
+                <div class="num" id="statLosses">0</div>
+                <div class="label">失败</div>
+              </div>
+              <div class="stat-item">
+                <div class="num" id="statWinRate">0%</div>
+                <div class="label">胜率</div>
+              </div>
+              <div class="stat-item">
+                <div class="num" id="statStreak">0</div>
+                <div class="label">连胜</div>
+              </div>
+            </div>
+            <div class="game-type-stats" id="gameTypeStats"></div>
+          </div>
+
+          <!-- 成就 -->
+          <div class="card">
+            <div class="card-title">
+              <span>🏆 成就</span>
+              <span class="right" id="achieveProgress">0 / 0</span>
+            </div>
+            <div class="achieve-summary">
+              <div class="as-item">
+                <div class="as-num" id="asTotal">0</div>
+                <div class="as-label">总成就</div>
+              </div>
+              <div class="as-item">
+                <div class="as-num" id="asUnlocked">0</div>
+                <div class="as-label">已解锁</div>
+              </div>
+              <div class="as-item">
+                <div class="as-num" id="asPercent">0%</div>
+                <div class="as-label">完成度</div>
+              </div>
+            </div>
+            <div class="achieve-grid" id="achieveGrid">
+              <div class="empty">加载中...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===== 工具函数 =====
+    function showToast(msg, type = 'info') {
+      const old = document.querySelector('.toast');
+      if (old) old.remove();
+      const t = document.createElement('div');
+      t.className = 'toast ' + type;
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateX(100%)'; }, 3000);
+      setTimeout(() => t.remove(), 3500);
+    }
+
+    function fmtDate(ts) {
+      if (!ts) return '-';
+      const d = new Date(ts);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    function fmtTime(ts) {
+      if (!ts) return '-';
+      const d = new Date(ts);
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+
+    // ===== Socket =====
+    const socket = io(window.location.origin, { transports: ['websocket', 'polling'], reconnection: true });
+    let currentAccountId = null;
+
+    function getToken() {
+      return localStorage.getItem('userToken');
+    }
+
+    // ===== 经验计算（与服务器一致）=====
+    const EXP_MAP = { 2: 80, 3: 160, 4: 280, 5: 440, 6: 640, 7: 880, 8: 1200, 9: 1600, 10: 2100, 11: 2700, 12: 3400, 13: 4200, 14: 5100, 15: 6100, 16: 7300, 17: 8700, 18: 10300, 19: 12100, 20: 14100, 21: 16300, 22: 18700, 23: 21300, 24: 24100, 25: 27100, 26: 30300, 27: 33700, 28: 37300, 29: 41100, 30: 45100, 31: 49300, 32: 53700, 33: 58300, 34: 63100, 35: 68100, 36: 73300, 37: 78700, 38: 84300, 39: 90100, 40: 96100, 41: 102300, 42: 108700, 43: 115300, 44: 122100, 45: 129100, 46: 136300, 47: 143700, 48: 151300, 49: 159100, 50: 167100 };
+    function getExp(lv) { return EXP_MAP[lv] || Math.max(100, (lv - 1) * 100); }
+    function calcLevel(totalExp) {
+      let lv = 1, rem = totalExp;
+      while (true) { const n = getExp(lv + 1); if (rem < n || n <= 0) break; rem -= n; lv++; }
+      return { level: lv, currentExp: rem, nextExp: getExp(lv + 1) };
+    }
+
+    // ===== 渲染 =====
+    function renderProfile(data) {
+      const p = data.profile || {}, acct = data.account || {}, stats = data.stats || {}, games = data.games || {};
+      currentAccountData = acct;
+
+      // 基础信息
+      document.getElementById('displayName').textContent = acct.nickname || acct.username || '玩家';
+      document.getElementById('userMeta').textContent = 'ID: ' + (acct.id || '-');
+      document.getElementById('regTime').textContent = fmtDate(acct.createdAt);
+      document.getElementById('accountType').textContent = acct.type === 'guest' ? '游客' : '注册用户';
+      const avatarChar = (acct.nickname || acct.username || '?')[0];
+      document.getElementById('avatarDisplay').textContent = avatarChar;
+
+      // 等级经验
+      const { level, currentExp, nextExp } = calcLevel(p.exp || 0);
+      document.getElementById('levelDisplay').textContent = level;
+      document.getElementById('expDisplay').textContent = `经验: ${currentExp} / ${nextExp}`;
+      document.getElementById('expBarFill').style.width = Math.min(100, (currentExp / (nextExp || 100)) * 100) + '%';
+
+      // 头部统计
+      const totalGames = stats.totalGames || 0, totalWins = stats.totalWins || 0;
+      const winRate = totalGames > 0 ? Math.round(totalWins / totalGames * 100) : 0;
+      document.getElementById('hTotalGames').textContent = totalGames;
+      document.getElementById('hWins').textContent = totalWins;
+      document.getElementById('hWinRate').textContent = winRate + '%';
+
+      // 星钻
+      document.getElementById('currencyBalance').textContent = data.currency || 0;
+
+      // 详细统计
+      document.getElementById('statGames').textContent = totalGames;
+      document.getElementById('statWins').textContent = totalWins;
+      document.getElementById('statDraws').textContent = stats.totalDraws || 0;
+      document.getElementById('statLosses').textContent = stats.totalLosses || 0;
+      document.getElementById('statWinRate').textContent = winRate + '%';
+      document.getElementById('statStreak').textContent = stats.bestStreak || 0;
+
+      // 各棋种统计
+      renderGameTypeStats(games);
+
+      // 等级奖励
+      renderLevelRewards(data.levelRewards);
+
+      // 成就
+      renderAchievements(data.achievements);
+
+      // 勋章
+      renderBadges(data.achievements);
+
+      // 交易记录
+      loadTransactions(acct.id);
+    }
+
+    function renderGameTypeStats(games) {
+      const container = document.getElementById('gameTypeStats');
+      const types = [
+        { key: 'gobang', icon: '🔴', name: '五子棋' },
+        { key: 'go', icon: '⚪', name: '围棋' },
+        { key: 'chess', icon: '🟥', name: '象棋' },
+        { key: 'snake', icon: '🐍', name: '贪吃蛇' }
+      ];
+      let html = '';
+      for (const t of types) {
+        const g = games[t.key] || {};
+        const played = g.played || 0;
+        const wins = g.wins || 0;
+        const streak = g.streak || 0;
+        const wr = played > 0 ? Math.round(wins / played * 100) + '%' : '-';
+        html += `<div class="game-type-row">
+          <span class="type-icon">${t.icon}</span>
+          <span class="type-name">${t.name}</span>
+          <span class="type-stat">局数: <strong>${played}</strong></span>
+          <span class="type-stat">胜率: <strong>${wr}</strong></span>
+          <span class="type-stat">连胜: <strong>${streak}</strong></span>
+        </div>`;
+      }
+      container.innerHTML = html || '<div class="empty">暂无游戏数据</div>';
+    }
+
+    function renderLevelRewards(rw) {
+      const progressEl = document.getElementById('rewardProgress');
+      const listEl = document.getElementById('rewardList');
+      const claimBtn = document.getElementById('claimAllBtn');
+
+      const all = [
+        { level: 5, desc: '100💎 + 称号"棋坛新秀"' },
+        { level: 10, desc: '250💎 + 称号"对弈达人"' },
+        { level: 15, desc: '500💎 + 称号"棋艺高手"' },
+        { level: 20, desc: '800💎 + 限定徽章' },
+        { level: 25, desc: '1200💎 + 称号"棋坛精英"' },
+        { level: 30, desc: '1800💎 + 限定徽章' },
+        { level: 40, desc: '3000💎 + 称号"传奇大师"' },
+        { level: 50, desc: '5000💎 + 限定徽章 + 称号"至尊棋圣"' }
+      ];
+
+      const claimed = rw?.claimedLevels || [];
+      const available = (rw?.available || []).map(r => r.level);
+      const curLevel = parseInt(document.getElementById('levelDisplay').textContent) || 1;
+
+      // 进度条
+      let progHtml = '';
+      for (let i = 0; i < all.length; i++) {
+        const r = all[i];
+        if (i > 0) progHtml += `<div class="reward-line ${claimed.includes(r.level) ? 'claimed' : ''}"></div>`;
+        const isClaimed = claimed.includes(r.level);
+        const isAvail = available.includes(r.level);
+        const isPast = curLevel >= r.level;
+        let cls = 'reward-dot';
+        if (isClaimed) cls += ' claimed';
+        else if (isAvail) cls += ' available';
+        else if (isPast) cls += ' active';
+        const tip = isClaimed ? '✓' : isAvail ? '!' : r.level;
+        progHtml += `<div class="${cls}" title="Lv.${r.level}: ${r.desc}" onclick="${isAvail ? `claimLevelReward(${r.level})` : ''}">${tip}</div>`;
+      }
+      progressEl.innerHTML = progHtml;
+
+      // 列表
+      let hasAvailable = false;
+      let listHtml = '';
+      for (const r of all) {
+        const isClaimed = claimed.includes(r.level);
+        const isAvail = available.includes(r.level);
+        const isFuture = r.level > curLevel;
+        if (isAvail) hasAvailable = true;
+
+        let cls = 'reward-row';
+        if (isClaimed) cls += ' claimed';
+        else if (isAvail) cls += ' available';
+        else if (isFuture) cls += ' future';
+
+        let badge = '';
+        if (isClaimed) badge = '<span class="reward-badge claimed-badge">✓ 已领取</span>';
+        else if (isAvail) badge = '<span class="reward-badge grab-badge">点击领取</span>';
+        else if (isFuture) badge = '<span class="reward-badge locked-badge">Lv.' + r.level + '解锁</span>';
+
+        listHtml += `<div class="${cls}" onclick="${isAvail ? `claimLevelReward(${r.level})` : ''}">
+          <div class="reward-lv">Lv.${r.level}</div>
+          <div class="reward-desc">${r.desc}</div>
+          ${badge}
+        </div>`;
+      }
+      listEl.innerHTML = listHtml || '<div class="empty">暂无等级奖励</div>';
+      claimBtn.style.display = hasAvailable ? 'inline-block' : 'none';
+    }
+
+    function renderAchievements(ach) {
+      if (!ach || !ach.unlocked) {
+        document.getElementById('achieveProgress').textContent = '0 / 0';
+        document.getElementById('asTotal').textContent = '0';
+        document.getElementById('asUnlocked').textContent = '0';
+        document.getElementById('asPercent').textContent = '0%';
+        document.getElementById('achieveGrid').innerHTML = '<div class="empty">暂无成就数据</div>';
+        return;
+      }
+      const unlocked = ach.unlocked || [];
+      const prog = ach.progress || { total: 0, unlocked: 0, percentage: 0 };
+      document.getElementById('achieveProgress').textContent = prog.unlocked + ' / ' + prog.total;
+      document.getElementById('asTotal').textContent = prog.total;
+      document.getElementById('asUnlocked').textContent = prog.unlocked;
+      document.getElementById('asPercent').textContent = (prog.percentage || 0) + '%';
+
+      const icons = [20, 30, 40, 50, 60].map((n, i) => ({ max: n, icon: ['⭐', '🎯', '👑', '🏅', '🎖️', '🏆', '💎'][i] }));
+      icons.push({ max: Infinity, icon: '💎' });
+      const getIcon = id => (icons.find(i => id <= i.max) || icons[icons.length - 1]).icon;
+
+      if (unlocked.length === 0) {
+        document.getElementById('achieveGrid').innerHTML = '<div class="empty">还没有解锁任何成就</div>';
+        return;
+      }
+      let html = '';
+      for (const a of unlocked.slice(0, 36)) {
+        html += `<div class="achieve-card unlocked">
+          <div class="achieve-icon">${getIcon(a.id)}</div>
+          <div class="achieve-name">${a.name || ''}</div>
+          <div class="achieve-desc">${a.description || ''}</div>
+          <div class="achieve-exp">+${a.reward?.exp || 0} 经验</div>
+        </div>`;
+      }
+      if (unlocked.length > 36) {
+        html += '<div class="empty" style="grid-column:1/-1;padding:8px;">仅显示最近36个，共' + unlocked.length + '个</div>';
+      }
+      document.getElementById('achieveGrid').innerHTML = html;
+    }
+
+    function renderBadges(ach) {
+      const grid = document.getElementById('badgeGrid');
+      const count = document.getElementById('badgeCount');
+      if (!ach || !ach.badges || ach.badges.length === 0) {
+        grid.innerHTML = '<div class="empty">暂无勋章</div>';
+        count.textContent = '0 个';
+        return;
+      }
+      const badges = ach.badges;
+      count.textContent = badges.length + ' 个';
+      let html = '';
+      for (const b of badges) {
+        html += `<div class="badge-item unlocked" title="${b}">${b.includes('level') ? '🎖️' : '🏅'}</div>`;
+      }
+      grid.innerHTML = html;
+    }
+
+    // ===== 数据加载 =====
+
+    async function fetchProfile(accountId) {
+      try {
+        const res = await fetch('/api/profile/' + accountId);
+        const json = await res.json();
+        if (json.success && json.data) {
+          document.getElementById('loadingState').style.display = 'none';
+          document.getElementById('profileContent').style.display = 'block';
+          renderProfile(json.data);
+        } else {
+          showToast('加载个人资料失败', 'error');
+        }
+      } catch (err) {
+        console.error(err);
+        showToast('网络错误，请稍后重试', 'error');
+      }
+    }
+
+    async function loadTransactions(accountId) {
+      try {
+        const res = await fetch('/api/currency/' + accountId + '/transactions?limit=30');
+        const json = await res.json();
+        const list = document.getElementById('txList');
+        document.getElementById('txCount').textContent = '共 ' + (json.transactions?.length || 0) + ' 笔记录';
+        if (!json.success || !json.transactions || json.transactions.length === 0) {
+          list.innerHTML = '<div class="empty">暂无星钻变动记录</div>';
+          return;
+        }
+        // 也可以从传入的 data 中拿到登录次数
+        let html = '';
+        for (const tx of json.transactions) {
+          const icon = tx.type === 'earn' ? '💰' : '💸';
+          const cls = tx.type === 'earn' ? 'earn' : 'spend';
+          const sign = tx.type === 'earn' ? '+' : '-';
+          html += `<div class="tx-item">
+            <span>${icon}</span>
+            <span class="tx-reason">${tx.reason || tx.source || '未知'}</span>
+            <span class="tx-amount ${cls}">${sign}${tx.amount}💎</span>
+            <span class="tx-time">${fmtDate(tx.timestamp)} ${fmtTime(tx.timestamp)}</span>
+          </div>`;
+        }
+        list.innerHTML = html;
+      } catch (err) { /* ignore */ }
+    }
+
+    // ===== 等级奖励领取 =====
+
+    async function claimLevelReward(level) {
+      if (!currentAccountId) return;
+      try {
+        const res = await fetch('/api/level-rewards/' + currentAccountId + '/claim', { method: 'POST' });
+        const json = await res.json();
+        if (json.success && json.rewards?.length > 0) {
+          showToast('🎉 成功领取 ' + json.rewards.length + ' 项等级奖励！', 'success');
+          await fetchProfile(currentAccountId);
+        } else {
+          showToast('没有可领取的奖励', 'info');
+        }
+      } catch (e) {
+        showToast('领取失败，请稍后重试', 'error');
+      }
+    }
+
+    async function claimAllRewards() {
+      await claimLevelReward();
+    }
+
+    // ===== 账号设置（已登录时弹出模态框）=====
+
+    function showEditProfile() {
+      if (!currentAccountId) {
+        showToast('请先登录', 'warning');
+        return;
+      }
+      // 跳转到游戏大厅并打开账号设置
+      window.location.href = '/';
+      // 简单处理：提示用户去游戏大厅操作
+    }
+
+    // ===== Socket 事件 =====
+
+    socket.on('connect', () => {
+      const token = getToken();
+      if (token) {
+        socket.emit('get_account_by_token', { token });
+      } else {
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('loginRequired').style.display = 'block';
+      }
+    });
+
+    socket.on('account_info', (result) => {
+      if (result?.success && result.data) {
+        currentAccountId = result.data.account?.account?.id || result.data.account?.id;
+        if (currentAccountId) {
+          fetchProfile(currentAccountId);
+        } else {
+          document.getElementById('loadingState').style.display = 'none';
+          document.getElementById('loginRequired').style.display = 'block';
+        }
+      } else {
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('loginRequired').style.display = 'block';
+      }
+    });
+
+    socket.on('account_updated', (data) => {
+      if (data?.account && currentAccountId) fetchProfile(currentAccountId);
+    });
+
+    // ===== 账号设置 =====
+
+    let currentAccountData = null;
+
+    function openSettings() {
+      if (!currentAccountId) { showToast('请先登录', 'warning'); return; }
+      // 填充当前账号数据
+      document.getElementById('settingsUsername').value = currentAccountData?.username || '';
+      document.getElementById('settingsNickname').value = currentAccountData?.nickname || '';
+      document.getElementById('settingsRegTime').value = fmtDate(currentAccountData?.createdAt);
+      document.getElementById('settingsOldPass').value = '';
+      document.getElementById('settingsNewPass').value = '';
+      document.getElementById('settingsNewPass2').value = '';
+      document.getElementById('settingsOverlay').style.display = 'flex';
+    }
+
+    function closeSettings() {
+      document.getElementById('settingsOverlay').style.display = 'none';
+    }
+
+    function switchSettingsTab(tab) {
+      document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+      document.querySelector(`.settings-tab[onclick*="${tab}"]`).classList.add('active');
+      document.getElementById('panel-' + tab).classList.add('active');
+    }
+
+    function saveProfile() {
+      const nickname = document.getElementById('settingsNickname').value.trim();
+      if (!nickname) { showToast('昵称不能为空', 'warning'); return; }
+      if (nickname.length < 1 || nickname.length > 20) { showToast('昵称长度应在1-20个字符', 'warning'); return; }
+      socket.emit('account_update_profile', { nickname, profile: currentAccountData?.profile || {} });
+      showToast('正在保存...', 'info');
+    }
+
+    function changePassword() {
+      const oldPass = document.getElementById('settingsOldPass').value;
+      const newPass = document.getElementById('settingsNewPass').value;
+      const newPass2 = document.getElementById('settingsNewPass2').value;
+      if (!oldPass) { showToast('请输入当前密码', 'warning'); return; }
+      if (newPass.length < 6) { showToast('新密码至少6位', 'warning'); return; }
+      if (newPass !== newPass2) { showToast('两次密码输入不一致', 'warning'); return; }
+      socket.emit('account_change_password', { oldPassword: oldPass, newPassword: newPass });
+      showToast('正在修改...', 'info');
+    }
+
+    // 监听账号操作结果
+    socket.on('account_action_result', (result) => {
+      console.log('账号操作结果:', result);
+      if (result.action === 'update_profile') {
+        if (result.success) {
+          showToast('✅ 昵称修改成功！', 'success');
+          closeSettings();
+          // 刷新个人资料
+          if (currentAccountId) fetchProfile(currentAccountId);
+        } else {
+          showToast('❌ ' + (result.message || '修改失败'), 'error');
+        }
+      } else if (result.action === 'change_password') {
+        if (result.success) {
+          showToast('✅ 密码修改成功！', 'success');
+          closeSettings();
+        } else {
+          showToast('❌ ' + (result.message || '修改失败'), 'error');
+        }
+      }
+    });
+
+    console.log('个人资料页已加载');
+  </script>
+
+  <!-- 账号设置模态框 -->
+  <div class="settings-overlay" id="settingsOverlay" style="display:none;"
+    onclick="if(event.target===this)closeSettings()">
+    <div class="settings-modal">
+      <h2>
+        ⚙️ 账号设置
+        <button class="close-btn" onclick="closeSettings()">✕</button>
+      </h2>
+      <div class="settings-tabs">
+        <button class="settings-tab active" onclick="switchSettingsTab('profile')">📝 个人资料</button>
+        <button class="settings-tab" onclick="switchSettingsTab('password')">🔑 修改密码</button>
+      </div>
+      <!-- 个人资料 -->
+      <div class="settings-panel active" id="panel-profile">
+        <div class="form-group">
+          <label>用户名</label>
+          <input type="text" id="settingsUsername" disabled style="background:#f7fafc;cursor:not-allowed;">
+        </div>
+        <div class="form-group">
+          <label>昵称</label>
+          <input type="text" id="settingsNickname" placeholder="输入新昵称" maxlength="20">
+          <div class="hint">显示在游戏中的名字，1-20个字符</div>
+        </div>
+        <div class="form-group">
+          <label>注册时间</label>
+          <input type="text" id="settingsRegTime" disabled style="background:#f7fafc;cursor:not-allowed;">
+        </div>
+        <button class="btn-primary" onclick="saveProfile()">保存修改</button>
+      </div>
+      <!-- 修改密码 -->
+      <div class="settings-panel" id="panel-password">
+        <div class="form-group">
+          <label>当前密码</label>
+          <input type="password" id="settingsOldPass" placeholder="输入当前密码">
+        </div>
+        <div class="form-group">
+          <label>新密码</label>
+          <input type="password" id="settingsNewPass" placeholder="至少6位新密码">
+          <div class="hint">密码长度至少6个字符</div>
+        </div>
+        <div class="form-group">
+          <label>确认新密码</label>
+          <input type="password" id="settingsNewPass2" placeholder="再次输入新密码">
+        </div>
+        <button class="btn-primary" onclick="changePassword()">修改密码</button>
+      </div>
+    </div>
+  </div>
+
+</body>
+
+</html>

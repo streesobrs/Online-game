@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#007bff">
+  <title>星钻消费 - 多棋种联机大厅</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      transition: all 0.25s ease;
+    }
+
+    body {
+      font-family: 'Microsoft Yahei', Arial, sans-serif;
+      background: #f0f2f5;
+      color: #2d3748;
+      min-height: 100vh;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ===== 顶部导航 ===== */
+    .game-nav {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+      background: white;
+      padding: 8px 16px;
+      border-radius: 10px;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+      width: 100%;
+      max-width: 1100px;
+      flex-wrap: wrap;
+    }
+
+    .nav-btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 7px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 15px;
+      background: #f8f9fa;
+      color: #495057;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .nav-btn:hover {
+      background: #e9ecef;
+      transform: translateY(-2px);
+    }
+
+    .nav-btn.active {
+      background: #007bff;
+      color: white;
+    }
+
+    .nav-btn.active:hover {
+      background: #0056b3;
+    }
+
+    /* ===== 主容器 ===== */
+    .container {
+      width: 100%;
+      max-width: 1100px;
+    }
+
+    /* ===== 页面标题 ===== */
+    .page-header {
+      background: white;
+      padding: 24px 28px;
+      border-radius: 12px;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+      margin-bottom: 16px;
+    }
+
+    .page-header h1 {
+      font-size: 28px;
+      color: #2d3748;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* ===== 敬请期待 ===== */
+    .coming-soon {
+      background: white;
+      padding: 80px 40px;
+      border-radius: 12px;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+      text-align: center;
+    }
+
+    .coming-icon {
+      font-size: 96px;
+      margin-bottom: 24px;
+      animation: bounce 2s infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-20px); }
+    }
+
+    .coming-title {
+      font-size: 32px;
+      font-weight: bold;
+      color: #2d3748;
+      margin-bottom: 16px;
+    }
+
+    .coming-desc {
+      font-size: 16px;
+      color: #6c757d;
+      max-width: 500px;
+      margin: 0 auto;
+      line-height: 1.8;
+    }
+
+    .feature-list {
+      margin-top: 32px;
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .feature-item {
+      background: #f8f9fa;
+      padding: 16px 24px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .feature-icon {
+      font-size: 24px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- 导航栏 -->
+  <div class="game-nav">
+    <button class="nav-btn" onclick="window.location.href='/'">🏠 游戏大厅</button>
+    <button class="nav-btn" onclick="window.location.href='/profile.html'">👤 个人资料</button>
+    <button class="nav-btn" onclick="window.location.href='/games-history.html'">📊 游戏记录</button>
+    <button class="nav-btn active">🛒 星钻消费</button>
+    <button class="nav-btn" onclick="window.location.href='/feedback.html'">💬 帮助/反馈</button>
+  </div>
+
+  <div class="container">
+
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <h1>🛒 星钻消费</h1>
+    </div>
+
+    <!-- 敬请期待 -->
+    <div class="coming-soon">
+      <div class="coming-icon">🚧</div>
+      <div class="coming-title">敬请期待</div>
+      <div class="coming-desc">
+        星钻商店正在紧张建设中，很快就能用星钻兑换各种好东西啦！<br>
+        请持续关注我们的更新哦~
+      </div>
+      <div class="feature-list">
+        <div class="feature-item">
+          <span class="feature-icon">🎨</span>
+          <span>个性头像框</span>
+        </div>
+        <div class="feature-item">
+          <span class="feature-icon">🖼️</span>
+          <span>精美背景</span>
+        </div>
+        <div class="feature-item">
+          <span class="feature-icon">🏆</span>
+          <span>专属头衔</span>
+        </div>
+        <div class="feature-item">
+          <span class="feature-icon">🎁</span>
+          <span>更多惊喜</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+
+</html>

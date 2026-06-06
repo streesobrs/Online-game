@@ -26,6 +26,7 @@
       align-items: center;
       font-family: 'Microsoft Yahei', Arial, sans-serif;
       padding: 20px;
+      padding-top: 20px;
       min-height: 100vh;
     }
 
@@ -2267,20 +2268,209 @@
 
     .account-bar {
       display: flex;
-      justify-content: flex-end;
+      justify-content: center;
       align-items: center;
       gap: 10px;
       width: 100%;
       max-width: 1000px;
       margin-bottom: 10px;
+      position: sticky;
+      top: 10px;
+      z-index: 100;
+      transition: all 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .account-bar.collapsed {
+      justify-content: flex-end;
+      max-width: 100%;
+      padding-right: 10px;
+    }
+
+    .account-info {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 14px;
+      background: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: 10px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+      width: 1000px;
+      height: 48px;
+      min-height: 48px;
+      max-height: 48px;
+      border: 1px solid rgba(226, 232, 240, 0.8);
+      transition: all 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+      box-sizing: border-box;
+      overflow: visible;
+      position: relative;
+      z-index: 1;
+    }
+
+    .account-bar.collapsed .account-info {
+      width: 56px;
+      padding: 8px;
+      opacity: 0.65;
+      background: rgba(255, 255, 255, 0.92);
+      border-radius: 12px;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .account-bar.collapsed .account-info:hover {
+      opacity: 1;
+      width: 600px;
+      padding: 8px 14px;
+      border-radius: 10px;
+      justify-content: space-between;
+      z-index: 101;
+    }
+
+    .account-bar.collapsed .account-info:hover .account-user-section {
+      position: relative;
+      left: auto;
+      top: auto;
+      transform: none;
+      width: auto;
+      height: auto;
+    }
+
+    .account-bar.collapsed .account-info:hover .account-user-details {
+      display: flex !important;
+    }
+
+    .account-bar.collapsed .account-info:hover .account-avatar {
+      position: relative;
+      left: auto;
+      top: auto;
+      transform: none;
+    }
+
+    .account-bar.collapsed .account-buttons {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    .account-bar.collapsed .account-info:hover .account-buttons {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .account-bar.collapsed .account-user-section {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 1;
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: auto;
+      height: auto;
+    }
+
+    .account-bar.collapsed .account-user-details {
+      display: none !important;
+    }
+
+    .account-bar.collapsed .account-avatar {
+      font-size: 24px;
+      width: 36px;
+      height: 36px;
+      opacity: 1;
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .account-info:hover {
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .account-user-section {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .account-user-details,
+    .account-buttons {
+      transition: opacity 0.3s ease 0.15s;
+      opacity: 1;
+    }
+
+    .account-avatar {
+      font-size: 24px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 4px rgba(102, 126, 234, 0.25);
+      flex-shrink: 0;
+    }
+
+    .account-user-details {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .account-nickname {
+      font-weight: bold;
+      color: #2d3748;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .account-stats {
+      display: flex;
+      gap: 6px;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+    }
+
+    .account-starcoins {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      padding: 3px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: bold;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    .account-buttons {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .account-btn {
+      padding: 6px 12px;
+      font-size: 13px;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .account-level {
       background: linear-gradient(135deg, #f39c12, #e74c3c);
       color: white;
-      padding: 4px 10px;
-      border-radius: 15px;
-      font-size: 12px;
+      padding: 3px 8px;
+      border-radius: 10px;
+      font-size: 11px;
       font-weight: bold;
       text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
     }
@@ -2288,9 +2478,9 @@
     .account-exp {
       background: linear-gradient(135deg, #3498db, #2ecc71);
       color: white;
-      padding: 4px 10px;
-      border-radius: 15px;
-      font-size: 12px;
+      padding: 3px 8px;
+      border-radius: 10px;
+      font-size: 11px;
       font-weight: bold;
       text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
     }
@@ -3204,14 +3394,14 @@
 
   <!-- 版本信息 -->
   <div class="version-info">
-    版本说明：多棋种联机大厅版 - 支持五子棋/围棋/象棋 | 智能提示系统 | 性能优化版 | 快捷键系统 v<span id="client-version-display">1.4.0</span>
+    版本说明：多棋种联机大厅版 - 支持五子棋/围棋/象棋 | 智能提示系统 | 性能优化版 | 快捷键系统 v<span id="client-version-display">1.5.0</span>
     <span id="server-version-display" style="margin-left: 10px; font-size: 12px; color: #666;"></span>
   </div>
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>
     // 版本号 (语义化版本: MAJOR.MINOR.PATCH)
-    const CLIENT_VERSION = '1.4.0';
+    const CLIENT_VERSION = '1.5.0';
 
     // 全局游戏变量
     let currentGame = 'gobang'; // 当前选择的棋种：gobang, go, chess, snake
@@ -4875,6 +5065,7 @@
           }
 
           localStorage.setItem('currentAccountId', accountId);
+          localStorage.setItem('nickname', nickname || username || '玩家');
 
           // 更新界面
           updateAccountBar();
@@ -10414,7 +10605,7 @@
       const accountBar = document.getElementById('account-bar');
       if (currentAccount) {
         // 处理不同的数据结构
-        let accountType, nickname, username, level, exp;
+        let accountType, nickname, username, level, exp, starCoins;
         if (currentAccount.account.account) {
           // 账号登录的数据结构
           accountType = currentAccount.account.account.type;
@@ -10422,6 +10613,7 @@
           username = currentAccount.account.account.username;
           level = currentAccount.account.account.profile?.level || 1;
           exp = currentAccount.account.account.profile?.exp || 0;
+          starCoins = currentAccount.account.currency?.starCoins || 0;
         } else {
           // 游客登录的数据结构
           accountType = currentAccount.account.type;
@@ -10429,6 +10621,7 @@
           username = currentAccount.account.username;
           level = currentAccount.account.profile?.level || 1;
           exp = currentAccount.account.profile?.exp || 0;
+          starCoins = currentAccount.currency?.starCoins || 0;
         }
 
         // 根据用户类型显示不同的退出按钮
@@ -10436,18 +10629,28 @@
         const logoutText = isGuest ? '退出游客' : '退出登录';
         const logoutFunction = isGuest ? 'guestLogout()' : 'logout()';
 
-        // 游客用户不显示资料按钮，但显示游戏历史按钮
-        const profileButton = isGuest ? '' : '<button class="account-btn btn-info" onclick="showProfileModal()">资料</button>';
+        // 游客用户不显示资料按钮
+        const profileButton = isGuest ? '' : '<button class="account-btn btn-info" onclick="window.location.href=\'/profile.html\'">👤 资料</button>';
         const historyButton = '<button class="account-btn" onclick="showGameHistoryModal()" style="background: #9b59b6;">📜 历史</button>';
 
         accountBar.innerHTML = `
           <div class="account-info">
-            <span class="account-nickname">👤 ${nickname || username}</span>
-            <span class="account-level">Lv.${level}</span>
-            <span class="account-exp">${exp} EXP</span>
-            ${profileButton}
-            ${historyButton}
-            <button class="account-btn" onclick="${logoutFunction}">${logoutText}</button>
+            <div class="account-user-section">
+              <span class="account-avatar">👤</span>
+              <div class="account-user-details">
+                <span class="account-nickname">${nickname || username}</span>
+                <div class="account-stats">
+                  <span class="account-level">Lv.${level}</span>
+                  <span class="account-exp">${exp} EXP</span>
+                  <span class="account-starcoins">💎 ${starCoins}</span>
+                </div>
+              </div>
+            </div>
+            <div class="account-buttons">
+              ${profileButton}
+              ${historyButton}
+              <button class="account-btn" onclick="${logoutFunction}">${logoutText}</button>
+            </div>
           </div>
         `;
       } else {
@@ -12527,6 +12730,23 @@
         showToast('您当前以游客身份登录，部分功能受限', 'info', 5000);
       }
     }
+
+    // ========== 账号栏浮动效果 ==========
+    const accountBar = document.getElementById('account-bar');
+    let scrollTimeout;
+
+    function handleScroll() {
+      if (window.scrollY > 30) {
+        accountBar.classList.add('collapsed');
+      } else {
+        accountBar.classList.remove('collapsed');
+      }
+    }
+
+    window.addEventListener('scroll', () => {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(handleScroll, 50);
+    });
 
     // ========== 页面清理 ==========
     window.onunload = () => {

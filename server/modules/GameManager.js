@@ -900,11 +900,11 @@ class GameManager {
           // 先给予经验值奖励（更新等级），再检查成就
           let expReward = 0;
           if (playerResult === 'win') {
-            expReward = 50;
+            expReward = 100;
           } else if (playerResult === 'draw') {
-            expReward = 25;
+            expReward = 50;
           } else {
-            expReward = 10;
+            expReward = 20;
           }
 
           if (expReward > 0) {
@@ -1845,18 +1845,18 @@ class GameManager {
       // 根据结果给予经验值
       let expReward = 0;
       if (result === 'win') {
-        expReward = 50; // 胜利奖励
+        expReward = 100; // 胜利奖励
       } else if (result === 'draw') {
-        expReward = 25; // 平局奖励
+        expReward = 50; // 平局奖励
       } else {
-        expReward = 10; // 失败安慰奖
+        expReward = 20; // 失败安慰奖
       }
 
       // 根据难度调整
       if (aiGame.difficulty === 'hard') {
-        expReward = Math.floor(expReward * 1.5);
+        expReward = Math.floor(expReward * 2.0);
       } else if (aiGame.difficulty === 'medium') {
-        expReward = Math.floor(expReward * 1.2);
+        expReward = Math.floor(expReward * 1.5);
       }
 
       // 添加经验值

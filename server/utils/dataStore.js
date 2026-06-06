@@ -11,13 +11,16 @@ class DataStore {
     // 按ID拆分的集合配置
     this.splitByIdCollections = {
       'accounts': 'accounts',
-      'games': 'games' // 游戏记录按ID拆分存储
+      'games': 'games', // 游戏记录按ID拆分存储
+      'currencyTransactions': 'currency_transactions' // 星钻交易记录按用户ID拆分存储
     };
+
     // 普通集合的目录映射
     this.collectionDirs = {
       'globalChats': 'chats',
       'gameChats': 'chats',
-      'systemStats': 'system'
+      'systemStats': 'system',
+      'feedbacks': 'feedbacks'
     };
     this.init();
   }

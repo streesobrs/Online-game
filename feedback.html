@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#007bff">
+  <title>帮助/反馈 - 多棋种联机大厅</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      transition: all 0.25s ease;
+    }
+
+    body {
+      font-family: 'Microsoft Yahei', Arial, sans-serif;
+      background: #f0f2f5;
+      color: #2d3748;
+      min-height: 100vh;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ===== 顶部导航 ===== */
+    .game-nav {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+      background: white;
+      padding: 8px 16px;
+      border-radius: 10px;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+      width: 100%;
+      max-width: 1100px;
+      flex-wrap: wrap;
+    }
+
+    .nav-btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 7px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 15px;
+      background: #f8f9fa;
+      color: #495057;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .nav-btn:hover {
+      background: #e9ecef;
+      transform: translateY(-2px);
+    }
+
+    .nav-btn.active {
+      background: #007bff;
+      color: white;
+    }
+
+    .nav-btn.active:hover {
+      background: #0056b3;
+    }
+
+    /* ===== 主容器 ===== */
+    .container {
+      width: 100%;
+      max-width: 1100px;
+      display: grid;
+      grid-template-columns: 400px 1fr;
+      gap: 16px;
+    }
+
+    /* ===== 页面标题 ===== */
+    .page-header {
+      background: white;
+      padding: 24px 28px;
+      border-radius: 12px;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+      margin-bottom: 16px;
+      grid-column: 1 / -1;
+    }
+
+    .page-header h1 {
+      font-size: 28px;
+      color: #2d3748;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* ===== 提价反馈表单 ===== */
+    .submit-card {
+      background: white;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+      height: fit-content;
+    }
+
+    .submit-card h2 {
+      font-size: 20px;
+      margin-bottom: 16px;
+      color: #2d3748;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #495057;
+    }
+
+    .form-group select,
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      padding: 10px 14px;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      font-size: 15px;
+      font-family: inherit;
+    }
+
+    .form-group select:focus,
+    .form-group input:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #007bff;
+    }
+
+    .form-group textarea {
+      resize: vertical;
+      min-height: 120px;
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 12px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .submit-btn:hover {
+      background: #0056b3;
+    }
+
+    .submit-btn:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
+    }
+
+    /* ===== 反馈列表 ===== */
+    .feedbacks-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .feedback-card {
+      background: white;
+      padding: 20px 24px;
+      border-radius: 12px;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+    }
+
+    .feedback-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+      gap: 16px;
+    }
+
+    .feedback-title {
+      font-size: 18px;
+      font-weight: bold;
+      color: #2d3748;
+    }
+
+    .feedback-meta {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .feedback-type {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .type-bug {
+      background: #ffeaea;
+      color: #dc3545;
+    }
+
+    .type-feature {
+      background: #e3f2fd;
+      color: #1976d2;
+    }
+
+    .type-question {
+      background: #fff3e0;
+      color: #f57c00;
+    }
+
+    .type-other {
+      background: #f5f5f5;
+      color: #616161;
+    }
+
+    .feedback-status {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .status-pending {
+      background: #fff3e0;
+      color: #f57c00;
+    }
+
+    .status-processing {
+      background: #e3f2fd;
+      color: #1976d2;
+    }
+
+    .status-resolved {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+
+    .status-closed {
+      background: #f5f5f5;
+      color: #616161;
+    }
+
+    .feedback-author {
+      font-size: 14px;
+      color: #6c757d;
+    }
+
+    .feedback-content {
+      margin-bottom: 12px;
+      line-height: 1.6;
+      color: #495057;
+    }
+
+    .feedback-actions {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+
+    .vote-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border: 2px solid #e9ecef;
+      background: white;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #495057;
+    }
+
+    .vote-btn:hover {
+      border-color: #007bff;
+      color: #007bff;
+    }
+
+    .vote-btn.voted {
+      border-color: #007bff;
+      background: #e3f2fd;
+      color: #007bff;
+    }
+
+    .vote-count {
+      font-weight: bold;
+    }
+
+    .toggle-comments-btn {
+      padding: 6px 14px;
+      border: 2px solid #e9ecef;
+      background: white;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #495057;
+    }
+
+    .toggle-comments-btn:hover {
+      border-color: #007bff;
+      color: #007bff;
+    }
+
+    /* ===== 评论区 ===== */
+    .comments-section {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #e9ecef;
+      display: none;
+    }
+
+    .comments-section.open {
+      display: block;
+    }
+
+    .add-comment {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .add-comment input {
+      flex: 1;
+      padding: 10px 14px;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .add-comment input:focus {
+      outline: none;
+      border-color: #007bff;
+    }
+
+    .add-comment button {
+      padding: 10px 20px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .add-comment button:hover {
+      background: #0056b3;
+    }
+
+    .comments-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .comment-item {
+      background: #f8f9fa;
+      padding: 12px 16px;
+      border-radius: 8px;
+    }
+
+    .comment-author {
+      font-weight: bold;
+      color: #2d3748;
+      margin-bottom: 4px;
+    }
+
+    .comment-content {
+      color: #495057;
+    }
+
+    .comment-time {
+      font-size: 12px;
+      color: #6c757d;
+      margin-top: 6px;
+    }
+
+    /* ===== 加载状态 ===== */
+    .loading {
+      text-align: center;
+      padding: 60px 20px;
+      color: #6c757d;
+      grid-column: 1 / -1;
+    }
+
+    .loading-spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid #e9ecef;
+      border-top: 4px solid #007bff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* ===== 空状态 ===== */
+    .empty-state {
+      background: white;
+      padding: 60px 20px;
+      border-radius: 12px;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+      text-align: center;
+      color: #6c757d;
+      grid-column: 1 / -1;
+    }
+
+    .empty-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+
+    /* ===== 响应式 ===== */
+    @media (max-width: 900px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- 导航栏 -->
+  <div class="game-nav">
+    <button class="nav-btn" onclick="window.location.href='/'">🏠 游戏大厅</button>
+    <button class="nav-btn" onclick="window.location.href='/profile.html'">👤 个人资料</button>
+    <button class="nav-btn" onclick="window.location.href='/games-history.html'">📊 游戏记录</button>
+    <button class="nav-btn" onclick="window.location.href='/shop.html'">🛒 星钻消费</button>
+    <button class="nav-btn active">💬 帮助/反馈</button>
+  </div>
+
+  <div class="container">
+
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <h1>💬 帮助/反馈</h1>
+    </div>
+
+    <!-- 加载状态 -->
+    <div class="loading" id="loadingState">
+      <div class="loading-spinner"></div>
+      <div>加载中...</div>
+    </div>
+
+    <!-- 提交反馈表单 -->
+    <div class="submit-card" id="submitCard" style="display: none;">
+      <h2>📝 提交反馈</h2>
+      <div class="form-group">
+        <label>反馈类型</label>
+        <select id="feedbackType">
+          <option value="bug">Bug 反馈</option>
+          <option value="feature">功能建议</option>
+          <option value="question">问题咨询</option>
+          <option value="other">其他</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>标题</label>
+        <input type="text" id="feedbackTitle" placeholder="简要描述您的反馈">
+      </div>
+      <div class="form-group">
+        <label>详细内容</label>
+        <textarea id="feedbackContent" placeholder="请详细描述您的问题或建议..."></textarea>
+      </div>
+      <button class="submit-btn" id="submitBtn" onclick="submitFeedback()">提交反馈</button>
+    </div>
+
+    <!-- 反馈列表 -->
+    <div class="feedbacks-list" id="feedbacksList" style="display: none;"></div>
+
+    <!-- 空状态 -->
+    <div class="empty-state" id="emptyState" style="display: none;">
+      <div class="empty-icon">💬</div>
+      <h3>还没有任何反馈</h3>
+      <p>成为第一个提交反馈的人吧！</p>
+    </div>
+
+  </div>
+
+  <script>
+    const socket = io();
+    let userToken = null;
+    let currentAccountId = null;
+    let currentNickname = null;
+    let feedbacks = [];
+
+    // 类型配置
+    const typeConfig = {
+      bug: { label: 'Bug 反馈', class: 'type-bug' },
+      feature: { label: '功能建议', class: 'type-feature' },
+      question: { label: '问题咨询', class: 'type-question' },
+      other: { label: '其他', class: 'type-other' }
+    };
+
+    const statusConfig = {
+      pending: { label: '待处理', class: 'status-pending' },
+      processing: { label: '处理中', class: 'status-processing' },
+      resolved: { label: '已解决', class: 'status-resolved' },
+      closed: { label: '已关闭', class: 'status-closed' }
+    };
+
+    // Socket事件：获取用户信息
+    socket.on('account_info', (result) => {
+      if (result?.success && result.data) {
+        const account = result.data.account?.account || result.data.account;
+        if (account) {
+          currentAccountId = account.id;
+          currentNickname = account.nickname || account.username || '玩家';
+        }
+      }
+    });
+
+    // Socket事件监听
+    socket.on('feedbacks_list', (data) => {
+      feedbacks = data.feedbacks;
+      renderFeedbacks();
+    });
+
+    socket.on('feedback_submitted', () => {
+      alert('反馈提交成功！');
+      document.getElementById('feedbackTitle').value = '';
+      document.getElementById('feedbackContent').value = '';
+    });
+
+    socket.on('error', (data) => {
+      alert(data.message);
+    });
+
+    // 初始化
+    window.onload = async () => {
+      userToken = localStorage.getItem('userToken');
+      currentAccountId = localStorage.getItem('currentAccountId');
+      currentNickname = localStorage.getItem('nickname');
+
+      if (!userToken) {
+        alert('请先登录！');
+        window.location.href = '/';
+        return;
+      }
+
+      // 先通过Socket获取用户信息（如果localStorage中没有的话）
+      const token = localStorage.getItem('userToken');
+      if (token && (!currentAccountId || !currentNickname)) {
+        socket.emit('get_account_by_token', { token });
+      }
+
+      // 先通过fetch加载反馈列表
+      document.getElementById('loadingState').style.display = 'none';
+      document.getElementById('submitCard').style.display = 'block';
+      await loadFeedbacks();
+    };
+
+    // 加载反馈列表
+    async function loadFeedbacks() {
+      try {
+        const res = await fetch('/api/feedbacks');
+        const data = await res.json();
+        if (data.success) {
+          feedbacks = data.data;
+          renderFeedbacks();
+        }
+      } catch (err) {
+        console.error('加载反馈失败:', err);
+      }
+    }
+
+    // 提交反馈
+    async function submitFeedback() {
+      const type = document.getElementById('feedbackType').value;
+      const title = document.getElementById('feedbackTitle').value.trim();
+      const content = document.getElementById('feedbackContent').value.trim();
+
+      if (!title || !content) {
+        alert('请填写标题和内容');
+        return;
+      }
+
+      if (!currentAccountId) {
+        alert('请先登录！');
+        return;
+      }
+
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+
+      try {
+        const res = await fetch('/api/feedbacks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accountId: currentAccountId,
+            nickname: currentNickname || '玩家',
+            type,
+            title,
+            content
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('反馈提交成功！');
+          document.getElementById('feedbackTitle').value = '';
+          document.getElementById('feedbackContent').value = '';
+          loadFeedbacks();
+        } else {
+          alert(data.message || '提交失败');
+        }
+      } catch (err) {
+        console.error('提交反馈失败:', err);
+        alert('提交失败，请重试');
+      } finally {
+        submitBtn.disabled = false;
+      }
+    }
+
+    // 渲染反馈列表
+    function renderFeedbacks() {
+      const list = document.getElementById('feedbacksList');
+      const emptyState = document.getElementById('emptyState');
+      const loadingState = document.getElementById('loadingState');
+
+      loadingState.style.display = 'none';
+
+      if (feedbacks.length === 0) {
+        list.style.display = 'none';
+        emptyState.style.display = 'block';
+        return;
+      }
+
+      emptyState.style.display = 'none';
+      list.style.display = 'flex';
+      list.innerHTML = '';
+
+      feedbacks.forEach(feedback => {
+        const type = typeConfig[feedback.type] || typeConfig.other;
+        const status = statusConfig[feedback.status] || statusConfig.pending;
+        const voteCount = feedback.votes?.length || 0;
+        const hasVoted = feedback.votes?.some(v => v.accountId === currentAccountId);
+        const commentCount = feedback.comments?.length || 0;
+
+        const card = document.createElement('div');
+        card.className = 'feedback-card';
+        card.innerHTML = `
+          <div class="feedback-header">
+            <div>
+              <div class="feedback-title">${escapeHtml(feedback.title)}</div>
+              <div class="feedback-author">
+                ${escapeHtml(feedback.nickname)} · ${formatDate(feedback.createdAt)}
+              </div>
+            </div>
+            <div class="feedback-meta">
+              <span class="feedback-type ${type.class}">${type.label}</span>
+              <span class="feedback-status ${status.class}">${status.label}</span>
+            </div>
+          </div>
+          <div class="feedback-content">${escapeHtml(feedback.content)}</div>
+          <div class="feedback-actions">
+            <button class="vote-btn ${hasVoted ? 'voted' : ''}" onclick="voteFeedback('${feedback.id}')">
+              👍 <span class="vote-count">${voteCount}</span>
+            </button>
+            <button class="toggle-comments-btn" onclick="toggleComments('${feedback.id}')">
+              💬 ${commentCount} 条评论
+            </button>
+          </div>
+          <div class="comments-section" id="comments-${feedback.id}">
+            <div class="add-comment">
+              <input type="text" id="comment-input-${feedback.id}" placeholder="写下你的评论...">
+              <button onclick="addComment('${feedback.id}')">发送</button>
+            </div>
+            <div class="comments-list" id="comments-list-${feedback.id}">
+              ${renderComments(feedback.comments || [])}
+            </div>
+          </div>
+        `;
+
+        list.appendChild(card);
+      });
+    }
+
+    // 渲染评论
+    function renderComments(comments) {
+      if (comments.length === 0) {
+        return '<div style="color: #6c757d; text-align: center; padding: 20px;">暂无评论</div>';
+      }
+
+      return comments.map(comment => `
+        <div class="comment-item">
+          <div class="comment-author">${escapeHtml(comment.nickname)}</div>
+          <div class="comment-content">${escapeHtml(comment.content)}</div>
+          <div class="comment-time">${formatDate(comment.createdAt)}</div>
+        </div>
+      `).join('');
+    }
+
+    // 投票
+    async function voteFeedback(feedbackId) {
+      try {
+        const res = await fetch(`/api/feedbacks/${feedbackId}/vote`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accountId: currentAccountId,
+            voteType: 'up'
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadFeedbacks();
+        } else {
+          alert(data.message || '投票失败');
+        }
+      } catch (err) {
+        console.error('投票失败:', err);
+        alert('投票失败，请重试');
+      }
+    }
+
+    // 切换评论区
+    function toggleComments(feedbackId) {
+      const section = document.getElementById(`comments-${feedbackId}`);
+      section.classList.toggle('open');
+    }
+
+    // 添加评论
+    async function addComment(feedbackId) {
+      const input = document.getElementById(`comment-input-${feedbackId}`);
+      const content = input.value.trim();
+      if (!content) {
+        alert('请输入评论内容');
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/feedbacks/${feedbackId}/comments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accountId: currentAccountId,
+            nickname: currentNickname,
+            content
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          input.value = '';
+          loadFeedbacks();
+        } else {
+          alert(data.message || '评论失败');
+        }
+      } catch (err) {
+        console.error('评论失败:', err);
+        alert('评论失败，请重试');
+      }
+    }
+
+    // HTML转义
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // 格式化日期
+    function formatDate(timestamp) {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diff = now - date;
+
+      if (diff < 60000) return '刚刚';
+      if (diff < 3600000) return Math.floor(diff / 60000) + ' 分钟前';
+      if (diff < 86400000) return Math.floor(diff / 3600000) + ' 小时前';
+      if (diff < 604800000) return Math.floor(diff / 86400000) + ' 天前';
+
+      return date.toLocaleDateString('zh-CN') + ' ' + date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    }
+  </script>
+
+</body>
+
+</html>
