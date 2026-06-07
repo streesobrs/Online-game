@@ -81,6 +81,9 @@
       border-radius: 12px;
       box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
       margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     .page-header h1 {
@@ -91,60 +94,561 @@
       gap: 10px;
     }
 
-    /* ===== 敬请期待 ===== */
-    .coming-soon {
+    .star-coins {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-size: 20px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    /* ===== 商店标签 ===== */
+    .shop-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
       background: white;
-      padding: 80px 40px;
+      padding: 8px;
+      border-radius: 12px;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+    }
+
+    .shop-tab {
+      flex: 1;
+      padding: 12px 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 15px;
+      background: #f8f9fa;
+      color: #495057;
+    }
+
+    .shop-tab:hover {
+      background: #e9ecef;
+    }
+
+    .shop-tab.active {
+      background: #007bff;
+      color: white;
+    }
+
+    /* ===== 商品网格 ===== */
+    .items-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 16px;
+    }
+
+    .item-card {
+      background: white;
+      padding: 20px;
       border-radius: 12px;
       box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
       text-align: center;
     }
 
-    .coming-icon {
-      font-size: 96px;
-      margin-bottom: 24px;
-      animation: bounce 2s infinite;
+    .item-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
     }
 
-    @keyframes bounce {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-20px); }
+    .item-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
     }
 
-    .coming-title {
-      font-size: 32px;
+    .item-name {
+      font-size: 18px;
       font-weight: bold;
       color: #2d3748;
+      margin-bottom: 8px;
+    }
+
+    .item-desc {
+      font-size: 14px;
+      color: #6c757d;
+      margin-bottom: 16px;
+      min-height: 40px;
+    }
+
+    .item-price {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+      font-size: 20px;
+      font-weight: bold;
+      color: #fda085;
+      margin-bottom: 12px;
+    }
+
+    .buy-btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      background: #007bff;
+      color: white;
+    }
+
+    .buy-btn:hover {
+      background: #0056b3;
+    }
+
+    .buy-btn.owned {
+      background: #52c41a;
+    }
+
+    .buy-btn.equip {
+      background: #17a2b8;
+    }
+
+    .buy-btn:disabled {
+      background: #adb5bd;
+      cursor: not-allowed;
+    }
+
+    .item-card.disabled {
+      opacity: 0.6;
+    }
+
+    /* ===== 会员区 ===== */
+    .vip-section {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+      text-align: center;
+    }
+
+    .vip-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 36px;
+      border-radius: 16px;
+      max-width: 500px;
+      margin: 0 auto 24px;
+    }
+
+    .vip-title {
+      font-size: 26px;
+      font-weight: bold;
       margin-bottom: 16px;
     }
 
-    .coming-desc {
-      font-size: 16px;
-      color: #6c757d;
-      max-width: 500px;
-      margin: 0 auto;
-      line-height: 1.8;
+    .vip-days {
+      font-size: 48px;
+      font-weight: bold;
+      margin: 12px 0;
     }
 
-    .feature-list {
-      margin-top: 32px;
+    .vip-options {
       display: flex;
       gap: 16px;
       justify-content: center;
       flex-wrap: wrap;
     }
 
-    .feature-item {
-      background: #f8f9fa;
-      padding: 16px 24px;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+    .vip-option {
+      background: rgba(255, 255, 255, 0.15);
+      padding: 20px 28px;
+      border-radius: 12px;
+      cursor: pointer;
     }
 
-    .feature-icon {
+    .vip-option:hover {
+      background: rgba(255, 255, 255, 0.25);
+      transform: translateY(-4px);
+    }
+
+    /* ===== 分类标题 ===== */
+    .category-title {
+      font-size: 18px;
+      font-weight: bold;
+      color: #2d3748;
+      margin: 20px 0 12px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e9ecef;
+    }
+
+    /* ===== 背包 ===== */
+    .inventory-empty {
+      text-align: center;
+      padding: 60px;
+      color: #6c757d;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+    }
+
+    .item-count {
+      color: #52c41a;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .equipped-tag {
+      color: #52c41a;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    /* ===== 消息提示 ===== */
+    .message {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 16px 30px;
+      border-radius: 12px;
+      font-size: 16px;
+      z-index: 9999;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .message.success,
+    .message.error {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .message.success {
+      background: #52c41a;
+      color: white;
+    }
+
+    .message.error {
+      background: #f5222d;
+      color: white;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 60px;
+      color: #6c757d;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+    }
+
+    /* ===== 搜索和筛选 ===== */
+    .search-filter-bar {
+      background: white;
+      padding: 16px;
+      border-radius: 12px;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+      margin-bottom: 16px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .search-input {
+      flex: 1;
+      min-width: 200px;
+      padding: 10px 16px;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      font-size: 15px;
+      outline: none;
+    }
+
+    .search-input:focus {
+      border-color: #007bff;
+    }
+
+    .filter-select {
+      padding: 10px 16px;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      font-size: 15px;
+      outline: none;
+      cursor: pointer;
+      background: white;
+    }
+
+    .filter-select:focus {
+      border-color: #007bff;
+    }
+
+    /* ===== 稀有度样式 ===== */
+    .rarity-common {
+      border-left: 4px solid #6c757d;
+    }
+
+    .rarity-uncommon {
+      border-left: 4px solid #28a745;
+    }
+
+    .rarity-rare {
+      border-left: 4px solid #007bff;
+    }
+
+    .rarity-epic {
+      border-left: 4px solid #6f42c1;
+    }
+
+    .rarity-legendary {
+      border-left: 4px solid #ffc107;
+    }
+
+    .rarity-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+
+    .rarity-badge.common {
+      background: #6c757d22;
+      color: #6c757d;
+    }
+
+    .rarity-badge.uncommon {
+      background: #28a74522;
+      color: #28a745;
+    }
+
+    .rarity-badge.rare {
+      background: #007bff22;
+      color: #007bff;
+    }
+
+    .rarity-badge.epic {
+      background: #6f42c122;
+      color: #6f42c1;
+    }
+
+    .rarity-badge.legendary {
+      background: #ffc10722;
+      color: #ffc107;
+    }
+
+    .item-card.glow-legendary {
+      animation: glow-legendary 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes glow-legendary {
+      from {
+        box-shadow: 0 0 10px rgba(255, 193, 7, 0.3);
+      }
+
+      to {
+        box-shadow: 0 0 20px rgba(255, 193, 7, 0.7);
+      }
+    }
+
+    .item-card.glow-epic {
+      animation: glow-epic 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes glow-epic {
+      from {
+        box-shadow: 0 0 10px rgba(111, 66, 193, 0.3);
+      }
+
+      to {
+        box-shadow: 0 0 20px rgba(111, 66, 193, 0.7);
+      }
+    }
+
+    /* ===== 标签 ===== */
+    .item-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      justify-content: center;
+      margin-top: 8px;
+    }
+
+    .item-tag {
+      padding: 2px 8px;
+      background: #e9ecef;
+      color: #495057;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
+    /* ===== 道具详情弹窗 ===== */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+    }
+
+    .item-detail-modal {
+      background: white;
+      border-radius: 16px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow: hidden;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .item-detail-modal-scroll {
+      overflow-y: auto;
+      flex: 1;
+      padding-right: 4px;
+    }
+
+    /* 自定义滚动条 */
+    .item-detail-modal-scroll::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .item-detail-modal-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .item-detail-modal-scroll::-webkit-scrollbar-thumb {
+      background: #d1d5db;
+      border-radius: 4px;
+    }
+
+    .item-detail-modal-scroll::-webkit-scrollbar-thumb:hover {
+      background: #9ca3af;
+    }
+
+    .item-detail-header {
+      padding: 24px;
+      border-bottom: 1px solid #e9ecef;
+      text-align: center;
+    }
+
+    .item-detail-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+
+    .item-detail-basic h2 {
       font-size: 24px;
+      margin-bottom: 8px;
+    }
+
+    .item-detail-body {
+      padding: 24px;
+    }
+
+    .detail-section {
+      margin-bottom: 20px;
+    }
+
+    .detail-section h4 {
+      font-size: 16px;
+      color: #2d3748;
+      margin-bottom: 8px;
+    }
+
+    .detail-section p {
+      color: #6c757d;
+      line-height: 1.6;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .info-item {
+      background: #f8f9fa;
+      padding: 10px 12px;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .info-label {
+      font-size: 12px;
+      color: #6c757d;
+    }
+
+    .info-value {
+      font-size: 14px;
+      font-weight: bold;
+      color: #2d3748;
+    }
+
+    .tags-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tag {
+      padding: 4px 12px;
+      background: #e9ecef;
+      color: #495057;
+      border-radius: 20px;
+      font-size: 13px;
+    }
+
+    .item-detail-actions {
+      padding: 16px 24px 24px;
+      display: flex;
+      gap: 12px;
+      border-top: 1px solid #e9ecef;
+    }
+
+    .action-btn {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .action-btn.primary {
+      background: #007bff;
+      color: white;
+    }
+
+    .action-btn.buy {
+      background: #fda085;
+      color: white;
+    }
+
+    .action-btn.secondary {
+      background: #6c757d;
+      color: white;
+    }
+
+    .item-count-badge {
+      display: inline-block;
+      background: #007bff;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-weight: bold;
+      margin-left: 8px;
     }
   </style>
 </head>
@@ -165,37 +669,635 @@
     <!-- 页面标题 -->
     <div class="page-header">
       <h1>🛒 星钻消费</h1>
+      <div class="star-coins">
+        <span>💎</span>
+        <span id="starCoins">0</span>
+      </div>
     </div>
 
-    <!-- 敬请期待 -->
-    <div class="coming-soon">
-      <div class="coming-icon">🚧</div>
-      <div class="coming-title">敬请期待</div>
-      <div class="coming-desc">
-        星钻商店正在紧张建设中，很快就能用星钻兑换各种好东西啦！<br>
-        新手礼包、星钻礼包等更多商品即将上线，敬请期待！
-      </div>
-      <div class="feature-list">
-        <div class="feature-item">
-          <span class="feature-icon">🎁</span>
-          <span>星钻礼包</span>
-        </div>
-        <div class="feature-item">
-          <span class="feature-icon">🎨</span>
-          <span>个性头像框</span>
-        </div>
-        <div class="feature-item">
-          <span class="feature-icon">🖼️</span>
-          <span>精美背景</span>
-        </div>
-        <div class="feature-item">
-          <span class="feature-icon">🏆</span>
-          <span>专属头衔</span>
-        </div>
-      </div>
+    <!-- 商店标签 -->
+    <div class="shop-tabs">
+      <button class="shop-tab active" data-tab="items">道具</button>
+      <button class="shop-tab" data-tab="cosmetics">外观</button>
+      <button class="shop-tab" data-tab="packs">礼包</button>
+      <button class="shop-tab" data-tab="vip">会员</button>
+      <button class="shop-tab" data-tab="inventory">背包</button>
     </div>
+
+    <!-- 搜索和筛选栏 -->
+    <div class="search-filter-bar" id="searchFilterBar" style="display:none;">
+      <input type="text" class="search-input" id="searchInput" placeholder="🔍 搜索道具、名称、描述、标签...">
+      <select class="filter-select" id="rarityFilter">
+        <option value="">全部稀有度</option>
+        <option value="common">普通</option>
+        <option value="uncommon">优秀</option>
+        <option value="rare">稀有</option>
+        <option value="epic">史诗</option>
+        <option value="legendary">传说</option>
+      </select>
+    </div>
+
+    <!-- 内容区 -->
+    <div id="content"></div>
 
   </div>
+
+  <div id="message"></div>
+
+  <script>
+    let userId = localStorage.getItem('gameUserId') || 'guest_' + Date.now();
+    let shopData = null;
+    let inventory = null;
+    let cosmetics = null;
+    let vipInfo = null;
+    let activeTab = 'items';
+    let searchKeyword = '';
+    let rarityFilter = '';
+
+    const API_BASE = '/api';
+
+    // 稀有度配置
+    const RARITY_CONFIG = {
+      common: { name: '普通', color: '#6c757d' },
+      uncommon: { name: '优秀', color: '#28a745' },
+      rare: { name: '稀有', color: '#007bff' },
+      epic: { name: '史诗', color: '#6f42c1' },
+      legendary: { name: '传说', color: '#ffc107' }
+    };
+
+    let messageTimeout = null;
+    function showMessage(text, type) {
+      const el = document.getElementById('message');
+      el.textContent = text;
+      el.className = `message ${type}`;
+
+      if (messageTimeout) {
+        clearTimeout(messageTimeout);
+      }
+      messageTimeout = setTimeout(() => {
+        el.className = 'message';
+      }, 3000);
+    }
+
+    // 搜索和筛选初始化
+    function initSearchFilter() {
+      const searchInput = document.getElementById('searchInput');
+      const raritySelect = document.getElementById('rarityFilter');
+
+      searchInput.addEventListener('input', (e) => {
+        searchKeyword = e.target.value.toLowerCase().trim();
+        renderTab();
+      });
+
+      raritySelect.addEventListener('change', (e) => {
+        rarityFilter = e.target.value;
+        renderTab();
+      });
+    }
+
+    // 过滤商品
+    function filterItems(items) {
+      let result = { ...items };
+
+      // 稀有度筛选
+      if (rarityFilter) {
+        for (const [id, item] of Object.entries(result)) {
+          if (item.rarity !== rarityFilter) {
+            delete result[id];
+          }
+        }
+      }
+
+      // 关键词搜索
+      if (searchKeyword) {
+        for (const [id, item] of Object.entries(result)) {
+          const matchName = item.name?.toLowerCase().includes(searchKeyword);
+          const matchDesc = item.description?.toLowerCase().includes(searchKeyword);
+          const matchTags = item.tags?.some(tag => tag.toLowerCase().includes(searchKeyword));
+          if (!matchName && !matchDesc && !matchTags) {
+            delete result[id];
+          }
+        }
+      }
+
+      return result;
+    }
+
+    // 显示道具详情
+    function showItemDetail(itemId, fromInventory = false) {
+      // 获取物品信息
+      let item = null;
+      let itemType = '';
+      if (shopData.items?.[itemId]) {
+        item = shopData.items[itemId];
+        itemType = 'item';
+      } else if (shopData.packs?.[itemId]) {
+        item = shopData.packs[itemId];
+        itemType = 'pack';
+      } else if (shopData.vip?.[itemId]) {
+        item = shopData.vip[itemId];
+        itemType = 'vip';
+      }
+
+      if (!item) return;
+
+      const rarity = RARITY_CONFIG[item.rarity] || RARITY_CONFIG.common;
+      const count = fromInventory ? inventory?.items?.[itemId] : 0;
+
+      // 生成礼包内容HTML
+      let contentHtml = '';
+      if (itemType === 'pack' && item.content) {
+        contentHtml = `
+          <div class="detail-section">
+            <h4>🎁 礼包内容</h4>
+            <div class="info-grid" style="grid-template-columns: 1fr;">
+              ${Object.entries(item.content).map(([itemId, count]) => {
+          const itemInfo = shopData.items?.[itemId];
+          return `
+                  <div class="info-item" style="flex-direction: row; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span style="font-size: 20px;">${itemInfo?.icon || '📦'}</span>
+                      <span style="font-weight: bold;">${itemInfo?.name || itemId}</span>
+                    </div>
+                    <span style="font-weight: bold; color: #007bff;">×${count}</span>
+                  </div>
+                `;
+        }).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      const modalHtml = `
+        <div class="modal-overlay" id="itemDetailModal" onclick="closeItemDetail()">
+          <div class="item-detail-modal" onclick="event.stopPropagation()" style="border-top: 4px solid ${rarity.color}">
+            <div class="item-detail-header">
+              <div class="item-detail-icon">${item.icon}</div>
+              <div class="item-detail-basic">
+                <h2 style="color: ${rarity.color}; display:inline;">${item.name}</h2>
+                ${count ? `<span class="item-count-badge">×${count}</span>` : ''}
+                <div><span class="rarity-badge ${item.rarity || 'common'}">${rarity.name}</span></div>
+              </div>
+            </div>
+
+            <div class="item-detail-modal-scroll">
+              <div class="item-detail-body">
+                <div class="detail-section">
+                  <h4>📋 描述</h4>
+                  <p>${item.description}</p>
+                </div>
+
+                ${contentHtml}
+
+                ${item.tags && item.tags.length > 0 ? `
+                <div class="detail-section">
+                  <h4>🏷️ 标签</h4>
+                  <div class="tags-container">
+                    ${item.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+                  </div>
+                </div>
+                ` : ''}
+
+                <div class="detail-section">
+                  <h4>📊 信息</h4>
+                  <div class="info-grid">
+                    <div class="info-item">
+                      <span class="info-label">价格</span>
+                      <span class="info-value">💎 ${item.price}</span>
+                    </div>
+                    <div class="info-item">
+                      <span class="info-label">分类</span>
+                      <span class="info-value">${item.category || '未知'}</span>
+                    </div>
+                    ${item.maxStack ? `
+                    <div class="info-item">
+                      <span class="info-label">最大堆叠</span>
+                      <span class="info-value">${item.maxStack}</span>
+                    </div>
+                    ` : ''}
+                    <div class="info-item">
+                      <span class="info-label">可交易</span>
+                      <span class="info-value">${item.tradable ? '✅ 是' : '❌ 否'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="item-detail-actions">
+                ${fromInventory && item.usable ? `
+                  <button class="action-btn primary" onclick="useItem('${itemId}'); closeItemDetail();">使用</button>
+                ` : ''}
+                ${!fromInventory && item.price ? `
+                  <button class="action-btn buy" onclick="buyItem('${itemId}'); closeItemDetail();">💎 ${item.price} 购买</button>
+                ` : ''}
+                <button class="action-btn secondary" onclick="closeItemDetail()">关闭</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+
+    // 关闭道具详情
+    function closeItemDetail() {
+      const modal = document.getElementById('itemDetailModal');
+      if (modal) modal.remove();
+    }
+
+    async function loadData() {
+      try {
+        const res = await fetch(`${API_BASE}/shop/data?userId=${userId}`);
+        const data = await res.json();
+        if (data.success) {
+          shopData = data.data;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/shop/inventory?userId=${userId}`);
+        const data = await res.json();
+        if (data.success) {
+          inventory = data.inventory;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/shop/cosmetics?userId=${userId}`);
+        const data = await res.json();
+        if (data.success) {
+          cosmetics = data.cosmetics;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/shop/vip?userId=${userId}`);
+        const data = await res.json();
+        if (data.success) {
+          vipInfo = data.vip;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/currency/balance?userId=${userId}`);
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('starCoins').textContent = data.balance;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+
+      renderTab();
+    }
+
+    async function buyItem(itemId) {
+      try {
+        const res = await fetch(`${API_BASE}/shop/buy`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, itemId })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showMessage(data.message || '购买成功！', 'success');
+          await loadData();
+        } else {
+          showMessage(data.message || '购买失败', 'error');
+        }
+      } catch (e) {
+        showMessage('网络错误', 'error');
+      }
+    }
+
+    async function equipCosmetic(category, cosmeticId) {
+      try {
+        const res = await fetch(`${API_BASE}/shop/cosmetics/equip`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, category, cosmeticId })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showMessage('装备成功！', 'success');
+          await loadData();
+        } else {
+          showMessage(data.message || '装备失败', 'error');
+        }
+      } catch (e) {
+        showMessage('网络错误', 'error');
+      }
+    }
+
+    async function useItem(itemId) {
+      try {
+        const res = await fetch(`${API_BASE}/shop/use-item`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, itemId })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showMessage(data.message || '使用成功！', 'success');
+          await loadData();
+        } else {
+          showMessage(data.message || '使用失败', 'error');
+        }
+      } catch (e) {
+        showMessage('网络错误', 'error');
+      }
+    }
+
+    function renderItems() {
+      if (!shopData) return '<div class="loading">加载中...</div>';
+
+      let items = shopData.items || {};
+      items = filterItems(items);
+
+      if (Object.keys(items).length === 0) {
+        return '<div class="inventory-empty">暂无商品</div>';
+      }
+
+      let html = '<div class="items-grid">';
+      for (const [id, item] of Object.entries(items)) {
+        const count = inventory?.items?.[id] || 0;
+        const rarityClass = item.rarity ? `rarity-${item.rarity}` : '';
+        const glowClass = item.rarity === 'legendary' || item.rarity === 'epic' ? `glow-${item.rarity}` : '';
+
+        html += `
+          <div class="item-card ${rarityClass} ${glowClass}" onclick="showItemDetail('${id}', false)">
+            <div class="item-icon">${item.icon}</div>
+            <div class="item-name">${item.name}</div>
+            <div class="item-desc">${item.description}</div>
+            <div class="rarity-badge ${item.rarity || 'common'}">${RARITY_CONFIG[item.rarity]?.name || '普通'}</div>
+            ${item.tags && item.tags.length > 0 ? `
+              <div class="item-tags">
+                ${item.tags.slice(0, 3).map(tag => `<span class="item-tag">${tag}</span>`).join('')}
+              </div>
+            ` : ''}
+            <div class="item-price">💎 ${item.price}</div>
+            ${count > 0 ? `<div class="item-count">已拥有: ${count}</div>` : ''}
+            <button class="buy-btn" onclick="event.stopPropagation(); buyItem('${id}')">购买</button>
+          </div>
+        `;
+      }
+      html += '</div>';
+      return html;
+    }
+
+    function renderCosmetics() {
+      if (!shopData || !cosmetics) return '<div class="loading">加载中...</div>';
+
+      const categories = [
+        { key: 'frames', title: '头像框', category: 'frame' },
+        { key: 'skins', title: '皮肤', category: 'skin' },
+        { key: 'backgrounds', title: '背景', category: 'background' },
+        { key: 'titles', title: '称号', category: 'title' }
+      ];
+
+      let html = '';
+      for (const cat of categories) {
+        const items = shopData[cat.key] || {};
+        if (Object.keys(items).length === 0) continue;
+
+        html += `<div class="category-title">${cat.title}</div>`;
+        html += '<div class="items-grid">';
+        for (const [id, item] of Object.entries(items)) {
+          const isComingSoon = item.enabled === false;
+          const owned = cosmetics.owned?.[cat.key]?.includes(id);
+          const equipped = cosmetics.equipped?.[cat.category] === id;
+
+          html += `
+            <div class="item-card ${isComingSoon ? 'disabled' : ''}">
+              <div class="item-icon">${item.icon}</div>
+              <div class="item-name">${item.name}</div>
+              <div class="item-desc">${item.description}</div>
+              ${!isComingSoon && !owned ? `<div class="item-price">💎 ${item.price}</div>` : ''}
+              ${!isComingSoon && equipped ? `<div class="equipped-tag">已装备</div>` : ''}
+              ${!isComingSoon && owned && !equipped ? `
+                <button class="buy-btn equip" onclick="equipCosmetic('${cat.category}', '${id}')">装备</button>
+              ` : ''}
+              ${!isComingSoon && !owned ? `<button class="buy-btn" onclick="buyItem('${id}')">购买</button>` : ''}
+              ${isComingSoon ? `<button class="buy-btn" disabled>敬请期待</button>` : ''}
+            </div>
+          `;
+        }
+        html += '</div>';
+      }
+
+      return html || '<div class="inventory-empty">暂无商品</div>';
+    }
+
+    function renderPacks() {
+      if (!shopData) return '<div class="loading">加载中...</div>';
+
+      let packs = shopData.packs || {};
+      packs = filterItems(packs);
+
+      if (Object.keys(packs).length === 0) {
+        return '<div class="inventory-empty">暂无商品</div>';
+      }
+
+      let html = '<div class="items-grid">';
+      for (const [id, pack] of Object.entries(packs)) {
+        const rarityClass = pack.rarity ? `rarity-${pack.rarity}` : '';
+        const glowClass = pack.rarity === 'legendary' || pack.rarity === 'epic' ? `glow-${pack.rarity}` : '';
+
+        // 生成礼包内容预览
+        let contentPreview = '';
+        if (pack.content) {
+          contentPreview = Object.entries(pack.content)
+            .map(([itemId, count]) => {
+              const itemInfo = shopData.items?.[itemId];
+              return `${itemInfo?.icon || '📦'}×${count}`;
+            })
+            .join(' ');
+        }
+
+        html += `
+          <div class="item-card ${rarityClass} ${glowClass}" onclick="showItemDetail('${id}', false)">
+            <div class="item-icon">${pack.icon}</div>
+            <div class="item-name">${pack.name}</div>
+            <div class="item-desc">${pack.description}</div>
+            ${contentPreview ? `<div style="font-size:18px; margin:4px 0;">${contentPreview}</div>` : ''}
+            <div class="rarity-badge ${pack.rarity || 'common'}">${RARITY_CONFIG[pack.rarity]?.name || '普通'}</div>
+            ${pack.tags && pack.tags.length > 0 ? `
+              <div class="item-tags">
+                ${pack.tags.slice(0, 3).map(tag => `<span class="item-tag">${tag}</span>`).join('')}
+              </div>
+            ` : ''}
+            <div class="item-price">💎 ${pack.price}</div>
+            <button class="buy-btn" onclick="event.stopPropagation(); buyItem('${id}')">购买</button>
+          </div>
+        `;
+      }
+      html += '</div>';
+      return html;
+    }
+
+    function renderVip() {
+      if (!shopData) return '<div class="loading">加载中...</div>';
+
+      let vips = shopData.vip || {};
+      vips = filterItems(vips);
+
+      const daysMap = { 'vip_week': 7, 'vip_month': 30, 'vip_year': 365 };
+      const nameMap = { 'vip_week': '周卡', 'vip_month': '月卡', 'vip_year': '年卡' };
+
+      let html = '<div class="vip-section">';
+
+      html += '<div style="text-align:center; margin-bottom:16px; color:#6c757d; font-size:13px;">会员状态请到个人资料页面查看</div>';
+
+      html += '<div class="vip-options">';
+      for (const [id, vip] of Object.entries(vips)) {
+        const rarityClass = vip.rarity ? `rarity-${vip.rarity}` : '';
+        const glowClass = vip.rarity === 'legendary' || vip.rarity === 'epic' ? `glow-${vip.rarity}` : '';
+
+        html += `
+          <div class="vip-option ${rarityClass} ${glowClass}" onclick="showItemDetail('${id}', false)" style="cursor:pointer; border-radius:12px; padding:20px; transition:transform 0.2s;">
+            <div style="font-size:24px;font-weight:bold; color: ${RARITY_CONFIG[vip.rarity]?.color || '#007bff'}">${nameMap[id]}</div>
+            <div style="margin-top:8px;">${daysMap[id]}天</div>
+            <div style="font-size:13px;margin-top:8px;opacity:0.8;line-height:1.4;">${vip.description}</div>
+            <div><span class="rarity-badge ${vip.rarity || 'common'}">${RARITY_CONFIG[vip.rarity]?.name || '普通'}</span></div>
+            ${vip.tags && vip.tags.length > 0 ? `
+              <div class="item-tags">
+                ${vip.tags.slice(0, 2).map(tag => `<span class="item-tag">${tag}</span>`).join('')}
+              </div>
+            ` : ''}
+            <div style="font-size:14px;margin-top:8px;opacity:0.8;">经验 +${vip.expBonus * 100}%</div>
+            <div style="font-size:22px;font-weight:bold;margin-top:12px;">💎 ${vip.price}</div>
+          </div>
+        `;
+      }
+      html += '</div></div>';
+      return html;
+    }
+
+    function renderInventory() {
+      if (!inventory || !cosmetics) return '<div class="loading">加载中...</div>';
+
+      let html = '';
+
+      // 从商店数据中获取背包物品的详细信息，并过滤
+      let items = {};
+      for (const [id, count] of Object.entries(inventory.items || {})) {
+        const itemInfo = shopData?.items?.[id];
+        if (itemInfo) {
+          items[id] = { ...itemInfo, _count: count };
+        }
+      }
+
+      // 应用搜索/筛选
+      items = filterItems(items);
+
+      if (Object.keys(items).length > 0) {
+        html += '<div class="category-title">道具</div>';
+        html += '<div class="items-grid">';
+        for (const [id, item] of Object.entries(items)) {
+          const count = item._count;
+          const rarityClass = item.rarity ? `rarity-${item.rarity}` : '';
+          const glowClass = item.rarity === 'legendary' || item.rarity === 'epic' ? `glow-${item.rarity}` : '';
+
+          html += `
+            <div class="item-card ${rarityClass} ${glowClass}" onclick="showItemDetail('${id}', true)">
+              <div class="item-icon">${item.icon}</div>
+              <div class="item-name">${item.name}</div>
+              <div class="item-desc">${item.description}</div>
+              <div class="rarity-badge ${item.rarity || 'common'}">${RARITY_CONFIG[item.rarity]?.name || '普通'}</div>
+              <div style="font-size:24px;font-weight:bold;color:#007bff;">×${count}</div>
+              <button class="buy-btn" onclick="event.stopPropagation(); useItem('${id}')">使用</button>
+            </div>
+          `;
+        }
+        html += '</div>';
+      }
+
+      const categories = [
+        { key: 'frames', title: '头像框', category: 'frame' },
+        { key: 'skins', title: '皮肤', category: 'skin' },
+        { key: 'backgrounds', title: '背景', category: 'background' },
+        { key: 'titles', title: '称号', category: 'title' }
+      ];
+
+      for (const cat of categories) {
+        const owned = cosmetics.owned?.[cat.key] || [];
+        if (owned.length === 0) continue;
+
+        html += `<div class="category-title">${cat.title}</div>`;
+        html += '<div class="items-grid">';
+        for (const id of owned) {
+          const itemInfo = shopData?.[cat.key]?.[id] || { icon: '📦', name: id, description: '' };
+          const equipped = cosmetics.equipped?.[cat.category] === id;
+          html += `
+            <div class="item-card">
+              <div class="item-icon">${itemInfo.icon}</div>
+              <div class="item-name">${itemInfo.name}</div>
+              <div class="item-desc">${itemInfo.description}</div>
+              ${equipped ? `<div class="equipped-tag">已装备</div>` : ''}
+              ${!equipped ? `
+                <button class="buy-btn equip" onclick="equipCosmetic('${cat.category}', '${id}')">装备</button>
+              ` : ''}
+            </div>
+          `;
+        }
+        html += '</div>';
+      }
+
+      return html || '<div class="inventory-empty">背包是空的</div>';
+    }
+
+    function renderTab() {
+      const content = document.getElementById('content');
+      const searchBar = document.getElementById('searchFilterBar');
+
+      // 控制搜索栏显示/隐藏
+      if (['items', 'packs', 'vip', 'inventory'].includes(activeTab)) {
+        searchBar.style.display = 'flex';
+      } else {
+        searchBar.style.display = 'none';
+      }
+
+      switch (activeTab) {
+        case 'items':
+          content.innerHTML = renderItems();
+          break;
+        case 'cosmetics':
+          content.innerHTML = renderCosmetics();
+          break;
+        case 'packs':
+          content.innerHTML = renderPacks();
+          break;
+        case 'vip':
+          content.innerHTML = renderVip();
+          break;
+        case 'inventory':
+          content.innerHTML = renderInventory();
+          break;
+      }
+    }
+
+    document.querySelectorAll('.shop-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        activeTab = tab.dataset.tab;
+        document.querySelectorAll('.shop-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        renderTab();
+      });
+    });
+
+    // 初始化
+    initSearchFilter();
+    loadData();
+  </script>
 
 </body>
 

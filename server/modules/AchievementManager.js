@@ -98,10 +98,10 @@ class AchievementManager {
       {
         id: 13,
         name: '五子棋传奇',
-        description: '在五子棋中获得50场胜利',
+        description: '在五子棋中获得100场胜利',
         type: 'game_type',
-        condition: { gameType: 'gobang', wins: 50 },
-        reward: { exp: 3500, badge: 'gobang_legend' }
+        condition: { gameType: 'gobang', wins: 100 },
+        reward: { exp: 4000, badge: 'gobang_legend' }
       },
       {
         id: 20,
@@ -130,10 +130,10 @@ class AchievementManager {
       {
         id: 23,
         name: '象棋传奇',
-        description: '在象棋中获得50场胜利',
+        description: '在象棋中获得100场胜利',
         type: 'game_type',
-        condition: { gameType: 'chess', wins: 50 },
-        reward: { exp: 3500, badge: 'chess_legend' }
+        condition: { gameType: 'chess', wins: 100 },
+        reward: { exp: 5000, badge: 'chess_legend' }
       },
       {
         id: 30,
@@ -162,10 +162,10 @@ class AchievementManager {
       {
         id: 33,
         name: '围棋传奇',
-        description: '在围棋中获得50场胜利',
+        description: '在围棋中获得100场胜利',
         type: 'game_type',
-        condition: { gameType: 'go', wins: 50 },
-        reward: { exp: 3500, badge: 'go_legend' }
+        condition: { gameType: 'go', wins: 100 },
+        reward: { exp: 5000, badge: 'go_legend' }
       },
       // 等级成就
       {

@@ -5353,46 +5353,7 @@
                   <div style="background: #f7fafc; padding: 12px; border-radius: 8px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px;">
                       <span>${accountData?.profile?.exp || 0} EXP</span>
-                      <span>下一级需要 ${(() => {
-                const totalExp = accountData?.profile?.exp || 0;
-                const level = accountData?.profile?.level || 1;
-                let currentExp = totalExp;
-                let currentLevel = 1;
-
-                // 按照后端逻辑计算当前等级内的经验值
-                while (currentExp >= currentLevel * 100) {
-                  currentExp -= currentLevel * 100;
-                  currentLevel++;
-                }
-
-                let expNeeded = 0;
-                if (currentLevel === level) {
-                  expNeeded = level * 100 - currentExp;
-                }
-
-                return Math.max(0, expNeeded);
-              })()} EXP</span>
-                    </div>
-                    <div style="height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden;">
-                      <div style="width: ${(() => {
-                const totalExp = accountData?.profile?.exp || 0;
-                const level = accountData?.profile?.level || 1;
-                let currentExp = totalExp;
-                let currentLevel = 1;
-
-                // 按照后端逻辑计算当前等级内的经验值
-                while (currentExp >= currentLevel * 100) {
-                  currentExp -= currentLevel * 100;
-                  currentLevel++;
-                }
-
-                let progress = 0;
-                if (level > 0) {
-                  progress = (currentExp / (level * 100)) * 100;
-                }
-
-                return Math.min(100, progress);
-              })()}%; height: 100%; background: linear-gradient(90deg, #4299e1, #3182ce); border-radius: 5px;"></div>
+                      <span>经验: ${accountData?.profile?.exp || 0}</span>
                     </div>
                   </div>
                 </div>
@@ -11029,46 +10990,7 @@
             <div style="background: #f7fafc; padding: 12px; border-radius: 8px;">
               <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px;">
                 <span>${accountData?.profile?.exp || 0} EXP</span>
-                <span>下一级需要 ${(() => {
-          const totalExp = accountData?.profile?.exp || 0;
-          const level = accountData?.profile?.level || 1;
-          let currentExp = totalExp;
-          let currentLevel = 1;
-
-          // 按照后端逻辑计算当前等级内的经验值
-          while (currentExp >= currentLevel * 100) {
-            currentExp -= currentLevel * 100;
-            currentLevel++;
-          }
-
-          let expNeeded = 0;
-          if (currentLevel === level) {
-            expNeeded = level * 100 - currentExp;
-          }
-
-          return Math.max(0, expNeeded);
-        })()} EXP</span>
-              </div>
-              <div style="height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden;">
-                <div style="width: ${(() => {
-          const totalExp = accountData?.profile?.exp || 0;
-          const level = accountData?.profile?.level || 1;
-          let currentExp = totalExp;
-          let currentLevel = 1;
-
-          // 按照后端逻辑计算当前等级内的经验值
-          while (currentExp >= currentLevel * 100) {
-            currentExp -= currentLevel * 100;
-            currentLevel++;
-          }
-
-          let progress = 0;
-          if (level > 0) {
-            progress = (currentExp / (level * 100)) * 100;
-          }
-
-          return Math.min(100, progress);
-        })()}%; height: 100%; background: linear-gradient(90deg, #4299e1, #3182ce); border-radius: 5px;"></div>
+                <span>经验: ${accountData?.profile?.exp || 0}</span>
               </div>
             </div>
           </div>

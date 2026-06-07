@@ -927,7 +927,7 @@ class GameManager {
           if (postExpAccount.account && postExpAccount.account.profile && postExpAccount.account.profile.exp) {
             const totalExp = postExpAccount.account.profile.exp;
             let exp = totalExp;
-            while (exp >= this.accountManager.getExpForLevel(newLevel + 1)) {
+            while (newLevel < this.accountManager.getMaxLevel() && exp >= this.accountManager.getExpForLevel(newLevel + 1)) {
               exp -= this.accountManager.getExpForLevel(newLevel + 1);
               newLevel++;
             }
@@ -940,11 +940,15 @@ class GameManager {
           // 聚合所有游戏类型的连胜数据
           let bestStreak = 0;
           let bestMaxStreak = 0;
+          const gameTypeWins = {};
           if (postExpAccount.games) {
             Object.values(postExpAccount.games).forEach(g => {
               bestStreak = Math.max(bestStreak, g.streak || 0);
               bestMaxStreak = Math.max(bestMaxStreak, g.maxStreak || 0);
             });
+            for (const [gk, gd] of Object.entries(postExpAccount.games)) {
+              gameTypeWins[gk] = gd.wins || 0;
+            }
           }
 
           const stats = {
@@ -966,6 +970,10 @@ class GameManager {
             allGameTypes: postExpAccount.games && Object.keys(postExpAccount.games).filter(k => postExpAccount.games[k].totalGames > 0).length >= 3,
             singleGameType: postExpAccount.games && Object.keys(postExpAccount.games).filter(k => postExpAccount.games[k].totalGames > 0).length === 1 && (postExpAccount.stats?.totalGames || 0) > 1,
             lonerWin: isWinner && (game.gameType === 'snake' || reason === 'resign'),
+            wins: postExpAccount.stats?.totalWins || 0,
+            losses: postExpAccount.stats?.totalLosses || 0,
+            draws: postExpAccount.stats?.totalDraws || 0,
+            gameTypeWins,
           };
 
           const unlockedAchievements = await this.achievementManager.checkAchievements(accountId, stats);
@@ -1885,7 +1893,7 @@ class GameManager {
         if (account.account && account.account.profile && account.account.profile.exp) {
           const totalExp = account.account.profile.exp;
           let exp = totalExp;
-          while (exp >= this.accountManager.getExpForLevel(level + 1)) {
+          while (level < this.accountManager.getMaxLevel() && exp >= this.accountManager.getExpForLevel(level + 1)) {
             exp -= this.accountManager.getExpForLevel(level + 1);
             level++;
           }
@@ -1898,11 +1906,15 @@ class GameManager {
         // 聚合所有游戏类型的连胜数据
         let bestStreak = 0;
         let bestMaxStreak = 0;
+        const gameTypeWins = {};
         if (account.games) {
           Object.values(account.games).forEach(g => {
             bestStreak = Math.max(bestStreak, g.streak || 0);
             bestMaxStreak = Math.max(bestMaxStreak, g.maxStreak || 0);
           });
+          for (const [gk, gd] of Object.entries(account.games)) {
+            gameTypeWins[gk] = gd.wins || 0;
+          }
         }
 
         const stats = {
@@ -1927,6 +1939,10 @@ class GameManager {
           allGameTypes: account.games && Object.keys(account.games).filter(k => account.games[k].totalGames > 0).length >= 3,
           singleGameType: account.games && Object.keys(account.games).filter(k => account.games[k].totalGames > 0).length === 1 && (account.stats?.totalGames || 0) > 1,
           lonerWin: result === 'win',
+          wins: account.stats?.totalWins || 0,
+          losses: account.stats?.totalLosses || 0,
+          draws: account.stats?.totalDraws || 0,
+          gameTypeWins,
         };
         const unlockedAchievements = await this.achievementManager.checkAchievements(accountId, stats);
         if (unlockedAchievements.length > 0 && userSocket) {

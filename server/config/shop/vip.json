@@ -1,0 +1,45 @@
+{
+  "vip_week": {
+    "id": "vip_week",
+    "name": "VIP周卡",
+    "description": "7天VIP会员，所有游戏获得的经验值翻倍，快速升级",
+    "icon": "⭐",
+    "price": 300,
+    "category": "vip",
+    "type": "membership",
+    "rarity": "rare",
+    "usable": true,
+    "tradable": false,
+    "tags": [
+      "VIP",
+      "会员",
+      "经验"
+    ],
+    "enabled": true,
+    "rollout": 100,
+    "days": 7,
+    "expBonus": 2
+  },
+  "vip_month": {
+    "id": "vip_month",
+    "name": "VIP月卡",
+    "description": "30天VIP会员，所有游戏获得的经验值翻倍，超值优惠",
+    "icon": "🌟",
+    "price": 800,
+    "category": "vip",
+    "type": "membership",
+    "rarity": "epic",
+    "usable": true,
+    "tradable": false,
+    "tags": [
+      "VIP",
+      "会员",
+      "经验",
+      "优惠"
+    ],
+    "enabled": true,
+    "rollout": 100,
+    "days": 30,
+    "expBonus": 2
+  }
+}

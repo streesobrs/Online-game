@@ -33,8 +33,48 @@ class AccountManager {
   static holidayCache = null;
   static holidayCacheDate = null; // 缓存日期字符串，用于判断是否过期
 
+  // 节假日缓存文件路径
+  static get HOLIDAY_CACHE_PATH() {
+    return path.join(__dirname, '..', 'config', 'holidayCache.json');
+  }
+
+  // 从本地文件读取节假日缓存
+  static loadHolidayCacheFromFile() {
+    try {
+      if (fs.existsSync(AccountManager.HOLIDAY_CACHE_PATH)) {
+        const raw = fs.readFileSync(AccountManager.HOLIDAY_CACHE_PATH, 'utf8');
+        const data = JSON.parse(raw);
+        const yearNow = new Date().getFullYear();
+        if (data.year === yearNow && data.cache) {
+          AccountManager.holidayCache = data.cache;
+          AccountManager.holidayCacheDate = yearNow;
+          logger.info('节假日缓存加载成功', { year: yearNow, count: Object.keys(data.cache).length });
+          return true;
+        }
+      }
+    } catch (err) {
+      logger.warn('读取节假日缓存文件失败', { error: err.message });
+    }
+    return false;
+  }
+
+  // 保存节假日缓存到本地文件
+  static saveHolidayCacheToFile(year, cache) {
+    try {
+      const data = JSON.stringify({ year, cache, updatedAt: new Date().toISOString() });
+      fs.writeFileSync(AccountManager.HOLIDAY_CACHE_PATH, data, 'utf8');
+    } catch (err) {
+      logger.warn('保存节假日缓存失败', { error: err.message });
+    }
+  }
+
   // 从 API 获取节假日数据
   static async initHolidays() {
+    // 先尝试加载本地缓存，有有效缓存则跳过API请求
+    if (AccountManager.loadHolidayCacheFromFile()) {
+      return;
+    }
+
     const year = new Date().getFullYear();
     const url = `https://api.jiejiariapi.com/v1/holidays/${year}`;
     try {
@@ -52,10 +92,15 @@ class AccountManager {
       }
       AccountManager.holidayCache = cache;
       AccountManager.holidayCacheDate = year;
+      AccountManager.saveHolidayCacheToFile(year, cache);
       logger.info('节假日数据加载成功', { year, count: Object.keys(cache).length });
     } catch (err) {
-      logger.warn('节假日API获取失败，仅使用周末翻倍', { error: err.message });
-      AccountManager.holidayCache = {}; // 置空，用周末兜底
+      if (AccountManager.holidayCache && Object.keys(AccountManager.holidayCache).length > 0) {
+        logger.warn('节假日API获取失败，使用本地缓存', { error: err.message });
+      } else {
+        logger.warn('节假日API获取失败，仅使用周末翻倍', { error: err.message });
+        AccountManager.holidayCache = {};
+      }
     }
   }
 
@@ -88,12 +133,19 @@ class AccountManager {
     return totalExp;
   }
 
-  // 根据总经验值计算等级和剩余经验值
+  // 获取配置中的最高等级
+  getMaxLevel() {
+    const keys = Object.keys(this.levelExpConfig).map(Number);
+    return Math.max(...keys, 1);
+  }
+
+  // 根据总经验值计算等级和剩余经验值（上限按配置文件自动确定）
   calculateLevelAndExp(totalExp) {
+    const maxLevel = this.getMaxLevel();
     let level = 1;
     let exp = totalExp;
 
-    while (exp >= this.getExpForLevel(level + 1)) {
+    while (level < maxLevel && exp >= this.getExpForLevel(level + 1)) {
       exp -= this.getExpForLevel(level + 1);
       level++;
     }
@@ -1482,7 +1534,7 @@ class AccountManager {
   }
 
   // 添加经验值
-  // applyEventMult: false 表示只应用等级倍率，不叠加活动/周末倍率（如成就奖励）
+  // applyEventMult: false 表示不应用任何倍率（如经验药水、等级直升券）
   async addExp(id, exp, applyEventMult = true) {
     try {
       const account = await dataStore.findOne('accounts', { 'account.id': id });
@@ -1490,15 +1542,59 @@ class AccountManager {
         return { success: false, message: '账号不存在' };
       }
 
-      // 获取当前等级并应用倍率
+      // 获取当前等级
       const oldLevel = account.account?.profile?.level || 1;
-      const levelMult = this.getExpMultiplier(oldLevel);
-      let eventMult = { multiplier: 1.0, label: '' };
+      const now = Date.now();
+      let finalExp = exp;
+      let levelMult = 1;
+      let eventLabel = '';
+      let totalMult = 1;
+
+      // 只有在 applyEventMult 为 true 时才应用倍率
       if (applyEventMult) {
-        eventMult = this.getEventMultiplier();
+        levelMult = this.getExpMultiplier(oldLevel);
+
+        // 收集所有倍率和标签
+        const multipliers = [];
+        const labels = [];
+
+        // 1. 周末/节假日活动倍率
+        const eventResult = this.getEventMultiplier();
+        if (eventResult.multiplier !== 1.0) {
+          multipliers.push(eventResult.multiplier);
+          labels.push(eventResult.label);
+        }
+
+        // 2. 双倍/三倍经验buff（优先使用三倍）
+        if (account.activeBuffs?.tripleExp && account.activeBuffs.tripleExp > now) {
+          multipliers.push(3.0);
+          labels.push('三倍经验');
+        } else if (account.activeBuffs?.doubleExp && account.activeBuffs.doubleExp > now) {
+          multipliers.push(2.0);
+          labels.push('双倍经验');
+        }
+
+        // 3. VIP会员
+        if (account.vip?.expireAt > now) {
+          const vipBonus = account.vip.expBonus || 2.0;
+          multipliers.push(vipBonus);
+          labels.push(`VIP×${vipBonus}`);
+        }
+
+        // 计算总倍率
+        let eventMultTotal = 1.0;
+        for (const m of multipliers) {
+          eventMultTotal *= m;
+        }
+
+        totalMult = levelMult * eventMultTotal;
+        finalExp = Math.floor(exp * totalMult);
+
+        // 构建标签
+        if (labels.length > 0) {
+          eventLabel = labels.join('+');
+        }
       }
-      const totalMult = levelMult * eventMult.multiplier;
-      const finalExp = Math.floor(exp * totalMult);
 
       // 获取当前总经验值
       const currentExp = account.account?.profile?.exp || 0;
@@ -1516,10 +1612,14 @@ class AccountManager {
       };
 
       await dataStore.update('accounts', { 'account.id': id }, { 'account.profile': updatedProfile, 'account.updatedAt': Date.now() });
-      logger.info('添加经验值', { id, addedExp: finalExp, levelMult, eventLabel: eventMult.label, totalMult, baseExp: exp, currentExp, newTotalExp, newLevel: level });
+      logger.info('添加经验值', { id, addedExp: finalExp, levelMult, eventLabel, totalMult, baseExp: exp, currentExp, newTotalExp, newLevel: level });
 
       // 每获得10点经验，奖励1星钻
-      const currencyReward = Math.max(1, Math.floor(finalExp / 10));
+      let currencyReward = Math.max(1, Math.floor(finalExp / 10));
+      // 幸运符提升星钻奖励
+      if (account.activeBuffs?.luckBoost && account.activeBuffs.luckBoost > Date.now()) {
+        currencyReward = Math.floor(currencyReward * 2); // 双倍星钻奖励
+      }
       if (currencyReward > 0) {
         await this.addCurrency(id, currencyReward, `获得${finalExp}经验值奖励`, 'exp_reward');
       }
@@ -1529,8 +1629,8 @@ class AccountManager {
       if (level > oldLevel) {
         levelUpCurrency = (level - oldLevel) * 50; // 每升1级奖励50星钻
         await this.addCurrency(id, levelUpCurrency, `从${oldLevel}级升到${level}级奖励`, 'level_up');
-        await this.checkLevelRewards(id);
       }
+      await this.checkLevelRewards(id);
 
       // 记录经验变动
       try {
@@ -1541,7 +1641,7 @@ class AccountManager {
           bonusExp: finalExp - exp,
           finalExp,
           levelMult,
-          eventLabel: eventMult.label || null,
+          eventLabel: eventLabel || null,
           oldLevel,
           newLevel: level,
           totalExp: newTotalExp,
@@ -1569,7 +1669,7 @@ class AccountManager {
         bonusExp: finalExp - exp,      // 额外经验（倍率加成部分）
         finalExp,
         levelMult,
-        eventLabel: eventMult.label || null
+        eventLabel: eventLabel || null
       };
     } catch (err) {
       logger.error('添加经验值失败', { id, error: err.message });
@@ -1856,14 +1956,85 @@ class AccountManager {
   // 等级奖励配置
   getLevelRewards() {
     return [
-      { level: 5, rewards: [{ type: 'currency', amount: 100 }, { type: 'title', name: '棋坛新秀' }], description: '获得100💎 + 称号"棋坛新秀"' },
-      { level: 10, rewards: [{ type: 'currency', amount: 250 }, { type: 'title', name: '对弈达人' }], description: '获得250💎 + 称号"对弈达人"' },
-      { level: 15, rewards: [{ type: 'currency', amount: 500 }, { type: 'title', name: '棋艺高手' }], description: '获得500💎 + 称号"棋艺高手"' },
-      { level: 20, rewards: [{ type: 'currency', amount: 800 }, { type: 'badge', name: 'level_20_reward' }], description: '获得800💎 + 限定徽章' },
-      { level: 25, rewards: [{ type: 'currency', amount: 1200 }, { type: 'title', name: '棋坛精英' }], description: '获得1200💎 + 称号"棋坛精英"' },
-      { level: 30, rewards: [{ type: 'currency', amount: 1800 }, { type: 'badge', name: 'level_30_reward' }], description: '获得1800💎 + 限定徽章' },
-      { level: 40, rewards: [{ type: 'currency', amount: 3000 }, { type: 'title', name: '传奇大师' }], description: '获得3000💎 + 称号"传奇大师"' },
-      { level: 50, rewards: [{ type: 'currency', amount: 5000 }, { type: 'badge', name: 'level_50_reward' }, { type: 'title', name: '至尊棋圣' }], description: '获得5000💎 + 限定徽章 + 称号"至尊棋圣"' }
+      {
+        level: 5, rewards: [
+          { type: 'currency', amount: 100 },
+          { type: 'title', name: '棋坛新秀' },
+          { type: 'item', id: 'item_exp_potion', count: 3 },
+          { type: 'item', id: 'item_undo', count: 1 }
+        ], description: '获得100💎 + 称号"棋坛新秀" + 🧪经验药水×3 + ↩️悔棋卡×1'
+      },
+      {
+        level: 10, rewards: [
+          { type: 'currency', amount: 250 },
+          { type: 'title', name: '对弈达人' },
+          { type: 'item', id: 'item_exp_potion', count: 5 },
+          { type: 'item', id: 'item_double_exp', count: 2 },
+          { type: 'item', id: 'item_hint', count: 3 },
+          { type: 'vip', days: 7, expBonus: 2.0 }
+        ], description: '获得250💎 + 称号"对弈达人" + 🧪经验药水×5 + ✨双倍经验卡×2 + 💡提示卡×3 + 💎7天月卡'
+      },
+      {
+        level: 15, rewards: [
+          { type: 'currency', amount: 500 },
+          { type: 'title', name: '棋艺高手' },
+          { type: 'item', id: 'item_exp_potion', count: 10 },
+          { type: 'item', id: 'item_double_exp', count: 3 },
+          { type: 'item', id: 'item_undo', count: 3 }
+        ], description: '获得500💎 + 称号"棋艺高手" + 🧪经验药水×10 + ✨双倍经验卡×3 + ↩️悔棋卡×3'
+      },
+      {
+        level: 20, rewards: [
+          { type: 'currency', amount: 800 },
+          { type: 'badge', name: 'level_20_reward' },
+          { type: 'item', id: 'item_exp_potion', count: 10 },
+          { type: 'item', id: 'item_double_exp', count: 5 },
+          { type: 'item', id: 'item_hint', count: 5 },
+          { type: 'item', id: 'item_luck_boost', count: 1 },
+          { type: 'vip', days: 30, expBonus: 2.0 }
+        ], description: '获得800💎 + 限定徽章 + 🧪经验药水×10 + ✨双倍经验卡×5 + 💡提示卡×5 + 🍀幸运符×1 + 💎30天月卡'
+      },
+      {
+        level: 25, rewards: [
+          { type: 'currency', amount: 1200 },
+          { type: 'title', name: '棋坛精英' },
+          { type: 'item', id: 'item_triple_exp', count: 2 },
+          { type: 'item', id: 'item_undo', count: 5 },
+          { type: 'item', id: 'item_hint', count: 5 }
+        ], description: '获得1200💎 + 称号"棋坛精英" + 🌟三倍经验卡×2 + ↩️悔棋卡×5 + 💡提示卡×5'
+      },
+      {
+        level: 30, rewards: [
+          { type: 'currency', amount: 1800 },
+          { type: 'badge', name: 'level_30_reward' },
+          { type: 'item', id: 'item_triple_exp', count: 3 },
+          { type: 'item', id: 'item_exp_potion', count: 20 },
+          { type: 'item', id: 'item_luck_boost', count: 3 },
+          { type: 'vip', days: 30, expBonus: 2.0 }
+        ], description: '获得1800💎 + 限定徽章 + 🌟三倍经验卡×3 + 🧪经验药水×20 + 🍀幸运符×3 + 💎30天月卡'
+      },
+      {
+        level: 40, rewards: [
+          { type: 'currency', amount: 3000 },
+          { type: 'title', name: '传奇大师' },
+          { type: 'item', id: 'item_triple_exp', count: 5 },
+          { type: 'item', id: 'item_exp_potion', count: 30 },
+          { type: 'item', id: 'item_level_up', count: 1 },
+          { type: 'vip', days: 30, expBonus: 2.0 }
+        ], description: '获得3000💎 + 称号"传奇大师" + 🌟三倍经验卡×5 + 🧪经验药水×30 + 🚀等级直升券×1 + 💎30天月卡'
+      },
+      {
+        level: 50, rewards: [
+          { type: 'currency', amount: 5000 },
+          { type: 'badge', name: 'level_50_reward' },
+          { type: 'title', name: '至尊棋圣' },
+          { type: 'item', id: 'item_triple_exp', count: 10 },
+          { type: 'item', id: 'item_exp_potion', count: 50 },
+          { type: 'item', id: 'item_level_up', count: 3 },
+          { type: 'item', id: 'item_luck_boost', count: 5 },
+          { type: 'vip', days: 30, expBonus: 2.0 }
+        ], description: '获得5000💎 + 限定徽章 + 称号"至尊棋圣" + 🌟三倍经验卡×10 + 🧪经验药水×50 + 🚀等级直升券×3 + 🍀幸运符×5 + 💎30天月卡'
+      }
     ];
   }
 
@@ -1871,13 +2042,11 @@ class AccountManager {
   async getCurrency(accountId) {
     try {
       const account = await dataStore.findOne('accounts', { 'account.id': accountId });
-      if (!account) return { success: false, message: '账号不存在', balance: 0 };
-
-      const currency = account.currency || { starCoins: 0 };
+      const currency = account?.currency || { starCoins: 0 };
       return { success: true, balance: currency.starCoins || 0 };
     } catch (err) {
       logger.error('获取星钻余额失败', { accountId, error: err.message });
-      return { success: false, message: '获取失败', balance: 0 };
+      return { success: true, balance: 0 };
     }
   }
 
@@ -2037,6 +2206,10 @@ class AccountManager {
           for (const reward of rewardConfig.rewards) {
             if (reward.type === 'currency') {
               await this.addCurrency(accountId, reward.amount, `达到${rewardConfig.level}级奖励`, 'level_reward');
+            } else if (reward.type === 'item') {
+              await this.addItem(accountId, reward.id, reward.count);
+            } else if (reward.type === 'vip') {
+              await this.addVip(accountId, reward.days, reward.expBonus);
             }
             // title 和 badge 类型预留，未来可扩展
           }
@@ -2209,6 +2382,329 @@ class AccountManager {
       logger.error('新手礼包+补偿失败', { error: err.message });
       return { success: false, message: '领取失败', error: err.message };
     }
+  }
+
+  // ========== 内部辅助方法 ==========
+
+  /**
+   * 获取原始账号数据（包含完整字段，供内部使用）
+   */
+  async _getAccount(userId) {
+    try {
+      const account = await dataStore.findOne('accounts', { 'account.id': userId });
+      return account || null;
+    } catch (err) {
+      logger.error('_getAccount 失败', { userId, error: err.message });
+      return null;
+    }
+  }
+
+  /**
+   * 保存账号数据（供内部使用）
+   */
+  async _saveAccount(userId, account) {
+    try {
+      await dataStore.writeOne('accounts', userId, account);
+      return true;
+    } catch (err) {
+      logger.error('_saveAccount 失败', { userId, error: err.message });
+      return false;
+    }
+  }
+
+  // ========== 背包系统 ==========
+
+  /**
+   * 获取用户背包
+   */
+  async getInventory(userId) {
+    const account = await this._getAccount(userId);
+    const inventory = account?.inventory || { items: {} };
+    return { success: true, inventory };
+  }
+
+  /**
+   * 添加道具
+   */
+  async addItem(userId, itemId, count = 1) {
+    const account = await this._getAccount(userId);
+    if (!account) {
+      return { success: false, message: '账号不存在' };
+    }
+    if (!account.inventory) {
+      account.inventory = { items: {} };
+    }
+    if (!account.inventory.items) {
+      account.inventory.items = {};
+    }
+    account.inventory.items[itemId] = (account.inventory.items[itemId] || 0) + count;
+    await this._saveAccount(userId, account);
+    return { success: true };
+  }
+
+  /**
+   * 使用道具
+   */
+  async useItem(userId, itemId, count = 1) {
+    const account = await this._getAccount(userId);
+    if (!account) {
+      return { success: false, message: '账号不存在' };
+    }
+    if (!account.inventory?.items?.[itemId] || account.inventory.items[itemId] < count) {
+      return { success: false, message: '道具不足' };
+    }
+
+    let result = { success: true };
+    let expToAdd = 0;
+
+    switch (itemId) {
+      case 'item_double_exp':
+        // 双倍经验卡：添加1小时的双倍经验buff
+        if (!account.activeBuffs) account.activeBuffs = {};
+        const now = Date.now();
+        const existingExpire = account.activeBuffs.doubleExp || now;
+        account.activeBuffs.doubleExp = Math.max(existingExpire, now) + 60 * 60 * 1000; // 1小时
+        result.message = '双倍经验卡已激活！1小时内经验翻倍';
+        break;
+      case 'item_luck_boost':
+        // 幸运符：添加1小时的幸运buff
+        if (!account.activeBuffs) account.activeBuffs = {};
+        const luckNow = Date.now();
+        const existingLuckExpire = account.activeBuffs.luckBoost || luckNow;
+        account.activeBuffs.luckBoost = Math.max(existingLuckExpire, luckNow) + 60 * 60 * 1000; // 1小时
+        result.message = '幸运符已激活！1小时内星钻奖励翻倍';
+        break;
+      case 'item_triple_exp':
+        // 三倍经验卡：添加1小时的三倍经验buff
+        if (!account.activeBuffs) account.activeBuffs = {};
+        const tripleNow = Date.now();
+        const existingTripleExpire = account.activeBuffs.tripleExp || tripleNow;
+        account.activeBuffs.tripleExp = Math.max(existingTripleExpire, tripleNow) + 60 * 60 * 1000; // 1小时
+        result.message = '三倍经验卡已激活！1小时内经验三倍';
+        break;
+      case 'item_exp_potion':
+        // 经验药水：立即获得500经验
+        expToAdd = 500 * count;
+        result.message = `使用成功！获得${expToAdd}经验值`;
+        break;
+      case 'item_level_up':
+        // 等级直升券：加每一级所需经验，让等级表自动计算
+        const currentLevel = account.account?.profile?.level || 1;
+        const targetLevel = currentLevel + count;
+        let totalExpNeeded = 0;
+        for (let l = currentLevel + 1; l <= targetLevel; l++) {
+          totalExpNeeded += this.getExpForLevel(l);
+        }
+        expToAdd = totalExpNeeded;
+        result.message = `使用成功！等级从${currentLevel}提升到${targetLevel}`;
+        break;
+      case 'item_undo':
+        // 悔棋卡：添加悔棋次数
+        if (!account.inventory) account.inventory = {};
+        if (!account.inventory.undoCount) account.inventory.undoCount = 0;
+        account.inventory.undoCount += 3 * count;
+        result.message = `使用成功！获得${3 * count}次悔棋次数`;
+        break;
+      case 'item_hint':
+        // 提示卡：添加提示次数
+        if (!account.inventory) account.inventory = {};
+        if (!account.inventory.hintCount) account.inventory.hintCount = 0;
+        account.inventory.hintCount += 5 * count;
+        result.message = `使用成功！获得${5 * count}次提示次数`;
+        break;
+      default:
+        break;
+    }
+
+    // 处理经验添加、星钻奖励、经验记录
+    if (expToAdd > 0) {
+      if (!account.account) account.account = {};
+      if (!account.account.profile) account.account.profile = {};
+
+      const oldLevel = account.account.profile.level || 1;
+      const oldExp = account.account.profile.exp || 0;
+      const newTotalExp = oldExp + expToAdd;
+
+      // 通过总经验重新计算等级
+      const { level: calculatedLevel, exp: currentLevelExp } = this.calculateLevelAndExp(newTotalExp);
+      account.account.profile.exp = newTotalExp;
+      account.account.profile.level = calculatedLevel;
+      const newLevel = calculatedLevel;
+
+      // 星钻奖励
+      let currencyReward = Math.max(1, Math.floor(expToAdd / 10));
+      if (currencyReward > 0) {
+        await this.addCurrency(userId, currencyReward, `获得${expToAdd}经验值奖励`, 'exp_reward');
+      }
+
+      // 升级奖励
+      if (newLevel > oldLevel) {
+        const levelUpCurrency = (newLevel - oldLevel) * 50;
+        await this.addCurrency(userId, levelUpCurrency, `从${oldLevel}级升到${newLevel}级奖励`, 'level_up');
+      }
+      await this.checkLevelRewards(userId);
+
+      // 记录经验变动
+      try {
+        const expRecords = await this.getExpRecords(userId);
+        expRecords.transactions.push({
+          id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+          baseExp: expToAdd,
+          bonusExp: 0,
+          finalExp: expToAdd,
+          levelMult: 1,
+          eventLabel: itemId === 'item_exp_potion' ? '经验药水' : '等级直升券',
+          oldLevel: oldLevel,
+          newLevel: newLevel,
+          totalExp: account.account.profile.exp,
+          timestamp: Date.now()
+        });
+        if (expRecords.transactions.length > 500) {
+          expRecords.transactions = expRecords.transactions.slice(-500);
+        }
+        await dataStore.writeOne('expTransactions', userId, expRecords);
+      } catch (recErr) {
+        logger.warn('记录经验变动失败', { userId, error: recErr.message });
+      }
+    }
+
+    // 扣除道具
+    account.inventory.items[itemId] -= count;
+    if (account.inventory.items[itemId] <= 0) {
+      delete account.inventory.items[itemId];
+    }
+
+    await this._saveAccount(userId, account);
+    return result;
+  }
+
+  // ========== 外观系统 ==========
+
+  /**
+   * 获取用户外观
+   */
+  async getCosmetics(userId) {
+    const account = await this._getAccount(userId);
+    const cosmetics = account?.cosmetics || {
+      owned: { frames: [], skins: [], backgrounds: [], titles: [] },
+      equipped: { frame: null, skin: null, background: null, title: null }
+    };
+    return { success: true, cosmetics };
+  }
+
+  /**
+   * 添加外观
+   */
+  async addCosmetic(userId, category, cosmeticId) {
+    const account = await this._getAccount(userId);
+    if (!account) {
+      return { success: false, message: '账号不存在' };
+    }
+    if (!account.cosmetics) {
+      account.cosmetics = {
+        owned: { frames: [], skins: [], backgrounds: [], titles: [] },
+        equipped: { frame: null, skin: null, background: null, title: null }
+      };
+    }
+
+    const categoryMap = {
+      frame: 'frames',
+      skin: 'skins',
+      background: 'backgrounds',
+      title: 'titles'
+    };
+    const ownedKey = categoryMap[category];
+
+    if (!ownedKey) {
+      return { success: false, message: '类型错误' };
+    }
+
+    if (!account.cosmetics.owned[ownedKey].includes(cosmeticId)) {
+      account.cosmetics.owned[ownedKey].push(cosmeticId);
+    }
+
+    await this._saveAccount(userId, account);
+    return { success: true };
+  }
+
+  /**
+   * 装备外观
+   */
+  async equipCosmetic(userId, category, cosmeticId) {
+    const account = await this._getAccount(userId);
+    if (!account) {
+      return { success: false, message: '账号不存在' };
+    }
+    if (!account.cosmetics) {
+      return { success: false, message: '请先购买' };
+    }
+
+    const categoryMap = {
+      frame: 'frames',
+      skin: 'skins',
+      background: 'backgrounds',
+      title: 'titles'
+    };
+    const ownedKey = categoryMap[category];
+
+    if (!ownedKey) {
+      return { success: false, message: '类型错误' };
+    }
+
+    if (cosmeticId && !account.cosmetics.owned[ownedKey].includes(cosmeticId)) {
+      return { success: false, message: '未拥有该外观' };
+    }
+
+    account.cosmetics.equipped[category] = cosmeticId || null;
+    await this._saveAccount(userId, account);
+    return { success: true };
+  }
+
+  // ========== 会员系统 ==========
+
+  /**
+   * 获取用户会员信息
+   */
+  async getVip(userId) {
+    const account = await this._getAccount(userId);
+    const vip = account?.vip || { type: null, expireAt: 0, expBonus: 0, lastDailyGift: 0, lastWeeklyGift: 0, lastMonthlyGift: 0 };
+
+    const now = Date.now();
+    const isActive = vip.expireAt > now;
+
+    return {
+      success: true,
+      vip: {
+        ...vip,
+        isActive,
+        remainingDays: isActive ? Math.ceil((vip.expireAt - now) / (1000 * 60 * 60 * 24)) : 0
+      }
+    };
+  }
+
+  /**
+   * 添加会员
+   */
+  async addVip(userId, days, expBonus) {
+    const account = await this._getAccount(userId);
+    if (!account) {
+      return { success: false, message: '账号不存在' };
+    }
+    if (!account.vip) {
+      account.vip = { type: null, expireAt: 0, expBonus: 0, lastDailyGift: 0, lastWeeklyGift: 0, lastMonthlyGift: 0 };
+    }
+
+    const now = Date.now();
+    if (account.vip.expireAt > now) {
+      account.vip.expireAt += days * 24 * 60 * 60 * 1000;
+    } else {
+      account.vip.expireAt = now + days * 24 * 60 * 60 * 1000;
+    }
+    account.vip.type = `vip_${days === 7 ? 'week' : days === 30 ? 'month' : 'year'}`;
+    account.vip.expBonus = Math.max(account.vip.expBonus || 0, expBonus);
+
+    await this._saveAccount(userId, account);
+    return { success: true };
   }
 }
 

@@ -1,0 +1,7 @@
+{
+  "version": "1.0.0",
+  "hotUpdate": {
+    "enabled": true,
+    "checkInterval": 30000
+  }
+}

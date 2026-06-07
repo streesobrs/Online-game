@@ -1,0 +1,50 @@
+{
+  "frames": {
+    "frame_comingsoon": {
+      "id": "frame_comingsoon",
+      "name": "头像框功能开发中...",
+      "description": "敬请期待更多炫酷头像框",
+      "icon": "🚧",
+      "price": 0,
+      "category": "frame",
+      "enabled": false,
+      "rollout": 0
+    }
+  },
+  "skins": {
+    "skin_comingsoon": {
+      "id": "skin_comingsoon",
+      "name": "皮肤功能开发中...",
+      "description": "敬请期待更多精美皮肤",
+      "icon": "🚧",
+      "price": 0,
+      "category": "skin",
+      "enabled": false,
+      "rollout": 0
+    }
+  },
+  "backgrounds": {
+    "bg_comingsoon": {
+      "id": "bg_comingsoon",
+      "name": "背景功能开发中...",
+      "description": "敬请期待更多个性背景",
+      "icon": "🚧",
+      "price": 0,
+      "category": "background",
+      "enabled": false,
+      "rollout": 0
+    }
+  },
+  "titles": {
+    "title_comingsoon": {
+      "id": "title_comingsoon",
+      "name": "称号功能开发中...",
+      "description": "敬请期待更多专属称号",
+      "icon": "🚧",
+      "price": 0,
+      "category": "title",
+      "enabled": false,
+      "rollout": 0
+    }
+  }
+}

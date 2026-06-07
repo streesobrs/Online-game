@@ -497,6 +497,65 @@
       text-align: right;
     }
 
+    /* ===== 活跃buff和会员信息（合并紧凑显示）===== */
+    .status-bars {
+      margin-top: 8px;
+      margin-bottom: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .status-bar {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-bar.buff {
+      background: #e8f5e9;
+      border: 1px solid #81c784;
+      color: #2e7d32;
+    }
+
+    .status-bar.vip {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      color: #856404;
+    }
+
+    .status-bar.vip-inactive {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      color: #6c757d;
+    }
+
+    .status-icon {
+      font-size: 16px;
+    }
+
+    .status-timer {
+      font-weight: 600;
+      font-family: monospace;
+    }
+
+    .status-tag {
+      font-weight: 600;
+      background: #4caf50;
+      color: white;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+    }
+
+    .status-tag.vip {
+      background: #ffc107;
+      color: #856404;
+    }
+
     .tx-time {
       color: #adb5bd;
       font-size: 12px;
@@ -1072,6 +1131,14 @@
                 onclick="showUpgradeModal()">[转正]</span></span>
             <span>登录次数: <strong id="loginCount">-</strong></span>
           </div>
+
+          <!-- 状态条（活跃buff + 会员） -->
+          <div id="statusBars" class="status-bars"></div>
+
+          <!-- 道具次数显示 -->
+          <div id="itemCounts" style="margin-top: 8px; display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px;">
+          </div>
+
           <div class="exp-section">
             <div class="exp-labels">
               <span class="level-wrap">等级 <strong id="levelDisplay">1</strong>
@@ -1291,12 +1358,24 @@
       return localStorage.getItem('userToken');
     }
 
-    // ===== 经验计算（与服务器一致）=====
-    const EXP_MAP = { 2: 80, 3: 160, 4: 280, 5: 440, 6: 640, 7: 880, 8: 1200, 9: 1600, 10: 2100, 11: 2700, 12: 3400, 13: 4200, 14: 5100, 15: 6100, 16: 7300, 17: 8700, 18: 10300, 19: 12100, 20: 14100, 21: 16300, 22: 18700, 23: 21300, 24: 24100, 25: 27100, 26: 30300, 27: 33700, 28: 37300, 29: 41100, 30: 45100, 31: 49300, 32: 53700, 33: 58300, 34: 63100, 35: 68100, 36: 73300, 37: 78700, 38: 84300, 39: 90100, 40: 96100, 41: 102300, 42: 108700, 43: 115300, 44: 122100, 45: 129100, 46: 136300, 47: 143700, 48: 151300, 49: 159100, 50: 167100 };
+    // ===== 经验计算（从服务器动态加载）=====
+    let EXP_MAP = {};
+    async function loadLevelConfig() {
+      try {
+        const res = await fetch('/api/config/levelExp');
+        const json = await res.json();
+        EXP_MAP = json.data || {};
+      } catch (e) {
+        console.warn('加载等级配置失败，使用默认值', e);
+        EXP_MAP = { 2: 80, 3: 160, 4: 280, 5: 440, 6: 640, 7: 880, 8: 1200, 9: 1600, 10: 2100 };
+      }
+    }
     function getExp(lv) { return EXP_MAP[lv] || Math.max(100, (lv - 1) * 100); }
+    function getMaxLevel() { return Math.max(...Object.keys(EXP_MAP).map(Number), 50); }
     function calcLevel(totalExp) {
+      const maxLv = getMaxLevel();
       let lv = 1, rem = totalExp;
-      while (true) { const n = getExp(lv + 1); if (rem < n || n <= 0) break; rem -= n; lv++; }
+      while (lv < maxLv) { const n = getExp(lv + 1); if (rem < n || n <= 0) break; rem -= n; lv++; }
       return { level: lv, currentExp: rem, nextExp: getExp(lv + 1) };
     }
 
@@ -1333,6 +1412,18 @@
       document.getElementById('hTotalGames').textContent = totalGames;
       document.getElementById('hWins').textContent = totalWins;
       document.getElementById('hWinRate').textContent = winRate + '%';
+
+      // 道具次数显示
+      const inventory = data.inventory || {};
+      const itemCountsEl = document.getElementById('itemCounts');
+      let itemHtml = '';
+      if (inventory.undoCount > 0) {
+        itemHtml += `<span style="padding: 4px 8px; background: #e8f5e9; border-radius: 4px; color: #2e7d32;">↩️ 悔棋: ${inventory.undoCount}</span>`;
+      }
+      if (inventory.hintCount > 0) {
+        itemHtml += `<span style="padding: 4px 8px; background: #e3f2fd; border-radius: 4px; color: #1565c0;">💡 提示: ${inventory.hintCount}</span>`;
+      }
+      itemCountsEl.innerHTML = itemHtml;
 
       // 星钻
       document.getElementById('currencyBalance').textContent = data.currency || 0;
@@ -1393,14 +1484,14 @@
       const claimBtn = document.getElementById('claimAllBtn');
 
       const all = [
-        { level: 5, desc: '100💎 + 称号"棋坛新秀"' },
-        { level: 10, desc: '250💎 + 称号"对弈达人"' },
-        { level: 15, desc: '500💎 + 称号"棋艺高手"' },
-        { level: 20, desc: '800💎 + 限定徽章' },
-        { level: 25, desc: '1200💎 + 称号"棋坛精英"' },
-        { level: 30, desc: '1800💎 + 限定徽章' },
-        { level: 40, desc: '3000💎 + 称号"传奇大师"' },
-        { level: 50, desc: '5000💎 + 限定徽章 + 称号"至尊棋圣"' }
+        { level: 5, desc: '100💎 + 🏆棋坛新秀 + 🧪经验药水×3 + ↩️悔棋卡×1' },
+        { level: 10, desc: '250💎 + 🏆对弈达人 + 🧪经验药水×5 + ✨双倍经验卡×2 + 💡提示卡×3 + 💎7天月卡' },
+        { level: 15, desc: '500💎 + 🏆棋艺高手 + 🧪经验药水×10 + ✨双倍经验卡×3 + ↩️悔棋卡×3' },
+        { level: 20, desc: '800💎 + 🏅限定徽章 + 🧪经验药水×10 + ✨双倍经验卡×5 + 💡提示卡×5 + 🍀幸运符×1 + 💎30天月卡' },
+        { level: 25, desc: '1200💎 + 🏆棋坛精英 + 🌟三倍经验卡×2 + ↩️悔棋卡×5 + 💡提示卡×5' },
+        { level: 30, desc: '1800💎 + 🏅限定徽章 + 🌟三倍经验卡×3 + 🧪经验药水×20 + 🍀幸运符×3 + 💎30天月卡' },
+        { level: 40, desc: '3000💎 + 🏆传奇大师 + 🌟三倍经验卡×5 + 🧪经验药水×30 + 🚀等级直升券×1 + 💎30天月卡' },
+        { level: 50, desc: '5000💎 + 🏅限定徽章 + 🏆至尊棋圣 + 🌟三倍经验卡×10 + 🧪经验药水×50 + 🚀等级直升券×3 + 🍀幸运符×5 + 💎30天月卡' }
       ];
 
       const claimed = rw?.claimedLevels || [];
@@ -1636,8 +1727,99 @@
       }
     }
 
+    let statusTimer = null;
+
+    async function loadStatus() {
+      const accountId = currentAccountId;
+      if (!accountId) return;
+      try {
+        const [buffsRes, vipRes] = await Promise.all([
+          fetch('/api/buffs/' + accountId),
+          fetch('/api/shop/vip?userId=' + accountId)
+        ]);
+        const buffsData = await buffsRes.json();
+        const vipData = await vipRes.json();
+        if (buffsData.success && vipData.success) {
+          renderStatus(buffsData.buffs, vipData.vip);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function renderStatus(buffs, vipData) {
+      const container = document.getElementById('statusBars');
+      const now = Date.now();
+      let html = '';
+
+      // 会员状态
+      if (vipData && vipData.isActive && vipData.expireAt > now) {
+        const remaining = vipData.expireAt - now;
+        const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+        html += `
+          <div class="status-bar vip">
+            <span class="status-icon">⭐</span>
+            <span>VIP</span>
+            <span class="status-tag vip">×${vipData.expBonus}</span>
+            <span class="status-timer">${days}天 ${hours}时 ${minutes}分 ${seconds}秒</span>
+          </div>
+        `;
+      } else {
+        html += `
+          <div class="status-bar vip-inactive">
+            <span class="status-icon">⭐</span>
+            <span>暂无会员</span>
+          </div>
+        `;
+      }
+
+      // 活跃buff
+      const buffConfig = {
+        doubleExp: { icon: '✨', name: '双倍经验' },
+        tripleExp: { icon: '🌟', name: '三倍经验' },
+        luckBoost: { icon: '🍀', name: '幸运提升' }
+      };
+
+      for (const [key, value] of Object.entries(buffs)) {
+        if (!value) continue;
+
+        const config = buffConfig[key] || { icon: '🎁', name: key };
+        let timerText = '';
+
+        if (typeof value === 'number' && value > now) {
+          const remaining = value - now;
+          const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
+          const hours = Math.floor((remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+          const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+          const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+          timerText = (days ? days + '天 ' : '') + (hours ? hours + '时 ' : '') + (minutes ? minutes + '分 ' : '') + seconds + '秒';
+        } else if (value === true) {
+          timerText = '永久';
+        } else {
+          continue;
+        }
+
+        html += `
+          <div class="status-bar buff">
+            <span class="status-icon">${config.icon}</span>
+            <span>${config.name}</span>
+            <span class="status-timer">${timerText}</span>
+          </div>
+        `;
+      }
+
+      container.innerHTML = html;
+
+      if (statusTimer) clearInterval(statusTimer);
+      statusTimer = setInterval(() => { loadStatus(); }, 1000);
+    }
+
     async function fetchProfile(accountId) {
       try {
+        await loadLevelConfig();
         const res = await fetch('/api/profile/' + accountId);
         const json = await res.json();
         if (json.success && json.data) {
@@ -1645,6 +1827,7 @@
           document.getElementById('profileContent').style.display = 'block';
           renderProfile(json.data);
           loadMultiplierInfo();
+          loadStatus();
         } else {
           showToast('加载个人资料失败', 'error');
         }

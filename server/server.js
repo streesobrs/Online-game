@@ -3,6 +3,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 
 // 加载配置
 const config = require('./config');
@@ -19,6 +20,7 @@ const AchievementManager = require('./modules/AchievementManager');
 const AIManager = require('./modules/AIManager');
 const ThemeManager = require('./modules/ThemeManager');
 const FeedbackManager = require('./modules/FeedbackManager');
+const ShopManager = require('./modules/ShopManager');
 
 // 初始化Express应用
 const app = express();
@@ -84,6 +86,150 @@ app.get('/health', (req, res) => {
     timestamp: Date.now(),
     uptime: Date.now() - serverStartTime
   });
+});
+
+// 获取等级经验配置
+app.get('/api/config/levelExp', (req, res) => {
+  try {
+    const configPath = path.join(__dirname, 'config', 'levelExp.json');
+    const data = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    res.json({ success: true, data: data.levelExp || {} });
+  } catch (err) {
+    logger.error('获取等级配置失败', { error: err.message });
+    res.status(500).json({ success: false, data: {} });
+  }
+});
+
+// ========== 商店API ==========
+
+// 获取商店数据
+app.get('/api/shop/data', async (req, res) => {
+  try {
+    const userId = req.query.userId;
+    const data = shopManager.getShopData(userId);
+    res.json({ success: true, data });
+  } catch (err) {
+    logger.error('获取商店数据失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取失败' });
+  }
+});
+
+// 购买商品
+app.post('/api/shop/buy', async (req, res) => {
+  try {
+    const { userId, itemId } = req.body;
+    if (!userId || !itemId) {
+      return res.status(400).json({ success: false, message: '参数错误' });
+    }
+    const result = await shopManager.purchaseItem(userId, itemId, accountManager);
+    res.json(result);
+  } catch (err) {
+    logger.error('购买失败', { error: err.message });
+    res.status(500).json({ success: false, message: '购买失败' });
+  }
+});
+
+// 获取用户背包
+app.get('/api/shop/inventory', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: '参数错误' });
+    }
+    const result = await accountManager.getInventory(userId);
+    res.json(result);
+  } catch (err) {
+    logger.error('获取背包失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取失败' });
+  }
+});
+
+// 获取用户外观
+app.get('/api/shop/cosmetics', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: '参数错误' });
+    }
+    const result = await accountManager.getCosmetics(userId);
+    res.json(result);
+  } catch (err) {
+    logger.error('获取外观失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取失败' });
+  }
+});
+
+// 装备外观
+app.post('/api/shop/cosmetics/equip', async (req, res) => {
+  try {
+    const { userId, category, cosmeticId } = req.body;
+    if (!userId || !category) {
+      return res.status(400).json({ success: false, message: '参数错误' });
+    }
+    const result = await accountManager.equipCosmetic(userId, category, cosmeticId);
+    res.json(result);
+  } catch (err) {
+    logger.error('装备失败', { error: err.message });
+    res.status(500).json({ success: false, message: '装备失败' });
+  }
+});
+
+// 获取用户会员信息
+app.get('/api/shop/vip', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: '参数错误' });
+    }
+    const result = await accountManager.getVip(userId);
+    res.json(result);
+  } catch (err) {
+    logger.error('获取会员信息失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取失败' });
+  }
+});
+
+// 获取星钻余额
+app.get('/api/currency/balance', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: '参数错误' });
+    }
+    const result = await accountManager.getCurrency(userId);
+    res.json(result);
+  } catch (err) {
+    logger.error('获取星钻余额失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取失败' });
+  }
+});
+
+// 使用道具
+app.post('/api/shop/use-item', async (req, res) => {
+  try {
+    const { userId, itemId } = req.body;
+    if (!userId || !itemId) {
+      return res.status(400).json({ success: false, message: '参数错误' });
+    }
+    const result = await accountManager.useItem(userId, itemId, 1);
+    res.json(result);
+  } catch (err) {
+    logger.error('使用道具失败', { error: err.message });
+    res.status(500).json({ success: false, message: '使用失败' });
+  }
+});
+
+// 获取活跃buff
+app.get('/api/buffs/:userId', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const account = await accountManager._getAccount(userId);
+    const buffs = account?.activeBuffs || {};
+    res.json({ success: true, buffs });
+  } catch (err) {
+    logger.error('获取活跃buff失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取失败' });
+  }
 });
 
 // 系统状态API
@@ -1017,7 +1163,12 @@ app.get('/api/profile/:accountId', async (req, res) => {
           bestStreak,
           winRate: totalGames > 0 ? Math.round((totalWins / totalGames) * 100) : 0
         },
-        games
+        games,
+        activeBuffs: account.activeBuffs || {},
+        inventory: {
+          undoCount: account.inventory?.undoCount || 0,
+          hintCount: account.inventory?.hintCount || 0
+        }
       }
     });
   } catch (err) {
@@ -1038,6 +1189,7 @@ const gameManager = new GameManager(userManager, accountManager, achievementMana
 const chatManager = new ChatManager(userManager, gameManager, accountManager);
 const adminManager = new AdminManager(userManager, gameManager, chatManager, accountManager);
 const feedbackManager = FeedbackManager;
+const shopManager = new ShopManager();
 // 注入accountManager到FeedbackManager用于实时查询昵称
 feedbackManager.accountManager = accountManager;
 
@@ -1626,14 +1778,18 @@ io.on('connection', (socket) => {
       const activity = account?.account?.activity || {};
       const level = account?.account?.profile?.level || 1;
 
-      // 聚合所有游戏类型的连胜数据
+      // 聚合所有游戏类型的胜利数据
       let bestStreak = 0;
       let bestMaxStreak = 0;
+      const gameTypeWins = {};
       if (account?.games) {
         Object.values(account.games).forEach(g => {
           bestStreak = Math.max(bestStreak, g.streak || 0);
           bestMaxStreak = Math.max(bestMaxStreak, g.maxStreak || 0);
         });
+        for (const [gameKey, gameData] of Object.entries(account.games)) {
+          gameTypeWins[gameKey] = gameData.wins || 0;
+        }
       }
 
       // 兼容新旧成就格式：统一转为纯ID数组
@@ -1653,6 +1809,10 @@ io.on('connection', (socket) => {
         maxStreak: bestMaxStreak,      // 历史最大连胜
         achievementCount: userAchievementIds.length,
         badges: stats.badges || 0,
+        wins: stats.totalWins || 0,
+        losses: stats.totalLosses || 0,
+        draws: stats.totalDraws || 0,
+        gameTypeWins,
       });
 
       // 为每个成就添加解锁状态
@@ -2156,11 +2316,15 @@ io.on('connection', (socket) => {
           // 聚合所有游戏类型的连胜数据
           let snakeBestStreak = 0;
           let snakeBestMaxStreak = 0;
+          const gameTypeWins = {};
           if (postAccount.games) {
             Object.values(postAccount.games).forEach(g => {
               snakeBestStreak = Math.max(snakeBestStreak, g.streak || 0);
               snakeBestMaxStreak = Math.max(snakeBestMaxStreak, g.maxStreak || 0);
             });
+            for (const [gk, gd] of Object.entries(postAccount.games)) {
+              gameTypeWins[gk] = gd.wins || 0;
+            }
           }
 
           await gameManager.achievementManager.checkAchievements(accountId, {
@@ -2183,6 +2347,10 @@ io.on('connection', (socket) => {
             quickGame: score < 50,
             slowGame: score > 300,
             maxMoves: moveHistory ? moveHistory.length : 0,
+            wins: postAccount.stats?.totalWins || 0,
+            losses: postAccount.stats?.totalLosses || 0,
+            draws: postAccount.stats?.totalDraws || 0,
+            gameTypeWins,
             timestamp: Date.now()
           });
         }
