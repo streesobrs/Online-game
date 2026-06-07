@@ -266,7 +266,7 @@
     <div class="filter-bar">
       <select class="filter-select" id="gameTypeFilter" onchange="loadGames()">
         <option value="all">全部游戏</option>
-        <option value="gomoku">五子棋</option>
+        <option value="gobang">五子棋</option>
         <option value="go">围棋</option>
         <option value="xiangqi">象棋</option>
         <option value="snake">贪吃蛇</option>
@@ -304,6 +304,7 @@
 
     // 游戏类型配置
     const gameTypeConfig = {
+      gobang: { name: '五子棋', icon: '⚫', color: '#1a1a1a' },
       gomoku: { name: '五子棋', icon: '⚫', color: '#1a1a1a' },
       go: { name: '围棋', icon: '⚪', color: '#6c757d' },
       xiangqi: { name: '象棋', icon: '🏰', color: '#dc3545' },
@@ -403,7 +404,7 @@
             <div class="game-meta">
               <span>🎯 对手: ${game.opponent || 'AI'}</span>
               <span>📍 回合: ${game.moves}</span>
-              <span>📅 ${formatDate(game.endTime)}</span>
+              <span>📅 ${formatDate(game.date || game.endTime)}</span>
             </div>
           </div>
           <div class="game-result ${resultClass}">${resultText}</div>

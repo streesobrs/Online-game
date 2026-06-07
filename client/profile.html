@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 
 <head>
@@ -71,7 +71,7 @@
     /* ===== 主容器 ===== */
     .container {
       width: 100%;
-      max-width: 1100px;
+      max-width: 1400px;
     }
 
     /* ===== 头部 ===== */
@@ -149,6 +149,126 @@
       color: #007bff;
     }
 
+    .exp-labels .level-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .exp-labels .level-wrap .info-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #adb5bd;
+      color: white;
+      font-size: 10px;
+      font-weight: bold;
+      cursor: pointer;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .exp-labels .level-wrap .info-icon:hover {
+      background: #007bff;
+    }
+
+    .exp-labels .level-wrap .info-icon .tip {
+      display: none;
+      position: absolute;
+      top: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #2d3748;
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: normal;
+      white-space: nowrap;
+      z-index: 999;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      line-height: 1.6;
+    }
+
+    .exp-labels .level-wrap .info-icon .tip::before {
+      content: '';
+      position: absolute;
+      top: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-bottom: 6px solid #2d3748;
+    }
+
+    /* 提示框适配移动端 */
+    @media (max-width: 768px) {
+      .exp-labels .level-wrap .info-icon .tip {
+        white-space: normal;
+        max-width: 260px;
+      }
+    }
+
+    .exp-labels .level-wrap .info-icon:hover .tip {
+      display: block;
+    }
+
+    .exp-labels .level-wrap .multiplier-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+      line-height: 1.5;
+      margin-left: 2px;
+    }
+
+    .multiplier-badge.normal {
+      background: #e9ecef;
+      color: #6c757d;
+    }
+
+    .multiplier-badge.boosted {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .multiplier-badge.hot {
+      background: #ffe0b2;
+      color: #e65100;
+      animation: pulse-glow 2s ease-in-out infinite;
+    }
+
+    .exp-labels .level-wrap .event-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+      line-height: 1.5;
+      margin-left: 2px;
+    }
+
+    .event-badge.active {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    @keyframes pulse-glow {
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 rgba(230, 81, 0, 0.3);
+      }
+
+      50% {
+        box-shadow: 0 0 6px 2px rgba(230, 81, 0, 0.15);
+      }
+    }
+
     .exp-bar {
       height: 8px;
       background: #e9ecef;
@@ -215,6 +335,39 @@
       font-weight: normal;
       font-size: 13px;
       color: #6c757d;
+    }
+
+    /* 标签切换 */
+    .tab-bar {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 14px;
+      background: #f0f2f5;
+      border-radius: 8px;
+      padding: 3px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      text-align: center;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #6c757d;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+    }
+
+    .tab-btn:hover {
+      color: #495057;
+    }
+
+    .tab-btn.active {
+      background: white;
+      color: #007bff;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
     }
 
     /* ===== 双栏 ===== */
@@ -314,7 +467,6 @@
     }
 
     .tx-list {
-      max-height: 260px;
       overflow-y: auto;
     }
 
@@ -915,12 +1067,28 @@
           <div class="subtitle" id="userMeta">ID: -</div>
           <div class="header-meta">
             <span>注册时间: <strong id="regTime">-</strong></span>
-            <span>账号类型: <strong id="accountType">-</strong></span>
+            <span>账号类型: <strong id="accountType">-</strong> <span id="upgradeLink"
+                style="display:none; color:#007bff; cursor:pointer; font-size:12px; margin-left:4px;"
+                onclick="showUpgradeModal()">[转正]</span></span>
             <span>登录次数: <strong id="loginCount">-</strong></span>
           </div>
           <div class="exp-section">
             <div class="exp-labels">
-              <span>等级 <strong id="levelDisplay">1</strong></span>
+              <span class="level-wrap">等级 <strong id="levelDisplay">1</strong>
+                <span class="info-icon">?
+                  <span class="tip" id="levelTip">
+                    <b>等级经验倍率</b><br>
+                    1~10级：×1.0（基础）<br>
+                    11~20级：×1.5<br>
+                    21~30级：×2.0<br>
+                    31~40级：×2.5<br>
+                    41级+：×3.0<br>
+                    <span style="color:#90cdf4;">周末/节假日额外翻倍！</span>
+                  </span>
+                </span>
+                <span class="multiplier-badge" id="currentMultiplier"></span>
+                <span class="event-badge" id="eventMultiplier"></span>
+              </span>
               <span id="expDisplay">经验: 0 / 100</span>
             </div>
             <div class="exp-bar">
@@ -944,6 +1112,10 @@
         </div>
       </div>
 
+      <!-- 补偿状态（通栏） -->
+      <div id="compensationSection"
+        style="display:none; margin-bottom: 16px; padding: 12px 18px; border-radius: 8px; font-size: 13px;"></div>
+
       <!-- 双栏 -->
       <div class="content-grid">
         <!-- 左栏 -->
@@ -952,24 +1124,50 @@
           <div class="card">
             <div class="card-title">
               <span>💎 星钻</span>
-              <span class="right" id="txCount">共 0 笔记录</span>
             </div>
-            <div class="currency-box">
-              <span class="currency-icon">💎</span>
-              <span class="currency-amount" id="currencyBalance">0</span>
-              <span class="currency-label">星钻</span>
+            <!-- 标签栏 -->
+            <div class="tab-bar">
+              <span class="tab-btn active" onclick="switchCurrencyTab('overview')">📊 概览</span>
+              <span class="tab-btn" onclick="switchCurrencyTab('records')">📋 星钻</span>
+              <span class="tab-btn" onclick="switchCurrencyTab('exp')">📈 经验</span>
             </div>
-            <div
-              style="padding: 10px 14px; background: #fff3cd; border-radius: 8px; margin-bottom: 14px; font-size: 13px; color: #856404;">
-              💡 <strong>星钻获取规则</strong>：
-              <ul style="margin: 6px 0 0 20px; padding: 0;">
-                <li>每获得10点经验奖励1星钻</li>
-                <li>每升1级奖励50星钻</li>
-                <li>等级奖励额外赠送大量星钻</li>
-              </ul>
-            </div>
-            <div class="tx-list" id="txList">
-              <div class="empty">暂无星钻变动记录</div>
+            <!-- 内容区（绝对定位重叠，切换完全无抖动） -->
+            <div style="position:relative; min-height:290px; width:100%;">
+              <!-- 概览 -->
+              <div id="currencyOverview" style="position:absolute; left:0; top:0; width:100%;">
+                <div class="currency-box">
+                  <span class="currency-icon">💎</span>
+                  <span class="currency-amount" id="currencyBalance">0</span>
+                  <span class="currency-label">星钻</span>
+                </div>
+                <div
+                  style="padding: 10px 14px; background: #fff3cd; border-radius: 8px; font-size: 13px; color: #856404;">
+                  💡 <strong>星钻获取规则</strong>：
+                  <ul style="margin: 6px 0 0 20px; padding: 0;">
+                    <li>每获得10点经验奖励1星钻</li>
+                    <li>每升1级奖励50星钻</li>
+                    <li>等级奖励额外赠送大量星钻</li>
+                  </ul>
+                </div>
+              </div>
+              <!-- 记录 -->
+              <div id="currencyRecords" style="position:absolute; left:0; top:0; width:100%; display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                  <span style="font-size:13px; color:#6c757d;" id="txCount">共 0 笔记录</span>
+                </div>
+                <div class="tx-list" id="txList" style="max-height:240px;">
+                  <div class="empty">暂无星钻变动记录</div>
+                </div>
+              </div>
+              <!-- 经验记录 -->
+              <div id="expRecords" style="position:absolute; left:0; top:0; width:100%; display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                  <span style="font-size:13px; color:#6c757d;" id="expTxCount">共 0 笔记录</span>
+                </div>
+                <div class="tx-list" id="expTxList" style="max-height:240px;">
+                  <div class="empty">暂无经验变动记录</div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1112,6 +1310,14 @@
       document.getElementById('userMeta').textContent = 'ID: ' + (acct.id || '-');
       document.getElementById('regTime').textContent = fmtDate(acct.createdAt);
       document.getElementById('accountType').textContent = acct.type === 'guest' ? '游客' : '注册用户';
+      document.getElementById('loginCount').textContent = acct.loginCount || 0;
+      // 游客显示转正入口
+      const upgradeLink = document.getElementById('upgradeLink');
+      if (acct.type === 'guest') {
+        upgradeLink.style.display = 'inline';
+      } else {
+        upgradeLink.style.display = 'none';
+      }
       const avatarChar = (acct.nickname || acct.username || '?')[0];
       document.getElementById('avatarDisplay').textContent = avatarChar;
 
@@ -1151,8 +1357,8 @@
       // 勋章
       renderBadges(data.achievements);
 
-      // 交易记录
-      loadTransactions(acct.id);
+      // 老玩家补偿状态
+      checkCompensation(acct.id);
     }
 
     function renderGameTypeStats(games) {
@@ -1166,7 +1372,7 @@
       let html = '';
       for (const t of types) {
         const g = games[t.key] || {};
-        const played = g.played || 0;
+        const played = g.played || g.totalGames || 0;
         const wins = g.wins || 0;
         const streak = g.streak || 0;
         const wr = played > 0 ? Math.round(wins / played * 100) + '%' : '-';
@@ -1305,6 +1511,131 @@
 
     // ===== 数据加载 =====
 
+    // ===== 游客转正 =====
+    let upgradeModal = null;
+
+    function showUpgradeModal() {
+      if (upgradeModal) { upgradeModal.remove(); upgradeModal = null; }
+      const m = document.createElement('div');
+      m.className = 'settings-overlay';
+      m.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;justify-content:center;align-items:center;z-index:9999;';
+      m.innerHTML = `
+        <div style="background:white;border-radius:12px;padding:28px;max-width:400px;width:90%;box-shadow:0 8px 30px rgba(0,0,0,0.2);">
+          <h3 style="margin:0 0 16px;font-size:18px;">📝 游客转正</h3>
+          <p style="font-size:13px;color:#6c757d;margin-bottom:16px;">注册账号后，游客数据将永久保留，可随时登录。</p>
+          <div class="account-form-group" style="margin-bottom:12px;">
+            <label style="font-size:13px;font-weight:600;color:#2d3748;">用户名</label>
+            <input type="text" id="upgrade-username" placeholder="3-20位字母/数字/下划线" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;margin-top:4px;box-sizing:border-box;">
+          </div>
+          <div class="account-form-group" style="margin-bottom:12px;">
+            <label style="font-size:13px;font-weight:600;color:#2d3748;">密码</label>
+            <input type="password" id="upgrade-password" placeholder="至少6位密码" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;margin-top:4px;box-sizing:border-box;">
+          </div>
+          <div class="account-form-group" style="margin-bottom:16px;">
+            <label style="font-size:13px;font-weight:600;color:#2d3748;">确认密码</label>
+            <input type="password" id="upgrade-password2" placeholder="再次输入密码" style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;margin-top:4px;box-sizing:border-box;">
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button onclick="this.closest('.settings-overlay').remove()" style="padding:8px 20px;border:1px solid #ddd;border-radius:6px;background:white;cursor:pointer;font-size:13px;">取消</button>
+            <button onclick="doUpgrade()" style="padding:8px 20px;border:none;border-radius:6px;background:#28a745;color:white;cursor:pointer;font-size:13px;font-weight:bold;">注册转正</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(m);
+      upgradeModal = m;
+      m.addEventListener('click', (e) => { if (e.target === m) { m.remove(); upgradeModal = null; } });
+    }
+
+    async function doUpgrade() {
+      const username = document.getElementById('upgrade-username').value.trim();
+      const password = document.getElementById('upgrade-password').value;
+      const password2 = document.getElementById('upgrade-password2').value;
+
+      if (!username || username.length < 3) { showToast('用户名至少3位', 'error'); return; }
+      if (!password || password.length < 6) { showToast('密码至少6位', 'error'); return; }
+      if (password !== password2) { showToast('两次密码不一致', 'error'); return; }
+
+      const btn = upgradeModal.querySelector('button:last-child');
+      btn.textContent = '处理中...';
+      btn.disabled = true;
+
+      socket.emit('account_register', { username, password, nickname: null });
+    }
+
+    // 监听注册结果
+    socket.on('account_action_result', (data) => {
+      if (data.action !== 'register' || !upgradeModal) return;
+      const btn = upgradeModal.querySelector('button:last-child');
+      if (btn) { btn.textContent = '注册转正'; btn.disabled = false; }
+      if (data.success) {
+        showToast('🎉 转正成功！', 'success');
+        upgradeModal.remove();
+        upgradeModal = null;
+        document.getElementById('accountType').textContent = '注册用户';
+        document.getElementById('upgradeLink').style.display = 'none';
+      } else {
+        showToast(data.message || '转正失败', 'error');
+      }
+    });
+
+    async function loadMultiplierInfo() {
+      try {
+        const res = await fetch('/api/event-multiplier');
+        const data = await res.json();
+        const tip = document.getElementById('levelTip');
+        const badge = document.getElementById('currentMultiplier');
+        const eventBadge = document.getElementById('eventMultiplier');
+        const m = data.event;
+        const level = parseInt(document.getElementById('levelDisplay').textContent) || 1;
+        // 计算等级倍率
+        let levelMult = 1.0;
+        if (level > 40) levelMult = 3.0;
+        else if (level > 30) levelMult = 2.5;
+        else if (level > 20) levelMult = 2.0;
+        else if (level > 10) levelMult = 1.5;
+        const totalMult = levelMult * m.multiplier;
+
+        // 等级倍率 badge
+        badge.textContent = levelMult > 1.0 ? `×${levelMult}` : '';
+        badge.className = 'multiplier-badge';
+        if (levelMult >= 2.0) {
+          badge.classList.add('hot');
+        } else if (levelMult > 1.0) {
+          badge.classList.add('boosted');
+        }
+
+        // 活动倍率 badge（仅在有活动时显示）
+        eventBadge.textContent = '';
+        eventBadge.className = 'event-badge';
+        if (m.multiplier > 1.0) {
+          const eventName = (m.label.split('限时')[0] || '活动').trim();
+          eventBadge.textContent = `+${eventName} ×${m.multiplier}`;
+          eventBadge.classList.add('active');
+        }
+
+        // 提示框内容
+        let extra = '';
+        if (m.multiplier > 1.0) {
+          extra = `<span style="color:#4ade80;">🔥 ${m.label}，今日经验加速中！</span>
+          <span style="color:#a0aec0;font-size:11px;">等级 ${levelMult}× + ${m.label} = 总 ${totalMult}×</span>`;
+        } else {
+          extra = '<span style="color:#90cdf4;">周末/节假日额外翻倍！</span>';
+        }
+        tip.innerHTML = `
+          <b>等级经验倍率</b><br>
+          1~10级：×1.0（基础）<br>
+          11~20级：×1.5<br>
+          21~30级：×2.0<br>
+          31~40级：×2.5<br>
+          41级+：×3.0<br>
+          ${extra}
+          <span style="color:#a0aec0;font-size:11px;">📅 ${data.today}</span>
+        `;
+      } catch (err) {
+        // fallback: 保持默认文案
+      }
+    }
+
     async function fetchProfile(accountId) {
       try {
         const res = await fetch('/api/profile/' + accountId);
@@ -1313,6 +1644,7 @@
           document.getElementById('loadingState').style.display = 'none';
           document.getElementById('profileContent').style.display = 'block';
           renderProfile(json.data);
+          loadMultiplierInfo();
         } else {
           showToast('加载个人资料失败', 'error');
         }
@@ -1322,7 +1654,33 @@
       }
     }
 
-    async function loadTransactions(accountId) {
+    // ===== 星钻/经验标签切换 =====
+    function switchCurrencyTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      const overview = document.getElementById('currencyOverview');
+      const records = document.getElementById('currencyRecords');
+      const expRec = document.getElementById('expRecords');
+      // 全部隐藏
+      overview.style.display = 'none';
+      records.style.display = 'none';
+      expRec.style.display = 'none';
+      if (tab === 'records') {
+        records.style.display = 'block';
+        document.querySelector('.tab-btn[onclick*="records"]').classList.add('active');
+        loadCurrencyTransactions();
+      } else if (tab === 'exp') {
+        expRec.style.display = 'block';
+        document.querySelector('.tab-btn[onclick*="exp"]').classList.add('active');
+        loadExpTransactions();
+      } else {
+        overview.style.display = 'block';
+        document.querySelector('.tab-btn[onclick*="overview"]').classList.add('active');
+      }
+    }
+
+    async function loadCurrencyTransactions() {
+      const accountId = currentAccountId;
+      if (!accountId) return;
       try {
         const res = await fetch('/api/currency/' + accountId + '/transactions?limit=30');
         const json = await res.json();
@@ -1332,7 +1690,6 @@
           list.innerHTML = '<div class="empty">暂无星钻变动记录</div>';
           return;
         }
-        // 也可以从传入的 data 中拿到登录次数
         let html = '';
         for (const tx of json.transactions) {
           const icon = tx.type === 'earn' ? '💰' : '💸';
@@ -1347,6 +1704,120 @@
         }
         list.innerHTML = html;
       } catch (err) { /* ignore */ }
+    }
+
+    async function loadExpTransactions() {
+      const accountId = currentAccountId;
+      if (!accountId) return;
+      try {
+        const res = await fetch('/api/currency/' + accountId + '/exp-transactions?limit=30');
+        const json = await res.json();
+        const list = document.getElementById('expTxList');
+        document.getElementById('expTxCount').textContent = '共 ' + (json.transactions?.length || 0) + ' 笔记录';
+        if (!json.success || !json.transactions || json.transactions.length === 0) {
+          list.innerHTML = '<div class="empty">暂无经验变动记录</div>';
+          return;
+        }
+        let html = '';
+        for (const tx of json.transactions) {
+          const bonus = tx.bonusExp || 0;
+          const base = tx.baseExp || 0;
+          const final = tx.finalExp || 0;
+          const label = tx.eventLabel ? `（含${tx.eventLabel}）` : '';
+          let detail = `基础 ${base}`;
+          if (bonus > 0) detail += ` + 额外 ${bonus}`;
+          html += `<div class="tx-item">
+            <span>⭐</span>
+            <span class="tx-reason">${detail}${label}</span>
+            <span class="tx-amount earn">+${final}EXP</span>
+            <span class="tx-time">${fmtDate(tx.timestamp)} ${fmtTime(tx.timestamp)}</span>
+          </div>`;
+        }
+        list.innerHTML = html;
+      } catch (err) { /* ignore */ }
+    }
+
+    // ===== 老玩家星钻补偿状态 =====
+
+    async function checkCompensation(accountId) {
+      try {
+        const res = await fetch('/api/currency/' + accountId + '/compensation');
+        const json = await res.json();
+        const section = document.getElementById('compensationSection');
+        if (!json.success) return;
+
+        if (!json.compensated) {
+          section.style.display = 'block';
+          section.style.background = '#fff3cd';
+          section.style.color = '#856404';
+          section.innerHTML = `
+            🎁 <strong>新手礼包</strong>：固定 500💎，新老玩家人人有份！<br>
+            💎 <strong>老玩家额外补偿</strong>：根据经验、等级、成就、对局和胜场计算。
+            <button id="compensateBtn" onclick="triggerCompensate('${accountId}')"
+              style="margin-top:8px; padding:6px 16px; background:#ffc107; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:bold;">
+              ⚡ 立即领取
+            </button>
+          `;
+        } else if (json.summary && json.summary.total > 0) {
+          // 判断是否今天领取的：是则显示，不是则隐藏
+          let showSection = false;
+          if (json.compensatedAt) {
+            const claimDate = new Date(json.compensatedAt);
+            const today = new Date();
+            showSection = claimDate.getFullYear() === today.getFullYear() &&
+              claimDate.getMonth() === today.getMonth() &&
+              claimDate.getDate() === today.getDate();
+          }
+          if (!showSection) {
+            section.style.display = 'none';
+          } else {
+            section.style.display = 'block';
+            section.style.background = '#d4edda';
+            section.style.color = '#155724';
+            let detailParts = [];
+            if (json.summary.baseBonus > 0) detailParts.push(`新手礼包 ${json.summary.baseBonus}💎`);
+            if (json.summary.expComp > 0) detailParts.push(`经验 ${json.summary.expComp}💎`);
+            if (json.summary.levelComp > 0) detailParts.push(`等级 ${json.summary.levelComp}💎`);
+            if (json.summary.achieveComp > 0) detailParts.push(`${json.summary.achievementCount}个成就 ${json.summary.achieveComp}💎`);
+            if (json.summary.gameComp > 0) detailParts.push(`${json.summary.oldGames}局 ${json.summary.gameComp}💎`);
+            if (json.summary.winComp > 0) detailParts.push(`${json.summary.oldWins}胜 ${json.summary.winComp}💎`);
+            section.innerHTML = `
+              ✅ <strong>已领取</strong>：
+              ${detailParts.join(' + ')}
+              = <strong>共 ${json.summary.total}💎</strong>
+            `;
+          }
+        }
+      } catch (err) { /* ignore */ }
+    }
+
+    async function triggerCompensate(accountId) {
+      const btn = document.getElementById('compensateBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = '处理中...';
+      }
+      try {
+        const res = await fetch('/api/currency/compensate', { method: 'POST' });
+        const json = await res.json();
+        if (json.success) {
+          showToast('🎉 补偿完成！' + (json.totalCoins > 0 ? `共发放 ${json.totalCoins}💎` : '无需补偿'), 'success');
+          // 刷新页面数据
+          if (currentAccountId) {
+            fetchProfile(currentAccountId);
+            checkCompensation(currentAccountId);
+          }
+        } else {
+          showToast('补偿失败：' + (json.message || '未知错误'), 'error');
+        }
+      } catch (err) {
+        showToast('网络错误，请重试', 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '⚡ 立即领取';
+        }
+      }
     }
 
     // ===== 等级奖励领取 =====

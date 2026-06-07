@@ -17,6 +17,48 @@ class AccountManager {
     this.levelExpConfig = this.loadLevelExpConfig();
   }
 
+  // 节假日名称→倍率映射
+  static HOLIDAY_MULTIPLIERS = {
+    '春节': 2.5,
+    '除夕': 2.5,
+    '国庆节': 2.5,
+    '元旦': 2.0,
+    '劳动节': 2.0,
+    '清明节': 2.0,
+    '端午节': 2.0,
+    '中秋节': 2.0,
+  };
+
+  // 节假日缓存（静态）
+  static holidayCache = null;
+  static holidayCacheDate = null; // 缓存日期字符串，用于判断是否过期
+
+  // 从 API 获取节假日数据
+  static async initHolidays() {
+    const year = new Date().getFullYear();
+    const url = `https://api.jiejiariapi.com/v1/holidays/${year}`;
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const cache = {};
+      for (const [dateStr, info] of Object.entries(data)) {
+        if (info.isOffDay) {
+          const mult = AccountManager.HOLIDAY_MULTIPLIERS[info.name] || 2.0;
+          cache[dateStr] = { name: info.name, multiplier: mult };
+        } else {
+          cache[dateStr] = { name: info.name, multiplier: 1.0, isMakeup: true };
+        }
+      }
+      AccountManager.holidayCache = cache;
+      AccountManager.holidayCacheDate = year;
+      logger.info('节假日数据加载成功', { year, count: Object.keys(cache).length });
+    } catch (err) {
+      logger.warn('节假日API获取失败，仅使用周末翻倍', { error: err.message });
+      AccountManager.holidayCache = {}; // 置空，用周末兜底
+    }
+  }
+
   loadLevelExpConfig() {
     try {
       const configPath = path.join(__dirname, '../config/levelExp.json');
@@ -1332,18 +1374,135 @@ class AccountManager {
     }
   }
 
+  // 国际节假日配置（按计算规则）
+  static INTERNATIONAL_HOLIDAYS() {
+    return [
+      // 固定日期
+      { rule: 'fixed', month: 1, day: 1, name: '元旦', multiplier: 2.0 },
+      { rule: 'fixed', month: 2, day: 14, name: '情人节', multiplier: 1.5 },
+      { rule: 'fixed', month: 3, day: 8, name: '妇女节', multiplier: 1.5 },
+      { rule: 'fixed', month: 4, day: 22, name: '地球日', multiplier: 1.5 },
+      { rule: 'fixed', month: 6, day: 1, name: '儿童节', multiplier: 2.0 },
+      { rule: 'fixed', month: 10, day: 31, name: '万圣节', multiplier: 1.5 },
+      { rule: 'fixed', month: 12, day: 25, name: '圣诞节', multiplier: 2.0 },
+
+      // 计算日期
+      // 母亲节：5月第二个周日
+      { rule: 'weekday', month: 5, week: 2, weekday: 0, name: '母亲节', multiplier: 2.0 },
+      // 父亲节：6月第三个周日
+      { rule: 'weekday', month: 6, week: 3, weekday: 0, name: '父亲节', multiplier: 2.0 },
+      // 感恩节：11月第四个周四
+      { rule: 'weekday', month: 11, week: 4, weekday: 4, name: '感恩节', multiplier: 2.0 },
+    ];
+  }
+
+  // 计算某个月第N个星期几的日期
+  static calcNthWeekdayOfMonth(year, month, week, weekday) {
+    // 当月1号
+    const first = new Date(year, month - 1, 1);
+    // 1号是星期几
+    const firstWeekday = first.getDay();
+    // 第一个目标星期几是几号
+    let diff = weekday - firstWeekday;
+    if (diff < 0) diff += 7;
+    const firstDate = 1 + diff; // 第一个目标星期几的日期
+    const date = firstDate + (week - 1) * 7;
+    // 安全检查：不超过当月天数
+    const lastDay = new Date(year, month, 0).getDate();
+    if (date > lastDay) return null;
+    return date;
+  }
+
+  // 获取国际节假日（如果有）
+  getInternationalHoliday() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    const day = now.getDate();
+
+    const holidays = AccountManager.INTERNATIONAL_HOLIDAYS();
+    for (const h of holidays) {
+      let match = false;
+      if (h.rule === 'fixed') {
+        match = (month === h.month && day === h.day);
+      } else if (h.rule === 'weekday') {
+        const calcDay = AccountManager.calcNthWeekdayOfMonth(year, h.month, h.week, h.weekday);
+        match = (calcDay !== null && month === h.month && day === calcDay);
+      }
+      if (match) {
+        return { multiplier: h.multiplier, label: h.name + '限时翻倍×' + h.multiplier };
+      }
+    }
+    return null;
+  }
+
+  // 限时经验倍率：周末/节假日自动翻倍
+  getEventMultiplier() {
+    const now = new Date();
+    const day = now.getDay();
+    const isWeekend = (day === 0 || day === 6);
+    const mmdd = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+
+    // 1. 检查中国节假日（API 拉取，优先级最高）
+    if (AccountManager.holidayCache && AccountManager.holidayCache[mmdd]) {
+      const h = AccountManager.holidayCache[mmdd];
+      if (h.isMakeup) return { multiplier: 1.0, label: '' }; // 补班日，无加成
+      if (isWeekend) {
+        const stacked = h.multiplier * 1.5;
+        return { multiplier: stacked, label: `${h.name}·周末 限时翻倍×${stacked}` };
+      }
+      return { multiplier: h.multiplier, label: `${h.name} 限时翻倍×${h.multiplier}` };
+    }
+
+    // 2. 检查国际节假日（计算规则）
+    const intl = this.getInternationalHoliday();
+    if (intl) {
+      if (isWeekend) {
+        const stacked = intl.multiplier * 1.5;
+        return { multiplier: stacked, label: `${intl.label.split('限时')[0]}·周末 限时翻倍×${stacked}` };
+      }
+      return intl;
+    }
+
+    // 3. 周末 1.5 倍
+    if (isWeekend) {
+      return { multiplier: 1.5, label: '周末 限时翻倍×1.5' };
+    }
+
+    return { multiplier: 1.0, label: '' };
+  }
+
+  // 等级经验倍率：等级越高倍率越大，保证后期升级不吃力
+  getExpMultiplier(level) {
+    if (level <= 10) return 1.0;
+    if (level <= 20) return 1.5;
+    if (level <= 30) return 2.0;
+    if (level <= 40) return 2.5;
+    return 3.0;
+  }
+
   // 添加经验值
-  async addExp(id, exp) {
+  // applyEventMult: false 表示只应用等级倍率，不叠加活动/周末倍率（如成就奖励）
+  async addExp(id, exp, applyEventMult = true) {
     try {
       const account = await dataStore.findOne('accounts', { 'account.id': id });
       if (!account) {
         return { success: false, message: '账号不存在' };
       }
 
+      // 获取当前等级并应用倍率
+      const oldLevel = account.account?.profile?.level || 1;
+      const levelMult = this.getExpMultiplier(oldLevel);
+      let eventMult = { multiplier: 1.0, label: '' };
+      if (applyEventMult) {
+        eventMult = this.getEventMultiplier();
+      }
+      const totalMult = levelMult * eventMult.multiplier;
+      const finalExp = Math.floor(exp * totalMult);
+
       // 获取当前总经验值
       const currentExp = account.account?.profile?.exp || 0;
-      const oldLevel = account.account?.profile?.level || 1;
-      const newTotalExp = currentExp + exp;
+      const newTotalExp = currentExp + finalExp;
 
       // 计算新的等级和当前等级剩余经验
       const { level, exp: currentLevelExp } = this.calculateLevelAndExp(newTotalExp);
@@ -1357,12 +1516,12 @@ class AccountManager {
       };
 
       await dataStore.update('accounts', { 'account.id': id }, { 'account.profile': updatedProfile, 'account.updatedAt': Date.now() });
-      logger.info('添加经验值', { id, addedExp: exp, currentExp, newTotalExp, newLevel: level });
+      logger.info('添加经验值', { id, addedExp: finalExp, levelMult, eventLabel: eventMult.label, totalMult, baseExp: exp, currentExp, newTotalExp, newLevel: level });
 
       // 每获得10点经验，奖励1星钻
-      const currencyReward = Math.max(1, Math.floor(exp / 10));
+      const currencyReward = Math.max(1, Math.floor(finalExp / 10));
       if (currencyReward > 0) {
-        await this.addCurrency(id, currencyReward, `获得${exp}经验值奖励`, 'exp_reward');
+        await this.addCurrency(id, currencyReward, `获得${finalExp}经验值奖励`, 'exp_reward');
       }
 
       // 升级时额外奖励星钻并检查等级奖励
@@ -1373,6 +1532,29 @@ class AccountManager {
         await this.checkLevelRewards(id);
       }
 
+      // 记录经验变动
+      try {
+        const expRecords = await this.getExpRecords(id);
+        expRecords.transactions.push({
+          id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+          baseExp: exp,
+          bonusExp: finalExp - exp,
+          finalExp,
+          levelMult,
+          eventLabel: eventMult.label || null,
+          oldLevel,
+          newLevel: level,
+          totalExp: newTotalExp,
+          timestamp: Date.now()
+        });
+        if (expRecords.transactions.length > 500) {
+          expRecords.transactions = expRecords.transactions.slice(-500);
+        }
+        await dataStore.writeOne('expTransactions', id, expRecords);
+      } catch (recErr) {
+        logger.warn('记录经验变动失败', { id, error: recErr.message });
+      }
+
       return {
         success: true,
         level,
@@ -1381,7 +1563,13 @@ class AccountManager {
         levelUp: level > oldLevel,
         oldLevel,
         currencyReward,
-        levelUpCurrency
+        levelUpCurrency,
+        // 经验明细
+        baseExp: exp,
+        bonusExp: finalExp - exp,      // 额外经验（倍率加成部分）
+        finalExp,
+        levelMult,
+        eventLabel: eventMult.label || null
       };
     } catch (err) {
       logger.error('添加经验值失败', { id, error: err.message });
@@ -1704,6 +1892,17 @@ class AccountManager {
     }
   }
 
+  // 获取经验记录文件
+  async getExpRecords(accountId) {
+    try {
+      const records = await dataStore.readOne('expTransactions', accountId);
+      return records || { userId: accountId, transactions: [] };
+    } catch (err) {
+      logger.error('获取经验记录失败', { accountId, error: err.message });
+      return { userId: accountId, transactions: [] };
+    }
+  }
+
   // 添加星钻（带交易记录）
   async addCurrency(accountId, amount, reason, source = 'system') {
     try {
@@ -1809,6 +2008,18 @@ class AccountManager {
     }
   }
 
+  // 获取经验记录
+  async getExpTransactions(accountId, limit = 50) {
+    try {
+      const records = await this.getExpRecords(accountId);
+      const transactions = (records.transactions || []).slice(-limit).reverse();
+      return { success: true, transactions };
+    } catch (err) {
+      logger.error('获取经验记录失败', { accountId, error: err.message });
+      return { success: false, message: '获取失败', transactions: [] };
+    }
+  }
+
   // 检查并领取等级奖励
   async checkLevelRewards(accountId) {
     try {
@@ -1894,6 +2105,109 @@ class AccountManager {
     } catch (err) {
       logger.error('初始化货币字段失败', { error: err.message });
       return { success: false, message: '初始化失败' };
+    }
+  }
+
+  // ========== 老玩家星钻补偿 ==========
+
+  /**
+   * 发放新手礼包 + 老玩家补偿（每种账号仅领取一次）
+   * 固定部分（所有人）：
+   *   - 新手礼包 500💎
+   * 额外部分（老玩家，基于已有数据）：
+   *   - 每10点经验补偿1星钻
+   *   - 每级（从1级开始）补偿50星钻
+   *   - 每个成就补偿50星钻
+   *   - 每局游戏补偿5星钻
+   *   - 每场胜利补偿10星钻
+   */
+  async compensateOldPlayers() {
+    const BASE_BONUS = 500;
+
+    try {
+      const accounts = await dataStore.read('accounts');
+      const stats = { total: 0, compensated: 0, skipped: 0, totalCoins: 0, errors: [] };
+
+      for (const account of accounts) {
+        const accountId = account.account?.id || account.id;
+        if (!accountId) continue;
+        stats.total++;
+
+        if (account.compensatedAt) {
+          stats.skipped++;
+          continue;
+        }
+
+        try {
+          if (!account.currency) account.currency = { starCoins: 0 };
+
+          const level = account.account?.profile?.level || 1;
+          const totalExp = account.account?.profile?.exp || 0;
+          const achievements = this._normalizeAchievements(account.achievements || []);
+          const achievementCount = achievements.length;
+          const playerStats = account.stats || {};
+          const totalGames = playerStats.totalGames || 0;
+          const totalWins = playerStats.totalWins || 0;
+
+          // 老玩家额外部分
+          const expComp = Math.max(0, Math.floor(totalExp / 10));
+          const levelComp = (level - 1) * 50;
+          const achieveComp = achievementCount * 50;
+          const gameComp = totalGames * 5;
+          const winComp = totalWins * 10;
+          const veteranTotal = expComp + levelComp + achieveComp + gameComp + winComp;
+
+          // 总发放 = 固定礼包 + 老玩家额外
+          const total = BASE_BONUS + veteranTotal;
+
+          // 发放星钻
+          account.currency.starCoins = (account.currency.starCoins || 0) + total;
+          account.compensatedAt = Date.now();
+          account.compensationSummary = {
+            baseBonus: BASE_BONUS,
+            expComp, levelComp, achieveComp, achievementCount,
+            gameComp, winComp, veteranTotal,
+            total,
+            oldLevel: level, oldExp: totalExp, oldGames: totalGames, oldWins: totalWins
+          };
+          await dataStore.writeOne('accounts', accountId, account);
+
+          // 构建原因
+          const parts = [`${BASE_BONUS}(新手礼包)`];
+          if (expComp > 0) parts.push(`${expComp}(经验)`);
+          if (levelComp > 0) parts.push(`${levelComp}(等级)`);
+          if (achieveComp > 0) parts.push(`${achieveComp}(${achievementCount}个成就)`);
+          if (gameComp > 0) parts.push(`${gameComp}(${totalGames}局)`);
+          if (winComp > 0) parts.push(`${winComp}(${totalWins}胜)`);
+          const reason = `新手礼包+老玩家补偿：${parts.join(' + ')}`;
+
+          // 交易记录
+          const records = await this.getTransactionRecords(accountId);
+          records.transactions.push({
+            id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+            type: 'earn', amount: total, balance: account.currency.starCoins,
+            source: 'compensation', reason, timestamp: Date.now()
+          });
+          if (records.transactions.length > 1000) records.transactions = records.transactions.slice(-1000);
+          await dataStore.writeOne('currencyTransactions', accountId, records);
+
+          await this.checkLevelRewards(accountId);
+
+          stats.compensated++;
+          stats.totalCoins += total;
+
+          logger.info('新手礼包+补偿完成', { accountId, baseBonus: BASE_BONUS, veteranTotal, total, balance: account.currency.starCoins });
+        } catch (err) {
+          logger.error('补偿失败', { accountId, error: err.message });
+          stats.errors.push({ accountId, error: err.message });
+        }
+      }
+
+      logger.info('新手礼包+补偿统计', { total: stats.total, compensated: stats.compensated, skipped: stats.skipped, totalCoins: stats.totalCoins, errors: stats.errors.length });
+      return { success: true, ...stats };
+    } catch (err) {
+      logger.error('新手礼包+补偿失败', { error: err.message });
+      return { success: false, message: '领取失败', error: err.message };
     }
   }
 }

@@ -12,7 +12,8 @@ class DataStore {
     this.splitByIdCollections = {
       'accounts': 'accounts',
       'games': 'games', // 游戏记录按ID拆分存储
-      'currencyTransactions': 'currency_transactions' // 星钻交易记录按用户ID拆分存储
+      'currencyTransactions': 'currency_transactions', // 星钻交易记录按用户ID拆分存储
+      'expTransactions': 'exp_transactions' // 经验变动记录按用户ID拆分存储
     };
 
     // 普通集合的目录映射

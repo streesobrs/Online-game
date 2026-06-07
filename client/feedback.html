@@ -169,35 +169,46 @@
     .feedbacks-list {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      background: white;
+      border-radius: 8px;
+      padding: 0 20px;
     }
 
     .feedback-card {
       background: white;
-      padding: 20px 24px;
-      border-radius: 12px;
-      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+      padding: 20px 0;
+      border-bottom: 1px solid #f1f2f3;
     }
 
     .feedback-header {
       display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 12px;
-      gap: 16px;
+      gap: 12px;
+    }
+
+    /* 反馈头像 */
+    .feedback-avatar {
+      flex-shrink: 0;
+    }
+
+    /* 反馈主体 */
+    .feedback-main {
+      flex: 1;
+      min-width: 0;
     }
 
     .feedback-title {
-      font-size: 18px;
-      font-weight: bold;
-      color: #2d3748;
+      font-size: 16px;
+      font-weight: 600;
+      color: #18191c;
+      margin-bottom: 4px;
     }
 
     .feedback-meta {
       display: flex;
-      gap: 12px;
-      align-items: center;
-      flex-wrap: wrap;
+      gap: 8px;
+      flex-shrink: 0;
+      flex-direction: column;
+      align-items: flex-end;
     }
 
     .feedback-type {
@@ -255,64 +266,52 @@
     }
 
     .feedback-author {
-      font-size: 14px;
-      color: #6c757d;
+      font-size: 13px;
+      color: #9499a0;
+      margin-bottom: 8px;
     }
 
     .feedback-content {
       margin-bottom: 12px;
       line-height: 1.6;
-      color: #495057;
+      color: #61666d;
+      font-size: 14px;
     }
 
     .feedback-actions {
       display: flex;
       gap: 12px;
-      margin-bottom: 12px;
       align-items: center;
     }
 
-    .vote-btn {
+    .vote-btn,
+    .toggle-comments-btn {
+      padding: 6px 16px;
+      border: 1px solid #e7e7e7;
+      background: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 6px 14px;
-      border: 2px solid #e9ecef;
-      background: white;
-      border-radius: 20px;
-      cursor: pointer;
-      font-size: 14px;
-      color: #495057;
+      gap: 4px;
+      color: #9499a0;
     }
 
-    .vote-btn:hover {
-      border-color: #007bff;
-      color: #007bff;
+    .vote-btn:hover,
+    .toggle-comments-btn:hover {
+      border-color: #00a1d6;
+      color: #00a1d6;
     }
 
     .vote-btn.voted {
-      border-color: #007bff;
-      background: #e3f2fd;
-      color: #007bff;
+      background: #e3f5ff;
+      border-color: #00a1d6;
+      color: #00a1d6;
     }
 
     .vote-count {
-      font-weight: bold;
-    }
-
-    .toggle-comments-btn {
-      padding: 6px 14px;
-      border: 2px solid #e9ecef;
-      background: white;
-      border-radius: 20px;
-      cursor: pointer;
-      font-size: 14px;
-      color: #495057;
-    }
-
-    .toggle-comments-btn:hover {
-      border-color: #007bff;
-      color: #007bff;
+      font-weight: normal;
     }
 
     /* ===== 评论区 ===== */
@@ -336,57 +335,201 @@
     .add-comment input {
       flex: 1;
       padding: 10px 14px;
-      border: 2px solid #e9ecef;
-      border-radius: 8px;
+      border: 1px solid #e3e5e7;
+      border-radius: 6px;
+      background: #f1f2f3;
       font-size: 14px;
     }
 
     .add-comment input:focus {
       outline: none;
-      border-color: #007bff;
+      border-color: #00a1d6;
+      background: white;
     }
 
     .add-comment button {
       padding: 10px 20px;
-      background: #007bff;
+      background: #00a1d6;
       color: white;
       border: none;
-      border-radius: 8px;
+      border-radius: 6px;
       cursor: pointer;
-      font-weight: bold;
+      font-size: 14px;
     }
 
     .add-comment button:hover {
-      background: #0056b3;
+      background: #008ebd;
     }
 
     .comments-list {
       display: flex;
       flex-direction: column;
-      gap: 12px;
     }
 
     .comment-item {
-      background: #f8f9fa;
-      padding: 12px 16px;
-      border-radius: 8px;
+      background: white;
+      padding: 12px 0;
+      border-bottom: 1px solid #f1f2f3;
+      display: flex;
+      gap: 12px;
+    }
+
+    /* 回复 - B站风格 */
+    .comment-item.comment-nested {
+      margin: 0;
+      padding: 10px 0;
+      background: transparent;
+      border-left: none;
+      border-radius: 0;
+      border-bottom: none;
+    }
+
+    /* 头像 */
+    .comment-avatar {
+      flex-shrink: 0;
+    }
+
+    .avatar-circle {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #00a1d6, #00d4a8);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    /* 回复里的头像更小 */
+    .comment-item.comment-nested .avatar-circle {
+      width: 32px;
+      height: 32px;
+      font-size: 13px;
+    }
+
+    /* 评论主体 */
+    .comment-main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    /* @用户 */
+    .at-user {
+      color: #00a1d6;
+      font-weight: 500;
+    }
+
+    /* 回复容器 */
+    .replies-container {
+      margin-top: 8px;
+      background: #f1f2f3;
+      padding: 0 12px;
+      border-radius: 4px;
+    }
+
+    /* 查看更多按钮 */
+    .view-more-btn {
+      background: none;
+      border: none;
+      color: #757575;
+      cursor: pointer;
+      padding: 8px 0;
+      font-size: 13px;
+      display: block;
+      width: 100%;
+      text-align: left;
+    }
+
+    .view-more-btn:hover {
+      color: #00a1d6;
     }
 
     .comment-author {
-      font-weight: bold;
-      color: #2d3748;
+      font-weight: 500;
+      color: #61666d;
       margin-bottom: 4px;
+      font-size: 14px;
     }
 
     .comment-content {
-      color: #495057;
+      color: #18191c;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .comment-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 10px;
+      align-items: center;
+    }
+
+    .comment-actions button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      color: #9499a0;
+      padding: 4px 0;
+      margin-right: 20px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .comment-actions button:hover {
+      color: #00a1d6;
+    }
+
+    .comment-actions .comment-liked {
+      color: #00a1d6;
     }
 
     .comment-time {
       font-size: 12px;
-      color: #6c757d;
-      margin-top: 6px;
+      color: #9499a0;
+      margin-left: auto;
     }
+
+    .comment-reply-input {
+      display: flex;
+      gap: 10px;
+      margin: 8px 0;
+    }
+
+    .comment-reply-input input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #e3e5e7;
+      border-radius: 6px;
+      background: #f1f2f3;
+      font-size: 13px;
+    }
+
+    .comment-reply-input input:focus {
+      outline: none;
+      border-color: #00a1d6;
+      background: white;
+    }
+
+    .comment-reply-input button {
+      padding: 8px 20px;
+      background: #00a1d6;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .comment-reply-input button:hover {
+      background: #00a1d6;
+      opacity: 0.8;
+    }
+
+
 
     /* ===== 加载状态 ===== */
     .loading {
@@ -501,7 +644,12 @@
   </div>
 
   <script>
-    const socket = io();
+    const socket = io({
+      transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: 3,
+      reconnectionDelay: 2000
+    });
     let userToken = null;
     let currentAccountId = null;
     let currentNickname = null;
@@ -529,6 +677,8 @@
         if (account) {
           currentAccountId = account.id;
           currentNickname = account.nickname || account.username || '玩家';
+          localStorage.setItem('currentAccountId', currentAccountId);
+          localStorage.setItem('nickname', currentNickname);
         }
       }
     });
@@ -536,7 +686,10 @@
     // Socket事件监听
     socket.on('feedbacks_list', (data) => {
       feedbacks = data.feedbacks;
-      renderFeedbacks();
+      const list = document.getElementById('feedbacksList');
+      if (list.style.display !== 'none') {
+        renderFeedbacks();
+      }
     });
 
     socket.on('feedback_submitted', () => {
@@ -547,6 +700,11 @@
 
     socket.on('error', (data) => {
       alert(data.message);
+    });
+
+    // 页面关闭时断开 socket
+    window.addEventListener('beforeunload', () => {
+      socket.disconnect();
     });
 
     // 初始化
@@ -561,9 +719,9 @@
         return;
       }
 
-      // 先通过Socket获取用户信息（如果localStorage中没有的话）
+      // 始终通过Socket获取用户信息以建立服务端会话
       const token = localStorage.getItem('userToken');
-      if (token && (!currentAccountId || !currentNickname)) {
+      if (token) {
         socket.emit('get_account_by_token', { token });
       }
 
@@ -641,6 +799,16 @@
       const emptyState = document.getElementById('emptyState');
       const loadingState = document.getElementById('loadingState');
 
+      // 保存展开状态
+      const openSections = new Set();
+      document.querySelectorAll('.comments-section.open').forEach(el => {
+        openSections.add(el.id);
+      });
+      const openReplyInputs = new Set();
+      document.querySelectorAll('.comment-reply-input[style*="flex"]').forEach(el => {
+        openReplyInputs.add(el.id);
+      });
+
       loadingState.style.display = 'none';
 
       if (feedbacks.length === 0) {
@@ -653,21 +821,40 @@
       list.style.display = 'flex';
       list.innerHTML = '';
 
+      // 递归计算所有评论（包括嵌套回复）
+      function countAllComments(comments) {
+        if (!comments || comments.length === 0) return 0;
+        return comments.reduce((sum, c) => sum + 1 + countAllComments(c.replies), 0);
+      }
+
       feedbacks.forEach(feedback => {
         const type = typeConfig[feedback.type] || typeConfig.other;
         const status = statusConfig[feedback.status] || statusConfig.pending;
         const voteCount = feedback.votes?.length || 0;
         const hasVoted = feedback.votes?.some(v => v.accountId === currentAccountId);
-        const commentCount = feedback.comments?.length || 0;
+        // 评论总数（含所有楼中楼回复）
+        const totalComments = countAllComments(feedback.comments);
 
         const card = document.createElement('div');
         card.className = 'feedback-card';
         card.innerHTML = `
           <div class="feedback-header">
-            <div>
+            <div class="feedback-avatar">
+              <div class="avatar-circle">${escapeHtml(feedback.nickname).charAt(0)}</div>
+            </div>
+            <div class="feedback-main">
               <div class="feedback-title">${escapeHtml(feedback.title)}</div>
               <div class="feedback-author">
                 ${escapeHtml(feedback.nickname)} · ${formatDate(feedback.createdAt)}
+              </div>
+              <div class="feedback-content">${escapeHtml(feedback.content)}</div>
+              <div class="feedback-actions">
+                <button class="vote-btn ${hasVoted ? 'voted' : ''}" onclick="voteFeedback('${feedback.id}')">
+                  👍 <span class="vote-count">${voteCount}</span>
+                </button>
+                <button class="toggle-comments-btn" onclick="toggleComments('${feedback.id}')">
+                  💬 ${totalComments} 条评论
+                </button>
               </div>
             </div>
             <div class="feedback-meta">
@@ -675,67 +862,160 @@
               <span class="feedback-status ${status.class}">${status.label}</span>
             </div>
           </div>
-          <div class="feedback-content">${escapeHtml(feedback.content)}</div>
-          <div class="feedback-actions">
-            <button class="vote-btn ${hasVoted ? 'voted' : ''}" onclick="voteFeedback('${feedback.id}')">
-              👍 <span class="vote-count">${voteCount}</span>
-            </button>
-            <button class="toggle-comments-btn" onclick="toggleComments('${feedback.id}')">
-              💬 ${commentCount} 条评论
-            </button>
-          </div>
           <div class="comments-section" id="comments-${feedback.id}">
             <div class="add-comment">
               <input type="text" id="comment-input-${feedback.id}" placeholder="写下你的评论...">
               <button onclick="addComment('${feedback.id}')">发送</button>
             </div>
             <div class="comments-list" id="comments-list-${feedback.id}">
-              ${renderComments(feedback.comments || [])}
+              ${renderComments(feedback.comments || [], feedback.id)}
             </div>
           </div>
         `;
 
         list.appendChild(card);
       });
+
+      // 恢复展开状态
+      openSections.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('open');
+      });
+      openReplyInputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'flex';
+      });
     }
 
-    // 渲染评论
-    function renderComments(comments) {
-      if (comments.length === 0) {
+    // 渲染评论和回复 - B站风格：可展开/收起
+    function renderComments(comments, feedbackId) {
+      if (!comments || comments.length === 0) {
         return '<div style="color: #6c757d; text-align: center; padding: 20px;">暂无评论</div>';
       }
 
-      return comments.map(comment => `
-        <div class="comment-item">
-          <div class="comment-author">${escapeHtml(comment.nickname)}</div>
-          <div class="comment-content">${escapeHtml(comment.content)}</div>
-          <div class="comment-time">${formatDate(comment.createdAt)}</div>
+      let html = '';
+
+      // 遍历每条主评论
+      comments.forEach(comment => {
+        html += renderSingleComment(comment, feedbackId, false);
+
+        // 收集该评论的所有回复，同时记录根评论的昵称
+        const allReplies = [];
+        const rootNickname = comment.nickname;
+        collectReplies(comment, allReplies, comment.nickname);
+
+        if (allReplies.length > 0) {
+          const listId = `replies-${feedbackId}-${comment.id}`;
+          const btnId = `toggle-btn-${feedbackId}-${comment.id}`;
+
+          // 回复容器
+          html += `<div class="replies-container" id="${listId}">`;
+
+          // 默认只显示前2条回复
+          const showCount = Math.min(2, allReplies.length);
+          for (let i = 0; i < showCount; i++) {
+            // 只有当回复不是直接回复根评论时，才显示@
+            const showAt = allReplies[i].replyToNickname !== rootNickname;
+            html += renderSingleComment(allReplies[i].reply, feedbackId, true, showAt ? allReplies[i].replyToNickname : null);
+          }
+
+          // 隐藏的回复（超过2条的部分）
+          if (allReplies.length > 2) {
+            html += `<div class="hidden-replies" style="display: none;">`;
+            for (let i = 2; i < allReplies.length; i++) {
+              // 只有当回复不是直接回复根评论时，才显示@
+              const showAt = allReplies[i].replyToNickname !== rootNickname;
+              html += renderSingleComment(allReplies[i].reply, feedbackId, true, showAt ? allReplies[i].replyToNickname : null);
+            }
+            html += `</div>`;
+
+            // 查看更多按钮
+            html += `<button class="view-more-btn" id="${btnId}" onclick="toggleReplies('${listId}', '${btnId}', ${allReplies.length})">
+              共${allReplies.length}条回复，点击查看
+            </button>`;
+          }
+
+          html += `</div>`;
+        }
+      });
+
+      return html;
+
+      // 递归收集所有回复
+      function collectReplies(node, result, replyToNickname) {
+        if (node.replies && node.replies.length > 0) {
+          node.replies.forEach(reply => {
+            result.push({ reply, replyToNickname });
+            collectReplies(reply, result, reply.nickname);
+          });
+        }
+      }
+    }
+
+    // 切换回复展开/收起
+    function toggleReplies(listId, btnId, totalCount) {
+      const container = document.getElementById(listId);
+      const btn = document.getElementById(btnId);
+      const hiddenReplies = container.querySelector('.hidden-replies');
+
+      if (hiddenReplies.style.display === 'none') {
+        hiddenReplies.style.display = 'block';
+        btn.textContent = '收起回复';
+      } else {
+        hiddenReplies.style.display = 'none';
+        btn.textContent = `共${totalCount}条回复，点击查看`;
+      }
+    }
+
+
+    // 渲染单条评论/回复 - B站风格，带头像
+    function renderSingleComment(node, feedbackId, isNested, replyToNickname) {
+      const liked = node.likes && node.likes.indexOf(currentAccountId) !== -1;
+      const isOwner = node.accountId === currentAccountId;
+      const nodeId = node.id;
+      const levelClass = isNested ? 'comment-nested' : '';
+
+      // 如果是回复，添加 @被回复用户
+      let content = escapeHtml(node.content);
+      if (isNested && replyToNickname) {
+        content = `<span class="at-user">@${escapeHtml(replyToNickname)}</span> ${content}`;
+      }
+
+      return `
+        <div class="comment-item ${levelClass}">
+          <div class="comment-avatar">
+            <div class="avatar-circle">${escapeHtml(node.nickname).charAt(0)}</div>
+          </div>
+          <div class="comment-main">
+            <div class="comment-author">${escapeHtml(node.nickname)}</div>
+            <div class="comment-content">${content}</div>
+            <div class="comment-actions">
+              <span class="comment-time">${formatDate(node.createdAt)}</span>
+              <button class="${liked ? 'comment-liked' : ''}" onclick="likeComment('${feedbackId}','${nodeId}')">
+                👍 ${(node.likes && node.likes.length) || 0}
+              </button>
+              <button onclick="showReplyInput('${feedbackId}','${nodeId}')">回复</button>
+              ${isOwner ? `<button onclick="deleteComment('${feedbackId}','${nodeId}')">删除</button>` : ''}
+            </div>
+            <div class="comment-reply-input" id="reply-input-${feedbackId}-${nodeId}" style="display:none;">
+              <input type="text" id="reply-content-${feedbackId}-${nodeId}" placeholder="回复 ${escapeHtml(node.nickname)}..." onkeydown="if(event.key==='Enter')sendReply('${feedbackId}','${nodeId}')">
+              <button onclick="sendReply('${feedbackId}','${nodeId}')">发送</button>
+            </div>
+          </div>
         </div>
-      `).join('');
+      `;
     }
 
     // 投票
     async function voteFeedback(feedbackId) {
-      try {
-        const res = await fetch(`/api/feedbacks/${feedbackId}/vote`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            accountId: currentAccountId,
-            voteType: 'up'
-          })
-        });
-        const data = await res.json();
-        if (data.success) {
-          loadFeedbacks();
-        } else {
-          alert(data.message || '投票失败');
-        }
-      } catch (err) {
-        console.error('投票失败:', err);
-        alert('投票失败，请重试');
-      }
+      if (!currentAccountId) { alert('请先登录！'); return; }
+      socket.emit('vote_feedback', { feedbackId, voteType: 'up' });
     }
+
+    // 监听投票结果
+    socket.on('feedback_voted', () => {
+      loadFeedbacks();
+    });
 
     // 切换评论区
     function toggleComments(feedbackId) {
@@ -747,32 +1027,49 @@
     async function addComment(feedbackId) {
       const input = document.getElementById(`comment-input-${feedbackId}`);
       const content = input.value.trim();
-      if (!content) {
-        alert('请输入评论内容');
-        return;
-      }
+      if (!content) { alert('请输入评论内容'); return; }
+      if (!currentAccountId) { alert('请先登录！'); return; }
+      input.value = '';
+      socket.emit('add_comment', { feedbackId, content });
+    }
 
-      try {
-        const res = await fetch(`/api/feedbacks/${feedbackId}/comments`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            accountId: currentAccountId,
-            nickname: currentNickname,
-            content
-          })
-        });
-        const data = await res.json();
-        if (data.success) {
-          input.value = '';
-          loadFeedbacks();
-        } else {
-          alert(data.message || '评论失败');
-        }
-      } catch (err) {
-        console.error('评论失败:', err);
-        alert('评论失败，请重试');
+    // 监听评论结果
+    socket.on('comment_added', () => {
+      loadFeedbacks();
+    });
+
+    // 楼中楼回复
+    function showReplyInput(feedbackId, commentId) {
+      const el = document.getElementById(`reply-input-${feedbackId}-${commentId}`);
+      if (el) {
+        el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+        if (el.style.display === 'flex') el.querySelector('input').focus();
       }
+    }
+
+    function sendReply(feedbackId, commentId) {
+      const input = document.getElementById(`reply-content-${feedbackId}-${commentId}`);
+      const content = input.value.trim();
+      if (!content) return;
+      if (!currentAccountId) { alert('请先登录！'); return; }
+      socket.emit('reply_comment', { feedbackId, commentId, content });
+      input.value = '';
+      // 发送后收起回复框
+      const el = document.getElementById(`reply-input-${feedbackId}-${commentId}`);
+      if (el) el.style.display = 'none';
+    }
+
+    // 评论点赞
+    function likeComment(feedbackId, commentId) {
+      if (!currentAccountId) { alert('请先登录！'); return; }
+      socket.emit('like_comment', { feedbackId, commentId });
+    }
+
+    // 删除评论/回复（节点ID全局唯一）
+    function deleteComment(feedbackId, nodeId) {
+      if (!currentAccountId) return;
+      if (!confirm('确定删除吗？')) return;
+      socket.emit('delete_comment', { feedbackId, commentId: nodeId });
     }
 
     // HTML转义

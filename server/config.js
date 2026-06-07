@@ -15,8 +15,8 @@ function getStorageRoot() {
     // pkg 打包环境：使用程序所在目录
     return path.dirname(process.execPath);
   } else {
-    // 开发环境：使用项目根目录的 server/data
-    return __dirname;
+    // 开发环境：使用项目根目录
+    return path.join(__dirname, '..');
   }
 }
 

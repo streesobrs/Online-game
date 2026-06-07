@@ -19,7 +19,7 @@
       "server/config.js",
       "server/server.js",
       "server/version.json",
-      "index.html"
+      "client/**/*"
     ],
     "scripts": [
       "server/**/*.js"

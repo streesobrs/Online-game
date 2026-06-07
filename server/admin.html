@@ -778,12 +778,146 @@
 
     @media (max-width: 768px) {
       .sidebar {
-        width: 200px;
+        position: fixed;
+        left: -260px;
+        top: 0;
+        bottom: 0;
+        z-index: 1000;
+        transition: left 0.3s ease;
+        box-shadow: 2px 0 12px rgba(0, 0, 0, 0.3);
+      }
+
+      .sidebar.open {
+        left: 0;
+      }
+
+      .sidebar-backdrop {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+      }
+
+      .sidebar-backdrop.show {
+        display: block;
+      }
+
+      .sidebar-toggle {
+        display: inline-flex !important;
+      }
+
+      .main-content {
+        margin-left: 0 !important;
+        padding: 12px !important;
+      }
+
+      .top-bar {
+        padding: 10px 14px !important;
+      }
+
+      .top-bar .page-title {
+        font-size: 16px !important;
       }
 
       .stats-row {
         grid-template-columns: 1fr;
+        gap: 10px !important;
       }
+
+      .data-card {
+        padding: 0 !important;
+      }
+
+      .data-card .card-header {
+        padding: 12px 14px !important;
+      }
+
+      .data-card .card-header .card-title {
+        font-size: 14px !important;
+      }
+
+      .data-card>div:not(.card-header) {
+        padding: 12px !important;
+      }
+
+      /* 表格在小屏自动滚动 */
+      .data-card table,
+      .data-card>div>table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .admin-table {
+        font-size: 12px;
+      }
+
+      .admin-table th,
+      .admin-table td {
+        padding: 6px 8px !important;
+        white-space: nowrap;
+      }
+
+      .admin-table-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .stat-box {
+        padding: 14px !important;
+      }
+
+      .stat-box .stat-number {
+        font-size: 20px !important;
+      }
+
+      .quick-actions {
+        flex-direction: column;
+      }
+
+      .quick-actions .action-btn {
+        width: 100%;
+      }
+
+      .content-section {
+        padding: 0 !important;
+      }
+
+      .user-card {
+        padding: 10px !important;
+      }
+
+      .user-card .user-info {
+        gap: 6px !important;
+      }
+
+      .chat-message {
+        flex-direction: column;
+        gap: 4px !important;
+      }
+
+      .chat-message .chat-text {
+        max-width: 100% !important;
+      }
+
+      .filter-bar {
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .filter-bar select,
+      .filter-bar input {
+        width: 100%;
+      }
+    }
+
+    /* 桌面端隐藏侧边栏切换按钮 */
+    .sidebar-toggle {
+      display: none;
     }
   </style>
 </head>
@@ -805,7 +939,7 @@
   <!-- 管理后台 -->
   <div id="admin-app" class="admin-layout hidden">
     <!-- 侧边栏 -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <div class="sidebar-title">♟️ 棋类大厅</div>
         <div class="sidebar-subtitle">后台管理系统</div>
@@ -835,6 +969,10 @@
           <span class="nav-icon">⚙️</span>
           <span class="nav-text">系统设置</span>
         </div>
+        <div class="nav-item" onclick="switchView('feedbacks')">
+          <span class="nav-icon">💡</span>
+          <span class="nav-text">反馈管理</span>
+        </div>
       </nav>
       <div class="sidebar-footer">
         <div class="status-bar">
@@ -851,7 +989,10 @@
     <main class="main-content">
       <!-- 顶部栏 -->
       <header class="top-bar">
-        <h1 id="page-title" class="page-title">数据概览</h1>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button class="sidebar-toggle icon-btn" onclick="toggleSidebar()">☰</button>
+          <h1 id="page-title" class="page-title">数据概览</h1>
+        </div>
         <div class="top-actions">
           <button class="icon-btn" onclick="refreshAllData()" title="刷新数据">🔄</button>
           <button class="icon-btn" onclick="showBroadcastModal()" title="广播消息">📢</button>
@@ -1197,9 +1338,43 @@
             </div>
           </div>
         </section>
+
+        <!-- 反馈管理 -->
+        <section id="view-feedbacks" class="content-section">
+          <div class="data-card">
+            <div class="card-header">
+              <span class="card-title">💡 用户反馈列表</span>
+              <span id="feedbackCount" style="font-size:13px;color:#6c757d;"></span>
+            </div>
+            <div style="padding:16px;">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>时间</th>
+                    <th>用户</th>
+                    <th>类型</th>
+                    <th>标题</th>
+                    <th>内容</th>
+                    <th>状态</th>
+                    <th>投票</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="feedbackList">
+                  <tr>
+                    <td colspan="8" style="text-align:center;color:#6c757d;">加载中...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
       </div>
     </main>
   </div>
+
+  <!-- 侧边栏遮罩 -->
+  <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
 
   <!-- 模态框容器 -->
   <div id="modal-container"></div>
@@ -1227,6 +1402,11 @@
     });
 
     // ==================== 页面切换 ====================
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebarBackdrop').classList.toggle('show');
+    }
+
     function switchView(view) {
       currentView = view;
 
@@ -1241,7 +1421,8 @@
         games: '游戏管理',
         chat: '聊天管理',
         accounts: '账号管理',
-        system: '系统设置'
+        system: '系统设置',
+        feedbacks: '反馈管理'
       };
       document.getElementById('page-title').textContent = titles[view];
 
@@ -1253,9 +1434,16 @@
       if (view === 'dashboard') loadDashboardData();
       if (view === 'users') loadOnlineUsers();
       if (view === 'games') loadGames();
+      if (view === 'feedbacks') loadFeedbacks();
       if (view === 'chat') loadChatMessages();
       if (view === 'accounts') loadAccounts();
       if (view === 'system') loadSystemStats();
+
+      // 移动端切换页面后关闭侧边栏
+      if (window.innerWidth <= 768) {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebarBackdrop').classList.remove('show');
+      }
     }
 
     // ==================== 登录/退出 ====================    let reconnectAttempts = 0;
@@ -1299,10 +1487,13 @@
       });
 
       socket.on('disconnect', (reason) => {
-        showToast('连接已断开，正在尝试重连...', 'warning');
+        // 清空重连标记，避免无限重连
         if (reason === 'io server disconnect') {
-          // 服务器主动断开，需要重新登录
-          socket.connect();
+          // 服务器主动断开（如token失效），不自动重连
+          localStorage.removeItem('adminToken');
+          document.getElementById('login-page').classList.remove('hidden');
+          document.getElementById('admin-app').classList.add('hidden');
+          showToast('连接已断开，请重新登录', 'error');
         }
       });
 
@@ -1474,6 +1665,61 @@
 
     function loadAccounts() {
       socket.emit('get_all_accounts');
+    }
+
+    function loadFeedbacks() {
+      fetch('/api/feedbacks')
+        .then(r => r.json())
+        .then(data => {
+          const list = document.getElementById('feedbackList');
+          document.getElementById('feedbackCount').textContent = `共 ${data.data?.length || 0} 条`;
+          if (!data.success || !data.data || data.data.length === 0) {
+            list.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#6c757d;">暂无反馈</td></tr>';
+            return;
+          }
+          const typeMap = { bug: '🐛 缺陷', feature: '💡 建议', question: '❓ 疑问', other: '📝 其他' };
+          const statusMap = { pending: '待处理', processing: '处理中', resolved: '已解决', closed: '已关闭' };
+          const statusColors = { pending: '#e53e3e', processing: '#dd6b20', resolved: '#38a169', closed: '#6c757d' };
+          let html = '';
+          for (const f of data.data) {
+            const d = new Date(f.createdAt);
+            const time = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+            const nextStatus = f.status === 'pending' ? 'processing' : f.status === 'processing' ? 'resolved' : f.status === 'resolved' ? 'closed' : 'pending';
+            const nextLabel = f.status === 'pending' ? '→处理中' : f.status === 'processing' ? '→已解决' : f.status === 'resolved' ? '→已关闭' : '→待处理';
+            html += `<tr>
+              <td style="white-space:nowrap;font-size:12px;">${time}</td>
+              <td>${f.nickname || f.accountId?.slice(0, 8) || '-'}</td>
+              <td>${typeMap[f.type] || f.type}</td>
+              <td>${f.title || '-'}</td>
+              <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(f.content || '').replace(/"/g, '&quot;')}">${f.content?.slice(0, 60) || '-'}</td>
+              <td><span style="color:${statusColors[f.status] || '#6c757d'};font-weight:bold;">${statusMap[f.status] || f.status}</span></td>
+              <td>👍 ${f.votes?.length || 0}</td>
+              <td><button class="action-btn" onclick="updateFeedbackStatus('${f.id}','${nextStatus}')" style="padding:3px 10px;font-size:12px;border:1px solid #ddd;border-radius:4px;background:white;cursor:pointer;">${nextLabel}</button></td>
+            </tr>`;
+          }
+          list.innerHTML = html;
+        })
+        .catch(() => {
+          document.getElementById('feedbackList').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#e53e3e;">加载失败</td></tr>';
+        });
+    }
+
+    function updateFeedbackStatus(id, status) {
+      const token = localStorage.getItem('adminToken');
+      fetch(`/api/feedbacks/${id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ status })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            loadFeedbacks();
+          } else {
+            alert(data.message || '操作失败');
+          }
+        })
+        .catch(() => alert('网络错误'));
     }
 
 

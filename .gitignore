@@ -9,9 +9,13 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
+# 迁移脚本（临时）
+migrate-data.bat
+migrate-data.ps1
+
 # 运行时数据
-server/data/
-!server/data/.gitkeep
+data/
+!data/.gitkeep
 
 # 环境变量文件
 .env

@@ -57,14 +57,15 @@ function authenticateToken(req, res, next) {
   }
 
   // 验证token是否与配置中的adminToken匹配
-  if (token !== config.adminToken) {
+  if (token !== config.admin.token) {
     return res.status(401).json({ success: false, message: '无效的认证Token' });
   }
 
   next();
 }
 
-// 静态文件服务
+// 静态文件服务 - 优先 client 目录，fallback 到根目录
+app.use(express.static(path.join(__dirname, '..', 'client')));
 app.use(express.static(path.join(__dirname, '..')));
 
 // API路由
@@ -418,6 +419,10 @@ app.post('/api/feedbacks/:id/vote', async (req, res) => {
     }
 
     const result = await feedbackManager.voteFeedback(id, accountId, voteType);
+    // 广播实时更新
+    if (result.success) {
+      feedbackManager.getFeedbackList().then(all => io.emit('feedbacks_list', { feedbacks: all }));
+    }
     res.json(result);
   } catch (err) {
     logger.error('投票失败', { error: err.message });
@@ -432,15 +437,19 @@ app.post('/api/feedbacks/:id/vote', async (req, res) => {
 app.post('/api/feedbacks/:id/comments', async (req, res) => {
   try {
     const { id } = req.params;
-    const { accountId, nickname, content } = req.body;
-    if (!accountId || !nickname || !content) {
+    const { accountId, content } = req.body;
+    if (!accountId || !content) {
       return res.status(400).json({
         success: false,
         message: '缺少必要参数'
       });
     }
 
-    const result = await feedbackManager.addComment(id, accountId, nickname, content);
+    const result = await feedbackManager.addComment(id, accountId, content);
+    // 广播实时更新
+    if (result.success) {
+      feedbackManager.getFeedbackList().then(all => io.emit('feedbacks_list', { feedbacks: all }));
+    }
     res.json(result);
   } catch (err) {
     logger.error('添加评论失败', { error: err.message });
@@ -448,6 +457,27 @@ app.post('/api/feedbacks/:id/comments', async (req, res) => {
       success: false,
       message: '添加评论失败'
     });
+  }
+});
+
+// 更新反馈状态（管理员）
+app.put('/api/feedbacks/:id/status', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const validStatus = ['pending', 'processing', 'resolved', 'closed'];
+    if (!validStatus.includes(status)) {
+      return res.status(400).json({ success: false, message: '无效的状态值' });
+    }
+    const result = await feedbackManager.updateFeedbackStatus(id, status);
+    // 广播实时更新
+    if (result.success) {
+      feedbackManager.getFeedbackList().then(all => io.emit('feedbacks_list', { feedbacks: all }));
+    }
+    res.json(result);
+  } catch (err) {
+    logger.error('更新反馈状态失败', { error: err.message });
+    res.status(500).json({ success: false, message: '更新失败' });
   }
 });
 
@@ -817,6 +847,51 @@ app.get('/api/currency/:accountId/transactions', async (req, res) => {
   }
 });
 
+// 获取经验记录
+app.get('/api/currency/:accountId/exp-transactions', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const result = await accountManager.getExpTransactions(req.params.accountId, limit);
+    res.json(result);
+  } catch (err) {
+    logger.error('获取经验记录失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取经验记录失败' });
+  }
+});
+
+// ========== 老玩家星钻补偿 API ==========
+
+// 触发补偿（只执行一次，已补偿的账号自动跳过）
+app.post('/api/currency/compensate', async (req, res) => {
+  try {
+    const result = await accountManager.compensateOldPlayers();
+    res.json(result);
+  } catch (err) {
+    logger.error('星钻补偿失败', { error: err.message });
+    res.status(500).json({ success: false, message: '补偿失败' });
+  }
+});
+
+// 查询单个账号是否已补偿
+app.get('/api/currency/:accountId/compensation', async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const account = await accountManager.getAccount(accountId);
+    if (!account) {
+      return res.json({ success: false, message: '账号不存在' });
+    }
+    res.json({
+      success: true,
+      compensated: !!account.compensatedAt,
+      compensatedAt: account.compensatedAt || null,
+      summary: account.compensationSummary || null
+    });
+  } catch (err) {
+    logger.error('查询补偿状态失败', { error: err.message });
+    res.status(500).json({ success: false, message: '查询失败' });
+  }
+});
+
 // ========== 等级奖励系统 API ==========
 
 // 获取可领取的等级奖励列表
@@ -827,6 +902,28 @@ app.get('/api/level-rewards/:accountId', async (req, res) => {
   } catch (err) {
     logger.error('获取等级奖励列表失败', { error: err.message });
     res.status(500).json({ success: false, message: '获取等级奖励列表失败' });
+  }
+});
+
+// 获取当前经验倍率信息
+app.get('/api/event-multiplier', (req, res) => {
+  try {
+    const eventMult = accountManager.getEventMultiplier();
+    const multipliers = {
+      level: {
+        '1~10': 1.0,
+        '11~20': 1.5,
+        '21~30': 2.0,
+        '31~40': 2.5,
+        '41+': 3.0,
+      },
+      event: eventMult,
+      today: new Date().toLocaleDateString('zh-CN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+    };
+    res.json(multipliers);
+  } catch (err) {
+    logger.error('获取经验倍率信息失败', { error: err.message });
+    res.json({ event: { multiplier: 1.0, label: '' } });
   }
 });
 
@@ -880,11 +977,12 @@ app.get('/api/profile/:accountId', async (req, res) => {
     let totalLosses = 0;
     let bestStreak = 0;
     for (const g of Object.values(games)) {
-      totalGames += g.played || 0;
-      totalWins += g.wins || 0;
-      totalDraws += g.draws || 0;
-      totalLosses += g.losses || 0;
-      if ((g.bestStreak || 0) > bestStreak) bestStreak = g.bestStreak;
+      totalGames += (g.played || g.totalGames || 0);
+      totalWins += (g.wins || 0);
+      totalDraws += (g.draws || 0);
+      totalLosses += (g.losses || 0);
+      const streak = (g.bestStreak || g.maxStreak || 0);
+      if (streak > bestStreak) bestStreak = streak;
     }
 
     res.json({
@@ -931,6 +1029,8 @@ app.get('/api/profile/:accountId', async (req, res) => {
 // 初始化管理器
 const versionManager = new VersionManager();
 const accountManager = new AccountManager();
+// 后台加载节假日数据
+AccountManager.initHolidays().catch(err => logger.warn('节假日初始化失败', { error: err.message }));
 const userManager = new UserManager(accountManager);
 const achievementManager = new AchievementManager(accountManager, userManager);
 const aiManager = new AIManager();
@@ -938,6 +1038,8 @@ const gameManager = new GameManager(userManager, accountManager, achievementMana
 const chatManager = new ChatManager(userManager, gameManager, accountManager);
 const adminManager = new AdminManager(userManager, gameManager, chatManager, accountManager);
 const feedbackManager = FeedbackManager;
+// 注入accountManager到FeedbackManager用于实时查询昵称
+feedbackManager.accountManager = accountManager;
 
 // 服务器启动时增加构建版本号
 const newVersion = versionManager.incrementBuild();
@@ -1288,6 +1390,35 @@ io.on('connection', (socket) => {
   socket.on('get_account_by_token', async (data) => {
     const { token } = data;
     const result = await accountManager.getAccountByToken(token);
+
+    // 创建用户会话，确保后续操作（如转正）能拿到 accountId
+    if (result.success && result.data) {
+      const accountId = result.data.account?.account?.id || result.data.account?.id;
+      if (accountId) {
+        let userSession = userManager.getUserBySocketId(socket.id);
+        if (!userSession) {
+          userSession = {
+            socket: socket,
+            socketId: socket.id,
+            accountId: accountId,
+            token: token,
+            nickname: result.data.account?.account?.nickname || result.data.account?.nickname || '玩家',
+            accountType: result.data.account?.account?.type || 'guest',
+            accountData: result.data,
+            loginTime: Date.now()
+          };
+          userManager.socketToAccount.set(socket.id, accountId);
+          userManager.onlineUsers.set(accountId, userSession);
+        } else {
+          userSession.accountData = result.data;
+          userSession.token = token;
+          userSession.accountId = accountId;
+          userManager.socketToAccount.set(socket.id, accountId);
+          userManager.onlineUsers.set(accountId, userSession);
+        }
+      }
+    }
+
     socket.emit('account_info', result);
   });
 
@@ -1423,13 +1554,60 @@ io.on('connection', (socket) => {
     const result = await feedbackManager.addComment(
       data.feedbackId,
       userSession.accountId,
-      userSession.nickname,
       data.content
     );
 
     if (result.success) {
       socket.emit('comment_added', { feedback: result.feedback });
       // 广播给所有用户更新反馈列表
+      const allFeedbacks = await feedbackManager.getFeedbackList();
+      io.emit('feedbacks_list', { feedbacks: allFeedbacks });
+    } else {
+      socket.emit('error', { message: result.message });
+    }
+  });
+
+  // 楼中楼回复
+  socket.on('reply_comment', async (data) => {
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (!userSession || !userSession.accountId) {
+      socket.emit('error', { message: '请先登录' });
+      return;
+    }
+    const result = await feedbackManager.replyComment(data.feedbackId, data.commentId, userSession.accountId, data.content);
+    if (result.success) {
+      const allFeedbacks = await feedbackManager.getFeedbackList();
+      io.emit('feedbacks_list', { feedbacks: allFeedbacks });
+    } else {
+      socket.emit('error', { message: result.message });
+    }
+  });
+
+  // 评论点赞
+  socket.on('like_comment', async (data) => {
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (!userSession || !userSession.accountId) {
+      socket.emit('error', { message: '请先登录' });
+      return;
+    }
+    const result = await feedbackManager.likeComment(data.feedbackId, data.commentId, userSession.accountId);
+    if (result.success) {
+      const allFeedbacks = await feedbackManager.getFeedbackList();
+      io.emit('feedbacks_list', { feedbacks: allFeedbacks });
+    } else {
+      socket.emit('error', { message: result.message });
+    }
+  });
+
+  // 删除评论
+  socket.on('delete_comment', async (data) => {
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (!userSession || !userSession.accountId) {
+      socket.emit('error', { message: '请先登录' });
+      return;
+    }
+    const result = await feedbackManager.deleteComment(data.feedbackId, data.commentId, userSession.accountId);
+    if (result.success) {
       const allFeedbacks = await feedbackManager.getFeedbackList();
       io.emit('feedbacks_list', { feedbacks: allFeedbacks });
     } else {

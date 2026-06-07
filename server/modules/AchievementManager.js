@@ -716,7 +716,7 @@ class AchievementManager {
   // 给予奖励
   async giveReward(id, reward) {
     if (reward.exp) {
-      const result = await this.accountManager.addExp(id, reward.exp);
+      const result = await this.accountManager.addExp(id, reward.exp, false);
 
       // 通知客户端经验值更新
       if (result.success && this.userManager) {

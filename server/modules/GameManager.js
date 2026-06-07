@@ -900,15 +900,22 @@ class GameManager {
           // 先给予经验值奖励（更新等级），再检查成就
           let expReward = 0;
           if (playerResult === 'win') {
-            expReward = 100;
+            expReward = 300;
           } else if (playerResult === 'draw') {
-            expReward = 50;
+            expReward = 150;
           } else {
-            expReward = 20;
+            expReward = 75;
           }
 
           if (expReward > 0) {
-            await this.accountManager.addExp(accountId, expReward);
+            const expResult = await this.accountManager.addExp(accountId, expReward);
+            // 通知经验明细
+            if (expResult.success) {
+              const s = this.userManager.getSocketByAccountId(accountId);
+              if (s) {
+                s.emit('exp_gained', { expResult });
+              }
+            }
           }
 
           // 重新读取账号，获取最新等级
@@ -1845,11 +1852,11 @@ class GameManager {
       // 根据结果给予经验值
       let expReward = 0;
       if (result === 'win') {
-        expReward = 100; // 胜利奖励
+        expReward = 200; // 胜利奖励
       } else if (result === 'draw') {
-        expReward = 50; // 平局奖励
+        expReward = 100; // 平局奖励
       } else {
-        expReward = 20; // 失败安慰奖
+        expReward = 50; // 失败安慰奖
       }
 
       // 根据难度调整
@@ -1867,6 +1874,7 @@ class GameManager {
         if (expResult.success && userSocket) {
           const updatedAccount = await this.accountManager.getAccount(accountId);
           userSocket.emit('account_updated', { account: updatedAccount });
+          userSocket.emit('exp_gained', { expResult });
         }
       }
 

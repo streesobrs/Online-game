@@ -22,15 +22,17 @@ echo.
 if exist "temp-package" rmdir /s /q "temp-package"
 mkdir "temp-package"
 
+echo Copying client folder...
+xcopy "client" "temp-package\client\" /E /I /Y >nul
+
 echo Copying server folder...
 xcopy "server" "temp-package\server\" /E /I /Y >nul
 
-echo Removing logs and data...
+echo Removing runtime data and logs...
 if exist "temp-package\server\logs" rmdir /s /q "temp-package\server\logs"
-if exist "temp-package\server\data" rmdir /s /q "temp-package\server\data"
+if exist "temp-package\data" rmdir /s /q "temp-package\data"
 
-echo Copying other files...
-copy "index.html" "temp-package\" >nul
+echo Copying root files...
 copy "package.json" "temp-package\" >nul
 copy "start.bat" "temp-package\" >nul
 copy "start.ps1" "temp-package\" >nul

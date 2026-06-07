@@ -5428,6 +5428,22 @@
       });
     }
 
+    // 经验获得通知：显示基础经验 + 额外经验
+    socket.on('exp_gained', (data) => {
+      const r = data.expResult;
+      if (!r) return;
+      const bonus = r.bonusExp || 0;
+      const base = r.baseExp || 0;
+      const total = r.finalExp || (base + bonus);
+      let msg = `✨ 获得 ${total} 经验值`;
+      if (bonus > 0 && r.eventLabel) {
+        msg += `（基础 ${base} + ${r.eventLabel} 额外 ${bonus}）`;
+      } else if (bonus > 0) {
+        msg += `（基础 ${base} + 额外 ${bonus}）`;
+      }
+      showToast(msg, 'success');
+    });
+
     // 更新排行榜显示
     // 当前排行榜选中的游戏类型
     let currentLeaderboardGameType = 'all';
@@ -10629,8 +10645,8 @@
         const logoutText = isGuest ? '退出游客' : '退出登录';
         const logoutFunction = isGuest ? 'guestLogout()' : 'logout()';
 
-        // 游客用户不显示资料按钮
-        const profileButton = isGuest ? '' : '<button class="account-btn btn-info" onclick="window.location.href=\'/profile.html\'">👤 资料</button>';
+        // 游客用户也显示资料按钮（可查看个人信息和转正）
+        const profileButton = '<button class="account-btn btn-info" onclick="window.location.href=\'/profile.html\'">👤 资料</button>';
         const historyButton = '<button class="account-btn" onclick="showGameHistoryModal()" style="background: #9b59b6;">📜 历史</button>';
 
         accountBar.innerHTML = `
