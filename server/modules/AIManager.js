@@ -1676,486 +1676,323 @@ class AIManager {
     return { r: selected.r, c: selected.c };
   }
 
-  // 象棋 AI 移动
+  // ========== 象棋 AI 辅助 ==========
+
+  // 判断棋子颜色
+  chessColor(p) { if (!p || p === 0) return null; return p.startsWith('r-') ? 'r' : p.startsWith('b-') ? 'b' : null; }
+  // 判断棋子类型
+  chessType(p) { if (!p || p === 0) return null; const i = p.indexOf('-'); return i >= 0 ? p.substring(i + 1) : null; }
+  // 某方所有棋子
+  chessPieces(board, color) { const a = []; for (let r = 0; r < 10; r++) for (let c = 0; c < 9; c++) if (this.chessColor(board[r][c]) === color) a.push({ r, c }); return a; }
+  // 对友判断
+  chessFriend(board, r, c, col) { const p = board[r][c]; return p !== 0 && this.chessColor(p) === col; }
+  // 在棋盘内
+  chessIn(r, c) { return r >= 0 && r < 10 && c >= 0 && c < 9; }
+
+  // 棋子原始走法（不含将军后合法性）
+  chessRaw(board, r, c) {
+    const p = board[r][c]; if (!p || p === 0) return [];
+    const col = this.chessColor(p), tp = this.chessType(p), m = [], isR = col === 'r', fw = isR ? -1 : 1;
+    const ib = this.chessIn.bind(this), fr = (rr, cc) => this.chessFriend(board, rr, cc, col);
+    switch (tp) {
+      case 'ju': for (const [dr, dc] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) { let nr = r + dr, nc = c + dc; while (ib(nr, nc)) { if (fr(nr, nc)) break; m.push({ r: nr, c: nc }); if (board[nr][nc] !== 0) break; nr += dr; nc += dc; } } break;
+      case 'ma': for (const [dr, dc, lr, lc] of [[-2, -1, -1, 0], [-2, 1, -1, 0], [2, -1, 1, 0], [2, 1, 1, 0], [-1, -2, 0, -1], [-1, 2, 0, 1], [1, -2, 0, -1], [1, 2, 0, 1]]) { const nr = r + dr, nc = c + dc; if (ib(nr, nc) && !fr(nr, nc) && board[r + lr][c + lc] === 0) m.push({ r: nr, c: nc }); } break;
+      case 'xiang': for (const [dr, dc, er, ec] of [[-2, -2, -1, -1], [-2, 2, -1, 1], [2, -2, 1, -1], [2, 2, 1, 1]]) { const nr = r + dr, nc = c + dc; if (ib(nr, nc) && !fr(nr, nc) && board[r + er][c + ec] === 0) { if (isR ? (nr >= 5 && nr <= 9) : (nr >= 0 && nr <= 4)) m.push({ r: nr, c: nc }); } } break;
+      case 'shi': for (const [dr, dc] of [[-1, -1], [-1, 1], [1, -1], [1, 1]]) { const nr = r + dr, nc = c + dc; if (nr >= (isR ? 7 : 0) && nr <= (isR ? 9 : 2) && nc >= 3 && nc <= 5 && !fr(nr, nc)) m.push({ r: nr, c: nc }); } break;
+      case 'shuai': case 'jiang': for (const [dr, dc] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) { const nr = r + dr, nc = c + dc; if (nr >= (isR ? 7 : 0) && nr <= (isR ? 9 : 2) && nc >= 3 && nc <= 5 && !fr(nr, nc)) m.push({ r: nr, c: nc }); } const ok = isR ? 'b-jiang' : 'r-shuai'; let fg = false, bl = false; for (let rr = r + (isR ? -1 : 1); isR ? rr >= 0 : rr < 10; rr += isR ? -1 : 1) { if (board[rr][c] === ok) { fg = true; break } else if (board[rr][c] !== 0) { bl = true; break } } if (fg && !bl) { for (let rr = r + (isR ? -1 : 1); isR ? rr >= 0 : rr < 10; rr += isR ? -1 : 1) { if (board[rr][c] === ok) { m.push({ r: rr, c: c }); break; } } } break;
+      case 'pao': for (const [dr, dc] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) { let nr = r + dr, nc = c + dc; while (ib(nr, nc) && board[nr][nc] === 0) { m.push({ r: nr, c: nc }); nr += dr; nc += dc; } if (ib(nr, nc) && board[nr][nc] !== 0) { nr += dr; nc += dc; while (ib(nr, nc)) { if (board[nr][nc] !== 0) { if (this.chessColor(board[nr][nc]) !== col) m.push({ r: nr, c: nc }); break; } nr += dr; nc += dc; } } } break;
+      case 'bing': case 'zu': const fd = r + fw; if (ib(fd, c) && !fr(fd, c)) m.push({ r: fd, c: c }); if (isR ? r <= 4 : r >= 5) { for (const dc of [-1, 1]) { const nc = c + dc; if (ib(r, nc) && !fr(r, nc)) m.push({ r, c: nc }); } } break;
+    }
+    return m;
+  }
+
+  // 是否被将军
+  chessCheck(board, color) {
+    const kt = color === 'r' ? 'r-shuai' : 'b-jiang', oc = color === 'r' ? 'b' : 'r'; let kr = -1, kc = -1;
+    for (let r = 0; r < 10; r++)for (let c = 0; c < 9; c++)if (board[r][c] === kt) { kr = r; kc = c; break; }
+    if (kr < 0) return true;
+    for (let r = 0; r < 10; r++)for (let c = 0; c < 9; c++)if (board[r][c] !== 0 && this.chessColor(board[r][c]) === oc) if (this.chessRaw(board, r, c).some(m => m.r === kr && m.c === kc)) return true;
+    return false;
+  }
+
+  // 合法走法（走后不将军）
+  chessLegal(board, r, c) {
+    const col = this.chessColor(board[r][c]);
+    return this.chessRaw(board, r, c).filter(m => { const sv = board[m.r][m.c]; board[m.r][m.c] = board[r][c]; board[r][c] = 0; const ch = this.chessCheck(board, col); board[r][c] = board[m.r][m.c]; board[m.r][m.c] = sv; return !ch; });
+  }
+
+  // 象棋 AI 移动（player: 1=红'r' 2=黑'b'）
   getChessAIMove(board, difficulty, currentPlayer) {
+    const aiCol = currentPlayer === 1 ? 'r' : 'b';
     switch (difficulty) {
-      case 'easy':
-        return this.getChessEasyMove(board, currentPlayer);
-      case 'medium':
-        return this.getChessMediumMove(board, currentPlayer);
-      case 'hard':
-        return this.getChessHardMove(board, currentPlayer);
-      default:
-        return this.getChessEasyMove(board, currentPlayer);
+      case 'easy': return this.chessAIEasy(board, aiCol);
+      case 'medium': return this.chessAIMedium(board, aiCol);
+      case 'hard': return this.chessAIHard(board, aiCol);
+      default: return this.chessAIEasy(board, aiCol);
     }
   }
 
-  // 象棋简单难度 - 智能随机走棋
-  getChessEasyMove(board, currentPlayer) {
-    const pieces = this.getChessPieces(board, currentPlayer);
+  // === 象棋AI增强 ===
+
+  // 棋子基础价值
+  chessPieceValue(tp) {
+    const v = {
+      'shuai': 10000, 'jiang': 10000,
+      'ju': 900, 'pao': 450, 'ma': 400,
+      'xiang': 200, 'shi': 200,
+      'bing': 100, 'zu': 100
+    };
+    return v[tp] || 100;
+  }
+
+  // 模拟走棋并返回新棋盘
+  chessSimMove(board, fromR, fromC, toR, toC) {
+    const nb = board.map(r => [...r]);
+    nb[toR][toC] = nb[fromR][fromC];
+    nb[fromR][fromC] = 0;
+    return nb;
+  }
+
+  // 对方所有合法走法
+  chessAllLegal(board, color) {
+    const res = [];
+    for (const p of this.chessPieces(board, color)) {
+      for (const m of this.chessLegal(board, p.r, p.c)) {
+        res.push({ fromR: p.r, fromC: p.c, toR: m.r, toC: m.c });
+      }
+    }
+    return res;
+  }
+
+  // 评估某一方所有棋子总价值
+  chessTotalValue(board, color) {
+    let sum = 0;
+    for (const p of this.chessPieces(board, color)) {
+      sum += this.chessPieceValue(this.chessType(board[p.r][p.c]));
+    }
+    return sum;
+  }
+
+  // 检查某个位置是否被对方攻击
+  chessIsAttacked(board, r, c, byColor) {
+    for (const p of this.chessPieces(board, byColor)) {
+      for (const m of this.chessRaw(board, p.r, p.c)) {
+        if (m.r === r && m.c === c) return true;
+      }
+    }
+    return false;
+  }
+
+  // 对一步棋全面评分
+  chessScoreMove(board, fromR, fromC, toR, toC, aiCol, opCol) {
+    let s = 0;
+    const tp = this.chessType(board[fromR][fromC]);
+    const captured = board[toR][toC];
+    const isR = aiCol === 'r';
+
+    // 1. 吃子价值
+    if (captured !== 0) {
+      const capturedType = this.chessType(captured);
+      s += this.chessPieceValue(capturedType) * 10;
+
+      // 吃高价值棋子额外加分
+      if (this.chessPieceValue(capturedType) >= 400) s += 300;
+      if (this.chessPieceValue(capturedType) >= 900) s += 500;
+    }
+
+    // 2. 己方棋子被吃风险评估（走之后这个棋子是否会被对方吃掉）
+    const simBoard = this.chessSimMove(board, fromR, fromC, toR, toC);
+    if (this.chessIsAttacked(simBoard, toR, toC, opCol)) {
+      // 如果移动到被攻击的位置且会被吃
+      const movingPieceVal = this.chessPieceValue(tp);
+      // 看对方是否有能吃这个位置的棋子
+      for (const op of this.chessPieces(simBoard, opCol)) {
+        for (const om of this.chessLegal(simBoard, op.r, op.c)) {
+          if (om.r === toR && om.c === toC) {
+            const attackerVal = this.chessPieceValue(this.chessType(simBoard[op.r][op.c]));
+            if (attackerVal < movingPieceVal) {
+              // 低价值换高价值，可以接受
+              s -= (movingPieceVal - attackerVal) * 3;
+            } else if (attackerVal > movingPieceVal) {
+              // 高价值送吃，严重扣分
+              s -= movingPieceVal * 10;
+            } else {
+              s -= movingPieceVal * 5;
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    // 3. 将军/将杀加分
+    if (this.chessCheck(simBoard, opCol)) {
+      s += 800;
+      // 检查是否将杀
+      const opAllLegal = this.chessAllLegal(simBoard, opCol);
+      if (opAllLegal.length === 0) {
+        s += 10000; // 将杀！最高优先级
+      }
+    }
+
+    // 4. 己方被将军时解围
+    if (this.chessCheck(board, aiCol)) {
+      // 当前被将军，能解围的走法加高分
+      if (!this.chessCheck(simBoard, aiCol)) {
+        s += 1000;
+      }
+    }
+
+    // 5. 向前推进（红方r减小，黑方r增大）
+    if ((isR && toR < fromR) || (!isR && toR > fromR)) {
+      s += 10;
+      // 兵/卒过河后向前价值更高
+      if (tp === 'bing' || tp === 'zu') s += 20;
+    }
+
+    // 6. 棋子位置价值
+    // 中心控制
+    s += 12 - Math.abs(toR - 4.5) - Math.abs(toC - 4);
+    // 河界附近（战略要地）
+    if (toR >= 4 && toR <= 5) s += 5;
+
+    // 7. 兵/卒过河加分
+    if ((tp === 'bing' && isR && toR <= 4) || (tp === 'zu' && !isR && toR >= 5)) {
+      s += 50;
+    }
+
+    // 8. 活跃棋子加分（离开初始位置）
+    if (!this.chessPieceDefaultPos(fromR, fromC, tp, isR)) {
+      const startPos = this.chessPieceDefaultPos(fromR, fromC, tp, isR);
+      if (startPos) s += 15;
+    }
+
+    // 9. 保护己方高价值棋子（如果走到可以保护被攻击的高价值棋子的位置）
+    for (const p of this.chessPieces(simBoard, aiCol)) {
+      const pt = this.chessType(simBoard[p.r][p.c]);
+      if (this.chessPieceValue(pt) >= 400 && this.chessIsAttacked(simBoard, p.r, p.c, opCol)) {
+        // 是否因为这次走棋而形成了保护
+        if (this.chessFriend(simBoard, toR, toC, aiCol)) {
+          // 走到这个位置保护了被攻击的棋子
+          s += 60;
+        }
+      }
+    }
+
+    return s;
+  }
+
+  // 判断棋子是否在默认起始位置（粗略）
+  chessPieceDefaultPos(r, c, tp, isRed) {
+    if (isRed) {
+      switch (tp) {
+        case 'ju': return (r === 9 && (c === 0 || c === 8));
+        case 'ma': return (r === 9 && (c === 1 || c === 7));
+        case 'xiang': return (r === 9 && (c === 2 || c === 6));
+        case 'shi': return (r === 9 && (c === 3 || c === 5));
+        case 'shuai': return (r === 9 && c === 4);
+        case 'pao': return (r === 7 && (c === 1 || c === 7));
+        case 'bing': return (r === 6 && (c % 2 === 0));
+      }
+    } else {
+      switch (tp) {
+        case 'ju': return (r === 0 && (c === 0 || c === 8));
+        case 'ma': return (r === 0 && (c === 1 || c === 7));
+        case 'xiang': return (r === 0 && (c === 2 || c === 6));
+        case 'shi': return (r === 0 && (c === 3 || c === 5));
+        case 'jiang': return (r === 0 && c === 4);
+        case 'pao': return (r === 2 && (c === 1 || c === 7));
+        case 'zu': return (r === 3 && (c % 2 === 0));
+      }
+    }
+    return false;
+  }
+
+  // 象棋简单AI (增强版)
+  chessAIEasy(board, aiCol) {
+    const pieces = this.chessPieces(board, aiCol);
     if (pieces.length === 0) return null;
+    const opCol = aiCol === 'r' ? 'b' : 'r';
+    const scored = [];
+    for (const p of pieces) {
+      for (const m of this.chessLegal(board, p.r, p.c)) {
+        let s = this.chessScoreMove(board, p.r, p.c, m.r, m.c, aiCol, opCol);
+        // 简单AI降低一些权重，增加随机性
+        s = Math.round(s / 10);
+        scored.push({ fromR: p.r, fromC: p.c, toR: m.r, toC: m.c, score: s });
+      }
+    }
+    if (scored.length === 0) return null;
+    scored.sort((a, b) => b.score - a.score);
+    const pick = scored[Math.floor(Math.random() * Math.min(10, scored.length))];
+    return { fromR: pick.fromR, fromC: pick.fromC, toR: pick.toR, toC: pick.toC };
+  }
 
-    // 评估每个棋子的移动
-    const scoredMoves = [];
-    for (const piece of pieces) {
-      const validMoves = this.getChessValidMoves(board, piece);
-      for (const move of validMoves) {
-        let score = 0;
-
-        // 优先吃子
-        if (board[move.r][move.c] !== 0 && board[move.r][move.c] !== currentPlayer) {
-          score += 50;
+  // 象棋中等AI (增强版)
+  chessAIMedium(board, aiCol) {
+    const pieces = this.chessPieces(board, aiCol);
+    if (pieces.length === 0) return null;
+    const opCol = aiCol === 'r' ? 'b' : 'r';
+    // 检查是否有直接吃子（不吃会被吃的高价值棋子的防守）
+    const defensiveMoves = [];
+    const captureMoves = [];
+    const scored = [];
+    for (const p of pieces) {
+      for (const m of this.chessLegal(board, p.r, p.c)) {
+        const s = this.chessScoreMove(board, p.r, p.c, m.r, m.c, aiCol, opCol);
+        const captured = board[m.r][m.c];
+        if (captured !== 0 && this.chessColor(captured) === opCol) {
+          captureMoves.push({ fromR: p.r, fromC: p.c, toR: m.r, toC: m.c, score: s });
         }
-
-        // 优先向前移动
-        if (currentPlayer === 1 && move.r > piece.r) {
-          score += 5;
-        } else if (currentPlayer === 2 && move.r < piece.r) {
-          score += 5;
+        // 防守：当前棋子正被攻击
+        if (this.chessIsAttacked(board, p.r, p.c, opCol)) {
+          defensiveMoves.push({ fromR: p.r, fromC: p.c, toR: m.r, toC: m.c, score: s });
         }
-
-        // 优先靠近中心
-        const centerDistance = Math.abs(move.r - 4.5) + Math.abs(move.c - 4);
-        score += (10 - centerDistance);
-
-        scoredMoves.push({
-          fromR: piece.r,
-          fromC: piece.c,
-          toR: move.r,
-          toC: move.c,
-          score: score
-        });
+        scored.push({ fromR: p.r, fromC: p.c, toR: m.r, toC: m.c, score: s });
       }
     }
 
-    if (scoredMoves.length === 0) return null;
+    // 优先级：将军 > 吃高价值子 > 解被将军 > 防守 > 吃子 > 其他
+    if (scored.length === 0) return null;
+    scored.sort((a, b) => b.score - a.score);
 
-    // 按分数排序
-    scoredMoves.sort((a, b) => b.score - a.score);
-
-    // 从前10个候选移动中随机选择
-    const topCandidates = scoredMoves.slice(0, Math.min(10, scoredMoves.length));
-    const selected = topCandidates[Math.floor(Math.random() * topCandidates.length)];
-    // 只返回移动信息，不包含score
-    return { fromR: selected.fromR, fromC: selected.fromC, toR: selected.toR, toC: selected.toC };
+    // 前3候选随机（半确定性）
+    const pick = scored[Math.floor(Math.random() * Math.min(5, scored.length))];
+    return { fromR: pick.fromR, fromC: pick.fromC, toR: pick.toR, toC: pick.toC };
   }
 
-  // 寻找最佳进攻位置（更具侵略性）
-  findBestAttackMove(board, currentPlayer, opponent) {
-    const emptyCells = this.getEmptyCells(board);
-    let bestMove = null;
-    let maxScore = 0;
+  // 象棋困难AI (增强版 - 带2层搜索)
+  chessAIHard(board, aiCol) {
+    const pieces = this.chessPieces(board, aiCol);
+    if (pieces.length === 0) return null;
+    const opCol = aiCol === 'r' ? 'b' : 'r';
+    const scored = [];
+    for (const p of pieces) {
+      for (const m of this.chessLegal(board, p.r, p.c)) {
+        let s = this.chessScoreMove(board, p.r, p.c, m.r, m.c, aiCol, opCol);
 
-    for (const cell of emptyCells) {
-      // 评估进攻分数
-      board[cell.r][cell.c] = currentPlayer;
-      const attackScore = this.evaluatePositionV2(board, cell.r, cell.c, currentPlayer);
-      board[cell.r][cell.c] = 0;
-
-      // 只考虑有威胁的进攻位置
-      if (attackScore > maxScore && attackScore >= 50) {
-        maxScore = attackScore;
-        bestMove = { r: cell.r, c: cell.c, score: attackScore };
-      }
-    }
-
-    return bestMove;
-  }
-
-  // 评估某个位置的威胁程度V2（更详细的评分）
-  evaluatePositionV2(board, r, c, player) {
-    let totalScore = 0;
-    const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
-
-    for (const [dr, dc] of directions) {
-      // 检查这个方向上的连子情况
-      let count = 1; // 包括当前位置
-      let emptyEnds = 0;
-      let space = 0;
-
-      // 正向检查
-      for (let i = 1; i < 5; i++) {
-        const nr = r + dr * i;
-        const nc = c + dc * i;
-        if (nr < 0 || nr >= board.length || nc < 0 || nc >= board[0].length) break;
-        if (board[nr][nc] === player) {
-          count++;
-        } else if (board[nr][nc] === 0) {
-          emptyEnds++;
-          space++;
-          break;
-        } else {
-          break;
-        }
-      }
-
-      // 反向检查
-      for (let i = 1; i < 5; i++) {
-        const nr = r - dr * i;
-        const nc = c - dc * i;
-        if (nr < 0 || nr >= board.length || nc < 0 || nc >= board[0].length) break;
-        if (board[nr][nc] === player) {
-          count++;
-        } else if (board[nr][nc] === 0) {
-          emptyEnds++;
-          space++;
-          break;
-        } else {
-          break;
-        }
-      }
-
-      // 根据连子数和开放端评分（进攻导向 - 大幅提高）
-      let score = 0;
-      if (count >= 5) {
-        score = 100000; // 获胜 - 极高权重
-      } else if (count === 4 && emptyEnds === 2) {
-        score = 20000; // 活四（必胜）- 极高权重
-      } else if (count === 4 && emptyEnds === 1) {
-        score = 5000; // 冲四 - 很高权重
-      } else if (count === 3 && emptyEnds === 2) {
-        score = 2000; // 活三（很强）- 高权重
-      } else if (count === 3 && emptyEnds === 1) {
-        score = 800; // 冲三
-      } else if (count === 2 && emptyEnds === 2) {
-        score = 500; // 活二
-      } else if (count === 2 && emptyEnds === 1) {
-        score = 200; // 冲二
-      } else if (count === 1 && emptyEnds >= 1) {
-        score = 50; // 单点
-      }
-
-      totalScore += score;
-    }
-
-    return totalScore;
-  }
-
-  // 进攻性位置评分（优先进攻）
-  getBestPositionByScoreAggressive(board, currentPlayer, opponent) {
-    const emptyCells = this.getEmptyCells(board);
-
-    if (emptyCells.length === 0) return null;
-
-    // 评估每个空位
-    const scoredCells = emptyCells.map(cell => {
-      let score = 0;
-
-      // 进攻评分：在这个位置落子后自己的连子情况（权重更高）
-      board[cell.r][cell.c] = currentPlayer;
-      score += this.evaluatePositionV2(board, cell.r, cell.c, currentPlayer) * 1.5;
-      board[cell.r][cell.c] = 0;
-
-      // 防守评分：对手在这个位置落子后的威胁（权重较低）
-      board[cell.r][cell.c] = opponent;
-      score += this.evaluatePositionV2(board, cell.r, cell.c, opponent) * 0.5;
-      board[cell.r][cell.c] = 0;
-
-      // 中心位置加分
-      const centerR = Math.floor(board.length / 2);
-      const centerC = Math.floor(board[0].length / 2);
-      const distanceToCenter = Math.abs(cell.r - centerR) + Math.abs(cell.c - centerC);
-      score += Math.max(0, 15 - distanceToCenter);
-
-      // 靠近已有棋子加分（进攻性）
-      for (let dr = -2; dr <= 2; dr++) {
-        for (let dc = -2; dc <= 2; dc++) {
-          if (dr === 0 && dc === 0) continue;
-          const nr = cell.r + dr;
-          const nc = cell.c + dc;
-          if (nr >= 0 && nr < board.length && nc >= 0 && nc < board[0].length) {
-            if (board[nr][nc] === currentPlayer) {
-              const distance = Math.abs(dr) + Math.abs(dc);
-              score += (3 - distance) * 3; // 靠近自己的棋子
+        // 2层搜索：走完后评估对手最佳应手的影响
+        const simBoard = this.chessSimMove(board, p.r, p.c, m.r, m.c);
+        // 查找对手的最佳走法
+        let opponentBestResponse = 0;
+        for (const op of this.chessPieces(simBoard, opCol)) {
+          for (const om of this.chessLegal(simBoard, op.r, op.c)) {
+            const opScore = this.chessScoreMove(simBoard, op.r, op.c, om.r, om.c, opCol, aiCol);
+            if (opScore > opponentBestResponse) {
+              opponentBestResponse = opScore;
             }
           }
         }
-      }
+        // 扣减对手最佳反击的伤害（对方吃/将军的威胁）
+        s -= opponentBestResponse * 0.3;
 
-      return { r: cell.r, c: cell.c, score };
-    });
-
-    // 按分数排序
-    scoredCells.sort((a, b) => b.score - a.score);
-
-    // 从前3个候选位置中选择最佳（减少随机性，增加侵略性）
-    const topCandidates = scoredCells.slice(0, Math.min(3, scoredCells.length));
-    const selected = topCandidates[0]; // 总是选择最佳位置
-
-    return { r: selected.r, c: selected.c };
-  }
-
-  // 困难级位置评分（最强进攻+最强防守，无随机性）
-  getBestPositionByScoreHard(board, currentPlayer, opponent) {
-    const emptyCells = this.getEmptyCells(board);
-
-    if (emptyCells.length === 0) return null;
-
-    // 评估每个空位 - 更高的权重
-    const scoredCells = emptyCells.map(cell => {
-      let score = 0;
-
-      // 进攻评分：在这个位置落子后自己的连子情况（权重更高）
-      board[cell.r][cell.c] = currentPlayer;
-      score += this.evaluatePositionV2(board, cell.r, cell.c, currentPlayer) * 3.0;
-      board[cell.r][cell.c] = 0;
-
-      // 防守评分：对手在这个位置落子后的威胁（权重显著提高）
-      board[cell.r][cell.c] = opponent;
-      score += this.evaluatePositionV2(board, cell.r, cell.c, opponent) * 2.5;
-      board[cell.r][cell.c] = 0;
-
-      // 中心位置加分（更高权重）
-      const centerR = Math.floor(board.length / 2);
-      const centerC = Math.floor(board[0].length / 2);
-      const distanceToCenter = Math.abs(cell.r - centerR) + Math.abs(cell.c - centerC);
-      score += Math.max(0, 30 - distanceToCenter * 2);
-
-      // 靠近已有棋子加分（更强的进攻性）
-      for (let dr = -2; dr <= 2; dr++) {
-        for (let dc = -2; dc <= 2; dc++) {
-          if (dr === 0 && dc === 0) continue;
-          const nr = cell.r + dr;
-          const nc = cell.c + dc;
-          if (nr >= 0 && nr < board.length && nc >= 0 && nc < board[0].length) {
-            if (board[nr][nc] === currentPlayer) {
-              const distance = Math.abs(dr) + Math.abs(dc);
-              score += (3 - distance) * 8; // 更高的自己棋子权重
-            }
-          }
-        }
-      }
-
-      return { r: cell.r, c: cell.c, score };
-    });
-
-    // 按分数排序
-    scoredCells.sort((a, b) => b.score - a.score);
-
-    // 总是选择最佳位置 - 无任何随机性
-    const selected = scoredCells[0];
-
-    return { r: selected.r, c: selected.c };
-  }
-
-  // 中等难度位置选择 - 在高分位置中随机选择
-  getBestPositionByScoreMedium(board, currentPlayer, opponent) {
-    const emptyCells = this.getEmptyCells(board);
-
-    if (emptyCells.length === 0) return null;
-
-    // 统计棋盘上已有棋子数量
-    let hasPieces = false;
-    for (let r = 0; r < board.length; r++) {
-      for (let c = 0; c < board[0].length; c++) {
-        if (board[r][c] !== 0) {
-          hasPieces = true;
-          break;
-        }
-      }
-      if (hasPieces) break;
-    }
-
-    // 如果棋盘为空（AI是先手），选择中心附近的位置
-    if (!hasPieces) {
-      const centerR = Math.floor(board.length / 2);
-      const centerC = Math.floor(board[0].length / 2);
-      const centerCandidates = [];
-      for (let dr = -2; dr <= 2; dr++) {
-        for (let dc = -2; dc <= 2; dc++) {
-          const nr = centerR + dr;
-          const nc = centerC + dc;
-          if (nr >= 0 && nr < board.length && nc >= 0 && nc < board[0].length && board[nr][nc] === 0) {
-            centerCandidates.push({ r: nr, c: nc });
-          }
-        }
-      }
-      const selected = centerCandidates[Math.floor(Math.random() * centerCandidates.length)];
-      return { r: selected.r, c: selected.c };
-    }
-
-    // 如果有棋子，优先选择靠近已有棋子的位置
-    const nearPieceCells = [];
-    const farPieceCells = [];
-
-    for (const cell of emptyCells) {
-      let hasNearPiece = false;
-      for (let dr = -1; dr <= 1; dr++) {
-        for (let dc = -1; dc <= 1; dc++) {
-          if (dr === 0 && dc === 0) continue;
-          const nr = cell.r + dr;
-          const nc = cell.c + dc;
-          if (nr >= 0 && nr < board.length && nc >= 0 && nc < board[0].length) {
-            if (board[nr][nc] !== 0) {
-              hasNearPiece = true;
-              break;
-            }
-          }
-        }
-        if (hasNearPiece) break;
-      }
-
-      if (hasNearPiece) {
-        nearPieceCells.push(cell);
-      } else {
-        farPieceCells.push(cell);
+        scored.push({ fromR: p.r, fromC: p.c, toR: m.r, toC: m.c, score: s });
       }
     }
-
-    // 优先从靠近棋子的位置中选择
-    const candidates = nearPieceCells.length > 0 ? nearPieceCells : farPieceCells;
-
-    // 评估候选位置
-    const scoredCells = candidates.map(cell => {
-      let score = 0;
-
-      // 进攻评分
-      board[cell.r][cell.c] = currentPlayer;
-      score += this.evaluatePositionV2(board, cell.r, cell.c, currentPlayer) * 3.0;
-      board[cell.r][cell.c] = 0;
-
-      // 防守评分
-      board[cell.r][cell.c] = opponent;
-      score += this.evaluatePositionV2(board, cell.r, cell.c, opponent) * 2.5;
-      board[cell.r][cell.c] = 0;
-
-      // 中心位置加分
-      const centerR = Math.floor(board.length / 2);
-      const centerC = Math.floor(board[0].length / 2);
-      const distanceToCenter = Math.abs(cell.r - centerR) + Math.abs(cell.c - centerC);
-      score += Math.max(0, 30 - distanceToCenter * 2);
-
-      return { r: cell.r, c: cell.c, score };
-    });
-
-    // 按分数排序
-    scoredCells.sort((a, b) => b.score - a.score);
-
-    // 从前3个最高分位置中随机选择
-    const topCandidates = scoredCells.slice(0, Math.min(3, scoredCells.length));
-    const selected = topCandidates[Math.floor(Math.random() * topCandidates.length)];
-
-    return { r: selected.r, c: selected.c };
-  }
-
-  // 象棋中等难度 - 基于规则的AI
-  getChessMediumMove(board, currentPlayer) {
-    // 先尝试吃子
-    const captureMove = this.findChessCaptureMove(board, currentPlayer);
-    if (captureMove) return captureMove;
-
-    // 评估所有移动
-    const pieces = this.getChessPieces(board, currentPlayer);
-    const scoredMoves = [];
-    for (const piece of pieces) {
-      const validMoves = this.getChessValidMoves(board, piece);
-      for (const move of validMoves) {
-        let score = 0;
-
-        // 优先吃子
-        if (board[move.r][move.c] !== 0 && board[move.r][move.c] !== currentPlayer) {
-          score += 100;
-        }
-
-        // 优先向前移动
-        if (currentPlayer === 1 && move.r > piece.r) {
-          score += 10;
-        } else if (currentPlayer === 2 && move.r < piece.r) {
-          score += 10;
-        }
-
-        // 优先靠近中心
-        const centerDistance = Math.abs(move.r - 4.5) + Math.abs(move.c - 4);
-        score += (15 - centerDistance);
-
-        // 优先保护重要棋子
-        if (this.isImportantPiece(piece.type)) {
-          score += 20;
-        }
-
-        scoredMoves.push({
-          fromR: piece.r,
-          fromC: piece.c,
-          toR: move.r,
-          toC: move.c,
-          score: score
-        });
-      }
-    }
-
-    if (scoredMoves.length === 0) return null;
-
-    // 按分数排序
-    scoredMoves.sort((a, b) => b.score - a.score);
-
-    // 从前5个候选移动中随机选择
-    const topCandidates = scoredMoves.slice(0, Math.min(5, scoredMoves.length));
-    const selected = topCandidates[Math.floor(Math.random() * topCandidates.length)];
-    // 只返回移动信息，不包含score
-    return { fromR: selected.fromR, fromC: selected.fromC, toR: selected.toR, toC: selected.toC };
-  }
-
-  // 象棋困难难度 - 基于Minimax算法
-  getChessHardMove(board, currentPlayer) {
-    // 使用中等难度算法，但选择最优位置
-    const pieces = this.getChessPieces(board, currentPlayer);
-    const scoredMoves = [];
-    for (const piece of pieces) {
-      const validMoves = this.getChessValidMoves(board, piece);
-      for (const move of validMoves) {
-        let score = 0;
-
-        // 优先吃子
-        if (board[move.r][move.c] !== 0 && board[move.r][move.c] !== currentPlayer) {
-          score += 150;
-        }
-
-        // 优先向前移动
-        if (currentPlayer === 1 && move.r > piece.r) {
-          score += 15;
-        } else if (currentPlayer === 2 && move.r < piece.r) {
-          score += 15;
-        }
-
-        // 优先靠近中心
-        const centerDistance = Math.abs(move.r - 4.5) + Math.abs(move.c - 4);
-        score += (20 - centerDistance);
-
-        // 优先保护重要棋子
-        if (this.isImportantPiece(piece.type)) {
-          score += 30;
-        }
-
-        // 优先攻击重要棋子
-        if (this.isImportantPiece(board[move.r][move.c])) {
-          score += 50;
-        }
-
-        scoredMoves.push({
-          fromR: piece.r,
-          fromC: piece.c,
-          toR: move.r,
-          toC: move.c,
-          score: score
-        });
-      }
-    }
-
-    if (scoredMoves.length === 0) return null;
-
-    // 按分数排序
-    scoredMoves.sort((a, b) => b.score - a.score);
-
-    // 选择最优移动
-    const selected = scoredMoves[0];
-    // 只返回移动信息，不包含score
-    return { fromR: selected.fromR, fromC: selected.fromC, toR: selected.toR, toC: selected.toC };
-  }
-
-  // 检查是否是重要棋子
-  isImportantPiece(pieceType) {
-    // 将、车、马、炮是重要棋子
-    return pieceType === 'king' || pieceType === 'rook' || pieceType === 'horse' || pieceType === 'cannon';
+    if (scored.length === 0) return null;
+    scored.sort((a, b) => b.score - a.score);
+    const pick = scored[0];
+    return { fromR: pick.fromR, fromC: pick.fromC, toR: pick.toR, toC: pick.toC };
   }
 
   // 围棋 AI 移动
@@ -2386,64 +2223,6 @@ class AIManager {
     }
 
     return false;
-  }
-
-  // 获取象棋棋子
-  getChessPieces(board, currentPlayer) {
-    const pieces = [];
-    for (let r = 0; r < board.length; r++) {
-      for (let c = 0; c < board[r].length; c++) {
-        if (board[r][c] !== 0 && board[r][c] === currentPlayer) {
-          pieces.push({ r, c, type: board[r][c] });
-        }
-      }
-    }
-    return pieces;
-  }
-
-  // 获取象棋有效移动
-  getChessValidMoves(board, piece) {
-    // 简化实现，返回周围8个方向
-    const moves = [];
-    const directions = [
-      [-1, 0], [1, 0], [0, -1], [0, 1],
-      [-1, -1], [-1, 1], [1, -1], [1, 1]
-    ];
-
-    for (const [dr, dc] of directions) {
-      const newR = piece.r + dr;
-      const newC = piece.c + dc;
-
-      if (newR >= 0 && newR < board.length && newC >= 0 && newC < board[0].length) {
-        if (board[newR][newC] === 0 || board[newR][newC] !== piece.type) {
-          moves.push({ r: newR, c: newC });
-        }
-      }
-    }
-
-    return moves;
-  }
-
-  // 寻找象棋吃子移动
-  findChessCaptureMove(board, currentPlayer) {
-    const pieces = this.getChessPieces(board, currentPlayer);
-    const opponent = currentPlayer === 1 ? 2 : 1;
-
-    for (const piece of pieces) {
-      const validMoves = this.getChessValidMoves(board, piece);
-      for (const move of validMoves) {
-        if (board[move.r][move.c] === opponent) {
-          return {
-            fromR: piece.r,
-            fromC: piece.c,
-            toR: move.r,
-            toC: move.c
-          };
-        }
-      }
-    }
-
-    return null;
   }
 
   // ===== 增强的AI辅助函数 =====

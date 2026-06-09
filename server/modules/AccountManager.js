@@ -681,7 +681,7 @@ class AccountManager {
           aiResult: null,
           lastPlayedAt: null
         },
-        chess: {
+        'chinese-chess': {
           wins: 0,
           losses: 0,
           draws: 0,
@@ -1004,7 +1004,7 @@ class AccountManager {
             aiResult: null,
             lastPlayedAt: null
           },
-          chess: {
+          'chinese-chess': {
             wins: 0,
             losses: 0,
             draws: 0,
@@ -1265,7 +1265,7 @@ class AccountManager {
           aiResult: null,
           lastPlayedAt: null
         },
-        chess: {
+        'chinese-chess': {
           wins: 0,
           losses: 0,
           draws: 0,

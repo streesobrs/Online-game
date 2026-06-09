@@ -7,6 +7,7 @@
   <meta name="theme-color" content="#007bff">
   <title>游戏记录 - 多棋种联机大厅</title>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="replay-module.js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -242,6 +243,158 @@
       }
     }
   </style>
+  <!-- 回放弹窗样式 -->
+  <style>
+    .account-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+
+    .account-modal {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      width: 100%;
+      max-width: 700px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      animation: modalSlideIn 0.3s ease;
+    }
+
+    @keyframes modalSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .account-modal-title {
+      font-size: 20px;
+      font-weight: bold;
+      color: #2d3748;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    /* 棋盘样式 */
+    .replay-board {
+      margin: 0 auto;
+    }
+
+    .gobang-cell,
+    .go-cell {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: default;
+      background: none;
+    }
+
+    .gobang-cell::before,
+    .go-cell::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      pointer-events: none;
+    }
+
+    .last-move::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      right: 2px;
+      bottom: 2px;
+      border-radius: 50%;
+      border: 2px solid #f1c40f;
+      box-shadow: 0 0 6px rgba(241, 196, 15, 0.5);
+      pointer-events: none;
+    }
+
+    .gobang-black {
+      background: radial-gradient(circle at 35% 35%, #555, #111);
+      border-radius: 50%;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      z-index: 2;
+      position: relative;
+    }
+
+    .gobang-white {
+      background: radial-gradient(circle at 35% 35%, #fff, #ccc);
+      border-radius: 50%;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+      z-index: 2;
+      position: relative;
+    }
+
+    .go-black {
+      background: radial-gradient(circle at 35% 35%, #555, #111);
+      border-radius: 50%;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      z-index: 2;
+      position: relative;
+    }
+
+    .go-white {
+      background: radial-gradient(circle at 35% 35%, #fff, #ccc);
+      border-radius: 50%;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+      z-index: 2;
+      position: relative;
+    }
+
+    /* 回放弹窗按钮样式 */
+    #replay-modal button {
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      font-weight: bold;
+      transition: none;
+    }
+
+    #replay-modal button:hover {
+      opacity: 0.85;
+      transform: none;
+    }
+
+    #replay-modal button:active {
+      transform: scale(0.95);
+    }
+
+    /* 速度按钮 */
+    #replay-modal [data-speed] {
+      color: white;
+    }
+
+    /* 滑动条样式 */
+    #replay-modal input[type="range"] {
+      cursor: pointer;
+      height: 6px;
+    }
+
+    #replay-modal input[type="range"]:focus {
+      outline: none;
+    }
+  </style>
 </head>
 
 <body>
@@ -307,6 +460,8 @@
       gobang: { name: '五子棋', icon: '⚫', color: '#1a1a1a' },
       gomoku: { name: '五子棋', icon: '⚫', color: '#1a1a1a' },
       go: { name: '围棋', icon: '⚪', color: '#6c757d' },
+      chess: { name: '象棋', icon: '🏰', color: '#dc3545' },
+      'chinese-chess': { name: '象棋', icon: '🏰', color: '#dc3545' },
       xiangqi: { name: '象棋', icon: '🏰', color: '#dc3545' },
       snake: { name: '贪吃蛇', icon: '🐍', color: '#28a745' }
     };
@@ -407,7 +562,10 @@
               <span>📅 ${formatDate(game.date || game.endTime)}</span>
             </div>
           </div>
-          <div class="game-result ${resultClass}">${resultText}</div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="game-result ${resultClass}">${resultText}</div>
+            ${game.moves > 0 && game.gameId ? `<button onclick="openReplay('${game.gameId}', '${game.gameType}')" style="padding:6px 12px;border:none;border-radius:6px;background:#3498db;color:white;cursor:pointer;font-size:12px;font-weight:bold;">🎬 回放</button>` : ''}
+          </div>
         `;
 
         gamesList.appendChild(card);
@@ -426,6 +584,21 @@
       if (diff < 604800000) return Math.floor(diff / 86400000) + '天前';
 
       return date.toLocaleDateString('zh-CN');
+    }
+
+    // 打开游戏回放（在新标签页打开）
+    async function openReplay(gameId, gameType) {
+      try {
+        const res = await fetch(`/api/games/replay/${gameId}`);
+        const data = await res.json();
+        if (data.success && data.data) {
+          ReplayModule.showReplay(data.data);
+        } else {
+          alert('获取回放数据失败：' + (data.message || '未知错误'));
+        }
+      } catch (err) {
+        alert('获取回放数据失败：' + err.message);
+      }
     }
   </script>
 

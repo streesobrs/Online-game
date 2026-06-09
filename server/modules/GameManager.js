@@ -1061,7 +1061,7 @@ class GameManager {
       // 根据游戏类型添加独特字段
       switch (game.gameType) {
         case 'gobang':
-        case 'chess':
+        case 'chinese-chess':
         case 'go':
           // 棋类游戏特有字段
           record.boardSize = game.boardSize || 15; // 棋盘大小
@@ -1689,11 +1689,16 @@ class GameManager {
     // 发送移动结果
     const userSocket = this.userManager.getSocketByAccountId(accountId);
     if (userSocket) {
-      userSocket.emit('ai_move_result', {
+      const result = {
         position: position,
         color: 1,
         currentPlayer: 2
-      });
+      };
+      // 象棋需要发送完整棋盘数据
+      if (aiGame.gameType === 'chinese-chess') {
+        result.board = aiGame.board;
+      }
+      userSocket.emit('ai_move_result', result);
     }
 
     // AI思考并移动，根据难度设置不同的随机思考时间
@@ -1732,6 +1737,8 @@ class GameManager {
       return;
     }
 
+    logger.info('🤖 AI 执行移动', { accountId, gameType: aiGame.gameType, move: aiMove });
+
     // 执行 AI 移动
     this.executeMove(aiGame.gameType, aiGame.board, aiMove, aiGame.currentPlayer);
 
@@ -1764,11 +1771,16 @@ class GameManager {
     // 发送AI移动结果
     const userSocket = this.userManager.getSocketByAccountId(accountId);
     if (userSocket) {
-      userSocket.emit('ai_move_result', {
+      const result = {
         position: aiMove,
         color: 2,
         currentPlayer: 1
-      });
+      };
+      // 象棋需要发送完整棋盘数据
+      if (aiGame.gameType === 'chinese-chess') {
+        result.board = aiGame.board;
+      }
+      userSocket.emit('ai_move_result', result);
     }
   }
 
@@ -1813,7 +1825,7 @@ class GameManager {
       // 根据游戏类型添加独特字段
       switch (aiGame.gameType) {
         case 'gobang':
-        case 'chess':
+        case 'chinese-chess':
         case 'go':
           // 棋类游戏特有字段
           record.boardSize = aiGame.boardSize || 15; // 棋盘大小
@@ -1977,7 +1989,7 @@ class GameManager {
         return this.initializeGobangBoard();
       case 'go':
         return this.initializeGoBoard();
-      case 'chess':
+      case 'chinese-chess':
         return this.initializeChessBoard();
       default:
         return null;
@@ -2052,7 +2064,7 @@ class GameManager {
         return this.isValidGobangMove(board, position);
       case 'go':
         return this.isValidGoMove(board, position);
-      case 'chess':
+      case 'chinese-chess':
         return this.isValidChessMove(board, position, player);
       default:
         return false;
@@ -2077,11 +2089,267 @@ class GameManager {
     return isValid;
   }
 
-  // 验证象棋移动
-  isValidChessMove(board, position, player) {
-    // 简化实现，总是返回true
+  // ========== 象棋规则实现 ==========
+
+  // 判断棋子颜色：'r' 红方，'b' 黑方
+  getChessPieceColor(piece) {
+    if (!piece || piece === 0) return null;
+    if (piece.startsWith('r-')) return 'r';
+    if (piece.startsWith('b-')) return 'b';
+    return null;
+  }
+
+  // 获取棋子类型：ju, ma, xiang, shi, shuai, pao, bing, jiang, zu
+  getChessPieceType(piece) {
+    if (!piece || piece === 0) return null;
+    const idx = piece.indexOf('-');
+    return idx >= 0 ? piece.substring(idx + 1) : null;
+  }
+
+  // 获取某位置所有合法目标（不考虑将军后还不解除）
+  getChessRawMoves(board, r, c) {
+    const piece = board[r][c];
+    if (!piece || piece === 0) return [];
+    const color = this.getChessPieceColor(piece);
+    const type = this.getChessPieceType(piece);
+    const moves = [];
+
+    const isRed = color === 'r';
+    const forward = isRed ? -1 : 1; // 红方向上是-1，黑方是+1
+
+    const inBounds = (rr, cc) => rr >= 0 && rr < 10 && cc >= 0 && cc < 9;
+    const isEnemy = (rr, cc) => {
+      const p = board[rr][cc];
+      return p !== 0 && this.getChessPieceColor(p) !== color;
+    };
+    const isFriend = (rr, cc) => {
+      const p = board[rr][cc];
+      return p !== 0 && this.getChessPieceColor(p) === color;
+    };
+
+    switch (type) {
+      case 'ju': // 车：直线走，无阻挡
+        for (const [dr, dc] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+          let nr = r + dr, nc = c + dc;
+          while (inBounds(nr, nc)) {
+            if (isFriend(nr, nc)) break;
+            moves.push({ r: nr, c: nc });
+            if (isEnemy(nr, nc)) break;
+            nr += dr; nc += dc;
+          }
+        }
+        break;
+
+      case 'ma': // 马：走"日"字，注意蹩脚
+        for (const [dr, dc, legR, legC] of [
+          [-2, -1, -1, 0], [-2, 1, -1, 0],
+          [2, -1, 1, 0], [2, 1, 1, 0],
+          [-1, -2, 0, -1], [-1, 2, 0, 1],
+          [1, -2, 0, -1], [1, 2, 0, 1]
+        ]) {
+          const nr = r + dr, nc = c + dc;
+          const lr = r + legR, lc = c + legC;
+          if (inBounds(nr, nc) && !isFriend(nr, nc) && board[lr][lc] === 0) {
+            moves.push({ r: nr, c: nc });
+          }
+        }
+        break;
+
+      case 'xiang': // 象/相：走"田"字，不能过河，注意塞眼
+        for (const [dr, dc, eyeR, eyeC] of [
+          [-2, -2, -1, -1], [-2, 2, -1, 1],
+          [2, -2, 1, -1], [2, 2, 1, 1]
+        ]) {
+          const nr = r + dr, nc = c + dc;
+          const er = r + eyeR, ec = c + eyeC;
+          // 不能过河：红方0-4行，黑方5-9行
+          const inOwnHalf = isRed ? (nr >= 5 && nr <= 9) : (nr >= 0 && nr <= 4);
+          if (inBounds(nr, nc) && inOwnHalf && !isFriend(nr, nc) && board[er][ec] === 0) {
+            moves.push({ r: nr, c: nc });
+          }
+        }
+        break;
+
+      case 'shi': // 士/仕：斜走一格，不出九宫
+        const shiColMin = 3, shiColMax = 5;
+        const shiRowMin = isRed ? 7 : 0, shiRowMax = isRed ? 9 : 2;
+        for (const [dr, dc] of [[-1, -1], [-1, 1], [1, -1], [1, 1]]) {
+          const nr = r + dr, nc = c + dc;
+          if (nr >= shiRowMin && nr <= shiRowMax && nc >= shiColMin && nc <= shiColMax && !isFriend(nr, nc)) {
+            moves.push({ r: nr, c: nc });
+          }
+        }
+        break;
+
+      case 'shuai': // 帅/将：九宫内直走一格
+      case 'jiang':
+        const kingColMin = 3, kingColMax = 5;
+        const kingRowMin = isRed ? 7 : 0, kingRowMax = isRed ? 9 : 2;
+        for (const [dr, dc] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+          const nr = r + dr, nc = c + dc;
+          if (nr >= kingRowMin && nr <= kingRowMax && nc >= kingColMin && nc <= kingColMax && !isFriend(nr, nc)) {
+            moves.push({ r: nr, c: nc });
+          }
+        }
+        // 将帅对面：如果两将同列且中间无子，可以飞将吃对方将
+        const kingCol = c;
+        const opponentKingType = isRed ? 'b-jiang' : 'r-shuai';
+        let foundOpponentKing = false;
+        let blocked = false;
+        for (let rr = r + (isRed ? -1 : 1); isRed ? rr >= 0 : rr < 10; rr += isRed ? -1 : 1) {
+          if (board[rr][kingCol] === opponentKingType) {
+            foundOpponentKing = true;
+            break;
+          } else if (board[rr][kingCol] !== 0) {
+            blocked = true;
+            break;
+          }
+        }
+        if (foundOpponentKing && !blocked) {
+          // 找到对方将的位置
+          for (let rr = r + (isRed ? -1 : 1); isRed ? rr >= 0 : rr < 10; rr += isRed ? -1 : 1) {
+            if (board[rr][kingCol] === opponentKingType) {
+              moves.push({ r: rr, c: kingCol });
+              break;
+            }
+          }
+        }
+        break;
+
+      case 'pao': // 炮：直线走，但吃子需翻山
+        for (const [dr, dc] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+          let nr = r + dr, nc = c + dc;
+          // 移动（无阻挡）
+          while (inBounds(nr, nc) && board[nr][nc] === 0) {
+            moves.push({ r: nr, c: nc });
+            nr += dr; nc += dc;
+          }
+          // 找炮架
+          if (inBounds(nr, nc) && board[nr][nc] !== 0) {
+            nr += dr; nc += dc; // 跳过炮架
+            while (inBounds(nr, nc)) {
+              if (board[nr][nc] !== 0) {
+                if (isEnemy(nr, nc)) {
+                  moves.push({ r: nr, c: nc });
+                }
+                break;
+              }
+              nr += dr; nc += dc;
+            }
+          }
+        }
+        break;
+
+      case 'bing': // 兵/卒：未过河只能前进，过河可左右
+      case 'zu':
+        const fwd = r + forward;
+        if (inBounds(fwd, c) && !isFriend(fwd, c)) {
+          moves.push({ r: fwd, c: c });
+        }
+        // 过河后可以左右
+        const hasCrossedRiver = isRed ? (r <= 4) : (r >= 5);
+        if (hasCrossedRiver) {
+          for (const dc of [-1, 1]) {
+            const nc = c + dc;
+            if (inBounds(r, nc) && !isFriend(r, nc)) {
+              moves.push({ r: r, c: nc });
+            }
+          }
+        }
+        break;
+    }
+
+    return moves;
+  }
+
+  // 判断某方是否被将军
+  isCheck(board, color) {
+    const kingType = color === 'r' ? 'r-shuai' : 'b-jiang';
+    const opponentColor = color === 'r' ? 'b' : 'r';
+    // 找到己方将的位置
+    let kingR = -1, kingC = -1;
+    for (let r = 0; r < 10; r++) {
+      for (let c = 0; c < 9; c++) {
+        if (board[r][c] === kingType) {
+          kingR = r; kingC = c;
+          break;
+        }
+      }
+      if (kingR >= 0) break;
+    }
+    if (kingR < 0) return true; // 将已被吃
+
+    // 检查对方所有棋子是否能攻击到将
+    for (let r = 0; r < 10; r++) {
+      for (let c = 0; c < 9; c++) {
+        if (board[r][c] !== 0 && this.getChessPieceColor(board[r][c]) === opponentColor) {
+          const moves = this.getChessRawMoves(board, r, c);
+          if (moves.some(m => m.r === kingR && m.c === kingC)) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  // 判断某方是否被将杀（无合法移动）
+  isCheckmate(board, color) {
+    for (let r = 0; r < 10; r++) {
+      for (let c = 0; c < 9; c++) {
+        if (board[r][c] !== 0 && this.getChessPieceColor(board[r][c]) === color) {
+          const rawMoves = this.getChessRawMoves(board, r, c);
+          for (const move of rawMoves) {
+            // 模拟走棋，看是否还处于被将军状态
+            const saved = board[move.r][move.c];
+            board[move.r][move.c] = board[r][c];
+            board[r][c] = 0;
+            const stillCheck = this.isCheck(board, color);
+            board[r][c] = board[move.r][move.c];
+            board[move.r][move.c] = saved;
+            if (!stillCheck) return false;
+          }
+        }
+      }
+    }
     return true;
   }
+
+  // 验证象棋移动
+  isValidChessMove(board, position, player) {
+    const { fromR, fromC, toR, toC } = position;
+    const piece = board[fromR][fromC];
+    if (!piece || piece === 0) return false;
+
+    const color = this.getChessPieceColor(piece);
+    // 红方 player=1，黑方 player=2
+    const playerColor = player === 1 ? 'r' : 'b';
+    if (color !== playerColor) return false;
+
+    const validMoves = this.getChessRawMoves(board, fromR, fromC);
+    if (!validMoves.some(m => m.r === toR && m.c === toC)) return false;
+
+    // 模拟走棋，不能让自己的将被将军
+    const saved = board[toR][toC];
+    board[toR][toC] = piece;
+    board[fromR][fromC] = 0;
+    const stillCheck = this.isCheck(board, color);
+    board[fromR][fromC] = piece;
+    board[toR][toC] = saved;
+
+    return !stillCheck;
+  }
+
+  // 检查象棋胜利（将杀）
+  checkChessWin(board, player) {
+    const opponentColor = player === 1 ? 'b' : 'r';
+    if (this.isCheckmate(board, opponentColor)) {
+      return true;
+    }
+    return false;
+  }
+
+  // ========== 通用游戏方法 ==========
 
   // 执行移动
   executeMove(gameType, board, position, player) {
@@ -2092,7 +2360,7 @@ class GameManager {
       case 'go':
         this.executeGoMove(board, position, player);
         break;
-      case 'chess':
+      case 'chinese-chess':
         this.executeChessMove(board, position, player);
         break;
     }
@@ -2112,7 +2380,6 @@ class GameManager {
 
   // 执行象棋移动
   executeChessMove(board, position, player) {
-    // 简化实现
     const { fromR, fromC, toR, toC } = position;
     board[toR][toC] = board[fromR][fromC];
     board[fromR][fromC] = 0;
@@ -2125,7 +2392,7 @@ class GameManager {
         return this.checkGobangWin(board, player);
       case 'go':
         return this.checkGoWin(board, player);
-      case 'chess':
+      case 'chinese-chess':
         return this.checkChessWin(board, player);
       default:
         return false;
@@ -2134,7 +2401,6 @@ class GameManager {
 
   // 检查五子棋胜利
   checkGobangWin(board, player) {
-    // 简化实现，检查是否有五子连珠
     const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
 
     for (let r = 0; r < board.length; r++) {
@@ -2161,36 +2427,6 @@ class GameManager {
 
   // 检查围棋胜利
   checkGoWin(board, player) {
-    // 简化实现，总是返回false
-    return false;
-  }
-
-  // 检查象棋胜利
-  checkChessWin(board, player) {
-    // 检查是否将帅被吃
-    let redGeneralExists = false;
-    let blackGeneralExists = false;
-
-    for (let r = 0; r < board.length; r++) {
-      for (let c = 0; c < board[r].length; c++) {
-        if (board[r][c] === 'r-shuai') {
-          redGeneralExists = true;
-        } else if (board[r][c] === 'b-jiang') {
-          blackGeneralExists = true;
-        }
-      }
-    }
-
-    if (!redGeneralExists) {
-      // 红方帅被吃，黑方获胜
-      return player === 2 ? 'win' : 'loss';
-    }
-
-    if (!blackGeneralExists) {
-      // 黑方将被吃，红方获胜
-      return player === 1 ? 'win' : 'loss';
-    }
-
     return false;
   }
 }
