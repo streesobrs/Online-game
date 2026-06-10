@@ -299,7 +299,8 @@ class GameManager {
       moves: [],
       result: null,
       endTime: null,
-      chat: []
+      chat: [],
+      board: this.initializeBoard(gameType) // 初始化棋盘，用于悔棋等需要服务器同步的功能
     };
 
     this.games.set(gameId, game);
@@ -501,11 +502,22 @@ class GameManager {
       return false;
     }
 
+    // 根据游戏类型构建位置数据
+    let position;
+    if (data.fromR !== undefined) {
+      // 象棋：使用 fromR/fromC/toR/toC 格式
+      position = { fromR: data.fromR, fromC: data.fromC, toR: data.toR, toC: data.toC };
+    } else if (data.position) {
+      position = data.position;
+    } else {
+      position = { r: data.r, c: data.c };
+    }
+
     // 记录移动
     const move = {
       player: user.accountId,
       color: isPlayer1 ? 1 : 2,
-      position: data.position || { r: data.r, c: data.c },
+      position: position,
       timestamp: Date.now()
     };
 
@@ -516,6 +528,11 @@ class GameManager {
     // 保存移动历史
     const moves = this.moveHistory.get(game.gameId);
     moves.push(move);
+
+    // 在服务器棋盘上执行移动（保持服务器与客户端同步）
+    if (game.board && game.gameType) {
+      this.executeMove(game.gameType, game.board, position, move.color);
+    }
 
     // 更新用户活动
     this.userManager.updateUserActivity(user.accountId);
@@ -2428,6 +2445,372 @@ class GameManager {
   // 检查围棋胜利
   checkGoWin(board, player) {
     return false;
+  }
+
+  // ========== 悔棋系统 ==========
+
+  // 处理悔棋请求
+  handleUndoRequest(socketId, io) {
+    const user = this.userManager.getUserBySocketId(socketId);
+    if (!user) return;
+
+    // 检查是否在游戏中
+    let game = this.games.get(user.game);
+    let isAIGame = false;
+    let aiGame = null;
+    if (!game) {
+      aiGame = this.aiGames.get(user.accountId);
+      if (aiGame) {
+        isAIGame = true;
+        game = aiGame;
+      }
+    }
+
+    if (!game) {
+      const socket = this.userManager.getSocketByAccountId(user.accountId);
+      if (socket) socket.emit('error', { message: '当前没有进行中的游戏' });
+      return;
+    }
+
+    // AI游戏 - 直接执行悔棋
+    if (isAIGame) {
+      this.executeUndoAIGame(user.accountId, io);
+      return;
+    }
+
+    // 联机游戏 - 向对手发送请求
+    const opponentId = game.player1 === user.accountId ? game.player2 : game.player1;
+    const opponentSocket = this.userManager.getSocketByAccountId(opponentId);
+
+    if (!opponentSocket) {
+      const socket = this.userManager.getSocketByAccountId(user.accountId);
+      if (socket) socket.emit('error', { message: '对手已离线' });
+      return;
+    }
+
+    // 设置等待中的悔棋请求（防止重复请求）
+    if (game.pendingUndoRequest) {
+      const socket = this.userManager.getSocketByAccountId(user.accountId);
+      if (socket) socket.emit('error', { message: '已有待处理的悔棋请求' });
+      return;
+    }
+
+    game.pendingUndoRequest = {
+      requesterId: user.accountId,
+      requestTime: Date.now()
+    };
+
+    opponentSocket.emit('undo_request', {
+      from: user.accountId,
+      fromNickname: user.nickname || '对手'
+    });
+
+    const socket = this.userManager.getSocketByAccountId(user.accountId);
+    if (socket) socket.emit('undo_request_sent', { message: '已发送悔棋请求，等待对手回应' });
+  }
+
+  // 处理悔棋回应
+  async handleUndoResponse(socketId, accepted, io) {
+    const user = this.userManager.getUserBySocketId(socketId);
+    if (!user) return;
+
+    const game = this.games.get(user.game);
+    if (!game || !game.pendingUndoRequest) {
+      const socket = this.userManager.getSocketByAccountId(user.accountId);
+      if (socket) socket.emit('error', { message: '没有待处理的悔棋请求' });
+      return;
+    }
+
+    const requesterId = game.pendingUndoRequest.requesterId;
+    const requesterSocket = this.userManager.getSocketByAccountId(requesterId);
+
+    if (!accepted) {
+      // 拒绝悔棋
+      game.pendingUndoRequest = null;
+      if (requesterSocket) {
+        requesterSocket.emit('undo_rejected', { message: '对手拒绝了悔棋请求' });
+      }
+      const responderSocket = this.userManager.getSocketByAccountId(user.accountId);
+      if (responderSocket) responderSocket.emit('undo_rejected', { message: '已拒绝悔棋请求' });
+      return;
+    }
+
+    // 同意悔棋 - 执行悔棋逻辑
+    game.pendingUndoRequest = null;
+
+    // 需要撤销双方最近的一步
+    const success = this.executeUndoMove(game, requesterId, io);
+    if (success) {
+      // 通知双方悔棋成功（附带完整棋盘数据供客户端恢复）
+      const gameType = game.gameType || 'gobang';
+      const undoData = {
+        gameId: game.gameId,
+        board: game.board,
+        currentPlayer: game.currentPlayer,
+        moveCount: game.moves.length,
+        gameType: gameType,
+        isAI: false
+      };
+
+      // 发送更新给双方玩家
+      const player1Socket = this.userManager.getSocketByAccountId(game.player1);
+      const player2Socket = this.userManager.getSocketByAccountId(game.player2);
+
+      if (player1Socket) player1Socket.emit('undo_accepted', undoData);
+      if (player2Socket) player2Socket.emit('undo_accepted', undoData);
+
+      // 扣除请求者的悔棋次数
+      const requesterSocket = this.userManager.getSocketByAccountId(requesterId);
+      if (requesterSocket) {
+        requesterSocket.emit('undo_deduct', { success: true });
+        // 服务器端扣除悔棋次数
+        await this.deductUndoCount(requesterId, requesterSocket);
+      }
+    }
+  }
+
+  // 执行悔棋（撤销双方各一步）
+  executeUndoMove(game, requesterId, io) {
+    if (!game || !game.moves || game.moves.length < 2) {
+      const socket = this.userManager.getSocketByAccountId(requesterId);
+      if (socket) socket.emit('error', { message: '没有可以悔棋的步骤' });
+      return false;
+    }
+
+    // 执行实际撤销（在服务器棋盘数据上）
+    const lastMove = game.moves.pop();
+    const prevMove = game.moves.pop();
+    if (!lastMove || !prevMove) return false;
+
+    // 还原服务器棋盘状态
+    this.revertMove(game.gameType || 'gobang', game.board, lastMove);
+    this.revertMove(game.gameType || 'gobang', game.board, prevMove);
+
+    // 更新当前玩家为请求悔棋的玩家
+    game.currentPlayer = game.player1 === requesterId ? 1 : 2;
+
+    // 清除游戏结束状态
+    game.status = 'playing';
+
+    return true;
+  }
+
+  // 撤销落子
+  revertMove(gameType, board, move) {
+    switch (gameType) {
+      case 'gobang':
+        if (move.position && move.position.r !== undefined) {
+          board[move.position.r][move.position.c] = 0;
+        }
+        break;
+      case 'go':
+        if (move.position && move.position.r !== undefined) {
+          board[move.position.r][move.position.c] = 0;
+        }
+        break;
+      case 'chinese-chess':
+        if (move.position && move.position.fromR !== undefined) {
+          // 恢复被吃掉的棋子
+          board[move.position.fromR][move.position.fromC] = board[move.position.toR][move.position.toC];
+          if (move.captured) {
+            board[move.position.toR][move.position.toC] = move.captured;
+          } else {
+            board[move.position.toR][move.position.toC] = 0;
+          }
+        }
+        break;
+    }
+  }
+
+  // AI游戏直接悔棋
+  async executeUndoAIGame(accountId, io) {
+    const aiGame = this.aiGames.get(accountId);
+    if (!aiGame || !aiGame.moves || aiGame.moves.length < 2) {
+      const socket = this.userManager.getSocketByAccountId(accountId);
+      if (socket) socket.emit('error', { message: '没有可以悔棋的步骤' });
+      return;
+    }
+
+    // 撤销最后两步（玩家的最后一步和AI的最后一步）
+    const lastMove = aiGame.moves.pop();
+    const prevMove = aiGame.moves.pop();
+
+    this.revertMove(aiGame.gameType, aiGame.board, lastMove);
+    this.revertMove(aiGame.gameType, aiGame.board, prevMove);
+
+    aiGame.currentPlayer = 1; // 玩家回合
+    aiGame.status = 'playing';
+    aiGame.lastMoveTime = Date.now();
+
+    // 发送更新给客户端
+    const socket = this.userManager.getSocketByAccountId(accountId);
+    if (socket) {
+      const undoData = {
+        board: aiGame.board,
+        currentPlayer: 1,
+        moveCount: aiGame.moves.length,
+        isAI: true
+      };
+
+      // 象棋需要额外信息
+      if (aiGame.gameType === 'chinese-chess') {
+        undoData.board = aiGame.board;
+      }
+
+      socket.emit('undo_accepted', undoData);
+      socket.emit('undo_deduct', { success: true });
+
+      // 服务器端扣除悔棋次数
+      await this.deductUndoCount(accountId, socket);
+    }
+  }
+
+  // 扣除悔棋次数
+  async deductUndoCount(accountId, socket) {
+    if (!this.accountManager) return;
+    try {
+      const account = await this.accountManager.getAccount(accountId);
+      if (account && account.inventory && account.inventory.undoCount > 0) {
+        account.inventory.undoCount -= 1;
+        await this.accountManager._saveAccount(accountId, account);
+      }
+    } catch (err) {
+      logger.warn('扣除悔棋次数失败', { error: err.message });
+    }
+  }
+
+  // ========== 提示系统 ==========
+
+  // 处理提示请求
+  async handleHintRequest(socketId, io) {
+    const user = this.userManager.getUserBySocketId(socketId);
+    if (!user) return;
+
+    if (!this.aiManager) {
+      const socket = this.userManager.getSocketByAccountId(user.accountId);
+      if (socket) socket.emit('error', { message: 'AI系统不可用' });
+      return;
+    }
+
+    // 查找游戏
+    let game = null;
+    let gameType = null;
+    let board = null;
+    let currentPlayer = null;
+
+    // 检查AI游戏
+    const aiGame = this.aiGames.get(user.accountId);
+    if (aiGame) {
+      game = aiGame;
+      gameType = aiGame.gameType;
+      board = aiGame.board;
+      currentPlayer = 1; // 玩家视角
+    }
+
+    // 检查联机游戏
+    if (!game) {
+      const onlineGame = this.games.get(user.game);
+      if (onlineGame) {
+        game = onlineGame;
+        gameType = onlineGame.gameType;
+        board = onlineGame.board;
+        // 提示给请求者最佳位置（基于当前局面）
+        currentPlayer = onlineGame.player1 === user.accountId ? 1 : 2;
+      }
+    }
+
+    if (!game) {
+      const socket = this.userManager.getSocketByAccountId(user.accountId);
+      if (socket) socket.emit('error', { message: '当前没有进行中的游戏' });
+      return;
+    }
+
+    // 使用AI计算最佳移动
+    let hintMove = null;
+
+    // 将棋盘转为适用AIManager的格式
+    const aiBoard = board.map(row => Array.isArray(row) ? [...row] : row);
+
+    try {
+      // 计算提示 - 使用简单/中等难度快速计算
+      if (gameType === 'gobang') {
+        // 尝试用中等难度获取最优解
+        const medium = this.aiManager.getGobangMediumMove(aiBoard, currentPlayer);
+        if (medium) {
+          hintMove = { r: medium.r, c: medium.c };
+        } else {
+          // 回退到简单
+          const easy = this.aiManager.getGobangEasyMove(aiBoard, currentPlayer);
+          if (easy) {
+            hintMove = { r: easy.r, c: easy.c };
+          }
+        }
+      } else if (gameType === 'go') {
+        const goMove = this.aiManager.getGoMediumMove(aiBoard, currentPlayer);
+        if (goMove) {
+          hintMove = { r: goMove.r, c: goMove.c };
+        } else {
+          const easy = this.aiManager.getGoEasyMove(aiBoard);
+          if (easy) {
+            hintMove = { r: easy.r, c: easy.c };
+          }
+        }
+      } else if (gameType === 'chinese-chess') {
+        const chessMove = this.aiManager.getChessAIMove(aiBoard, 'medium', currentPlayer);
+        if (chessMove) {
+          hintMove = {
+            fromR: chessMove.fromR,
+            fromC: chessMove.fromC,
+            toR: chessMove.toR,
+            toC: chessMove.toC
+          };
+        } else {
+          const easy = this.aiManager.getChessAIMove(aiBoard, 'easy', currentPlayer);
+          if (easy) {
+            hintMove = {
+              fromR: easy.fromR,
+              fromC: easy.fromC,
+              toR: easy.toR,
+              toC: easy.toC
+            };
+          }
+        }
+      }
+
+      if (hintMove) {
+        const socket = this.userManager.getSocketByAccountId(user.accountId);
+        if (socket) {
+          socket.emit('hint_result', { move: hintMove, gameType: gameType });
+
+          // 扣除提示次数
+          if (this.accountManager && user.accountId) {
+            try {
+              // 尝试扣除提示次数（通过库存）
+              const account = await this.accountManager.getAccount(user.accountId);
+              if (account && account.inventory && account.inventory.hintCount > 0) {
+                account.inventory.hintCount -= 1;
+                await this.accountManager._saveAccount(user.accountId, account);
+                socket.emit('hint_deduct', { success: true, hintCount: account.inventory.hintCount });
+              } else {
+                socket.emit('hint_deduct', { success: false, message: '提示次数不足' });
+              }
+            } catch (err) {
+              logger.warn('扣除提示次数失败', { error: err.message });
+              socket.emit('hint_deduct', { success: false, message: '扣除次数失败' });
+            }
+          } else {
+            socket.emit('hint_deduct', { success: true });
+          }
+        }
+      } else {
+        const socket = this.userManager.getSocketByAccountId(user.accountId);
+        if (socket) socket.emit('error', { message: '无法计算提示位置' });
+      }
+    } catch (err) {
+      logger.error('提示计算失败', { error: err.message });
+      const socket = this.userManager.getSocketByAccountId(user.accountId);
+      if (socket) socket.emit('error', { message: '提示计算失败' });
+    }
   }
 }
 

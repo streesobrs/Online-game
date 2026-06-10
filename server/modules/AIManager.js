@@ -12,7 +12,7 @@ class AIManager {
     switch (gameType) {
       case 'gobang':
         return this.getGobangAIMove(board, difficulty, currentPlayer);
-      case 'chess':
+      case 'chinese-chess':
         return this.getChessAIMove(board, difficulty, currentPlayer);
       case 'go':
         return this.getGoAIMove(board, difficulty, currentPlayer);
@@ -1389,6 +1389,90 @@ class AIManager {
     const topCandidates = scoredCells.slice(0, Math.min(5, scoredCells.length));
     const selected = topCandidates[Math.floor(Math.random() * topCandidates.length)];
 
+    return { r: selected.r, c: selected.c };
+  }
+
+  // 中等难度位置评分 - 增加进攻权重
+  getBestPositionByScoreMedium(board, currentPlayer, opponent) {
+    const emptyCells = this.getEmptyCells(board);
+    if (emptyCells.length === 0) return null;
+
+    const scoredCells = emptyCells.map(cell => {
+      let score = 0;
+
+      // 进攻评分
+      board[cell.r][cell.c] = currentPlayer;
+      score += this.evaluatePosition(board, cell.r, cell.c, currentPlayer) * 1.5;
+      board[cell.r][cell.c] = 0;
+
+      // 防守评分
+      board[cell.r][cell.c] = opponent;
+      score += this.evaluatePosition(board, cell.r, cell.c, opponent) * 1.0;
+      board[cell.r][cell.c] = 0;
+
+      // 中心位置加分
+      const centerR = Math.floor(board.length / 2);
+      const centerC = Math.floor(board[0].length / 2);
+      const distanceToCenter = Math.abs(cell.r - centerR) + Math.abs(cell.c - centerC);
+      score += Math.max(0, 10 - distanceToCenter);
+
+      return { r: cell.r, c: cell.c, score };
+    });
+
+    scoredCells.sort((a, b) => b.score - a.score);
+    const topCandidates = scoredCells.slice(0, Math.min(3, scoredCells.length));
+    const selected = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+    return { r: selected.r, c: selected.c };
+  }
+
+  // 困难难度位置评分 - 全面评估
+  getBestPositionByScoreHard(board, currentPlayer, opponent) {
+    const emptyCells = this.getEmptyCells(board);
+    if (emptyCells.length === 0) return null;
+
+    const scoredCells = emptyCells.map(cell => {
+      let score = 0;
+
+      // 进攻评分（更高权重）
+      board[cell.r][cell.c] = currentPlayer;
+      const attackScore = this.evaluatePosition(board, cell.r, cell.c, currentPlayer);
+      // 连五直接给最高分
+      board[cell.r][cell.c] = 0;
+
+      // 防守评分
+      board[cell.r][cell.c] = opponent;
+      const defenseScore = this.evaluatePosition(board, cell.r, cell.c, opponent);
+      board[cell.r][cell.c] = 0;
+
+      score += attackScore * 1.8;
+      score += defenseScore * 1.2;
+
+      // 中心权重
+      const centerR = Math.floor(board.length / 2);
+      const centerC = Math.floor(board[0].length / 2);
+      const distanceToCenter = Math.abs(cell.r - centerR) + Math.abs(cell.c - centerC);
+      score += Math.max(0, 12 - distanceToCenter);
+
+      // 周围棋子密度加分
+      let neighborCount = 0;
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          const nr = cell.r + dr;
+          const nc = cell.c + dc;
+          if (nr >= 0 && nr < board.length && nc >= 0 && nc < board[0].length && board[nr][nc] !== 0) {
+            neighborCount++;
+          }
+        }
+      }
+      score += neighborCount * 3;
+
+      return { r: cell.r, c: cell.c, score };
+    });
+
+    scoredCells.sort((a, b) => b.score - a.score);
+    const topCandidates = scoredCells.slice(0, Math.min(2, scoredCells.length));
+    const selected = topCandidates[Math.floor(Math.random() * topCandidates.length)];
     return { r: selected.r, c: selected.c };
   }
 

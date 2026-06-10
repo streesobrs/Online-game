@@ -108,7 +108,7 @@ class AchievementManager {
         name: '象棋新手',
         description: '在象棋中获得5场胜利',
         type: 'game_type',
-        condition: { gameType: 'chess', wins: 5 },
+        condition: { gameType: 'chinese-chess', wins: 5 },
         reward: { exp: 200, badge: 'chess_beginner' }
       },
       {
@@ -116,7 +116,7 @@ class AchievementManager {
         name: '象棋大师',
         description: '在象棋中获得20场胜利',
         type: 'game_type',
-        condition: { gameType: 'chess', wins: 20 },
+        condition: { gameType: 'chinese-chess', wins: 20 },
         reward: { exp: 1000, badge: 'chess_expert' }
       },
       {
@@ -124,7 +124,7 @@ class AchievementManager {
         name: '象棋宗师',
         description: '在象棋中获得50场胜利',
         type: 'game_type',
-        condition: { gameType: 'chess', wins: 50 },
+        condition: { gameType: 'chinese-chess', wins: 50 },
         reward: { exp: 2000, badge: 'chess_master' }
       },
       {
@@ -132,7 +132,7 @@ class AchievementManager {
         name: '象棋传奇',
         description: '在象棋中获得100场胜利',
         type: 'game_type',
-        condition: { gameType: 'chess', wins: 100 },
+        condition: { gameType: 'chinese-chess', wins: 100 },
         reward: { exp: 5000, badge: 'chess_legend' }
       },
       {

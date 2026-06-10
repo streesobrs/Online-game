@@ -9,7 +9,7 @@
   "boardBackground": {
     "gobang": "#5d4037",
     "go": "#795548",
-    "chess": "#5d4037"
+    "chinese-chess": "#5d4037"
   },
   "pieceColor": {
     "gobangBlack": "#2e7d32",

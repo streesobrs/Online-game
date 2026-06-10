@@ -184,7 +184,7 @@ class AdminManager {
       byType: {
         gobang: games.filter(g => g.gameType === 'gobang').length,
         go: games.filter(g => g.gameType === 'go').length,
-        chess: games.filter(g => g.gameType === 'chess').length,
+        'chinese-chess': games.filter(g => g.gameType === 'chinese-chess').length,
         snake: games.filter(g => g.gameType === 'snake').length
       }
     };
@@ -617,7 +617,7 @@ class AdminManager {
         gamesByType: {
           gobang: games.filter(g => g.gameType === 'gobang').length,
           go: games.filter(g => g.gameType === 'go').length,
-          chess: games.filter(g => g.gameType === 'chess').length
+          'chinese-chess': games.filter(g => g.gameType === 'chinese-chess').length
         },
         averageGameDuration: games.length > 0
           ? Math.round(games.reduce((sum, g) => sum + (g.duration || 0), 0) / games.length)

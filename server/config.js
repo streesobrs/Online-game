@@ -47,7 +47,7 @@ module.exports = {
     types: {
       GOBANG: 'gobang',
       GO: 'go',
-      CHESS: 'chess',
+      CHINESE_CHESS: 'chinese-chess',
       SNAKE: 'snake'
     },
     maxWaitTime: 300000, // 最大等待时间 5分钟

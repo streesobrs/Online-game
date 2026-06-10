@@ -1351,6 +1351,21 @@
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
     }
 
+    /* 提示高亮脉冲动画 */
+    @keyframes hintPulse {
+
+      0%,
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+
+      50% {
+        transform: scale(1.2);
+        opacity: 0.8;
+      }
+    }
+
     /* 版本信息样式 */
     .version-info {
       color: #94a3b8;
@@ -2962,6 +2977,8 @@
     <button onclick="toggleAdvancedStats()" id="stats-btn" class="stats-btn">📈 高级统计</button>
     <button onclick="exportGameData()" id="export-btn" style="background:#27ae60;">📤 导出对局数据</button>
     <button onclick="playAgain()" id="play-again-btn" style="background:#e74c3c; display:none;">🔄 再来一把</button>
+    <button onclick="requestUndo()" id="undo-btn" style="background:#8B4513;display:none;">⏪ 悔棋</button>
+    <button onclick="requestHint()" id="hint-btn" style="background:#2E86C1;display:none;">💡 提示</button>
     <button onclick="returnToLobby()" style="background:#f39c12;">🏠 返回大厅</button>
     <button onclick="showGameTips()" style="background:#9b59b6;">💡 游戏规则</button>
   </div>
@@ -3515,7 +3532,7 @@
 • 禁止打劫（立即提回被提走的棋子）
 • 游戏结束时，领地和棋子数量之和多者获胜`
       },
-      chess: {
+      'chinese-chess': {
         size: { width: 9, height: 10 },
         totalCells: 90,
         winCondition: '将帅被吃',
@@ -3706,7 +3723,7 @@
           cycleTheme();
           break;
         case 'undoMove':
-          handleUndo();
+          requestUndo();
           break;
         case 'redoMove':
           handleRedo();
@@ -3877,11 +3894,223 @@
       updateStatus(`✅ 快捷键已更新: ${key === ' ' ? 'Space' : key.toUpperCase()}`);
     }
 
-    // 游戏操作函数（空实现，可根据实际情况补充）
-    function handleUndo() {
-      updateStatus('⏪ 悔棋功能');
+    // ========== 悔棋系统 ==========
+
+    // 请求悔棋
+    function requestUndo() {
+      // 检查是否有足够的悔棋次数
+      let undoCount = 0;
+      let itemUndoCount = 0;
+      if (currentAccount) {
+        const accData = currentAccount.account;
+        undoCount = accData.inventory?.undoCount || 0;
+        itemUndoCount = (accData.inventory?.items?.item_undo || 0) * 3;
+      }
+
+      const totalUndo = undoCount + itemUndoCount;
+
+      if (totalUndo <= 0) {
+        showToast('⏪ 悔棋次数不足，请购买悔棋卡', 'warning');
+        return;
+      }
+
+      // 如果直接次数不够但还有道具卡，自动使用一张
+      if (undoCount <= 0 && itemUndoCount > 0) {
+        socket.emit('game_use_item', { itemId: 'item_undo' });
+        updateStatus('⏪ 正在使用悔棋卡...');
+        return;
+      }
+
+      if (gameState.gameOver) {
+        showToast('❌ 游戏已结束，无法悔棋', 'warning');
+        return;
+      }
+
+      if (currentGame === 'snake') {
+        showToast('❌ 贪吃蛇不支持悔棋', 'warning');
+        return;
+      }
+
+      if (socket && socket.connected) {
+        socket.emit('undo_request');
+        updateStatus('⏪ 发送悔棋请求...');
+      } else {
+        showToast('❌ 未连接服务器', 'error');
+      }
     }
 
+    // 处理悔棋被接受后的棋盘更新
+    function handleUndoAccepted(data) {
+      // 使用服务器提供的完整棋盘数据恢复
+      if (data.board) {
+        gameState.board = data.board;
+      }
+
+      if (currentGame === 'chinese-chess') {
+        // 重新渲染象棋棋子
+        if (data.board) {
+          const pieces = convertBackendBoardToFrontend(data.board);
+          chessPieces.red = pieces.red;
+          chessPieces.black = pieces.black;
+        }
+        renderChessPieces();
+      } else if (currentGame === 'gobang') {
+        renderGobangBoard();
+      } else if (currentGame === 'go') {
+        renderGoBoard();
+      }
+
+      gameState.turn = data.currentPlayer || 1;
+      gameState.gameOver = false;
+      gameState.moveCount = data.moveCount || 0;
+
+      // 更新落子记录（裁剪到服务端返回的正确长度）
+      const targetLength = data.moveCount || 0;
+      if (targetLength < gameState.moveLog.length) {
+        gameState.moveLog.length = targetLength;
+      }
+
+      // 更新当前玩家显示
+      updateTurnDisplay();
+
+      // 隐藏再来一局按钮
+      const playAgainBtn = document.getElementById('play-again-btn');
+      if (playAgainBtn) playAgainBtn.style.display = 'none';
+
+      updateStatus('✅ 悔棋成功，轮到你了');
+    }
+
+    // ========== 提示系统 ==========
+
+    // 请求提示
+    function requestHint() {
+      let hintCount = 0;
+      let itemHintCount = 0;
+      if (currentAccount) {
+        const accData = currentAccount.account;
+        hintCount = accData.inventory?.hintCount || 0;
+        itemHintCount = (accData.inventory?.items?.item_hint || 0) * 5;
+      }
+
+      const totalHint = hintCount + itemHintCount;
+
+      if (totalHint <= 0) {
+        showToast('💡 提示次数不足，请购买提示卡', 'warning');
+        return;
+      }
+
+      // 如果直接次数不够但还有道具卡，自动使用一张
+      if (hintCount <= 0 && itemHintCount > 0) {
+        socket.emit('game_use_item', { itemId: 'item_hint' });
+        updateStatus('💡 正在使用提示卡...');
+        return;
+      }
+
+      if (gameState.gameOver) {
+        showToast('❌ 游戏已结束', 'warning');
+        return;
+      }
+
+      if (currentGame === 'snake') {
+        showToast('❌ 贪吃蛇不支持提示功能', 'warning');
+        return;
+      }
+
+      if (socket && socket.connected) {
+        socket.emit('request_hint');
+        updateStatus('💡 正在计算最佳位置...');
+      } else {
+        showToast('❌ 未连接服务器', 'error');
+      }
+    }
+
+    // 处理提示结果
+    function handleHintResult(data) {
+      if (!data.move) {
+        updateStatus('❌ 无法计算提示位置');
+        return;
+      }
+
+      const { move, gameType } = data;
+
+      // 在棋盘上高亮提示位置
+      if (gameType === 'gobang') {
+        highlightCell(move.r, move.c, '#00ff00');
+      } else if (gameType === 'go') {
+        highlightCell(move.r, move.c, '#00ff00');
+      } else if (gameType === 'chinese-chess') {
+        highlightChessMove(move);
+      }
+
+      updateStatus(`💡 提示：${formatHintPosition(move, gameType)}`);
+      showToast(`💡 建议位置：${formatHintPosition(move, gameType)}`, 'info', 5000);
+    }
+
+    // 格式化提示位置显示
+    function formatHintPosition(move, gameType) {
+      if (gameType === 'chinese-chess') {
+        return `从(${move.fromR},${move.fromC})移动到(${move.toR},${move.toC})`;
+      }
+      return `(${move.r}, ${move.c})`;
+    }
+
+    // 高亮棋盘单元格
+    function highlightCell(r, c, color) {
+      // 五子棋
+      const gobangCells = document.querySelectorAll('#gobang-board .cell');
+      if (gobangCells.length > 0) {
+        gobangCells.forEach(cell => {
+          const row = parseInt(cell.dataset.r);
+          const col = parseInt(cell.dataset.c);
+          if (row === r && col === c) {
+            cell.style.boxShadow = `0 0 8px 3px ${color}`;
+            cell.style.animation = 'hintPulse 1s ease-in-out infinite';
+            setTimeout(() => {
+              cell.style.boxShadow = '';
+              cell.style.animation = '';
+            }, 4000);
+          }
+        });
+        return;
+      }
+
+      // 围棋
+      const goCells = document.querySelectorAll('#go-board .cell');
+      if (goCells.length > 0) {
+        goCells.forEach(cell => {
+          const row = parseInt(cell.dataset.r);
+          const col = parseInt(cell.dataset.c);
+          if (row === r && col === c) {
+            cell.style.boxShadow = `0 0 8px 3px ${color}`;
+            cell.style.animation = 'hintPulse 1s ease-in-out infinite';
+            setTimeout(() => {
+              cell.style.boxShadow = '';
+              cell.style.animation = '';
+            }, 4000);
+          }
+        });
+      }
+    }
+
+    // 高亮象棋移动
+    function highlightChessMove(move) {
+      // 高亮来源与目标位置
+      const cells = document.querySelectorAll('#chess-board .chess-intersection');
+      cells.forEach(cell => {
+        const row = parseInt(cell.dataset.r);
+        const col = parseInt(cell.dataset.c);
+        if ((row === move.fromR && col === move.fromC) || (row === move.toR && col === move.toC)) {
+          cell.style.boxShadow = `0 0 8px 3px #00ff00`;
+          cell.style.animation = 'hintPulse 1s ease-in-out infinite';
+          setTimeout(() => {
+            cell.style.boxShadow = '';
+            cell.style.animation = '';
+          }, 4000);
+        }
+      });
+    }
+
+    // 重做功能
     function handleRedo() {
       updateStatus('⏩ 重做功能');
     }
@@ -3891,6 +4120,24 @@
         updateStatus('🏳️ 已认输');
         // 实际认输逻辑
       }
+    }
+
+    // 显示悔棋和提示按钮（仅对棋类游戏）
+    function showBoardGameActionButtons() {
+      const undoBtn = document.getElementById('undo-btn');
+      const hintBtn = document.getElementById('hint-btn');
+      if (currentGame === 'gobang' || currentGame === 'go' || currentGame === 'chinese-chess') {
+        if (undoBtn) undoBtn.style.display = 'inline-block';
+        if (hintBtn) hintBtn.style.display = 'inline-block';
+      }
+    }
+
+    // 隐藏悔棋和提示按钮
+    function hideBoardGameActionButtons() {
+      const undoBtn = document.getElementById('undo-btn');
+      const hintBtn = document.getElementById('hint-btn');
+      if (undoBtn) undoBtn.style.display = 'none';
+      if (hintBtn) hintBtn.style.display = 'none';
     }
 
     function restartCurrentGame() {
@@ -4313,6 +4560,10 @@
         const handleAccountInfo = (data) => {
           socket.off('account_info', handleAccountInfo);
           if (data.success && data.data) {
+            // 保存服务端返回的新token（自动续期）
+            if (data.data.token) {
+              localStorage.setItem('userToken', data.data.token);
+            }
             resolve(data.data);
           } else {
             resolve(null);
@@ -5412,6 +5663,105 @@
       }, 30000);
     }
 
+    // ========== 悔棋系统 ==========
+
+    // 收到对手的悔棋请求
+    socket.on('undo_request', (data) => {
+      const accepted = confirm(`玩家 ${data.fromNickname || '对手'} 请求悔棋，是否同意？`);
+      socket.emit('undo_response', { accepted });
+    });
+
+    // 悔棋请求已发送
+    socket.on('undo_request_sent', (data) => {
+      updateStatus(data.message || '⏪ 已发送悔棋请求，等待对手回应');
+    });
+
+    // 悔棋被接受
+    socket.on('undo_accepted', (data) => {
+      updateStatus('✅ 悔棋成功！');
+      handleUndoAccepted(data);
+    });
+
+    // 悔棋被拒绝
+    socket.on('undo_rejected', (data) => {
+      updateStatus(`❌ ${data.message || '悔棋请求被拒绝'}`);
+    });
+
+    // 悔棋扣除反馈
+    socket.on('undo_deduct', (data) => {
+      if (data.success) {
+        // 更新本地库存
+        if (currentAccount) {
+          const accData = currentAccount.account;
+          if (accData.inventory) {
+            accData.inventory.undoCount = (accData.inventory.undoCount || 1) - 1;
+          }
+          updateAccountBar();
+        }
+      }
+    });
+
+    // 游戏内道具使用反馈
+    socket.on('game_item_used', (data) => {
+      if (data.success) {
+        // 更新本地库存数据
+        if (currentAccount) {
+          const accData = currentAccount.account;
+          if (!accData.inventory) accData.inventory = {};
+          if (data.itemId === 'item_undo') {
+            // 删除一张道具卡，加上3次直接使用次数
+            const items = accData.inventory.items || {};
+            if (items.item_undo) items.item_undo -= 1;
+            accData.inventory.undoCount = data.undoCount || 0;
+          } else if (data.itemId === 'item_hint') {
+            const items = accData.inventory.items || {};
+            if (items.item_hint) items.item_hint -= 1;
+            accData.inventory.hintCount = data.hintCount || 0;
+          }
+          // 更新 items 数据
+          if (data.items) {
+            accData.inventory.items = data.items;
+          }
+          updateAccountBar();
+        }
+        // 重试请求
+        if (data.itemId === 'item_undo') {
+          requestUndo();
+        } else if (data.itemId === 'item_hint') {
+          requestHint();
+        }
+      } else {
+        showToast(`❌ 使用道具失败：${data.message || '未知错误'}`, 'error');
+        updateStatus('❌ 使用道具失败');
+      }
+    });
+
+    // ========== 提示系统 ==========
+
+    // 收到提示结果
+    socket.on('hint_result', (data) => {
+      handleHintResult(data);
+    });
+
+    // 提示扣除反馈
+    socket.on('hint_deduct', (data) => {
+      if (data.success) {
+        // 更新本地库存
+        if (currentAccount) {
+          const accData = currentAccount.account;
+          if (accData.inventory) {
+            accData.inventory.hintCount = data.hintCount !== undefined ? data.hintCount : (accData.inventory.hintCount || 1) - 1;
+          }
+          updateAccountBar();
+        }
+        if (data.message) {
+          updateStatus(`💡 ${data.message}`);
+        }
+      } else {
+        updateStatus(`❌ ${data.message || '提示次数不足'}`);
+      }
+    });
+
     // 隐藏系统广播
     function hideBroadcast() {
       systemBroadcast.classList.remove('show');
@@ -5472,7 +5822,7 @@
 
     // 初始化象棋棋盘
     function initChessBoard() {
-      const config = gameConfigs.chess;
+      const config = gameConfigs['chinese-chess'];
       chessBoard.innerHTML = '';
 
       // ========================================
@@ -8791,6 +9141,9 @@
       updateTurnDisplay();
       updateGameDisplay();
       updateStatus('🎮 匹配成功！你是 ' + myColorText + (color === 1 ? '，请先落子！' : '，等待对方落子！'));
+
+      // 显示悔棋和提示按钮
+      showBoardGameActionButtons();
     }
 
     function initGameBoard() {
@@ -9027,8 +9380,8 @@
         document.querySelector('button[onclick="loadLeaderboard(\'go\')"]').style.backgroundColor = '#27ae60';
         document.querySelector('button[onclick="loadLeaderboard(\'go\')"]').style.fontWeight = 'bold';
       } else if (gameType === 'chinese-chess') {
-        document.querySelector('button[onclick="loadLeaderboard(\'chess\')"]').style.backgroundColor = '#f39c12';
-        document.querySelector('button[onclick="loadLeaderboard(\'chess\')"]').style.fontWeight = 'bold';
+        document.querySelector('button[onclick="loadLeaderboard(\'chinese-chess\')"]').style.backgroundColor = '#f39c12';
+        document.querySelector('button[onclick="loadLeaderboard(\'chinese-chess\')"]').style.fontWeight = 'bold';
       } else if (gameType === 'snake') {
         document.querySelector('button[onclick="loadLeaderboard(\'snake\')"]').style.backgroundColor = '#9b59b6';
         document.querySelector('button[onclick="loadLeaderboard(\'snake\')"]').style.fontWeight = 'bold';
@@ -9166,6 +9519,9 @@
           difficulty: difficulty
         });
       }
+
+      // 显示悔棋和提示按钮
+      showBoardGameActionButtons();
     }
 
     // 发送 AI 游戏结果到服务器
@@ -10429,6 +10785,7 @@
       if (currentAccount) {
         // 处理不同的数据结构
         let accountType, nickname, username, level, exp, starCoins;
+        let undoCount = 0, hintCount = 0;
         if (currentAccount.account.account) {
           // 账号登录的数据结构
           accountType = currentAccount.account.account.type;
@@ -10437,6 +10794,12 @@
           level = currentAccount.account.account.profile?.level || 1;
           exp = currentAccount.account.account.profile?.exp || 0;
           starCoins = currentAccount.account.currency?.starCoins || 0;
+          undoCount = currentAccount.account.inventory?.undoCount || 0;
+          hintCount = currentAccount.account.inventory?.hintCount || 0;
+          // 加上道具卡可兑换的次数（每张悔棋卡=3次，每张提示卡=5次）
+          const items = currentAccount.account.inventory?.items || {};
+          undoCount += (items.item_undo || 0) * 3;
+          hintCount += (items.item_hint || 0) * 5;
         } else {
           // 游客登录的数据结构
           accountType = currentAccount.account.type;
@@ -10445,6 +10808,12 @@
           level = currentAccount.account.profile?.level || 1;
           exp = currentAccount.account.profile?.exp || 0;
           starCoins = currentAccount.currency?.starCoins || 0;
+          undoCount = currentAccount.account.inventory?.undoCount || 0;
+          hintCount = currentAccount.account.inventory?.hintCount || 0;
+          // 加上道具卡可兑换的次数
+          const items = currentAccount.account.inventory?.items || {};
+          undoCount += (items.item_undo || 0) * 3;
+          hintCount += (items.item_hint || 0) * 5;
         }
 
         // 根据用户类型显示不同的退出按钮
@@ -10466,6 +10835,9 @@
                   <span class="account-level">Lv.${level}</span>
                   <span class="account-exp">${exp} EXP</span>
                   <span class="account-starcoins">💎 ${starCoins}</span>
+                  <span class="account-items" style="font-size:11px;color:#718096;">
+                    ⏪${undoCount} 💡${hintCount}
+                  </span>
                 </div>
               </div>
             </div>
@@ -11167,7 +11539,7 @@
         boardBackground: {
           gobang: '#bb9a7b',
           go: '#d4a76a',
-          chess: '#f0d9b5'
+          'chinese-chess': '#f0d9b5'
         },
         pieceColor: {
           gobangBlack: '#000',
@@ -11652,7 +12024,7 @@
       // 更新棋盘颜色
       gobangBoard.style.background = theme.boardBackground.gobang;
       goBoard.style.background = theme.boardBackground.go;
-      chessBoard.style.background = theme.boardBackground.chess;
+      chessBoard.style.background = theme.boardBackground['chinese-chess'];
 
       // 更新棋子颜色和效果
       const pieceEffects = theme.effects?.pieces;

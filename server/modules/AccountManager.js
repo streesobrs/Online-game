@@ -200,9 +200,9 @@ class AccountManager {
       // 验证token格式
       if (!accountId || !timestamp || !random) return null;
 
-      // 验证token时效性（24小时有效期）
+      // 验证token时效性（7天有效期）
       const tokenAge = Date.now() - parseInt(timestamp);
-      const maxAge = 24 * 60 * 60 * 1000; // 24小时
+      const maxAge = 7 * 24 * 60 * 60 * 1000; // 7天
 
       if (tokenAge > maxAge) {
         logger.warn('Token已过期', { accountId, tokenAge });
@@ -381,7 +381,8 @@ class AccountManager {
         success: true,
         data: {
           account: account,
-          loginType: account.account?.type || 'guest'
+          loginType: account.account?.type || 'guest',
+          token: this.generateSessionToken(accountId)
         }
       };
     } catch (err) {
@@ -821,7 +822,8 @@ class AccountManager {
         data: {
           account: account,
           permissions: permissions,
-          loginType: account.account.type === 'guest' ? 'guest' : 'account'
+          loginType: account.account.type === 'guest' ? 'guest' : 'account',
+          token: this.generateSessionToken(accountId) // 每次验证成功刷新token
         }
       };
     } catch (err) {

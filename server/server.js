@@ -1930,6 +1930,79 @@ io.on('connection', (socket) => {
     }
   });
 
+  // ========== 游戏内道具使用事件 ==========
+
+  // 游戏内使用道具（悔棋卡/提示卡）
+  socket.on('game_use_item', async (data) => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user || !user.accountId) {
+      socket.emit('error', { message: '用户未登录' });
+      return;
+    }
+    const { itemId } = data;
+    if (!itemId) {
+      socket.emit('error', { message: '参数错误' });
+      return;
+    }
+    const result = await accountManager.useItem(user.accountId, itemId, 1);
+    if (result.success) {
+      // 获取更新后的账号信息
+      const account = await accountManager.getAccount(user.accountId);
+      const undoCount = account?.inventory?.undoCount || 0;
+      const hintCount = account?.inventory?.hintCount || 0;
+      // 还返回更新后的 items 数据，以便客户端刷新库存
+      const items = account?.inventory?.items || {};
+      socket.emit('game_item_used', {
+        success: true,
+        itemId,
+        undoCount,
+        hintCount,
+        items
+      });
+    } else {
+      socket.emit('game_item_used', {
+        success: false,
+        itemId,
+        message: result.message || '使用道具失败'
+      });
+    }
+  });
+
+  // ========== 悔棋相关事件 ==========
+
+  // 请求悔棋
+  socket.on('undo_request', () => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user) {
+      socket.emit('error', { message: '用户不存在' });
+      return;
+    }
+    gameManager.handleUndoRequest(socket.id, io);
+  });
+
+  // 回应悔棋请求（同意或拒绝）
+  socket.on('undo_response', (data) => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user) {
+      socket.emit('error', { message: '用户不存在' });
+      return;
+    }
+    const { accepted } = data;
+    gameManager.handleUndoResponse(socket.id, accepted, io);
+  });
+
+  // ========== 提示卡相关事件 ==========
+
+  // 请求提示
+  socket.on('request_hint', async () => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user) {
+      socket.emit('error', { message: '用户不存在' });
+      return;
+    }
+    await gameManager.handleHintRequest(socket.id, io);
+  });
+
   // ========== AI对战相关事件 ==========
 
   // 开始AI对战

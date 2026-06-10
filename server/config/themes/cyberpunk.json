@@ -109,7 +109,7 @@
   "boardBackground": {
     "gobang": "radial-gradient(circle at 20% 20%, rgba(0, 212, 255, 0.12) 0, transparent 55%), radial-gradient(circle at 80% 80%, rgba(255, 0, 255, 0.12) 0, transparent 55%), #1e0030",
     "go": "radial-gradient(circle at 20% 20%, rgba(0, 212, 255, 0.12) 0, transparent 55%), radial-gradient(circle at 80% 80%, rgba(255, 0, 255, 0.12) 0, transparent 55%), #1e0030",
-    "chess": "radial-gradient(circle at 20% 20%, rgba(0, 212, 255, 0.12) 0, transparent 55%), radial-gradient(circle at 80% 80%, rgba(255, 0, 255, 0.12) 0, transparent 55%), #1e0030"
+    "chinese-chess": "radial-gradient(circle at 20% 20%, rgba(0, 212, 255, 0.12) 0, transparent 55%), radial-gradient(circle at 80% 80%, rgba(255, 0, 255, 0.12) 0, transparent 55%), #1e0030"
   },
   "pieceColor": {
     "gobangBlack": "#000",
