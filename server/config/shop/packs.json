@@ -206,5 +206,66 @@
       "item_hint": 5,
       "item_undo": 5
     }
+  },
+  "pack_snake_beginner": {
+    "id": "pack_snake_beginner",
+    "name": "贪吃蛇新手包",
+    "description": "贪吃蛇必备道具包，包含复活卡×1 + 加速卡×2 + 缩短卡×2，轻松上手",
+    "icon": "🐍",
+    "price": 280,
+    "category": "pack",
+    "type": "bundle",
+    "rarity": "uncommon",
+    "usable": true,
+    "tradable": false,
+    "tags": ["贪吃蛇", "新手", "礼包"],
+    "enabled": true,
+    "rollout": 100,
+    "content": {
+      "item_snake_revive": 1,
+      "item_snake_speed": 2,
+      "item_snake_shrink": 2
+    }
+  },
+  "pack_snake_advanced": {
+    "id": "pack_snake_advanced",
+    "name": "贪吃蛇高手包",
+    "description": "高分冲刺必备，包含复活卡×3 + 双倍卡×3 + 加速卡×3，冲击最高分",
+    "icon": "🏆",
+    "price": 680,
+    "category": "pack",
+    "type": "bundle",
+    "rarity": "rare",
+    "usable": true,
+    "tradable": false,
+    "tags": ["贪吃蛇", "高手", "礼包"],
+    "enabled": true,
+    "rollout": 100,
+    "content": {
+      "item_snake_revive": 3,
+      "item_snake_double": 3,
+      "item_snake_speed": 3
+    }
+  },
+  "pack_snake_mega": {
+    "id": "pack_snake_mega",
+    "name": "贪吃蛇至尊包",
+    "description": "贪吃蛇全道具大礼包！复活卡×5 + 双倍卡×5 + 加速卡×5 + 缩短卡×5，无限畅玩",
+    "icon": "💎",
+    "price": 1280,
+    "category": "pack",
+    "type": "bundle",
+    "rarity": "legendary",
+    "usable": true,
+    "tradable": false,
+    "tags": ["贪吃蛇", "至尊", "礼包"],
+    "enabled": true,
+    "rollout": 100,
+    "content": {
+      "item_snake_revive": 5,
+      "item_snake_double": 5,
+      "item_snake_speed": 5,
+      "item_snake_shrink": 5
+    }
   }
 }

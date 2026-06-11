@@ -1466,14 +1466,28 @@
         const played = g.played || g.totalGames || 0;
         const wins = g.wins || 0;
         const streak = g.streak || 0;
+        const highScore = g.highScore || 0;
         const wr = played > 0 ? Math.round(wins / played * 100) + '%' : '-';
-        html += `<div class="game-type-row">
-          <span class="type-icon">${t.icon}</span>
-          <span class="type-name">${t.name}</span>
-          <span class="type-stat">局数: <strong>${played}</strong></span>
-          <span class="type-stat">胜率: <strong>${wr}</strong></span>
-          <span class="type-stat">连胜: <strong>${streak}</strong></span>
-        </div>`;
+
+        if (t.key === 'snake') {
+          // 贪吃蛇是单人游戏，显示最高分而非胜率连胜
+          const best = highScore > 0 ? highScore : (localStorage.getItem('snakeHighScore') || '-');
+          html += `<div class="game-type-row">
+            <span class="type-icon">${t.icon}</span>
+            <span class="type-name">${t.name}</span>
+            <span class="type-stat">局数: <strong>${played}</strong></span>
+            <span class="type-stat">最高分: <strong>${best}</strong></span>
+            <span class="type-stat">蛇最长: <strong>${streak || '-'}</strong></span>
+          </div>`;
+        } else {
+          html += `<div class="game-type-row">
+            <span class="type-icon">${t.icon}</span>
+            <span class="type-name">${t.name}</span>
+            <span class="type-stat">局数: <strong>${played}</strong></span>
+            <span class="type-stat">胜率: <strong>${wr}</strong></span>
+            <span class="type-stat">连胜: <strong>${streak}</strong></span>
+          </div>`;
+        }
       }
       container.innerHTML = html || '<div class="empty">暂无游戏数据</div>';
     }

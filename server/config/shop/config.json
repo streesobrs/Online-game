@@ -3,5 +3,6 @@
   "hotUpdate": {
     "enabled": true,
     "checkInterval": 30000
-  }
+  },
+  "vipDiscount": 10
 }

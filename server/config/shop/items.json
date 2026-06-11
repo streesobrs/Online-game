@@ -150,5 +150,85 @@
     "effect": {
       "hintCount": 5
     }
+  },
+  "item_snake_revive": {
+    "id": "item_snake_revive",
+    "name": "贪吃蛇·复活卡",
+    "description": "贪吃蛇游戏中使用，撞墙或撞身后可原地复活一次，保留当前分数",
+    "icon": "❤️",
+    "price": 100,
+    "category": "item",
+    "type": "consumable",
+    "rarity": "rare",
+    "maxStack": 10,
+    "usable": true,
+    "tradable": false,
+    "tags": [
+      "贪吃蛇",
+      "复活",
+      "道具"
+    ],
+    "enabled": true,
+    "rollout": 100
+  },
+  "item_snake_speed": {
+    "id": "item_snake_speed",
+    "name": "贪吃蛇·加速卡",
+    "description": "贪吃蛇游戏中使用，10秒内移动速度翻倍，快速冲刺获取高分",
+    "icon": "⚡",
+    "price": 80,
+    "category": "item",
+    "type": "consumable",
+    "rarity": "uncommon",
+    "maxStack": 20,
+    "usable": true,
+    "tradable": false,
+    "tags": [
+      "贪吃蛇",
+      "加速",
+      "道具"
+    ],
+    "enabled": true,
+    "rollout": 100
+  },
+  "item_snake_double": {
+    "id": "item_snake_double",
+    "name": "贪吃蛇·双倍卡",
+    "description": "贪吃蛇游戏中使用，15秒内吃掉食物获得双倍分数",
+    "icon": "✖️2",
+    "price": 120,
+    "category": "item",
+    "type": "consumable",
+    "rarity": "rare",
+    "maxStack": 10,
+    "usable": true,
+    "tradable": false,
+    "tags": [
+      "贪吃蛇",
+      "得分",
+      "道具"
+    ],
+    "enabled": true,
+    "rollout": 100
+  },
+  "item_snake_shrink": {
+    "id": "item_snake_shrink",
+    "name": "贪吃蛇·缩短卡",
+    "description": "贪吃蛇游戏中使用，身体立即缩短3节，降低碰撞风险",
+    "icon": "🔽",
+    "price": 60,
+    "category": "item",
+    "type": "consumable",
+    "rarity": "common",
+    "maxStack": 20,
+    "usable": true,
+    "tradable": false,
+    "tags": [
+      "贪吃蛇",
+      "缩短",
+      "道具"
+    ],
+    "enabled": true,
+    "rollout": 100
   }
 }

@@ -117,11 +117,14 @@ app.get('/api/shop/data', async (req, res) => {
 // 购买商品
 app.post('/api/shop/buy', async (req, res) => {
   try {
-    const { userId, itemId } = req.body;
+    const { userId, itemId, quantity = 1 } = req.body;
     if (!userId || !itemId) {
       return res.status(400).json({ success: false, message: '参数错误' });
     }
-    const result = await shopManager.purchaseItem(userId, itemId, accountManager);
+    if (quantity < 1 || quantity > 999) {
+      return res.status(400).json({ success: false, message: '数量不合法' });
+    }
+    const result = await shopManager.purchaseItem(userId, itemId, quantity, accountManager);
     res.json(result);
   } catch (err) {
     logger.error('购买失败', { error: err.message });
@@ -2370,6 +2373,17 @@ io.on('connection', (socket) => {
           // 贪吃蛇游戏：如果分数大于100，则认为是获胜
           const result = score > 100 ? 'win' : 'loss';
           await gameManager.accountManager.updateGameStats(accountId, result, 'snake', false, null, null);
+
+          // 给予经验值奖励（基于分数）
+          if (gameManager.accountManager) {
+            const expReward = 50 + Math.floor((score || 0) / 2);
+            if (expReward > 0) {
+              const expResult = await gameManager.accountManager.addExp(accountId, expReward);
+              if (expResult.success) {
+                socket.emit('exp_gained', { expResult });
+              }
+            }
+          }
 
           // 通知客户端账号数据已更新（使用 getAccount 重新读取，自动剥离 security）
           const updatedAccount = await gameManager.accountManager.getAccount(accountId);

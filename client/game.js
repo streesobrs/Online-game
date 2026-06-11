@@ -1,3406 +1,59 @@
-﻿<!DOCTYPE html>
-<html lang="zh-CN">
-
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport"
-    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#667eea">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>多棋种联机大厅 🎮 - 五子棋/围棋/象棋/贪吃蛇</title>
-  <style>
-    /* 全局重置+基础样式 */
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      transition: all 0.3s ease;
-    }
-
-
-
-    body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      font-family: 'Microsoft Yahei', Arial, sans-serif;
-      padding: 20px;
-      padding-top: 20px;
-      min-height: 100vh;
-    }
-
-    h2 {
-      color: #2d3748;
-      margin-bottom: 15px;
-      font-size: 24px;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    h2::before {
-      content: "🎮";
-      font-size: 32px;
-    }
-
-    /* 新增：顶部导航栏 */
-    .game-nav {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 15px;
-      background: white;
-      padding: 8px 16px;
-      border-radius: 10px;
-      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
-    }
-
-    .nav-btn {
-      padding: 10px 20px;
-      border: none;
-      border-radius: 7px;
-      cursor: pointer;
-      font-weight: bold;
-      font-size: 15px;
-      transition: all 0.2s;
-      background: #f8f9fa;
-      color: #495057;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .nav-btn:hover {
-      background: #e9ecef;
-      transform: translateY(-2px);
-    }
-
-    .nav-btn.active {
-      background: #007bff;
-      color: white;
-    }
-
-    .nav-btn.active:hover {
-      background: #0056b3;
-    }
-
-    /* 快捷键提示样式 */
-    .shortcut-hint {
-      font-size: 10px;
-      font-weight: 600;
-      color: #6c757d;
-      margin-left: 4px;
-      padding: 2px 5px;
-      background: #e9ecef;
-      border-radius: 4px;
-      vertical-align: super;
-      min-width: 16px;
-      text-align: center;
-      display: inline-block;
-    }
-
-    .nav-btn.active .shortcut-hint {
-      color: rgba(255, 255, 255, 0.8);
-      background: rgba(255, 255, 255, 0.2);
-    }
-
-    /* 大厅样式 */
-    .lobby-container {
-      width: 100%;
-      max-width: 600px;
-      background: white;
-      padding: 15px;
-      border-radius: 10px;
-      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
-      margin-bottom: 15px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    .lobby-title {
-      font-size: 18px;
-      color: #2c3e50;
-      margin-bottom: 8px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .lobby-status {
-      font-size: 12px;
-      color: #4a5568;
-      margin-bottom: 12px;
-      padding: 6px 12px;
-      background: #f7fafc;
-      border-radius: 7px;
-      text-align: center;
-    }
-
-    .lobby-controls {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-
-    .lobby-btn {
-      padding: 8px 18px;
-      border: none;
-      border-radius: 7px;
-      cursor: pointer;
-      font-weight: bold;
-      font-size: 14px;
-      transition: all 0.2s;
-    }
-
-    .match-btn {
-      background: #27ae60;
-      color: white;
-    }
-
-    .match-btn:hover {
-      background: #219653;
-      transform: translateY(-2px);
-    }
-
-    .match-btn:disabled {
-      background: #bdc3c7;
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    .cancel-btn {
-      background: #e74c3c;
-      color: white;
-    }
-
-    .cancel-btn:hover {
-      background: #c0392b;
-      transform: translateY(-2px);
-    }
-
-    .online-users {
-      width: 100%;
-      background: #f8f9fa;
-      padding: 8px;
-      border-radius: 7px;
-      margin-top: 6px;
-    }
-
-    .online-users-title {
-      font-size: 12px;
-      color: #2d3748;
-      margin-bottom: 6px;
-      font-weight: bold;
-    }
-
-    .user-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-
-    .user-item {
-      padding: 3px 8px;
-      background: #e3f2fd;
-      color: #2d3748;
-      border-radius: 12px;
-      font-size: 11px;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      position: relative;
-      /* For challenge button positioning */
-    }
-
-    .challenge-btn {
-      background: #3498db;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      padding: 2px 6px;
-      font-size: 10px;
-      cursor: pointer;
-      margin-left: 6px;
-      transition: background 0.2s;
-    }
-
-    .challenge-btn:hover {
-      background: #2980b9;
-    }
-
-    .challenge-btn:disabled {
-      background: #bdc3c7;
-      cursor: not-allowed;
-    }
-
-    .user-item.waiting {
-      background: #fff8e1;
-    }
-
-    .user-item.playing {
-      background: #e8f5e9;
-    }
-
-    .user-item.gobang {
-      border: 1px solid #ff6b6b;
-    }
-
-    .user-item.go {
-      border: 1px solid #4ecdc4;
-    }
-
-    .user-item.chess {
-      border: 1px solid #45b7d1;
-    }
-
-    /* 排行榜 */
-    .leaderboard-container {
-      width: 100%;
-      background: #f8f9fa;
-      padding: 8px;
-      border-radius: 7px;
-      margin-top: 6px;
-    }
-
-    .leaderboard-title {
-      font-size: 12px;
-      color: #2d3748;
-      margin-bottom: 6px;
-      font-weight: bold;
-    }
-
-    .leaderboard-list {
-      max-height: 100px;
-      overflow-y: auto;
-    }
-
-    .leaderboard-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 5px 8px;
-      background: #e3f2fd;
-      color: #2d3748;
-      border-radius: 12px;
-      font-size: 11px;
-      margin-bottom: 4px;
-    }
-
-    .leaderboard-item.top-1 {
-      background: #fff3cd;
-      border: 1px solid #ffeaa7;
-    }
-
-    .leaderboard-item.top-2 {
-      background: #e8eaf6;
-      border: 1px solid #c5cae9;
-    }
-
-    .leaderboard-item.top-3 {
-      background: #f3e5f5;
-      border: 1px solid #e1bee7;
-    }
-
-    .leaderboard-left {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .leaderboard-rank {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      font-size: 10px;
-      background: #4a5568;
-      color: white;
-    }
-
-    .leaderboard-item.top-1 .leaderboard-rank {
-      background: #ffc107;
-    }
-
-    .leaderboard-item.top-2 .leaderboard-rank {
-      background: #6c757d;
-    }
-
-    .leaderboard-item.top-3 .leaderboard-rank {
-      background: #d69e2e;
-    }
-
-    .leaderboard-name {
-      font-size: 11px;
-      font-weight: 500;
-      color: #2d3748;
-    }
-
-    .leaderboard-level {
-      font-size: 10px;
-      color: #718096;
-    }
-
-    .leaderboard-stats {
-      text-align: right;
-      font-size: 10px;
-    }
-
-    .leaderboard-wins {
-      color: #38a169;
-      font-weight: bold;
-    }
-
-    .leaderboard-winrate {
-      color: #4299e1;
-    }
-
-
-
-    /* 通用面板样式 */
-    .panel-avatar {
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      overflow: hidden;
-      margin: 0 auto 12px;
-    }
-
-    .panel-img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .panel-info {
-      text-align: center;
-    }
-
-    .panel-name {
-      font-size: 16px;
-      font-weight: bold;
-      margin-bottom: 6px;
-    }
-
-    .panel-desc {
-      font-size: 12px;
-      opacity: 0.9;
-    }
-
-    #theme-bg {
-      position: fixed;
-      inset: 0;
-      background-position: center center;
-      background-repeat: no-repeat;
-      background-size: cover;
-      filter: saturate(1.2) contrast(1.1) brightness(0.75);
-      opacity: 0;
-      transition: opacity 0.6s ease-out;
-      z-index: -1;
-      pointer-events: none;
-      transform: translateY(0);
-    }
-
-    #theme-bg.visible {
-      opacity: 1;
-    }
-
-    /* 核心信息面板 */
-    .info-container {
-      display: flex;
-      gap: 12px;
-      width: 100%;
-      max-width: 1000px;
-      margin-bottom: 15px;
-      flex-wrap: wrap;
-      display: none;
-      /* 默认隐藏，匹配成功后显示 */
-    }
-
-    .info-panel {
-      flex: 1;
-      min-width: 260px;
-      background: white;
-      padding: 14px;
-      border-radius: 10px;
-      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
-      border: 1px solid #e2e8f0;
-    }
-
-    .info-title {
-      font-weight: bold;
-      color: #2c3e50;
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 16px;
-      padding-bottom: 8px;
-      border-bottom: 2px solid #3498db;
-    }
-
-    .info-content {
-      color: #4a5568;
-      line-height: 1.6;
-      margin-bottom: 6px;
-      font-size: 14px;
-      display: flex;
-      justify-content: space-between;
-      padding: 4px 0;
-      border-bottom: 1px dashed #f0f0f0;
-    }
-
-    .info-content:last-child {
-      border-bottom: none;
-    }
-
-    .info-label {
-      color: #718096;
-      font-weight: 500;
-    }
-
-    .info-value {
-      color: #2d3748;
-      font-weight: bold;
-      font-family: monospace;
-      font-size: 16px;
-      padding: 2px 8px;
-      border-radius: 4px;
-      background: #f7fafc;
-    }
-
-    /* 状态值配色 */
-    .value-connected {
-      color: #27ae60;
-      background: #e8f5e9;
-    }
-
-    .value-waiting {
-      color: #f39c12;
-      background: #fff8e1;
-    }
-
-    .value-black {
-      color: #000;
-      background: #f5f5f5;
-    }
-
-    .value-white {
-      color: #fff;
-      background: #333;
-    }
-
-    .value-turn {
-      color: #3498db;
-      background: #e3f2fd;
-    }
-
-    .value-danger {
-      color: #e74c3c;
-      background: #ffebee;
-    }
-
-    .value-normal {
-      color: #9c27b0;
-      background: #f3e5f5;
-    }
-
-    .value-red {
-      color: #c0392b;
-      background: #ffeaa7;
-    }
-
-    .value-green {
-      color: #27ae60;
-      background: #d5f4e6;
-    }
-
-    /* 操作区 */
-    .controls {
-      display: flex;
-      gap: 10px;
-      margin: 10px 0 20px;
-      flex-wrap: wrap;
-      justify-content: center;
-      align-items: center;
-      display: none;
-      /* 默认隐藏，匹配成功后显示 */
-    }
-
-    button {
-      padding: 9px 18px;
-      border: none;
-      border-radius: 7px;
-      cursor: pointer;
-      background: #3498db;
-      color: white;
-      font-weight: bold;
-      font-size: 14px;
-      transition: all 0.2s;
-      box-shadow: 0 3px 6px rgba(52, 152, 219, 0.2);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    button:hover {
-      background: #2980b9;
-      transform: translateY(-2px);
-      box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
-    }
-
-    button:disabled {
-      background: #bdc3c7;
-      cursor: not-allowed;
-      transform: none;
-      box-shadow: none;
-      opacity: 0.7;
-    }
-
-    .reset-btn {
-      background: #e74c3c;
-    }
-
-    .reset-btn:hover {
-      background: #c0392b;
-    }
-
-    .stats-btn {
-      background: #9c27b0;
-    }
-
-    .stats-btn:hover {
-      background: #7b1fa2;
-    }
-
-    /* 状态区 */
-    .status-box {
-      background: white;
-      padding: 15px 20px;
-      border-radius: 8px;
-      color: #2d3748;
-      margin-bottom: 20px;
-      min-width: 400px;
-      text-align: center;
-      border-left: 5px solid #3498db;
-      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06);
-      font-size: 16px;
-      font-weight: 500;
-      display: none;
-      /* 默认隐藏，匹配成功后显示 */
-    }
-
-    .gobang-board {
-      display: grid;
-      grid-template-columns: repeat(19, 36px);
-      grid-template-rows: repeat(19, 36px);
-      gap: 0;
-      background: linear-gradient(135deg, #e8c49a 0%, #d4a76a 50%, #c4956a 100%);
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.3);
-      border: 4px solid #8b6914;
-      transform: translateZ(0);
-      will-change: contents;
-      display: none;
-      position: relative;
-    }
-
-    .gobang-board::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-image:
-        repeating-linear-gradient(90deg, transparent, transparent 35px, rgba(0, 0, 0, 0.3) 35px, rgba(0, 0, 0, 0.3) 36px),
-        repeating-linear-gradient(0deg, transparent, transparent 35px, rgba(0, 0, 0, 0.3) 35px, rgba(0, 0, 0, 0.3) 36px);
-      pointer-events: none;
-      z-index: 1;
-    }
-
-    .gobang-board::after {
-      content: '';
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      right: 20px;
-      bottom: 20px;
-      background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.1) 0%, transparent 60%);
-      pointer-events: none;
-      z-index: 2;
-    }
-
-
-
-    .gobang-cell {
-      width: 36px;
-      height: 36px;
-      background: transparent;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.15s;
-      position: relative;
-      pointer-events: auto;
-      z-index: 3;
-    }
-
-    .gobang-cell:hover {
-      background: rgba(255, 255, 255, 0.15);
-      transform: scale(1.05);
-    }
-
-    .gobang-cell.last-move::before {
-      content: '';
-      position: absolute;
-      width: 40px;
-      height: 40px;
-      background: radial-gradient(circle, rgba(0, 123, 255, 0.4) 0%, transparent 70%);
-      border-radius: 50%;
-      animation: pulse 1.5s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-
-      0%,
-      100% {
-        transform: scale(1);
-        opacity: 0.8;
-      }
-
-      50% {
-        transform: scale(1.2);
-        opacity: 0.4;
-      }
-    }
-
-    .gobang-black,
-    .gobang-white {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      transform: translateZ(0);
-      will-change: transform;
-      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      animation: stoneDrop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      position: relative;
-    }
-
-    @keyframes stoneDrop {
-      0% {
-        transform: scale(1.3) translateY(-15px);
-        opacity: 0;
-      }
-
-      100% {
-        transform: scale(1) translateY(0);
-        opacity: 1;
-      }
-    }
-
-    /* 落子涟漪效果 */
-    .stone-ripple {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      border-radius: 50%;
-      animation: rippleEffect 0.8s ease-out forwards;
-      pointer-events: none;
-      z-index: -1;
-    }
-
-    @keyframes rippleEffect {
-      0% {
-        transform: scale(0);
-        opacity: 0.8;
-        background: radial-gradient(circle, rgba(255, 255, 255, 0.6) 0%, transparent 70%);
-      }
-
-      100% {
-        transform: scale(3);
-        opacity: 0;
-        background: radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, transparent 70%);
-      }
-    }
-
-    .gobang-black {
-      background: radial-gradient(circle at 35% 35%, #4a4a4a 0%, #1a1a1a 60%, #000000 100%);
-      box-shadow:
-        0 4px 12px rgba(0, 0, 0, 0.5),
-        inset 0 2px 4px rgba(255, 255, 255, 0.15),
-        inset 0 -2px 4px rgba(0, 0, 0, 0.3);
-    }
-
-    .gobang-white {
-      background: radial-gradient(circle at 35% 35%, #ffffff 0%, #f0f0f0 60%, #d0d0d0 100%);
-      border: 1px solid #c0c0c0;
-      box-shadow:
-        0 4px 12px rgba(0, 0, 0, 0.3),
-        inset 0 2px 4px rgba(255, 255, 255, 0.8),
-        inset 0 -2px 4px rgba(0, 0, 0, 0.1);
-    }
-
-    /* 围棋棋盘样式 */
-    .go-board {
-      display: grid;
-      grid-template-columns: repeat(21, 34px);
-      grid-template-rows: repeat(21, 34px);
-      gap: 0;
-      background: linear-gradient(135deg, #e5c085 0%, #d4a76a 50%, #c4955a 100%);
-      padding: 24px;
-      border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.3);
-      border: 4px solid #8b6914;
-      transform: translateZ(0);
-      will-change: contents;
-      display: none;
-      position: relative;
-    }
-
-    .go-board::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-image:
-        repeating-linear-gradient(90deg, transparent, transparent 33px, rgba(0, 0, 0, 0.4) 33px, rgba(0, 0, 0, 0.4) 34px),
-        repeating-linear-gradient(0deg, transparent, transparent 33px, rgba(0, 0, 0, 0.4) 33px, rgba(0, 0, 0, 0.4) 34px);
-      pointer-events: none;
-      z-index: 1;
-    }
-
-    .go-board::after {
-      content: '';
-      position: absolute;
-      top: 24px;
-      left: 24px;
-      right: 24px;
-      bottom: 24px;
-      background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.08) 0%, transparent 60%);
-      pointer-events: none;
-      z-index: 2;
-    }
-
-    .go-cell {
-      width: 34px;
-      height: 34px;
-      background: transparent;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.15s;
-      position: relative;
-      pointer-events: auto;
-      z-index: 3;
-    }
-
-    .go-cell:hover {
-      background: rgba(255, 255, 255, 0.15);
-      transform: scale(1.05);
-    }
-
-    .go-cell.last-move::before {
-      content: '';
-      position: absolute;
-      width: 38px;
-      height: 38px;
-      background: radial-gradient(circle, rgba(255, 0, 0, 0.5) 0%, transparent 70%);
-      border-radius: 50%;
-      animation: pulse 1.5s ease-in-out infinite;
-      z-index: 10;
-    }
-
-    .go-black,
-    .go-white {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      transform: translateZ(0);
-      will-change: transform;
-      position: relative;
-      z-index: 4;
-      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      animation: goStoneDrop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-
-    @keyframes goStoneDrop {
-      0% {
-        transform: scale(1.3) translateY(-15px);
-        opacity: 0;
-      }
-
-      100% {
-        transform: scale(1) translateY(0);
-        opacity: 1;
-      }
-    }
-
-    .go-black {
-      background: radial-gradient(circle at 35% 35%, #3a3a3a 0%, #1a1a1a 60%, #000000 100%);
-      box-shadow:
-        0 4px 12px rgba(0, 0, 0, 0.5),
-        inset 0 2px 4px rgba(255, 255, 255, 0.12),
-        inset 0 -2px 4px rgba(0, 0, 0, 0.35);
-    }
-
-    .go-white {
-      background: radial-gradient(circle at 35% 35%, #ffffff 0%, #f5f5f5 60%, #e0e0e0 100%);
-      border: 1px solid #c0c0c0;
-      box-shadow:
-        0 4px 12px rgba(0, 0, 0, 0.35),
-        inset 0 2px 4px rgba(255, 255, 255, 0.9),
-        inset 0 -2px 4px rgba(0, 0, 0, 0.08);
-    }
-
-    .go-star {
-      width: 8px;
-      height: 8px;
-      background: radial-gradient(circle at 30% 30%, #1a1a1a 0%, #000000 100%);
-      border-radius: 50%;
-      position: absolute;
-      z-index: 2;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-    }
-
-    /* 象棋棋盘样式 */
-    .chess-board {
-      width: 360px;
-      height: 400px;
-      background: linear-gradient(135deg, #f5d9a8 0%, #e8c488 50%, #d4b06a 100%);
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.3);
-      border: 4px solid #8b6914;
-      transform: translateZ(0);
-      will-change: contents;
-      display: none;
-      position: relative;
-    }
-
-    .chess-board::after {
-      content: '';
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      width: 320px;
-      height: 360px;
-      background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.08) 0%, transparent 60%);
-      pointer-events: none;
-      z-index: 2;
-    }
-
-    .chess-intersection {
-      width: 40px;
-      height: 40px;
-      position: absolute;
-      transform: translate(-50%, -50%);
-      cursor: pointer;
-      transition: all 0.15s;
-      z-index: 3;
-    }
-
-    .chess-intersection:hover {
-      background: rgba(255, 255, 255, 0.2);
-      transform: translate(-50%, -50%) scale(1.1);
-      border-radius: 50%;
-    }
-
-    .chess-intersection.last-move::before {
-      content: '';
-      position: absolute;
-      width: 44px;
-      height: 44px;
-      background: radial-gradient(circle, rgba(255, 0, 0, 0.5) 0%, transparent 70%);
-      border-radius: 50%;
-      animation: pulse 1.5s ease-in-out infinite;
-      z-index: 10;
-    }
-
-    .chess-intersection.valid-move::before {
-      content: '';
-      position: absolute;
-      width: 20px;
-      height: 20px;
-      background: radial-gradient(circle, rgba(52, 152, 219, 0.6) 0%, transparent 70%);
-      border-radius: 50%;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 5;
-    }
-
-    .chess-intersection.valid-move:hover::before {
-      background: radial-gradient(circle, rgba(52, 152, 219, 0.8) 0%, transparent 70%);
-      transform: translate(-50%, -50%) scale(1.2);
-    }
-
-    .chess-piece {
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      font-size: 20px;
-      transform: translateZ(0);
-      will-change: transform;
-      cursor: grab;
-      position: absolute;
-      z-index: 10;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-      border: 2px solid rgba(255, 255, 255, 0.4);
-      box-shadow:
-        0 3px 10px rgba(0, 0, 0, 0.3),
-        inset 0 2px 4px rgba(255, 255, 255, 0.3),
-        inset 0 -2px 4px rgba(0, 0, 0, 0.2);
-    }
-
-    .chess-piece:active {
-      cursor: grabbing;
-      transform: scale(1.15);
-      z-index: 20;
-    }
-
-    .chess-piece.selected {
-      transform: scale(1.2);
-      box-shadow:
-        0 6px 16px rgba(0, 123, 255, 0.5),
-        0 0 20px rgba(0, 123, 255, 0.3),
-        inset 0 2px 4px rgba(255, 255, 255, 0.4);
-      z-index: 15;
-    }
-
-    .chess-red {
-      background: radial-gradient(circle at 35% 35%, #ff7b7b 0%, #e04848 50%, #c0392b 100%);
-      color: white;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-    }
-
-    .chess-black {
-      background: radial-gradient(circle at 35% 35%, #5d6d7e 0%, #3d4c53 50%, #2c3e50 100%);
-      color: white;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-    }
-
-    .chess-river {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      width: 320px;
-      height: 360px;
-      pointer-events: none;
-      z-index: 2;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 40px;
-      box-sizing: border-box;
-    }
-
-    .chess-river::before {
-      content: '楚 河';
-      font-size: 20px;
-      color: #2c3e50;
-      opacity: 0.6;
-      font-weight: bold;
-      font-family: "KaiTi", "楷体", serif;
-    }
-
-    .chess-river::after {
-      content: '汉 界';
-      font-size: 20px;
-      color: #2c3e50;
-      opacity: 0.6;
-      font-weight: bold;
-      font-family: "KaiTi", "楷体", serif;
-    }
-
-    .chess-position {
-      width: 8px;
-      height: 8px;
-      background: radial-gradient(circle at 30% 30%, #1a1a1a 0%, #000000 100%);
-      border-radius: 50%;
-      position: absolute;
-      z-index: 2;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-    }
-
-    /* 贪吃蛇游戏样式 */
-    .snake-game-container {
-      width: 100%;
-      max-width: 1000px;
-      background: #f8f9fa;
-      padding: 24px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-      margin-bottom: 20px;
-      text-align: center;
-    }
-
-    .snake-game-container .game-info {
-      display: flex;
-      justify-content: space-around;
-      align-items: center;
-      margin-bottom: 20px;
-      padding: 12px;
-      background: #ffffff;
-      border-radius: 6px;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-      border: 1px solid #e9ecef;
-    }
-
-    .snake-game-container .info-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      color: #495057;
-      font-weight: 600;
-      font-size: 14px;
-    }
-
-    .snake-game-container .info-label {
-      font-size: 14px;
-      color: #6c757d;
-    }
-
-    .snake-game-container .info-value {
-      font-size: 18px;
-      font-weight: 700;
-      min-width: 50px;
-      text-align: center;
-      background: #e3f2fd;
-      padding: 4px 12px;
-      border-radius: 16px;
-      border: 1px solid #bbdefb;
-      color: #1976d2;
-    }
-
-    #snake-canvas {
-      background: #263238;
-      border-radius: 6px;
-      box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
-      display: block;
-      margin: 0 auto 20px;
-      border: 2px solid #37474f;
-    }
-
-    .snake-game-container .game-controls {
-      display: flex;
-      justify-content: center;
-      gap: 16px;
-      margin-top: 16px;
-      margin-bottom: 16px;
-    }
-
-    .snake-game-container .game-controls button {
-      padding: 10px 20px;
-      font-size: 14px;
-      font-weight: 600;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    }
-
-    .snake-game-container .game-controls button:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25);
-    }
-
-    #snake-start {
-      background: #4caf50;
-      color: white;
-    }
-
-    #snake-pause {
-      background: #ff9800;
-      color: white;
-    }
-
-    #snake-restart {
-      background: #2196f3;
-      color: white;
-    }
-
-    .snake-game-container .game-rules {
-      margin-top: 16px;
-      padding: 16px;
-      background: #ffffff;
-      border-radius: 6px;
-      color: #495057;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-      text-align: left;
-      border: 1px solid #e9ecef;
-    }
-
-    .snake-game-container .rules-title {
-      font-size: 16px;
-      font-weight: 700;
-      margin-bottom: 12px;
-      text-align: center;
-      color: #495057;
-    }
-
-    .snake-game-container .rules-content {
-      font-size: 14px;
-      line-height: 1.6;
-      white-space: pre-line;
-      color: #6c757d;
-    }
-
-    /* 胜利提示 */
-    .win-alert {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      padding: 30px 45px;
-      border-radius: 20px;
-      box-shadow:
-        0 20px 60px rgba(102, 126, 234, 0.5),
-        0 0 0 3px rgba(255, 255, 255, 0.1) inset,
-        0 10px 40px rgba(0, 0, 0, 0.3);
-      font-size: 28px;
-      font-weight: 800;
-      color: #ffffff;
-      z-index: 1000;
-      display: none;
-      border: none;
-      animation: winPopup 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-      min-width: 280px;
-      text-align: center;
-    }
-
-    .win-alert::before {
-      content: '🏆';
-      display: block;
-      font-size: 48px;
-      margin-bottom: 10px;
-      animation: trophyBounce 0.6s ease-out;
-    }
-
-    @keyframes trophyBounce {
-      0% {
-        transform: scale(0) rotate(-180deg);
-        opacity: 0;
-      }
-
-      50% {
-        transform: scale(1.2) rotate(10deg);
-      }
-
-      70% {
-        transform: scale(0.9) rotate(-5deg);
-      }
-
-      100% {
-        transform: scale(1) rotate(0deg);
-        opacity: 1;
-      }
-    }
-
-    @keyframes winPopup {
-      0% {
-        transform: translate(-50%, -50%) scale(0.3) rotate(-10deg);
-        opacity: 0;
-      }
-
-      50% {
-        transform: translate(-50%, -50%) scale(1.1) rotate(3deg);
-      }
-
-      70% {
-        transform: translate(-50%, -50%) scale(0.95) rotate(-1deg);
-      }
-
-      100% {
-        transform: translate(-50%, -50%) scale(1);
-        opacity: 1;
-      }
-    }
-
-    /* 落子记录面板 */
-    .move-log-panel {
-      width: 100%;
-      max-width: 1000px;
-      background: white;
-      padding: 14px;
-      border-radius: 10px;
-      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
-      margin-top: 0;
-      display: none;
-      /* 默认隐藏，匹配成功后显示 */
-    }
-
-    .move-log-title {
-      font-size: 15px;
-      font-weight: bold;
-      color: #2c3e50;
-      margin-bottom: 8px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .move-log-list {
-      max-height: 130px;
-      overflow-y: auto;
-      padding: 8px;
-      background: #f7fafc;
-      border-radius: 7px;
-      font-family: monospace;
-      font-size: 13px;
-      line-height: 1.6;
-      will-change: scroll-position;
-    }
-
-    .move-log-item {
-      padding: 3px 8px;
-      border-radius: 4px;
-      margin-bottom: 4px;
-    }
-
-    .move-log-black {
-      background: #e8f5e9;
-      color: #000;
-    }
-
-    .move-log-white {
-      background: #fdf2f8;
-      color: #333;
-    }
-
-    .move-log-red {
-      background: #ffebee;
-      color: #c0392b;
-    }
-
-    .move-log-green {
-      background: #e8f5e9;
-      color: #27ae60;
-    }
-
-    /* 高级统计面板 */
-    .advanced-stats {
-      width: 100%;
-      max-width: 1000px;
-      background: white;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-      margin-top: 20px;
-      display: none;
-    }
-
-    .advanced-stats.show {
-      display: block;
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 15px;
-      margin-top: 15px;
-    }
-
-    .stats-item {
-      padding: 10px;
-      background: #f7fafc;
-      border-radius: 8px;
-      border-left: 3px solid #9c27b0;
-    }
-
-    .stats-item-label {
-      font-size: 14px;
-      color: #718096;
-      margin-bottom: 5px;
-    }
-
-    .stats-item-value {
-      font-size: 18px;
-      font-weight: bold;
-      font-family: monospace;
-      color: #2d3748;
-    }
-
-    /* 提示文本 */
-    .tip-text {
-      color: #7f8c8d;
-      font-size: 14px;
-      margin-top: 20px;
-      text-align: center;
-      max-width: 1000px;
-      line-height: 1.8;
-      background: white;
-      padding: 15px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    }
-
-    /* 提示高亮脉冲动画 */
-    @keyframes hintPulse {
-
-      0%,
-      100% {
-        transform: scale(1);
-        opacity: 1;
-      }
-
-      50% {
-        transform: scale(1.2);
-        opacity: 0.8;
-      }
-    }
-
-    /* 版本信息样式 */
-    .version-info {
-      color: #94a3b8;
-      font-size: 13px;
-      margin-top: 10px;
-      text-align: center;
-      font-style: italic;
-    }
-
-    /* 滚动条美化 */
-    ::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
-    }
-
-    ::-webkit-scrollbar-track {
-      background: #f1f1f1;
-      border-radius: 4px;
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: #cbd5e0;
-      border-radius: 4px;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-      background: #94a3b8;
-    }
-
-    /* 匹配动画 */
-    .loading-spinner {
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 3px solid rgba(255, 255, 255, 0.3);
-      border-radius: 50%;
-      border-top-color: white;
-      animation: spin 1s ease-in-out infinite;
-      margin-right: 8px;
-    }
-
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
-    /* 新增：棋种切换动画 */
-    .board-container {
-      position: relative;
-      width: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 400px;
-    }
-
-    .board-fade {
-      animation: boardFade 0.5s ease-in-out;
-    }
-
-    @keyframes boardFade {
-      0% {
-        opacity: 0;
-        transform: scale(0.95);
-      }
-
-      100% {
-        opacity: 1;
-        transform: scale(1);
-      }
-    }
-
-    /* 新增：智能提示弹窗 */
-    .tip-popup {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: white;
-      padding: 15px 20px;
-      border-radius: 8px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-      border-left: 4px solid #007bff;
-      max-width: 300px;
-      z-index: 50;
-      display: none;
-      animation: tipSlide 0.3s ease-out;
-    }
-
-    @keyframes tipSlide {
-      0% {
-        transform: translateX(100%);
-        opacity: 0;
-      }
-
-      100% {
-        transform: translateX(0);
-        opacity: 1;
-      }
-    }
-
-    .tip-popup.show {
-      display: block;
-    }
-
-    .tip-popup-title {
-      font-weight: bold;
-      color: #2c3e50;
-      margin-bottom: 8px;
-      font-size: 16px;
-    }
-
-    .tip-popup-content {
-      color: #718096;
-      font-size: 14px;
-      line-height: 1.6;
-    }
-
-    .tip-popup-close {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      background: none;
-      border: none;
-      font-size: 16px;
-      cursor: pointer;
-      color: #94a3b8;
-      padding: 2px;
-    }
-
-    .tip-popup-close:hover {
-      color: #64748b;
-    }
-
-    /* 通用弹窗样式 */
-    .modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.6);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-      backdrop-filter: blur(4px);
-    }
-
-    .modal.show {
-      display: flex;
-    }
-
-    /* 系统广播样式 */
-    .system-broadcast {
-      position: fixed;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 15px 30px;
-      border-radius: 12px;
-      box-shadow: 0 10px 40px rgba(102, 126, 234, 0.4);
-      z-index: 1000;
-      max-width: 600px;
-      width: 90%;
-      display: none;
-      animation: broadcastSlide 0.5s ease-out;
-    }
-
-    .system-broadcast.show {
-      display: block;
-    }
-
-    @keyframes broadcastSlide {
-      0% {
-        transform: translateX(-50%) translateY(-100px);
-        opacity: 0;
-      }
-
-      100% {
-        transform: translateX(-50%) translateY(0);
-        opacity: 1;
-      }
-    }
-
-    .broadcast-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-      font-weight: bold;
-      font-size: 16px;
-    }
-
-    .broadcast-title {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .broadcast-close {
-      background: none;
-      border: none;
-      color: white;
-      font-size: 20px;
-      cursor: pointer;
-      opacity: 0.8;
-      transition: opacity 0.2s;
-    }
-
-    .broadcast-close:hover {
-      opacity: 1;
-    }
-
-    .broadcast-content {
-      font-size: 15px;
-      line-height: 1.6;
-    }
-
-    .broadcast-time {
-      font-size: 12px;
-      opacity: 0.8;
-      margin-top: 8px;
-    }
-
-    /* 游戏和聊天容器 */
-    .main-content-container {
-      display: flex;
-      gap: 12px;
-      width: 100%;
-      max-width: 1800px;
-      margin: 15px auto;
-      min-height: 600px;
-    }
-
-    .center-content-container {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      min-height: 600px;
-    }
-
-    /* 响应式布局 */
-    @media (max-width: 1200px) {
-      .main-content-container {
-        flex-direction: column;
-        align-items: center;
-      }
-
-      .left-panels-container {
-        flex: 1;
-        width: 100%;
-        max-width: 800px;
-        flex-direction: row;
-      }
-
-      .online-users-panel {
-        flex: 1;
-      }
-
-      .move-log-panel {
-        flex: 1;
-      }
-
-      .right-panels-container {
-        flex: 1;
-        width: 100%;
-        max-width: 800px;
-      }
-    }
-
-    @media (max-width: 768px) {
-      .left-panels-container {
-        flex-direction: column;
-      }
-
-      .online-users-panel,
-      .move-log-panel {
-        width: 100%;
-      }
-    }
-
-    /* 左侧面板容器 */
-    .left-panels-container {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      flex: 0 0 260px;
-      transition: all 0.3s ease;
-    }
-
-    /* 右侧面板容器 */
-    .right-panels-container {
-      transition: all 0.3s ease;
-    }
-
-    /* 聊天面板 */
-    .chat-container {
-      transition: all 0.3s ease;
-    }
-
-    /* 在线玩家面板 */
-    .online-users-panel {
-      background: white;
-      padding: 12px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-      transition: all 0.3s ease;
-    }
-
-    .online-users-panel .user-list {
-      max-height: 150px;
-      overflow-y: auto;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-
-    /* 优化在线玩家项目样式 */
-    .user-item {
-      padding: 4px 8px;
-      background: #e3f2fd;
-      color: #2d3748;
-      border-radius: 12px;
-      font-size: 11px;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      position: relative;
-      transition: all 0.2s ease;
-    }
-
-    .user-item:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-
-    .user-item.waiting {
-      background: #fff8e1;
-    }
-
-    .user-item.playing {
-      background: #e8f5e9;
-    }
-
-    .user-item.gobang {
-      border: 1px solid #ff6b6b;
-    }
-
-    .user-item.go {
-      border: 1px solid #4ecdc4;
-    }
-
-    .user-item.chess {
-      border: 1px solid #45b7d1;
-    }
-
-    .challenge-btn {
-      background: #3498db;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      padding: 2px 6px;
-      font-size: 10px;
-      cursor: pointer;
-      margin-left: 6px;
-      transition: background 0.2s;
-    }
-
-    .challenge-btn:hover {
-      background: #2980b9;
-    }
-
-    .challenge-btn:disabled {
-      background: #bdc3c7;
-      cursor: not-allowed;
-    }
-
-    /* 右侧面板容器 */
-    .right-panels-container {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      flex: 0 0 300px;
-    }
-
-    /* 调整棋盘容器 */
-    .board-container {
-      flex: 1;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-    }
-
-    /* 调整落子记录面板 */
-    .move-log-panel {
-      width: 100%;
-      margin: 0;
-    }
-
-    /* 调整聊天面板 */
-    .chat-container {
-      width: 100%;
-      max-width: none;
-      margin: 0;
-      background: white;
-      padding: 14px;
-      border-radius: 10px;
-      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
-      display: block;
-    }
-
-    /* 聊天系统样式 */
-    .chat-messages {
-      height: 170px;
-      overflow-y: auto;
-      background: #f7fafc;
-      border-radius: 7px;
-      padding: 8px;
-      margin-bottom: 8px;
-    }
-
-    .chat-message {
-      padding: 8px 12px;
-      margin-bottom: 8px;
-      border-radius: 8px;
-      max-width: 80%;
-      animation: fadeIn 0.3s ease;
-    }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .chat-message.self {
-      background: #e3f2fd;
-      margin-left: auto;
-      text-align: right;
-    }
-
-    .chat-message.other {
-      background: #f5f5f5;
-      margin-right: auto;
-      text-align: left;
-    }
-
-    .chat-sender {
-      font-weight: bold;
-      color: #3498db;
-      font-size: 12px;
-      margin-bottom: 4px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .chat-scope {
-      font-size: 10px;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-weight: normal;
-      text-transform: uppercase;
-    }
-
-    .chat-scope.global {
-      background: #e3f2fd;
-      color: #1976d2;
-    }
-
-    .chat-scope.game {
-      background: #fff3e0;
-      color: #f57c00;
-    }
-
-    .chat-channel-selector {
-      display: flex;
-      gap: 4px;
-      margin-bottom: 8px;
-    }
-
-    .chat-channel-btn {
-      flex: 1;
-      padding: 6px 10px;
-      border: 2px solid #e2e8f0;
-      background: #f7fafc;
-      border-radius: 7px;
-      cursor: pointer;
-      font-size: 12px;
-      transition: all 0.2s;
-      color: #64748b;
-    }
-
-    .chat-channel-btn:hover:not(:disabled) {
-      border-color: #cbd5e0;
-      background: #e2e8f0;
-    }
-
-    .chat-channel-btn.active {
-      border-color: #3498db;
-      background: #e3f2fd;
-      color: #1976d2;
-      font-weight: bold;
-    }
-
-    .chat-channel-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .chat-input-container {
-      display: flex;
-      gap: 8px;
-    }
-
-    .chat-input {
-      flex: 1;
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 7px;
-      font-size: 13px;
-      transition: border-color 0.2s;
-    }
-
-    .chat-input:focus {
-      outline: none;
-      border-color: #3498db;
-    }
-
-    .chat-send-btn {
-      padding: 10px 20px;
-      background: #27ae60;
-      color: white;
-      border: none;
-      border-radius: 7px;
-      cursor: pointer;
-      font-weight: bold;
-      transition: all 0.2s;
-    }
-
-    .chat-send-btn:hover {
-      background: #219653;
-      transform: translateY(-2px);
-    }
-
-    /* 响应式设计 */
-    @media (max-width: 768px) {
-      .game-nav {
-        flex-wrap: wrap;
-        justify-content: center;
-      }
-
-      .info-container {
-        flex-direction: column;
-      }
-
-      .gobang-board {
-        grid-template-columns: repeat(15, 24px);
-      }
-
-      .gobang-cell {
-        width: 24px;
-        height: 24px;
-      }
-
-      .go-board {
-        grid-template-columns: repeat(19, 22px);
-      }
-
-      .go-cell {
-        width: 22px;
-        height: 22px;
-      }
-
-      .chess-board {
-        grid-template-columns: repeat(9, 35px);
-        grid-template-rows: repeat(10, 35px);
-      }
-
-      .chess-cell {
-        width: 35px;
-        height: 35px;
-      }
-
-      .gobang-black,
-      .gobang-white {
-        width: 22px;
-        height: 22px;
-      }
-
-      .go-black,
-      .go-white {
-        width: 20px;
-        height: 20px;
-      }
-
-      .chess-piece {
-        width: 32px;
-        height: 32px;
-        font-size: 16px;
-      }
-
-      .game-info-panel {
-        padding: 10px;
-        font-size: 12px;
-      }
-
-      .nav-btn {
-        padding: 8px 12px;
-        font-size: 12px;
-        margin: 4px;
-      }
-
-      .lobby-title {
-        font-size: 18px;
-      }
-
-      .btn {
-        padding: 10px 20px;
-        font-size: 14px;
-      }
-
-      .win-alert {
-        padding: 20px 30px;
-        font-size: 22px;
-      }
-    }
-
-    /* 针对小屏幕手机的优化 */
-    @media (max-width: 480px) {
-      body {
-        padding: 5px;
-      }
-
-      .gobang-board {
-        grid-template-columns: repeat(15, 20px);
-      }
-
-      .gobang-cell {
-        width: 20px;
-        height: 20px;
-      }
-
-      .gobang-black,
-      .gobang-white {
-        width: 18px;
-        height: 18px;
-      }
-
-      .go-board {
-        grid-template-columns: repeat(19, 18px);
-        padding: 15px;
-      }
-
-      .go-cell {
-        width: 18px;
-        height: 18px;
-      }
-
-      .go-black,
-      .go-white {
-        width: 16px;
-        height: 16px;
-      }
-
-      .chess-board {
-        grid-template-columns: repeat(9, 30px);
-        grid-template-rows: repeat(10, 30px);
-      }
-
-      .chess-cell {
-        width: 30px;
-        height: 30px;
-      }
-
-      .chess-piece {
-        width: 28px;
-        height: 28px;
-        font-size: 14px;
-      }
-
-      .header {
-        flex-direction: column;
-        gap: 10px;
-      }
-
-      .user-info {
-        font-size: 12px;
-      }
-
-      .status-box {
-        font-size: 12px;
-        padding: 8px;
-      }
-
-      .win-alert {
-        padding: 15px 20px;
-        font-size: 18px;
-      }
-
-      .win-alert::before {
-        font-size: 36px;
-      }
-    }
-
-    /* 触控设备优化 */
-    @media (hover: none) {
-
-      .gobang-cell:hover::before,
-      .go-cell:hover::before {
-        opacity: 0;
-      }
-
-      .gobang-cell:active::before,
-      .go-cell:active::before {
-        opacity: 1;
-        transform: scale(0.8);
-      }
-
-      .nav-btn:active,
-      .btn:active {
-        transform: scale(0.95);
-      }
-
-      .chess-piece:active {
-        transform: scale(1.1);
-      }
-    }
-
-    /* 横屏模式优化 */
-    @media (orientation: landscape) and (max-width: 768px) {
-      .main-content-container {
-        flex-direction: row;
-      }
-
-      .left-panels-container {
-        flex-direction: column;
-        width: auto;
-        max-width: 200px;
-      }
-    }
-
-    /* ========== 账号系统样式 ========== */
-
-    /* 统一错误提示样式 */
-    .error-toast {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: #fed7d7;
-      color: #c53030;
-      padding: 12px 16px;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      z-index: 10000;
-      max-width: 400px;
-      border-left: 4px solid #e53e3e;
-      animation: slideInRight 0.3s ease;
-    }
-
-    .success-toast {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: #c6f6d5;
-      color: #276749;
-      padding: 12px 16px;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      z-index: 10000;
-      max-width: 400px;
-      border-left: 4px solid #38a169;
-      animation: slideInRight 0.3s ease;
-    }
-
-    .warning-toast {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: #fef5e7;
-      color: #744210;
-      padding: 12px 16px;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      z-index: 10000;
-      max-width: 400px;
-      border-left: 4px solid #d69e2e;
-      animation: slideInRight 0.3s ease;
-    }
-
-    @keyframes slideInRight {
-      from {
-        transform: translateX(100%);
-        opacity: 0;
-      }
-
-      to {
-        transform: translateX(0);
-        opacity: 1;
-      }
-    }
-
-    @keyframes criticalFlash {
-
-      0%,
-      100% {
-        background: #fed7d7;
-        color: #c53030;
-        box-shadow: 0 0 10px rgba(245, 101, 101, 0.5);
-      }
-
-      50% {
-        background: #fff5f5;
-        color: #e53e3e;
-        box-shadow: 0 0 20px rgba(245, 101, 101, 0.8);
-      }
-    }
-
-    .account-bar {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 10px;
-      width: 100%;
-      max-width: 1000px;
-      margin-bottom: 10px;
-      position: sticky;
-      top: 10px;
-      z-index: 100;
-      transition: all 0.45s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .account-bar.collapsed {
-      justify-content: flex-end;
-      max-width: 100%;
-      padding-right: 10px;
-    }
-
-    .account-info {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 8px 14px;
-      background: rgba(255, 255, 255, 0.98);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border-radius: 10px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-      width: 1000px;
-      height: 48px;
-      min-height: 48px;
-      max-height: 48px;
-      border: 1px solid rgba(226, 232, 240, 0.8);
-      transition: all 0.45s cubic-bezier(0.4, 0, 0.2, 1);
-      box-sizing: border-box;
-      overflow: visible;
-      position: relative;
-      z-index: 1;
-    }
-
-    .account-bar.collapsed .account-info {
-      width: 56px;
-      padding: 8px;
-      opacity: 0.65;
-      background: rgba(255, 255, 255, 0.92);
-      border-radius: 12px;
-      justify-content: center;
-      align-items: center;
-    }
-
-    .account-bar.collapsed .account-info:hover {
-      opacity: 1;
-      width: 600px;
-      padding: 8px 14px;
-      border-radius: 10px;
-      justify-content: space-between;
-      z-index: 101;
-    }
-
-    .account-bar.collapsed .account-info:hover .account-user-section {
-      position: relative;
-      left: auto;
-      top: auto;
-      transform: none;
-      width: auto;
-      height: auto;
-    }
-
-    .account-bar.collapsed .account-info:hover .account-user-details {
-      display: flex !important;
-    }
-
-    .account-bar.collapsed .account-info:hover .account-avatar {
-      position: relative;
-      left: auto;
-      top: auto;
-      transform: none;
-    }
-
-    .account-bar.collapsed .account-buttons {
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.25s ease;
-    }
-
-    .account-bar.collapsed .account-info:hover .account-buttons {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    .account-bar.collapsed .account-user-section {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 1;
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      width: auto;
-      height: auto;
-    }
-
-    .account-bar.collapsed .account-user-details {
-      display: none !important;
-    }
-
-    .account-bar.collapsed .account-avatar {
-      font-size: 24px;
-      width: 36px;
-      height: 36px;
-      opacity: 1;
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-    }
-
-    .account-info:hover {
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-    }
-
-    .account-user-section {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    .account-user-details,
-    .account-buttons {
-      transition: opacity 0.3s ease 0.15s;
-      opacity: 1;
-    }
-
-    .account-avatar {
-      font-size: 24px;
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 1px 4px rgba(102, 126, 234, 0.25);
-      flex-shrink: 0;
-    }
-
-    .account-user-details {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    .account-nickname {
-      font-weight: bold;
-      color: #2d3748;
-      font-size: 14px;
-      white-space: nowrap;
-    }
-
-    .account-stats {
-      display: flex;
-      gap: 6px;
-      flex-wrap: nowrap;
-      white-space: nowrap;
-    }
-
-    .account-starcoins {
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      color: white;
-      padding: 3px 8px;
-      border-radius: 10px;
-      font-size: 11px;
-      font-weight: bold;
-      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
-    }
-
-    .account-buttons {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    .account-btn {
-      padding: 6px 12px;
-      font-size: 13px;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    .account-level {
-      background: linear-gradient(135deg, #f39c12, #e74c3c);
-      color: white;
-      padding: 3px 8px;
-      border-radius: 10px;
-      font-size: 11px;
-      font-weight: bold;
-      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
-    }
-
-    .account-exp {
-      background: linear-gradient(135deg, #3498db, #2ecc71);
-      color: white;
-      padding: 3px 8px;
-      border-radius: 10px;
-      font-size: 11px;
-      font-weight: bold;
-      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
-    }
-
-    /* 自动登录模态窗口样式 */
-    .auto-login-modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.8);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 2000;
-      backdrop-filter: blur(10px);
-      animation: fadeIn 0.3s ease;
-    }
-
-    .auto-login-content {
-      background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-      border-radius: 20px;
-      padding: 50px 40px 40px;
-      max-width: 520px;
-      width: 90%;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-      text-align: center;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      position: relative;
-      animation: slideUp 0.4s ease;
-    }
-
-    .auto-login-title {
-      font-size: 32px;
-      font-weight: 800;
-      margin-bottom: 15px;
-      color: #1a202c;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .auto-login-subtitle {
-      font-size: 16px;
-      color: #718096;
-      margin-bottom: 35px;
-      line-height: 1.6;
-      font-weight: 500;
-    }
-
-    .login-options {
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-      margin-bottom: 20px;
-    }
-
-    .login-option {
-      padding: 15px 20px;
-      border: 2px solid #e2e8f0;
-      border-radius: 10px;
-      background: #f7fafc;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      display: flex;
-      align-items: center;
-      gap: 15px;
-    }
-
-    .login-option:hover {
-      border-color: #4299e1;
-      background: #ebf8ff;
-      transform: translateY(-2px);
-    }
-
-    .login-option.active {
-      border-color: #4299e1;
-      background: #bee3f8;
-    }
-
-    .login-icon {
-      font-size: 24px;
-      width: 40px;
-      height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      background: #e2e8f0;
-    }
-
-    .login-text {
-      text-align: left;
-      flex: 1;
-    }
-
-    .login-title {
-      font-weight: bold;
-      font-size: 16px;
-      color: #2d3748;
-      margin-bottom: 5px;
-    }
-
-    .login-desc {
-      font-size: 14px;
-      color: #718096;
-    }
-
-    /* 自动登录按钮样式 */
-    .auto-login-buttons {
-      display: flex;
-      gap: 20px;
-      margin-bottom: 30px;
-    }
-
-    .auto-login-btn {
-      flex: 1;
-      padding: 25px 15px;
-      border: none;
-      border-radius: 15px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      background: #f7fafc;
-      border: 2px solid transparent;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 120px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .auto-login-btn::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-      transition: left 0.5s ease;
-    }
-
-    .auto-login-btn:hover::before {
-      left: 100%;
-    }
-
-    .auto-login-btn:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-    }
-
-    .auto-login-btn.btn-primary {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-    }
-
-    .auto-login-btn.btn-success {
-      background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-      color: white;
-    }
-
-    .auto-login-btn.btn-secondary {
-      background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%);
-      color: white;
-    }
-
-    .btn-icon {
-      font-size: 32px;
-      margin-bottom: 8px;
-      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
-    }
-
-    .btn-title {
-      font-size: 18px;
-      font-weight: 700;
-      margin-bottom: 4px;
-    }
-
-    .btn-desc {
-      font-size: 12px;
-      opacity: 0.9;
-      font-weight: 500;
-    }
-
-    .auto-login-guest-section {
-      text-align: center;
-      margin-top: 25px;
-      padding-top: 25px;
-      border-top: 1px solid rgba(226, 232, 240, 0.6);
-    }
-
-    .auto-login-footer {
-      margin-top: 20px;
-      text-align: center;
-    }
-
-    .auto-login-close-btn {
-      background: transparent;
-      color: #718096;
-      border: 1px solid #e2e8f0;
-      padding: 10px 25px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 14px;
-      transition: all 0.2s ease;
-    }
-
-    .auto-login-close-btn:hover {
-      background: #f7fafc;
-      color: #4a5568;
-      border-color: #cbd5e0;
-    }
-
-    /* 动画效果 */
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-      }
-
-      to {
-        opacity: 1;
-      }
-    }
-
-    @keyframes slideUp {
-      from {
-        opacity: 0;
-        transform: translateY(30px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .account-info {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 16px;
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    }
-
-    .account-nickname {
-      font-weight: bold;
-      color: #2d3748;
-    }
-
-    .account-btn {
-      padding: 8px 16px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 500;
-      font-size: 14px;
-      transition: all 0.2s;
-      background: #4a5568;
-      color: white;
-    }
-
-    .account-btn:hover {
-      background: #2d3748;
-      transform: translateY(-1px);
-    }
-
-    .account-btn.btn-primary {
-      background: #3182ce;
-    }
-
-    .account-btn.btn-primary:hover {
-      background: #2b6cb0;
-    }
-
-    .account-btn.btn-success {
-      background: #38a169;
-    }
-
-    .account-btn.btn-success:hover {
-      background: #2f855a;
-    }
-
-    .account-btn.btn-info {
-      background: #4299e1;
-    }
-
-    .account-btn.btn-info:hover {
-      background: #3182ce;
-    }
-
-    .account-modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 9999;
-    }
-
-    .account-modal {
-      background: white;
-      border-radius: 12px;
-      padding: 24px;
-      width: 100%;
-      max-width: 400px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-      animation: modalSlideIn 0.3s ease;
-    }
-
-    @keyframes modalSlideIn {
-      from {
-        opacity: 0;
-        transform: translateY(-20px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .account-modal-title {
-      font-size: 20px;
-      font-weight: bold;
-      color: #2d3748;
-      margin-bottom: 20px;
-      text-align: center;
-    }
-
-    .account-form-group {
-      margin-bottom: 16px;
-    }
-
-    .account-form-label {
-      display: block;
-      font-weight: 500;
-      color: #4a5568;
-      margin-bottom: 6px;
-      font-size: 14px;
-    }
-
-    .account-form-input {
-      width: 100%;
-      padding: 10px 14px;
-      border: 2px solid #e2e8f0;
-      border-radius: 8px;
-      font-size: 15px;
-      transition: border-color 0.2s;
-    }
-
-    .account-form-input:focus {
-      outline: none;
-      border-color: #3182ce;
-    }
-
-    .account-modal-footer {
-      display: flex;
-      gap: 10px;
-      margin-top: 20px;
-    }
-
-    .account-modal-footer .account-btn {
-      flex: 1;
-    }
-
-    .account-switch-text {
-      text-align: center;
-      margin-top: 16px;
-      color: #718096;
-      font-size: 14px;
-    }
-
-    .account-switch-link {
-      color: #3182ce;
-      cursor: pointer;
-      text-decoration: underline;
-    }
-
-    .account-switch-link:hover {
-      color: #2b6cb0;
-    }
-
-    /* 禁用触摸设备上的默认行为，防止双击放大 */
-    .touch-disabled {
-      touch-action: manipulation !important;
-      -webkit-user-select: none !important;
-      -moz-user-select: none !important;
-      -ms-user-select: none !important;
-      user-select: none !important;
-    }
-  </style>
-</head>
-
-<body>
-  <div id="theme-bg"></div>
-
-  <!-- 断开连接提示框 -->
-  <div id="disconnect-warning" class="disconnect-warning" style="display: none;">
-    <div class="disconnect-content">
-      <div class="disconnect-icon">🔌</div>
-      <div class="disconnect-title">连接已断开</div>
-      <div class="disconnect-message">与服务器的连接已断开，请检查网络后重新连接</div>
-      <button class="reconnect-btn" onclick="reconnectServer()">重新连接</button>
-    </div>
-  </div>
-  <!-- 账号栏 -->
-  <div class="account-bar" id="account-bar">
-    <button class="account-btn btn-primary" onclick="showLoginModal()">登录</button>
-    <button class="account-btn btn-success" onclick="showRegisterModal()">注册</button>
-  </div>
-
-  <h2>多棋种联机大厅 🎮</h2>
-
-  <!-- 新增：顶部导航栏 -->
-  <div class="game-nav">
-    <button class="nav-btn active" data-game="gobang" onclick="switchGame('gobang')">
-      🔴 五子棋<sup class="shortcut-hint">1</sup>
-    </button>
-    <button class="nav-btn" data-game="go" onclick="switchGame('go')">
-      ⚪ 围棋<sup class="shortcut-hint">2</sup>
-    </button>
-    <button class="nav-btn" data-game="chinese-chess" onclick="switchGame('chinese-chess')">
-      🟥 象棋<sup class="shortcut-hint">3</sup>
-    </button>
-    <button class="nav-btn" data-game="snake" onclick="switchGame('snake')">
-      🐍 贪吃蛇<sup class="shortcut-hint">4</sup>
-    </button>
-    <button class="nav-btn" data-page="achievements" onclick="showAchievements()">
-      🏆 成就<sup class="shortcut-hint">A</sup>
-    </button>
-    <button class="nav-btn" data-page="leaderboard" onclick="showLeaderboard()">
-      📊 排行榜<sup class="shortcut-hint">L</sup>
-    </button>
-    <button class="nav-btn" data-page="ai" onclick="showAIGame()">
-      🤖 AI对战<sup class="shortcut-hint">G</sup>
-    </button>
-    <button class="nav-btn" data-page="theme" onclick="showThemeModal()">
-      🎨 主题<sup class="shortcut-hint">V</sup>
-    </button>
-    <button class="nav-btn" data-page="shortcuts" onclick="showCustomShortcutsPanel()">
-      ⌨️ 快捷键<sup class="shortcut-hint">K</sup>
-    </button>
-  </div>
-
-  <!-- 大厅容器 -->
-  <div class="lobby-container" id="lobby-container">
-    <div class="lobby-title">🏛️ 联机大厅</div>
-    <div class="lobby-status" id="lobby-status">
-      欢迎来到多棋种联机大厅！选择棋种后点击"开始匹配"寻找对手
-    </div>
-    <div class="lobby-controls">
-      <button class="lobby-btn match-btn" id="match-btn" onclick="startMatching()">
-        🎯 开始匹配
-      </button>
-      <button class="lobby-btn cancel-btn" id="cancel-btn" onclick="cancelMatching()" disabled>
-        ❌ 取消匹配
-      </button>
-    </div>
-  </div>
-
-
-
-  <!-- 核心信息面板 -->
-  <div class="info-container" id="info-container">
-    <!-- 基础联机信息面板 -->
-    <div class="info-panel">
-      <div class="info-title">📢 基础联机信息</div>
-      <div class="info-content">
-        <span class="info-label">当前棋种：</span>
-        <span id="current-game" class="info-value">五子棋</span>
-      </div>
-      <div class="info-content">
-        <span class="info-label">当前身份：</span>
-        <span id="role" class="info-value">未加入</span>
-      </div>
-      <div class="info-content">
-        <span class="info-label">我的棋子：</span>
-        <span id="my-color" class="info-value">--</span>
-      </div>
-      <div class="info-content">
-        <span class="info-label">联机状态：</span>
-        <span id="connect-status" class="info-value">未联机</span>
-      </div>
-      <div class="info-content">
-        <span class="info-label">游戏状态：</span>
-        <span id="game-status" class="info-value">未开始</span>
-      </div>
-      <div class="info-content">
-        <span class="info-label">网络延迟：</span>
-        <span id="network-latency" class="info-value">0ms</span>
-      </div>
-    </div>
-
-    <!-- 核心游戏参数面板 -->
-    <div class="info-panel">
-      <div class="info-title">📊 核心游戏参数</div>
-      <div class="info-content">
-        <span class="info-label">当前回合：</span>
-        <span id="current-turn" class="info-value value-turn">黑棋</span>
-      </div>
-      <div class="info-content">
-        <span class="info-label">最后落子：</span>
-        <span id="last-move" class="info-value">无</span>
-      </div>
-      <div class="info-content">
-        <span class="info-label">落子总数：</span>
-        <span id="move-count" class="info-value">0</span>
-      </div>
-      <div class="info-content">
-        <span class="info-label">胜利方：</span>
-        <span id="winner" class="info-value">--</span>
-      </div>
-      <div class="info-content">
-        <span class="info-label">当前连子数：</span>
-        <span id="current-chain" class="info-value">0</span>
-      </div>
-      <div class="info-content">
-        <span class="info-label">胜负判定：</span>
-        <span id="win-condition" class="info-value">五子连珠</span>
-      </div>
-    </div>
-
-    <!-- 实时监控面板 -->
-    <div class="info-panel">
-      <div class="info-title">🎯 实时监控参数</div>
-      <div class="info-content">
-        <span class="info-label">鼠标悬停：</span>
-        <span id="mouse-pos" class="info-value">(--,--)</span>
-      </div>
-      <div class="info-content">
-        <span class="info-label">黑棋/红方：</span>
-        <span id="black-count" class="info-value">0</span>
-      </div>
-      <div class="info-content">
-        <span class="info-label">白棋/绿方：</span>
-        <span id="white-count" class="info-value">0</span>
-      </div>
-      <div class="info-content">
-        <span class="info-label">对局时长：</span>
-        <span id="game-time" class="info-value">00:00</span>
-      </div>
-      <div class="info-content">
-        <span class="info-label">空位数：</span>
-        <span id="empty-count" class="info-value">225</span>
-      </div>
-      <div class="info-content">
-        <span class="info-label">落子频率：</span>
-        <span id="move-frequency" class="info-value">0.00 步/秒</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- 操作控制区 -->
-  <div class="controls" id="game-controls">
-    <button onclick="resetGame(true)" id="reset-btn" class="reset-btn">🔄 重置游戏</button>
-    <button onclick="toggleAdvancedStats()" id="stats-btn" class="stats-btn">📈 高级统计</button>
-    <button onclick="exportGameData()" id="export-btn" style="background:#27ae60;">📤 导出对局数据</button>
-    <button onclick="playAgain()" id="play-again-btn" style="background:#e74c3c; display:none;">🔄 再来一把</button>
-    <button onclick="requestUndo()" id="undo-btn" style="background:#8B4513;display:none;">⏪ 悔棋</button>
-    <button onclick="requestHint()" id="hint-btn" style="background:#2E86C1;display:none;">💡 提示</button>
-    <button onclick="returnToLobby()" style="background:#f39c12;">🏠 返回大厅</button>
-    <button onclick="showGameTips()" style="background:#9b59b6;">💡 游戏规则</button>
-  </div>
-
-  <!-- 状态显示区 -->
-  <div class="status-box" id="status">
-    状态：请选择棋种并开始匹配
-  </div>
-
-  <!-- 主内容容器 -->
-  <div class="main-content-container">
-    <!-- 左侧面板 - 在线玩家和落子记录 -->
-    <div class="left-panels-container">
-      <!-- 在线玩家面板 -->
-      <div class="online-users-panel" id="online-users-panel" style="transition: all 0.3s ease;">
-        <div class="move-log-title">👥 在线玩家</div>
-        <div class="user-list" id="user-list">
-          暂无在线玩家
-        </div>
-      </div>
-
-      <!-- 落子记录面板 -->
-      <div class="move-log-panel" id="move-log-panel" style="transition: all 0.3s ease;">
-        <div class="move-log-title">📜 落子记录（实时更新）</div>
-        <div class="move-log-list" id="move-log">
-          等待落子...
-        </div>
-      </div>
-    </div>
-
-    <!-- 中间内容区域 -->
-    <div class="center-content-container">
-      <!-- 成就页面 -->
-      <div class="achievements-container" id="achievements-container"
-        style="display: none; width: 100%; max-width: 100%; min-width: 500px; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07); margin: 0 0 15px; box-sizing: border-box; transition: all 0.3s ease;">
-        <div class="lobby-title" style="font-size: 24px; margin-bottom: 15px;">🏆 成就系统</div>
-        <div class="lobby-status" style="font-size: 16px; margin-bottom: 25px;">
-          解锁成就，获得丰厚奖励！
-        </div>
-        <div class="achievements-list" id="achievements-list"
-          style="padding: 20px; background: #f8f9fa; border-radius: 8px; max-height: 500px; overflow-y: auto;">
-          加载中...
-        </div>
-      </div>
-
-      <!-- 排行榜页面 -->
-      <div class="leaderboard-page" id="leaderboard-page"
-        style="display: none; width: 100%; max-width: 100%; min-width: 500px; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07); margin: 0 0 15px; box-sizing: border-box; transition: all 0.3s ease;">
-        <div class="lobby-title" style="font-size: 24px; margin-bottom: 15px;">📊 排行榜</div>
-        <div class="lobby-status" style="font-size: 16px; margin-bottom: 25px;">
-          查看玩家排名和战绩！
-        </div>
-        <div class="leaderboard-controls"
-          style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; justify-content: center;">
-          <button class="lobby-btn" onclick="loadLeaderboard('all')"
-            style="background: #3498db; color: white; padding: 10px 16px; border-radius: 16px; font-size: 14px;">📋
-            总榜</button>
-          <button class="lobby-btn" onclick="loadLeaderboard('gobang')"
-            style="background: #e74c3c; color: white; padding: 10px 16px; border-radius: 16px; font-size: 14px;">🔴
-            五子棋</button>
-          <button class="lobby-btn" onclick="loadLeaderboard('go')"
-            style="background: #27ae60; color: white; padding: 10px 16px; border-radius: 16px; font-size: 14px;">⚪
-            围棋</button>
-          <button class="lobby-btn" onclick="loadLeaderboard('chinese-chess')"
-            style="background: #f39c12; color: white; padding: 10px 16px; border-radius: 16px; font-size: 14px;">🟥
-            象棋</button>
-          <button class="lobby-btn" onclick="loadLeaderboard('snake')"
-            style="background: #9b59b6; color: white; padding: 10px 16px; border-radius: 16px; font-size: 14px;">🐍
-            贪吃蛇</button>
-          <button class="lobby-btn cancel-btn" onclick="returnToLobby()"
-            style="background: #6c757d; color: white; padding: 10px 16px; border-radius: 16px; font-size: 14px; margin-left: auto;">🏠
-            返回大厅</button>
-        </div>
-        <div class="leaderboard-container"
-          style="width: 100%; background: #f8f9fa; border-radius: 8px; overflow: hidden;">
-          <div class="leaderboard-list" id="leaderboard-list"
-            style="padding: 20px; max-height: 600px; overflow-y: auto;">
-            加载中...
-          </div>
-        </div>
-      </div>
-
-      <!-- AI对战页面 -->
-      <div class="ai-game-container" id="ai-game-container"
-        style="display: none; width: 100%; max-width: 100%; min-width: 500px; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07); margin: 0 0 15px; box-sizing: border-box; transition: all 0.3s ease;">
-        <div class="lobby-title" style="font-size: 24px; text-align: center; margin-bottom: 15px; color: #2d3748;">
-          🤖 AI对战
-        </div>
-        <div class="lobby-status" style="text-align: center; margin-bottom: 25px; font-size: 16px; color: #718096;">
-          选择游戏类型和难度，挑战AI！
-        </div>
-        <div class="ai-game-controls"
-          style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px;">
-          <div style="grid-column: 1 / -1; margin-bottom: 20px;">
-            <div style="text-align: center; margin-bottom: 15px;">
-              <label style="font-weight: bold; font-size: 18px; color: #2d3748;">游戏类型：</label>
-            </div>
-            <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
-              <style>
-                .game-type-card {
-                  padding: 15px 25px;
-                  border-radius: 10px;
-                  border: 2px solid #e2e8f0;
-                  background: #f7fafc;
-                  color: #2d3748;
-                  font-size: 16px;
-                  font-weight: 600;
-                  cursor: pointer;
-                  transition: all 0.2s ease;
-                  min-width: 110px;
-                  text-align: center;
-                }
-
-                .game-type-card:hover {
-                  border-color: #4299e1;
-                  background: #ebf8ff;
-                }
-
-                .game-type-card.selected {
-                  border-color: #4299e1;
-                  background: #4299e1;
-                  color: white;
-                }
-              </style>
-              <div class="game-type-card selected" data-game-type="gobang" onclick="selectGameType('gobang')">
-                🔴 五子棋
-              </div>
-              <div class="game-type-card" data-game-type="go" onclick="selectGameType('go')">
-                ⚪ 围棋
-              </div>
-              <div class="game-type-card" data-game-type="chinese-chess" onclick="selectGameType('chinese-chess')">
-                🟥 象棋
-              </div>
-              <input type="hidden" id="ai-game-type" value="gobang">
-            </div>
-          </div>
-          <button class="lobby-btn match-btn" onclick="startAIGame('easy')"
-            style="background: #48bb78; padding: 18px; border-radius: 8px; border: none; color: white; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
-            🟢 简单难度
-            <div style="font-size: 12px; color: rgba(255, 255, 255, 0.9); margin-top: 6px;">AI会随机落子</div>
-          </button>
-          <button class="lobby-btn match-btn" onclick="startAIGame('medium')"
-            style="background: #ed8936; padding: 18px; border-radius: 8px; border: none; color: white; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
-            🟡 中等难度
-            <div style="font-size: 12px; color: rgba(255, 255, 255, 0.9); margin-top: 6px;">AI会进行简单的策略思考</div>
-          </button>
-          <button class="lobby-btn match-btn" onclick="startAIGame('hard')"
-            style="background: #f56565; padding: 18px; border-radius: 8px; border: none; color: white; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
-            🔴 困难难度
-            <div style="font-size: 12px; color: rgba(255, 255, 255, 0.9); margin-top: 6px;">AI会进行深度的策略思考</div>
-          </button>
-          <button class="lobby-btn cancel-btn" onclick="returnToLobby()"
-            style="grid-column: 1 / -1; background: #6c757d; padding: 12px; border-radius: 8px; border: none; color: white; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
-            🏠 返回大厅
-          </button>
-        </div>
-      </div>
-
-      <!-- 主题选择页面 -->
-      <div class="theme-container" id="theme-container"
-        style="display: none; width: 100%; max-width: 100%; min-width: 500px; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07); margin: 0 0 15px; box-sizing: border-box; transition: all 0.3s ease;">
-        <div class="lobby-title" style="font-size: 24px; margin-bottom: 15px;">🎨 主题选择</div>
-        <div class="lobby-status" style="font-size: 16px; margin-bottom: 25px;">
-          选择你喜欢的主题风格！
-        </div>
-        <div id="theme-list-container"
-          style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 8px; max-height: 500px; overflow-y: auto;">
-          <!-- 主题选项将在这里动态加载 -->
-        </div>
-        <div style="display: flex; justify-content: center; margin-top: 25px;">
-          <button class="lobby-btn cancel-btn" onclick="returnToLobby()"
-            style="background: #6c757d; color: white; padding: 12px 20px; border-radius: 20px; font-size: 16px;">
-            🏠 返回大厅
-          </button>
-        </div>
-      </div>
-
-      <!-- 棋盘容器 -->
-      <div class="board-container" style="transition: all 0.3s ease;">
-        <!-- 五子棋棋盘 -->
-        <div class="gobang-board" id="gobang-board"></div>
-
-        <!-- 围棋棋盘 -->
-        <div class="go-board" id="go-board"></div>
-
-        <!-- 象棋棋盘 -->
-        <div class="chess-board" id="chess-board"></div>
-
-        <!-- 贪吃蛇游戏 -->
-        <div class="snake-game-container" id="snake-game-container" style="display: none;">
-          <div class="game-info">
-            <div class="info-item">
-              <span class="info-label">分数：</span>
-              <span class="info-value" id="snake-score">0</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">最高分：</span>
-              <span class="info-value" id="snake-highscore">0</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">速度：</span>
-              <span class="info-value" id="snake-speed">150</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">⏱️ 时间：</span>
-              <span class="info-value" id="snake-time">2:00</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">🍎 食物：</span>
-              <span class="info-value" id="snake-food-count">0</span>
-            </div>
-          </div>
-          <canvas id="snake-canvas" width="400" height="400"></canvas>
-
-          <!-- 道具栏 -->
-          <div class="snake-item-bar" id="snake-item-bar"
-            style="display: none; margin: 10px auto; padding: 8px 12px; background: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 500px; border: 1px solid #e9ecef;">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-              <span style="font-size: 14px; font-weight: 600; color: #495057;">🎒 道具</span>
-              <span style="font-size: 12px; color: #6c757d;">双击使用</span>
-            </div>
-            <div id="snake-item-list" style="display: flex; gap: 8px; flex-wrap: wrap; min-height: 36px;"></div>
-          </div>
-
-          <div class="game-controls">
-            <button class="lobby-btn" id="snake-start" onclick="startSnakeGame()">🎮 单人模式</button>
-            <button class="lobby-btn" id="snake-dual" onclick="startSnakeDualGame()" style="background: #667eea;">⚔️
-              匹配对战</button>
-            <button class="lobby-btn" id="snake-restart" onclick="restartSnakeGame()">🔄 重新开始</button>
-            <button class="lobby-btn" id="snake-virt-btn" onclick="toggleVirtualControls()"
-              style="background: #9b59b6;">🕹️ 按键</button>
-            <button class="lobby-btn" id="snake-quit" onclick="quitSnakeGame()" style="background: #e74c3c;">🚪
-              退出</button>
-          </div>
-
-          <!-- 虚拟按键 -->
-          <div class="virtual-controls" id="snake-virtual-controls"
-            style="display: none; flex-direction: column; align-items: center; margin-top: 30px;">
-            <div class="virtual-btn up-btn" onclick="handleVirtualKey('up')"
-              style="width: 80px; height: 80px; background: #4ecdc4; border: none; border-radius: 15px; color: white; font-size: 32px; margin-bottom: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);">
-              ↑</div>
-            <div style="display: flex; gap: 15px;">
-              <div class="virtual-btn left-btn" onclick="handleVirtualKey('left')"
-                style="width: 80px; height: 80px; background: #4ecdc4; border: none; border-radius: 15px; color: white; font-size: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);">
-                ←</div>
-              <div class="virtual-btn down-btn" onclick="handleVirtualKey('down')"
-                style="width: 80px; height: 80px; background: #4ecdc4; border: none; border-radius: 15px; color: white; font-size: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);">
-                ↓</div>
-              <div class="virtual-btn right-btn" onclick="handleVirtualKey('right')"
-                style="width: 80px; height: 80px; background: #4ecdc4; border: none; border-radius: 15px; color: white; font-size: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);">
-                →</div>
-            </div>
-          </div>
-
-          <div class="game-rules">
-            <div class="rules-title">📜 游戏规则</div>
-            <div class="rules-content" id="snake-rules"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 右侧面板 - 聊天 -->
-    <div class="right-panels-container" style="transition: all 0.3s ease;">
-      <!-- 聊天面板 -->
-      <div class="chat-container" id="chat-container" style="transition: all 0.3s ease;">
-        <div class="move-log-title">💬 聊天</div>
-        <div class="chat-channel-selector">
-          <button class="chat-channel-btn active" id="channel-global" onclick="switchChatChannel('global')">
-            🌐 大厅
-          </button>
-          <button class="chat-channel-btn" id="channel-game" onclick="switchChatChannel('game')" disabled>
-            🎮 局内
-          </button>
-        </div>
-        <div class="chat-messages" id="chat-messages">
-        </div>
-        <div class="chat-input-container">
-          <input type="text" id="chat-input" class="chat-input" placeholder="输入消息..."
-            onkeypress="handleChatKeypress(event)">
-          <button class="chat-send-btn" onclick="sendChatMessage()">发送</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 高级统计面板 -->
-  <div class="advanced-stats" id="advanced-stats">
-    <div class="info-title">📋 高级对局统计</div>
-    <div class="stats-grid">
-      <div class="stats-item">
-        <div class="stats-item-label">棋盘总格子数</div>
-        <div class="stats-item-value" id="total-cells">225</div>
-      </div>
-      <div class="stats-item">
-        <div class="stats-item-label">已落子格子占比</div>
-        <div class="stats-item-value" id="filled-rate">0.00%</div>
-      </div>
-      <div class="stats-item">
-        <div class="stats-item-label">黑棋/红方胜率</div>
-        <div class="stats-item-value" id="black-win-rate">0%</div>
-      </div>
-      <div class="stats-item">
-        <div class="stats-item-label">白棋/绿方胜率</div>
-        <div class="stats-item-value" id="white-win-rate">0%</div>
-      </div>
-      <div class="stats-item">
-        <div class="stats-item-label">最快获胜步数</div>
-        <div class="stats-item-value" id="fastest-win-steps">--</div>
-      </div>
-      <div class="stats-item">
-        <div class="stats-item-label">当前最大连子数</div>
-        <div class="stats-item-value" id="max-chain">0</div>
-      </div>
-      <div class="stats-item">
-        <div class="stats-item-label">平均落子间隔</div>
-        <div class="stats-item-value" id="avg-move-interval">0ms</div>
-      </div>
-      <div class="stats-item">
-        <div class="stats-item-label">棋盘填满率</div>
-        <div class="stats-item-value" id="board-fill-rate">0.00%</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 胜利提示 -->
-  <div class="win-alert" id="win-alert">
-    <span id="win-text"></span>
-  </div>
-
-  <!-- 新增：智能提示弹窗 -->
-  <div class="tip-popup" id="tip-popup">
-    <button class="tip-popup-close" onclick="hideGameTips()">&times;</button>
-    <div class="tip-popup-title" id="tip-popup-title">游戏规则</div>
-    <div class="tip-popup-content" id="tip-popup-content"></div>
-  </div>
-
-  <!-- 操作提示 -->
-  <div class="tip-text">
-    📝 详细操作说明：<br>
-    1. 在顶部选择棋种（五子棋/围棋/象棋）→ 2. 点击"开始匹配"自动寻找对手 → 3. 匹配成功后系统随机分配阵营<br>
-    📊 监控说明：三栏面板实时显示基础/核心/实时参数，高级统计可查看连子数、占比等深度数据<br>
-    ⚠️ 注意：只有当前回合方可以落子，匹配成功后自动进入对局 | 点击"💡 游戏规则"查看各棋种玩法说明
-  </div>
-
-  <!-- 系统广播通知 -->
-  <div class="system-broadcast" id="system-broadcast">
-    <div class="broadcast-header">
-      <div class="broadcast-title">
-        <span>📢</span>
-        <span>系统公告</span>
-      </div>
-      <button class="broadcast-close" onclick="hideBroadcast()">&times;</button>
-    </div>
-    <div class="broadcast-content" id="broadcast-content"></div>
-    <div class="broadcast-time" id="broadcast-time"></div>
-  </div>
-
-  <!-- 版本信息 -->
-  <div class="version-info">
-    版本说明：多棋种联机大厅版 - 支持五子棋/围棋/象棋 | 智能提示系统 | 性能优化版 | 快捷键系统 v<span id="client-version-display">1.5.0</span>
-    <span id="server-version-display" style="margin-left: 10px; font-size: 12px; color: #666;"></span>
-  </div>
-
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-  <script src="replay-module.js"></script>
-  <script>
-    // 版本号 (语义化版本: MAJOR.MINOR.PATCH)
+﻿  <script>
+    // 鐗堟湰鍙?(璇箟鍖栫増鏈? MAJOR.MINOR.PATCH)
     const CLIENT_VERSION = '1.5.0';
 
-    // 全局游戏变量
-    let currentGame = 'gobang'; // 当前选择的棋种：gobang, go, chess, snake
-    let accountId = null; // 由服务器分配
+    // 鍏ㄥ眬娓告垙鍙橀噺
+    let currentGame = 'gobang'; // 褰撳墠閫夋嫨鐨勬绉嶏細gobang, go, chess, snake
+    let accountId = null; // 鐢辨湇鍔″櫒鍒嗛厤
 
-    // 从localStorage获取或生成用户ID
+    // 浠巐ocalStorage鑾峰彇鎴栫敓鎴愮敤鎴稩D
     function getSavedUserId() {
       try {
         let saved = localStorage.getItem('gameUserId');
         if (!saved) {
-          // 生成新的用户ID并保存
+          // 鐢熸垚鏂扮殑鐢ㄦ埛ID骞朵繚瀛?
           saved = generateClientUserId();
           localStorage.setItem('gameUserId', saved);
         }
         return saved;
       } catch (e) {
-        console.warn('无法访问localStorage:', e);
+        console.warn('鏃犳硶璁块棶localStorage:', e);
         return generateClientUserId();
       }
     }
 
-    // 生成客户端用户ID
+    // 鐢熸垚瀹㈡埛绔敤鎴稩D
     function generateClientUserId() {
       return 'user_' + Math.random().toString(36).substr(2, 9);
     }
 
-    // 保存用户ID
+    // 淇濆瓨鐢ㄦ埛ID
     function saveUserId(id) {
       try {
         localStorage.setItem('gameUserId', id);
       } catch (e) {
-        console.warn('无法保存用户ID:', e);
+        console.warn('鏃犳硶淇濆瓨鐢ㄦ埛ID:', e);
       }
     }
 
-    // 大厅和匹配相关变量
+    // 澶у巺鍜屽尮閰嶇浉鍏冲彉閲?
     let isMatching = false;
     let matchedOpponentId = null;
     let userStatus = 'online';
     let onlineUsers = new Map();
 
-    // 聊天频道相关变量
+    // 鑱婂ぉ棰戦亾鐩稿叧鍙橀噺
     let currentChatChannel = 'global';
     let globalChatHistory = [];
     let gameChatHistory = [];
 
-    // 账号相关变量
+    // 璐﹀彿鐩稿叧鍙橀噺
     let currentAccount = null;
     let lastExp = 0;
     let lastLevel = 1;
-    let pendingRegisterInfo = null; // 保存注册信息用于自动登录
+    let pendingRegisterInfo = null; // 淇濆瓨娉ㄥ唽淇℃伅鐢ㄤ簬鑷姩鐧诲綍
 
-    // Socket.io 连接
+    // Socket.io 杩炴帴
     const socket = io({
       transports: ['websocket', 'polling'],
       autoConnect: true,
@@ -3411,10 +64,10 @@
       timeout: 20000
     });
 
-    // 立即设置Socket.io事件监听
+    // 绔嬪嵆璁剧疆Socket.io浜嬩欢鐩戝惉
     setupSocketListeners();
 
-    // 游戏状态变量
+    // 娓告垙鐘舵€佸彉閲?
     let gameState = {
       board: null,
       turn: 1,
@@ -3432,14 +85,14 @@
       networkLatency: 0,
       selectedPiece: null,
       validMoves: [],
-      koPosition: null, // 打劫位置
-      koColor: null // 打劫颜色
+      koPosition: null, // 鎵撳姭浣嶇疆
+      koColor: null // 鎵撳姭棰滆壊
     };
 
-    // 重置请求数据
+    // 閲嶇疆璇锋眰鏁版嵁
     let currentResetRequest = null;
 
-    // DOM 元素
+    // DOM 鍏冪礌
     const themeBg = document.getElementById('theme-bg');
     const winAlert = document.getElementById('win-alert');
     const winText = document.getElementById('win-text');
@@ -3486,7 +139,7 @@
     const channelGlobalBtn = document.getElementById('channel-global');
     const channelGameBtn = document.getElementById('channel-game');
 
-    // 挑战相关DOM
+    // 鎸戞垬鐩稿叧DOM
     let challengeModal, challengeTitle, challengeMessage, challengeAcceptBtn, challengeRejectBtn;
 
 
@@ -3507,114 +160,114 @@
     const leaderboardTitle = document.querySelector('.leaderboard-title');
     const leaderboardList = document.getElementById('leaderboard-list');
 
-    // 棋盘DOM
+    // 妫嬬洏DOM
     const gobangBoard = document.getElementById('gobang-board');
     const goBoard = document.getElementById('go-board');
     const chessBoard = document.getElementById('chess-board');
 
-    // 游戏配置
+    // 娓告垙閰嶇疆
     const gameConfigs = {
       gobang: {
         size: 19,
         totalCells: 361,
-        winCondition: '五子连珠',
-        colorNames: ['黑棋', '白棋'],
+        winCondition: '浜斿瓙杩炵彔',
+        colorNames: ['榛戞', '鐧芥'],
         pieceClasses: ['gobang-black', 'gobang-white'],
         boardClass: 'gobang-board',
         cellClass: 'gobang-cell',
-        emoji: '🔴',
-        rules: `五子棋规则：
-• 黑白双方轮流落子，黑棋先行
-• 先在一条直线（横、竖、斜）上形成五子连珠者获胜
-• 落子后不能移动或拿掉任何棋子
-• 禁止长连（超过五颗棋子连成一线）
-• 禁止三三、四四、长连等禁手（本版本简化规则）`
+        emoji: '馃敶',
+        rules: `浜斿瓙妫嬭鍒欙細
+鈥?榛戠櫧鍙屾柟杞祦钀藉瓙锛岄粦妫嬪厛琛?
+鈥?鍏堝湪涓€鏉＄洿绾匡紙妯€佺珫銆佹枩锛変笂褰㈡垚浜斿瓙杩炵彔鑰呰幏鑳?
+鈥?钀藉瓙鍚庝笉鑳界Щ鍔ㄦ垨鎷挎帀浠讳綍妫嬪瓙
+鈥?绂佹闀胯繛锛堣秴杩囦簲棰楁瀛愯繛鎴愪竴绾匡級
+鈥?绂佹涓変笁銆佸洓鍥涖€侀暱杩炵瓑绂佹墜锛堟湰鐗堟湰绠€鍖栬鍒欙級`
       },
       go: {
         size: 21,
         totalCells: 441,
-        winCondition: '领地最多',
-        colorNames: ['黑棋', '白棋'],
+        winCondition: '棰嗗湴鏈€澶?,
+        colorNames: ['榛戞', '鐧芥'],
         pieceClasses: ['go-black', 'go-white'],
         boardClass: 'go-board',
         cellClass: 'go-cell',
-        emoji: '⚪',
-        rules: `围棋规则：
-• 黑白双方轮流落子，黑棋先行
-• 棋子放在交叉点上，不能移动
-• 当一组棋子的气（相邻空格）被对方填满时，这组棋子被提走
-• 禁止自杀（落子后使自己的棋子立即无气）
-• 禁止打劫（立即提回被提走的棋子）
-• 游戏结束时，领地和棋子数量之和多者获胜`
+        emoji: '鈿?,
+        rules: `鍥存瑙勫垯锛?
+鈥?榛戠櫧鍙屾柟杞祦钀藉瓙锛岄粦妫嬪厛琛?
+鈥?妫嬪瓙鏀惧湪浜ゅ弶鐐逛笂锛屼笉鑳界Щ鍔?
+鈥?褰撲竴缁勬瀛愮殑姘旓紙鐩搁偦绌烘牸锛夎瀵规柟濉弧鏃讹紝杩欑粍妫嬪瓙琚彁璧?
+鈥?绂佹鑷潃锛堣惤瀛愬悗浣胯嚜宸辩殑妫嬪瓙绔嬪嵆鏃犳皵锛?
+鈥?绂佹鎵撳姭锛堢珛鍗虫彁鍥炶鎻愯蛋鐨勬瀛愶級
+鈥?娓告垙缁撴潫鏃讹紝棰嗗湴鍜屾瀛愭暟閲忎箣鍜屽鑰呰幏鑳渀
       },
       'chinese-chess': {
         size: { width: 9, height: 10 },
         totalCells: 90,
-        winCondition: '将帅被吃',
-        colorNames: ['红方', '黑方'],
+        winCondition: '灏嗗竻琚悆',
+        colorNames: ['绾㈡柟', '榛戞柟'],
         pieceClasses: ['chess-red', 'chess-black'],
         boardClass: 'chess-board',
         cellClass: 'chess-intersection',
-        emoji: '🟥',
-        rules: `象棋规则：
-• 红方先行，双方轮流移动棋子
-• 马走日，象走田，车走直线炮翻山
-• 士走斜线护将边，将在九宫转圈圈
-• 兵卒过河横竖走，过河之前只向前
-• 吃掉对方的将帅获胜
-• 不能长将、长捉、长杀等重复循环`
+        emoji: '馃煡',
+        rules: `璞℃瑙勫垯锛?
+鈥?绾㈡柟鍏堣锛屽弻鏂硅疆娴佺Щ鍔ㄦ瀛?
+鈥?椹蛋鏃ワ紝璞¤蛋鐢帮紝杞﹁蛋鐩寸嚎鐐炕灞?
+鈥?澹蛋鏂滅嚎鎶ゅ皢杈癸紝灏嗗湪涔濆杞湀鍦?
+鈥?鍏靛崚杩囨渤妯珫璧帮紝杩囨渤涔嬪墠鍙悜鍓?
+鈥?鍚冩帀瀵规柟鐨勫皢甯呰幏鑳?
+鈥?涓嶈兘闀垮皢銆侀暱鎹夈€侀暱鏉€绛夐噸澶嶅惊鐜痐
       }
     };
 
-    // ========== 快捷键系统 ==========
-    // 默认快捷键配置
+    // ========== 蹇嵎閿郴缁?==========
+    // 榛樿蹇嵎閿厤缃?
     const defaultShortcuts = {
-      // ========== 游戏切换 ==========
-      '1': { action: 'switchGame', args: ['gobang'], description: '切换到五子棋', category: '游戏切换' },
-      '2': { action: 'switchGame', args: ['go'], description: '切换到围棋', category: '游戏切换' },
-      '3': { action: 'switchGame', args: ['chinese-chess'], description: '切换到象棋', category: '游戏切换' },
-      '4': { action: 'switchGame', args: ['snake'], description: '切换到贪吃蛇', category: '游戏切换' },
+      // ========== 娓告垙鍒囨崲 ==========
+      '1': { action: 'switchGame', args: ['gobang'], description: '鍒囨崲鍒颁簲瀛愭', category: '娓告垙鍒囨崲' },
+      '2': { action: 'switchGame', args: ['go'], description: '鍒囨崲鍒板洿妫?, category: '娓告垙鍒囨崲' },
+      '3': { action: 'switchGame', args: ['chinese-chess'], description: '鍒囨崲鍒拌薄妫?, category: '娓告垙鍒囨崲' },
+      '4': { action: 'switchGame', args: ['snake'], description: '鍒囨崲鍒拌椽鍚冭泧', category: '娓告垙鍒囨崲' },
 
-      // ========== 匹配系统 ==========
-      'm': { action: 'startMatch', description: '开始匹配', category: '匹配系统' },
-      'Escape': { action: 'cancelMatch', description: '取消匹配/关闭弹窗', category: '匹配系统' },
-      'r': { action: 'returnToLobby', description: '返回大厅', category: '匹配系统' },
+      // ========== 鍖归厤绯荤粺 ==========
+      'm': { action: 'startMatch', description: '寮€濮嬪尮閰?, category: '鍖归厤绯荤粺' },
+      'Escape': { action: 'cancelMatch', description: '鍙栨秷鍖归厤/鍏抽棴寮圭獥', category: '鍖归厤绯荤粺' },
+      'r': { action: 'returnToLobby', description: '杩斿洖澶у巺', category: '鍖归厤绯荤粺' },
 
-      // ========== 界面功能 ==========
-      't': { action: 'showGameTips', description: '显示游戏规则', category: '界面功能' },
-      'a': { action: 'showAchievements', description: '显示成就', category: '界面功能' },
-      'l': { action: 'showLeaderboard', description: '显示排行榜', category: '界面功能' },
-      'i': { action: 'showProfile', description: '个人资料', category: '界面功能' },
-      'h': { action: 'showGameHistory', description: '游戏历史', category: '界面功能' },
-      'g': { action: 'showAIGame', description: 'AI对战', category: '界面功能' },
-      'v': { action: 'showTheme', description: '主题设置', category: '界面功能' },
-      'k': { action: 'showCustomShortcuts', description: '自定义快捷键', category: '界面功能' },
-      '?': { action: 'showShortcuts', description: '显示快捷键帮助', category: '界面功能' },
-      's': { action: 'toggleSound', description: '切换音效', category: '界面功能' },
-      'q': { action: 'showLogin', description: '登录', category: '界面功能' },
-      'e': { action: 'showRegister', description: '注册', category: '界面功能' },
+      // ========== 鐣岄潰鍔熻兘 ==========
+      't': { action: 'showGameTips', description: '鏄剧ず娓告垙瑙勫垯', category: '鐣岄潰鍔熻兘' },
+      'a': { action: 'showAchievements', description: '鏄剧ず鎴愬氨', category: '鐣岄潰鍔熻兘' },
+      'l': { action: 'showLeaderboard', description: '鏄剧ず鎺掕姒?, category: '鐣岄潰鍔熻兘' },
+      'i': { action: 'showProfile', description: '涓汉璧勬枡', category: '鐣岄潰鍔熻兘' },
+      'h': { action: 'showGameHistory', description: '娓告垙鍘嗗彶', category: '鐣岄潰鍔熻兘' },
+      'g': { action: 'showAIGame', description: 'AI瀵规垬', category: '鐣岄潰鍔熻兘' },
+      'v': { action: 'showTheme', description: '涓婚璁剧疆', category: '鐣岄潰鍔熻兘' },
+      'k': { action: 'showCustomShortcuts', description: '鑷畾涔夊揩鎹烽敭', category: '鐣岄潰鍔熻兘' },
+      '?': { action: 'showShortcuts', description: '鏄剧ず蹇嵎閿府鍔?, category: '鐣岄潰鍔熻兘' },
+      's': { action: 'toggleSound', description: '鍒囨崲闊虫晥', category: '鐣岄潰鍔熻兘' },
+      'q': { action: 'showLogin', description: '鐧诲綍', category: '鐣岄潰鍔熻兘' },
+      'e': { action: 'showRegister', description: '娉ㄥ唽', category: '鐣岄潰鍔熻兘' },
 
-      // ========== 游戏操作 ==========
-      'z': { action: 'undoMove', description: '悔棋', category: '游戏操作' },
-      'Shift+Z': { action: 'redoMove', description: '重做', category: '游戏操作' },
-      'u': { action: 'resign', description: '认输', category: '游戏操作' },
-      'n': { action: 'newGame', description: '新游戏', category: '游戏操作' },
-      'p': { action: 'togglePause', description: '暂停/继续', category: '游戏操作' },
-      'f5': { action: 'restartGame', description: '重新开始', category: '游戏操作' },
+      // ========== 娓告垙鎿嶄綔 ==========
+      'z': { action: 'undoMove', description: '鎮旀', category: '娓告垙鎿嶄綔' },
+      'Shift+Z': { action: 'redoMove', description: '閲嶅仛', category: '娓告垙鎿嶄綔' },
+      'u': { action: 'resign', description: '璁よ緭', category: '娓告垙鎿嶄綔' },
+      'n': { action: 'newGame', description: '鏂版父鎴?, category: '娓告垙鎿嶄綔' },
+      'p': { action: 'togglePause', description: '鏆傚仠/缁х画', category: '娓告垙鎿嶄綔' },
+      'f5': { action: 'restartGame', description: '閲嶆柊寮€濮?, category: '娓告垙鎿嶄綔' },
 
-      // 方向键（贪吃蛇）
-      'ArrowUp': { action: 'snakeUp', description: '贪吃蛇向上', category: '贪吃蛇操作' },
-      'ArrowDown': { action: 'snakeDown', description: '贪吃蛇向下', category: '贪吃蛇操作' },
-      'ArrowLeft': { action: 'snakeLeft', description: '贪吃蛇向左', category: '贪吃蛇操作' },
-      'ArrowRight': { action: 'snakeRight', description: '贪吃蛇向右', category: '贪吃蛇操作' },
-      'w': { action: 'snakeUp', description: '贪吃蛇向上(W)', category: '贪吃蛇操作' },
-      's': { action: 'snakeDown', description: '贪吃蛇向下(S)', category: '贪吃蛇操作' },
-      'a': { action: 'snakeLeft', description: '贪吃蛇向左(A)', category: '贪吃蛇操作' },
-      'd': { action: 'snakeRight', description: '贪吃蛇向右(D)', category: '贪吃蛇操作' },
-      ' ': { action: 'snakePause', description: '贪吃蛇暂停(空格)', category: '贪吃蛇操作' }
+      // 鏂瑰悜閿紙璐悆铔囷級
+      'ArrowUp': { action: 'snakeUp', description: '璐悆铔囧悜涓?, category: '璐悆铔囨搷浣? },
+      'ArrowDown': { action: 'snakeDown', description: '璐悆铔囧悜涓?, category: '璐悆铔囨搷浣? },
+      'ArrowLeft': { action: 'snakeLeft', description: '璐悆铔囧悜宸?, category: '璐悆铔囨搷浣? },
+      'ArrowRight': { action: 'snakeRight', description: '璐悆铔囧悜鍙?, category: '璐悆铔囨搷浣? },
+      'w': { action: 'snakeUp', description: '璐悆铔囧悜涓?W)', category: '璐悆铔囨搷浣? },
+      's': { action: 'snakeDown', description: '璐悆铔囧悜涓?S)', category: '璐悆铔囨搷浣? },
+      'a': { action: 'snakeLeft', description: '璐悆铔囧悜宸?A)', category: '璐悆铔囨搷浣? },
+      'd': { action: 'snakeRight', description: '璐悆铔囧悜鍙?D)', category: '璐悆铔囨搷浣? },
+      ' ': { action: 'snakePause', description: '璐悆铔囨殏鍋?绌烘牸)', category: '璐悆铔囨搷浣? }
     };
 
-    // 从本地存储加载自定义快捷键，没有则使用默认
+    // 浠庢湰鍦板瓨鍌ㄥ姞杞借嚜瀹氫箟蹇嵎閿紝娌℃湁鍒欎娇鐢ㄩ粯璁?
     let shortcuts = loadCustomShortcuts();
     let soundMuted = false;
 
@@ -3626,7 +279,7 @@
           return { ...defaultShortcuts, ...custom };
         }
       } catch (e) {
-        console.error('加载快捷键失败:', e);
+        console.error('鍔犺浇蹇嵎閿け璐?', e);
       }
       return { ...defaultShortcuts };
     }
@@ -3635,14 +288,14 @@
       try {
         localStorage.setItem('gameShortcuts', JSON.stringify(shortcuts));
       } catch (e) {
-        console.error('保存快捷键失败:', e);
+        console.error('淇濆瓨蹇嵎閿け璐?', e);
       }
     }
 
     function resetShortcuts() {
       shortcuts = { ...defaultShortcuts };
       saveCustomShortcuts();
-      updateStatus('✅ 快捷键已重置为默认');
+      updateStatus('鉁?蹇嵎閿凡閲嶇疆涓洪粯璁?);
     }
 
     function handleKeydown(e) {
@@ -3661,12 +314,12 @@
 
     function executeShortcut(shortcut) {
       switch (shortcut.action) {
-        // ========== 游戏切换 ==========
+        // ========== 娓告垙鍒囨崲 ==========
         case 'switchGame':
           switchGame(shortcut.args[0]);
           break;
 
-        // ========== 匹配系统 ==========
+        // ========== 鍖归厤绯荤粺 ==========
         case 'startMatch':
           if (!isMatching) {
             startMatching();
@@ -3685,7 +338,7 @@
           returnToLobby();
           break;
 
-        // ========== 界面功能 ==========
+        // ========== 鐣岄潰鍔熻兘 ==========
         case 'showGameTips':
           showGameTips();
           break;
@@ -3718,7 +371,7 @@
           Object.keys(soundEnabled).forEach(k => {
             soundEnabled[k] = !soundMuted;
           });
-          updateStatus(soundMuted ? '🔇 音效已关闭' : '🔊 音效已开启');
+          updateStatus(soundMuted ? '馃攪 闊虫晥宸插叧闂? : '馃攰 闊虫晥宸插紑鍚?);
           break;
         case 'showLogin':
           showLoginModal();
@@ -3779,9 +432,9 @@
       const helpContent = `
         <div style="padding: 20px; max-width: 500px; background: white; border-radius: 12px; max-height: 80vh; overflow-y: auto;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h3 style="color: #667eea;">⌨️ 快捷键帮助</h3>
+            <h3 style="color: #667eea;">鈱笍 蹇嵎閿府鍔?/h3>
             <button onclick="showCustomShortcutsPanel()" style="padding: 6px 12px; font-size: 12px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer;">
-              ⚙️ 自定义
+              鈿欙笍 鑷畾涔?
             </button>
           </div>
           ${Object.entries(categories).map(([category, items]) => `
@@ -3825,18 +478,18 @@
       const panelContent = `
         <div style="padding: 20px; max-width: 550px; background: white; border-radius: 12px; max-height: 85vh; overflow-y: auto;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h3 style="color: #667eea;">⚙️ 自定义快捷键</h3>
+            <h3 style="color: #667eea;">鈿欙笍 鑷畾涔夊揩鎹烽敭</h3>
             <div style="display: flex; gap: 8px;">
               <button onclick="resetShortcuts(); showCustomShortcutsPanel()" style="padding: 6px 12px; font-size: 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                重置默认
+                閲嶇疆榛樿
               </button>
               <button onclick="document.querySelector('.modal').remove()" style="padding: 6px 12px; font-size: 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                关闭
+                鍏抽棴
               </button>
             </div>
           </div>
           <div style="font-size: 12px; color: #666; margin-bottom: 15px; padding: 10px; background: #fff3cd; border-radius: 6px;">
-            💡 提示：点击按键输入框后，直接按下想要设置的快捷键即可
+            馃挕 鎻愮ず锛氱偣鍑绘寜閿緭鍏ユ鍚庯紝鐩存帴鎸変笅鎯宠璁剧疆鐨勫揩鎹烽敭鍗冲彲
           </div>
           ${Object.entries(categories).map(([category, items]) => `
             <div style="margin-bottom: 18px;">
@@ -3887,33 +540,33 @@
       else if (key.length > 1) key = e.key;
       else key = key.toLowerCase();
 
-      // 检查是否已被其他功能占用
+      // 妫€鏌ユ槸鍚﹀凡琚叾浠栧姛鑳藉崰鐢?
       const existingAction = Object.entries(shortcuts).find(([k, v]) => k === key);
       if (existingAction && existingAction[0] !== input.dataset.oldValue) {
-        alert(`快捷键 ${key === ' ' ? 'Space' : key} 已被 "${existingAction[1].description}" 使用`);
+        alert(`蹇嵎閿?${key === ' ' ? 'Space' : key} 宸茶 "${existingAction[1].description}" 浣跨敤`);
         input.value = input.dataset.oldValue;
         return;
       }
 
-      // 移除旧的绑定
+      // 绉婚櫎鏃х殑缁戝畾
       if (input.dataset.oldValue !== key) {
         delete shortcuts[input.dataset.oldValue];
       }
 
-      // 设置新的绑定
+      // 璁剧疆鏂扮殑缁戝畾
       const defaultKey = input.dataset.default;
       shortcuts[key] = { ...defaultShortcuts[defaultKey] };
 
       input.value = key === ' ' ? 'Space' : key;
       saveCustomShortcuts();
-      updateStatus(`✅ 快捷键已更新: ${key === ' ' ? 'Space' : key.toUpperCase()}`);
+      updateStatus(`鉁?蹇嵎閿凡鏇存柊: ${key === ' ' ? 'Space' : key.toUpperCase()}`);
     }
 
-    // ========== 悔棋系统 ==========
+    // ========== 鎮旀绯荤粺 ==========
 
-    // 请求悔棋
+    // 璇锋眰鎮旀
     function requestUndo() {
-      // 检查是否有足够的悔棋次数
+      // 妫€鏌ユ槸鍚︽湁瓒冲鐨勬倲妫嬫鏁?
       let undoCount = 0;
       let itemUndoCount = 0;
       if (currentAccount) {
@@ -3925,44 +578,44 @@
       const totalUndo = undoCount + itemUndoCount;
 
       if (totalUndo <= 0) {
-        showToast('⏪ 悔棋次数不足，请购买悔棋卡', 'warning');
+        showToast('鈴?鎮旀娆℃暟涓嶈冻锛岃璐拱鎮旀鍗?, 'warning');
         return;
       }
 
-      // 如果直接次数不够但还有道具卡，自动使用一张
+      // 濡傛灉鐩存帴娆℃暟涓嶅浣嗚繕鏈夐亾鍏峰崱锛岃嚜鍔ㄤ娇鐢ㄤ竴寮?
       if (undoCount <= 0 && itemUndoCount > 0) {
         socket.emit('game_use_item', { itemId: 'item_undo' });
-        updateStatus('⏪ 正在使用悔棋卡...');
+        updateStatus('鈴?姝ｅ湪浣跨敤鎮旀鍗?..');
         return;
       }
 
       if (gameState.gameOver) {
-        showToast('❌ 游戏已结束，无法悔棋', 'warning');
+        showToast('鉂?娓告垙宸茬粨鏉燂紝鏃犳硶鎮旀', 'warning');
         return;
       }
 
       if (currentGame === 'snake') {
-        showToast('❌ 贪吃蛇不支持悔棋', 'warning');
+        showToast('鉂?璐悆铔囦笉鏀寔鎮旀', 'warning');
         return;
       }
 
       if (socket && socket.connected) {
         socket.emit('undo_request');
-        updateStatus('⏪ 发送悔棋请求...');
+        updateStatus('鈴?鍙戦€佹倲妫嬭姹?..');
       } else {
-        showToast('❌ 未连接服务器', 'error');
+        showToast('鉂?鏈繛鎺ユ湇鍔″櫒', 'error');
       }
     }
 
-    // 处理悔棋被接受后的棋盘更新
+    // 澶勭悊鎮旀琚帴鍙楀悗鐨勬鐩樻洿鏂?
     function handleUndoAccepted(data) {
-      // 使用服务器提供的完整棋盘数据恢复
+      // 浣跨敤鏈嶅姟鍣ㄦ彁渚涚殑瀹屾暣妫嬬洏鏁版嵁鎭㈠
       if (data.board) {
         gameState.board = data.board;
       }
 
       if (currentGame === 'chinese-chess') {
-        // 重新渲染象棋棋子
+        // 閲嶆柊娓叉煋璞℃妫嬪瓙
         if (data.board) {
           const pieces = convertBackendBoardToFrontend(data.board);
           chessPieces.red = pieces.red;
@@ -3979,25 +632,25 @@
       gameState.gameOver = false;
       gameState.moveCount = data.moveCount || 0;
 
-      // 更新落子记录（裁剪到服务端返回的正确长度）
+      // 鏇存柊钀藉瓙璁板綍锛堣鍓埌鏈嶅姟绔繑鍥炵殑姝ｇ‘闀垮害锛?
       const targetLength = data.moveCount || 0;
       if (targetLength < gameState.moveLog.length) {
         gameState.moveLog.length = targetLength;
       }
 
-      // 更新当前玩家显示
+      // 鏇存柊褰撳墠鐜╁鏄剧ず
       updateTurnDisplay();
 
-      // 隐藏再来一局按钮
+      // 闅愯棌鍐嶆潵涓€灞€鎸夐挳
       const playAgainBtn = document.getElementById('play-again-btn');
       if (playAgainBtn) playAgainBtn.style.display = 'none';
 
-      updateStatus('✅ 悔棋成功，轮到你了');
+      updateStatus('鉁?鎮旀鎴愬姛锛岃疆鍒颁綘浜?);
     }
 
-    // ========== 提示系统 ==========
+    // ========== 鎻愮ず绯荤粺 ==========
 
-    // 请求提示
+    // 璇锋眰鎻愮ず
     function requestHint() {
       let hintCount = 0;
       let itemHintCount = 0;
@@ -4010,45 +663,45 @@
       const totalHint = hintCount + itemHintCount;
 
       if (totalHint <= 0) {
-        showToast('💡 提示次数不足，请购买提示卡', 'warning');
+        showToast('馃挕 鎻愮ず娆℃暟涓嶈冻锛岃璐拱鎻愮ず鍗?, 'warning');
         return;
       }
 
-      // 如果直接次数不够但还有道具卡，自动使用一张
+      // 濡傛灉鐩存帴娆℃暟涓嶅浣嗚繕鏈夐亾鍏峰崱锛岃嚜鍔ㄤ娇鐢ㄤ竴寮?
       if (hintCount <= 0 && itemHintCount > 0) {
         socket.emit('game_use_item', { itemId: 'item_hint' });
-        updateStatus('💡 正在使用提示卡...');
+        updateStatus('馃挕 姝ｅ湪浣跨敤鎻愮ず鍗?..');
         return;
       }
 
       if (gameState.gameOver) {
-        showToast('❌ 游戏已结束', 'warning');
+        showToast('鉂?娓告垙宸茬粨鏉?, 'warning');
         return;
       }
 
       if (currentGame === 'snake') {
-        showToast('❌ 贪吃蛇不支持提示功能', 'warning');
+        showToast('鉂?璐悆铔囦笉鏀寔鎻愮ず鍔熻兘', 'warning');
         return;
       }
 
       if (socket && socket.connected) {
         socket.emit('request_hint');
-        updateStatus('💡 正在计算最佳位置...');
+        updateStatus('馃挕 姝ｅ湪璁＄畻鏈€浣充綅缃?..');
       } else {
-        showToast('❌ 未连接服务器', 'error');
+        showToast('鉂?鏈繛鎺ユ湇鍔″櫒', 'error');
       }
     }
 
-    // 处理提示结果
+    // 澶勭悊鎻愮ず缁撴灉
     function handleHintResult(data) {
       if (!data.move) {
-        updateStatus('❌ 无法计算提示位置');
+        updateStatus('鉂?鏃犳硶璁＄畻鎻愮ず浣嶇疆');
         return;
       }
 
       const { move, gameType } = data;
 
-      // 在棋盘上高亮提示位置
+      // 鍦ㄦ鐩樹笂楂樹寒鎻愮ず浣嶇疆
       if (gameType === 'gobang') {
         highlightCell(move.r, move.c, '#00ff00');
       } else if (gameType === 'go') {
@@ -4057,21 +710,21 @@
         highlightChessMove(move);
       }
 
-      updateStatus(`💡 提示：${formatHintPosition(move, gameType)}`);
-      showToast(`💡 建议位置：${formatHintPosition(move, gameType)}`, 'info', 5000);
+      updateStatus(`馃挕 鎻愮ず锛?{formatHintPosition(move, gameType)}`);
+      showToast(`馃挕 寤鸿浣嶇疆锛?{formatHintPosition(move, gameType)}`, 'info', 5000);
     }
 
-    // 格式化提示位置显示
+    // 鏍煎紡鍖栨彁绀轰綅缃樉绀?
     function formatHintPosition(move, gameType) {
       if (gameType === 'chinese-chess') {
-        return `从(${move.fromR},${move.fromC})移动到(${move.toR},${move.toC})`;
+        return `浠?${move.fromR},${move.fromC})绉诲姩鍒?${move.toR},${move.toC})`;
       }
       return `(${move.r}, ${move.c})`;
     }
 
-    // 高亮棋盘单元格
+    // 楂樹寒妫嬬洏鍗曞厓鏍?
     function highlightCell(r, c, color) {
-      // 五子棋
+      // 浜斿瓙妫?
       const gobangCells = document.querySelectorAll('#gobang-board .cell');
       if (gobangCells.length > 0) {
         gobangCells.forEach(cell => {
@@ -4089,7 +742,7 @@
         return;
       }
 
-      // 围棋
+      // 鍥存
       const goCells = document.querySelectorAll('#go-board .cell');
       if (goCells.length > 0) {
         goCells.forEach(cell => {
@@ -4107,9 +760,9 @@
       }
     }
 
-    // 高亮象棋移动
+    // 楂樹寒璞℃绉诲姩
     function highlightChessMove(move) {
-      // 高亮来源与目标位置
+      // 楂樹寒鏉ユ簮涓庣洰鏍囦綅缃?
       const cells = document.querySelectorAll('#chess-board .chess-intersection');
       cells.forEach(cell => {
         const row = parseInt(cell.dataset.r);
@@ -4125,19 +778,19 @@
       });
     }
 
-    // 重做功能
+    // 閲嶅仛鍔熻兘
     function handleRedo() {
-      updateStatus('⏩ 重做功能');
+      updateStatus('鈴?閲嶅仛鍔熻兘');
     }
 
     function handleResign() {
-      if (confirm('确定要认输吗？')) {
-        updateStatus('🏳️ 已认输');
-        // 实际认输逻辑
+      if (confirm('纭畾瑕佽杈撳悧锛?)) {
+        updateStatus('馃彸锔?宸茶杈?);
+        // 瀹為檯璁よ緭閫昏緫
       }
     }
 
-    // 显示悔棋和提示按钮（仅对棋类游戏）
+    // 鏄剧ず鎮旀鍜屾彁绀烘寜閽紙浠呭妫嬬被娓告垙锛?
     function showBoardGameActionButtons() {
       const undoBtn = document.getElementById('undo-btn');
       const hintBtn = document.getElementById('hint-btn');
@@ -4147,7 +800,7 @@
       }
     }
 
-    // 隐藏悔棋和提示按钮
+    // 闅愯棌鎮旀鍜屾彁绀烘寜閽?
     function hideBoardGameActionButtons() {
       const undoBtn = document.getElementById('undo-btn');
       const hintBtn = document.getElementById('hint-btn');
@@ -4161,88 +814,88 @@
       } else if (gameState && gameState.difficulty) {
         restartAIGame();
       } else {
-        if (confirm('确定要重新开始当前游戏吗？')) {
-          updateStatus('🔄 重新开始游戏');
-          // 实际重新开始逻辑
+        if (confirm('纭畾瑕侀噸鏂板紑濮嬪綋鍓嶆父鎴忓悧锛?)) {
+          updateStatus('馃攧 閲嶆柊寮€濮嬫父鎴?);
+          // 瀹為檯閲嶆柊寮€濮嬮€昏緫
         }
       }
     }
 
     function handleNewGame() {
-      if (confirm('确定要开始新游戏吗？')) {
-        updateStatus('🆕 新游戏开始');
-        // 实际新游戏逻辑
+      if (confirm('纭畾瑕佸紑濮嬫柊娓告垙鍚楋紵')) {
+        updateStatus('馃啎 鏂版父鎴忓紑濮?);
+        // 瀹為檯鏂版父鎴忛€昏緫
       }
     }
 
     function togglePause() {
-      updateStatus('⏸️ 游戏已暂停');
+      updateStatus('鈴革笍 娓告垙宸叉殏鍋?);
     }
 
     function handleSnakeDirection(dir) {
       if (currentGame === 'snake') {
-        // 实际贪吃蛇方向控制
+        // 瀹為檯璐悆铔囨柟鍚戞帶鍒?
       }
     }
 
     function toggleSnakePause() {
       if (currentGame === 'snake') {
-        // 实际贪吃蛇暂停逻辑
+        // 瀹為檯璐悆铔囨殏鍋滈€昏緫
       }
     }
 
     document.addEventListener('keydown', handleKeydown);
 
-    // 象棋棋子配置（正确的象棋棋子位置）
+    // 璞℃妫嬪瓙閰嶇疆锛堟纭殑璞℃妫嬪瓙浣嶇疆锛?
     const chessPieces = {
       red: [
-        { name: '帅', r: 9, c: 4, moves: 'general' },
-        { name: '仕', r: 9, c: 3, moves: 'advisor' },
-        { name: '仕', r: 9, c: 5, moves: 'advisor' },
-        { name: '相', r: 9, c: 2, moves: 'elephant' },
-        { name: '相', r: 9, c: 6, moves: 'elephant' },
-        { name: '马', r: 9, c: 1, moves: 'horse' },
-        { name: '马', r: 9, c: 7, moves: 'horse' },
-        { name: '车', r: 9, c: 0, moves: 'chariot' },
-        { name: '车', r: 9, c: 8, moves: 'chariot' },
-        { name: '炮', r: 7, c: 1, moves: 'cannon' },
-        { name: '炮', r: 7, c: 7, moves: 'cannon' },
-        { name: '兵', r: 6, c: 0, moves: 'soldier' },
-        { name: '兵', r: 6, c: 2, moves: 'soldier' },
-        { name: '兵', r: 6, c: 4, moves: 'soldier' },
-        { name: '兵', r: 6, c: 6, moves: 'soldier' },
-        { name: '兵', r: 6, c: 8, moves: 'soldier' }
+        { name: '甯?, r: 9, c: 4, moves: 'general' },
+        { name: '浠?, r: 9, c: 3, moves: 'advisor' },
+        { name: '浠?, r: 9, c: 5, moves: 'advisor' },
+        { name: '鐩?, r: 9, c: 2, moves: 'elephant' },
+        { name: '鐩?, r: 9, c: 6, moves: 'elephant' },
+        { name: '椹?, r: 9, c: 1, moves: 'horse' },
+        { name: '椹?, r: 9, c: 7, moves: 'horse' },
+        { name: '杞?, r: 9, c: 0, moves: 'chariot' },
+        { name: '杞?, r: 9, c: 8, moves: 'chariot' },
+        { name: '鐐?, r: 7, c: 1, moves: 'cannon' },
+        { name: '鐐?, r: 7, c: 7, moves: 'cannon' },
+        { name: '鍏?, r: 6, c: 0, moves: 'soldier' },
+        { name: '鍏?, r: 6, c: 2, moves: 'soldier' },
+        { name: '鍏?, r: 6, c: 4, moves: 'soldier' },
+        { name: '鍏?, r: 6, c: 6, moves: 'soldier' },
+        { name: '鍏?, r: 6, c: 8, moves: 'soldier' }
       ],
       black: [
-        { name: '将', r: 0, c: 4, moves: 'general' },
-        { name: '士', r: 0, c: 3, moves: 'advisor' },
-        { name: '士', r: 0, c: 5, moves: 'advisor' },
-        { name: '象', r: 0, c: 2, moves: 'elephant' },
-        { name: '象', r: 0, c: 6, moves: 'elephant' },
-        { name: '马', r: 0, c: 1, moves: 'horse' },
-        { name: '马', r: 0, c: 7, moves: 'horse' },
-        { name: '车', r: 0, c: 0, moves: 'chariot' },
-        { name: '车', r: 0, c: 8, moves: 'chariot' },
-        { name: '炮', r: 2, c: 1, moves: 'cannon' },
-        { name: '炮', r: 2, c: 7, moves: 'cannon' },
-        { name: '卒', r: 3, c: 0, moves: 'soldier' },
-        { name: '卒', r: 3, c: 2, moves: 'soldier' },
-        { name: '卒', r: 3, c: 4, moves: 'soldier' },
-        { name: '卒', r: 3, c: 6, moves: 'soldier' },
-        { name: '卒', r: 3, c: 8, moves: 'soldier' }
+        { name: '灏?, r: 0, c: 4, moves: 'general' },
+        { name: '澹?, r: 0, c: 3, moves: 'advisor' },
+        { name: '澹?, r: 0, c: 5, moves: 'advisor' },
+        { name: '璞?, r: 0, c: 2, moves: 'elephant' },
+        { name: '璞?, r: 0, c: 6, moves: 'elephant' },
+        { name: '椹?, r: 0, c: 1, moves: 'horse' },
+        { name: '椹?, r: 0, c: 7, moves: 'horse' },
+        { name: '杞?, r: 0, c: 0, moves: 'chariot' },
+        { name: '杞?, r: 0, c: 8, moves: 'chariot' },
+        { name: '鐐?, r: 2, c: 1, moves: 'cannon' },
+        { name: '鐐?, r: 2, c: 7, moves: 'cannon' },
+        { name: '鍗?, r: 3, c: 0, moves: 'soldier' },
+        { name: '鍗?, r: 3, c: 2, moves: 'soldier' },
+        { name: '鍗?, r: 3, c: 4, moves: 'soldier' },
+        { name: '鍗?, r: 3, c: 6, moves: 'soldier' },
+        { name: '鍗?, r: 3, c: 8, moves: 'soldier' }
       ]
     };
 
-    // 贪吃蛇游戏配置
+    // 璐悆铔囨父鎴忛厤缃?
     const snakeGameConfig = {
       gridSize: 20,
       cellSize: 20,
       initialSpeed: 150,
       canvasWidth: 400,
       canvasHeight: 400,
-      initialFoodCount: 3, // 初始食物数量
-      maxFoodCount: 8,    // 最大食物数量
-      foodScore: 10,       // 每个食物分数
+      initialFoodCount: 3, // 鍒濆椋熺墿鏁伴噺
+      maxFoodCount: 8,    // 鏈€澶ч鐗╂暟閲?
+      foodScore: 10,       // 姣忎釜椋熺墿鍒嗘暟
       colors: {
         snakeHead: '#4ecdc4',
         snakeBody: '#45b7d1',
@@ -4251,36 +904,36 @@
         grid: '#2d2d44',
         background: '#1a1a2e'
       },
-      rules: `贪吃蛇规则：
-• 使用方向键或WASD控制蛇的移动方向
-• 吃到食物后蛇身变长，分数增加
-• 撞到墙壁或自己的身体则游戏结束
-• 随着分数增加，蛇的移动速度会逐渐加快
-• 按空格键可以暂停/继续游戏
+      rules: `璐悆铔囪鍒欙細
+鈥?浣跨敤鏂瑰悜閿垨WASD鎺у埗铔囩殑绉诲姩鏂瑰悜
+鈥?鍚冨埌椋熺墿鍚庤泧韬彉闀匡紝鍒嗘暟澧炲姞
+鈥?鎾炲埌澧欏鎴栬嚜宸辩殑韬綋鍒欐父鎴忕粨鏉?
+鈥?闅忕潃鍒嗘暟澧炲姞锛岃泧鐨勭Щ鍔ㄩ€熷害浼氶€愭笎鍔犲揩
+鈥?鎸夌┖鏍奸敭鍙互鏆傚仠/缁х画娓告垙
 
-🍎 多食物机制：
-• 场地上同时存在多个食物（初始3个）
-• 随着分数提高，食物数量最多可增至8个
-• 食物颜色交替显示，便于区分
+馃崕 澶氶鐗╂満鍒讹細
+鈥?鍦哄湴涓婂悓鏃跺瓨鍦ㄥ涓鐗╋紙鍒濆3涓級
+鈥?闅忕潃鍒嗘暟鎻愰珮锛岄鐗╂暟閲忔渶澶氬彲澧炶嚦8涓?
+鈥?椋熺墿棰滆壊浜ゆ浛鏄剧ず锛屼究浜庡尯鍒?
 
-🎒 道具说明：
-• 复活卡（❤️）：使用后下次碰撞可原地复活一次，保留当前分数
-• 加速卡（⚡）：10秒内移动速度翻倍，快速冲刺获取高分
-• 双倍卡（✖️2）：15秒内吃掉食物获得双倍分数
-• 缩短卡（🔽）：身体立即缩短3节，降低碰撞风险
-使用方法：在游戏中双击道具栏中的道具即可使用（商店购买后自动同步）`
+馃帓 閬撳叿璇存槑锛?
+鈥?澶嶆椿鍗★紙鉂わ笍锛夛細浣跨敤鍚庝笅娆＄鎾炲彲鍘熷湴澶嶆椿涓€娆★紝淇濈暀褰撳墠鍒嗘暟
+鈥?鍔犻€熷崱锛堚殹锛夛細10绉掑唴绉诲姩閫熷害缈诲€嶏紝蹇€熷啿鍒鸿幏鍙栭珮鍒?
+鈥?鍙屽€嶅崱锛堚湒锔?锛夛細15绉掑唴鍚冩帀椋熺墿鑾峰緱鍙屽€嶅垎鏁?
+鈥?缂╃煭鍗★紙馃斀锛夛細韬綋绔嬪嵆缂╃煭3鑺傦紝闄嶄綆纰版挒椋庨櫓
+浣跨敤鏂规硶锛氬湪娓告垙涓弻鍑婚亾鍏锋爮涓殑閬撳叿鍗冲彲浣跨敤锛堝晢搴楄喘涔板悗鑷姩鍚屾锛塦
     };
 
-    // 双人模式配置
+    // 鍙屼汉妯″紡閰嶇疆
     const snakeDualConfig = {
       gridSize: 30,
       cellSize: 18,
       initialSpeed: 120,
       canvasWidth: 540,
       canvasHeight: 540,
-      gameDuration: 120, // 游戏时长（秒）
-      maxFoodCount: 8, // 最大食物数量
-      respawnDelay: 1000, // 复活延迟（毫秒）
+      gameDuration: 120, // 娓告垙鏃堕暱锛堢锛?
+      maxFoodCount: 8, // 鏈€澶ч鐗╂暟閲?
+      respawnDelay: 1000, // 澶嶆椿寤惰繜锛堟绉掞級
       colors: {
         snake1Head: '#4ecdc4',
         snake1Body: '#45b7d1',
@@ -4290,16 +943,16 @@
         grid: '#2d2d44',
         background: '#1a1a2e'
       },
-      rules: `双人模式规则：
-🎮 玩家1：使用方向键控制
-🎮 玩家2：使用WASD控制
-⏱️ 游戏时间：2分钟
-🔄 无限复活（死亡后1秒复活）
-🍎 地图中有更多食物
-🏆 时间结束后分数高者获胜！`
+      rules: `鍙屼汉妯″紡瑙勫垯锛?
+馃幃 鐜╁1锛氫娇鐢ㄦ柟鍚戦敭鎺у埗
+馃幃 鐜╁2锛氫娇鐢╓ASD鎺у埗
+鈴憋笍 娓告垙鏃堕棿锛?鍒嗛挓
+馃攧 鏃犻檺澶嶆椿锛堟浜″悗1绉掑娲伙級
+馃崕 鍦板浘涓湁鏇村椋熺墿
+馃弳 鏃堕棿缁撴潫鍚庡垎鏁伴珮鑰呰幏鑳滐紒`
     };
 
-    // ========== 音效系统 ==========
+    // ========== 闊虫晥绯荤粺 ==========
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     const soundEnabled = {
       stonePlace: true,
@@ -4372,38 +1025,38 @@
       }
     }
 
-    // ========== 初始化 ==========
+    // ========== 鍒濆鍖?==========
     async function init() {
-      // 加载保存的账号信息并检查登录状态
+      // 鍔犺浇淇濆瓨鐨勮处鍙蜂俊鎭苟妫€鏌ョ櫥褰曠姸鎬?
       const isLoggedIn = await loadSavedAccount();
 
       if (!isLoggedIn) {
-        // 如果没有登录，显示自动登录模态窗口
+        // 濡傛灉娌℃湁鐧诲綍锛屾樉绀鸿嚜鍔ㄧ櫥褰曟ā鎬佺獥鍙?
         setTimeout(() => {
           showAutoLoginModal();
         }, 1000);
       }
 
-      // 从服务器获取主题
+      // 浠庢湇鍔″櫒鑾峰彇涓婚
       await fetchThemesFromServer();
 
-      // 初始化缓存
+      // 鍒濆鍖栫紦瀛?
       moveLogEl.dataset.lastIndex = "-1";
-      // 更新客户端版本显示
+      // 鏇存柊瀹㈡埛绔増鏈樉绀?
       if (clientVersionDisplay) {
         clientVersionDisplay.textContent = CLIENT_VERSION;
       }
-      // 初始更新高级统计
+      // 鍒濆鏇存柊楂樼骇缁熻
       updateAdvancedStats();
-      // 初始化当前棋种显示
+      // 鍒濆鍖栧綋鍓嶆绉嶆樉绀?
       updateGameDisplay();
-      // 初始化棋盘
+      // 鍒濆鍖栨鐩?
       initBoards();
     }
 
-    // 统一错误提示函数
+    // 缁熶竴閿欒鎻愮ず鍑芥暟
     function showToast(message, type = 'info', duration = 3000) {
-      // 移除现有的提示
+      // 绉婚櫎鐜版湁鐨勬彁绀?
       const existingToasts = document.querySelectorAll('.error-toast, .success-toast, .warning-toast');
       existingToasts.forEach(toast => toast.remove());
 
@@ -4423,7 +1076,7 @@
       }, duration);
     }
 
-    // 非阻塞确认对话框
+    // 闈為樆濉炵‘璁ゅ璇濇
     let pendingConfirmCallback = null;
     function showConfirmDialog(message, onConfirm) {
       const modal = document.getElementById('custom-confirm-modal');
@@ -4433,12 +1086,12 @@
       const noBtn = document.getElementById('confirm-no');
       if (!modal || !msgEl) return;
 
-      titleEl.textContent = '确认操作';
+      titleEl.textContent = '纭鎿嶄綔';
       msgEl.textContent = message;
       pendingConfirmCallback = onConfirm;
       modal.style.display = 'block';
 
-      // 绑定按钮事件（先移除旧监听，避免重复）
+      // 缁戝畾鎸夐挳浜嬩欢锛堝厛绉婚櫎鏃х洃鍚紝閬垮厤閲嶅锛?
       const handleYes = () => {
         modal.style.display = 'none';
         pendingConfirmCallback = null;
@@ -4455,19 +1108,19 @@
       };
     }
 
-    // 增强的输入验证函数
+    // 澧炲己鐨勮緭鍏ラ獙璇佸嚱鏁?
     function validateUsername(username) {
       if (!username || username.trim().length === 0) {
-        return { valid: false, message: '用户名不能为空' };
+        return { valid: false, message: '鐢ㄦ埛鍚嶄笉鑳戒负绌? };
       }
 
       const trimmed = username.trim();
       if (trimmed.length < 3 || trimmed.length > 20) {
-        return { valid: false, message: '用户名长度必须在3-20位之间' };
+        return { valid: false, message: '鐢ㄦ埛鍚嶉暱搴﹀繀椤诲湪3-20浣嶄箣闂? };
       }
 
       if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
-        return { valid: false, message: '用户名只能包含字母、数字和下划线' };
+        return { valid: false, message: '鐢ㄦ埛鍚嶅彧鑳藉寘鍚瓧姣嶃€佹暟瀛楀拰涓嬪垝绾? };
       }
 
       return { valid: true };
@@ -4475,15 +1128,15 @@
 
     function validatePassword(password) {
       if (!password || password.length === 0) {
-        return { valid: false, message: '密码不能为空' };
+        return { valid: false, message: '瀵嗙爜涓嶈兘涓虹┖' };
       }
 
       if (password.length < 6) {
-        return { valid: false, message: '密码长度至少6位' };
+        return { valid: false, message: '瀵嗙爜闀垮害鑷冲皯6浣? };
       }
 
       if (password.length > 50) {
-        return { valid: false, message: '密码长度不能超过50位' };
+        return { valid: false, message: '瀵嗙爜闀垮害涓嶈兘瓒呰繃50浣? };
       }
 
       return { valid: true };
@@ -4491,24 +1144,24 @@
 
     function validateNickname(nickname) {
       if (!nickname || nickname.trim().length === 0) {
-        return { valid: true }; // 昵称可选
+        return { valid: true }; // 鏄电О鍙€?
       }
 
       const trimmed = nickname.trim();
       if (trimmed.length > 20) {
-        return { valid: false, message: '昵称长度不能超过20位' };
+        return { valid: false, message: '鏄电О闀垮害涓嶈兘瓒呰繃20浣? };
       }
 
-      // 检查是否有敏感字符
+      // 妫€鏌ユ槸鍚︽湁鏁忔劅瀛楃
       const forbiddenChars = /[<>\"'&]/;
       if (forbiddenChars.test(trimmed)) {
-        return { valid: false, message: '昵称包含不允许的特殊字符' };
+        return { valid: false, message: '鏄电О鍖呭惈涓嶅厑璁哥殑鐗规畩瀛楃' };
       }
 
       return { valid: true };
     }
 
-    // 增强的表单验证函数
+    // 澧炲己鐨勮〃鍗曢獙璇佸嚱鏁?
     function validateLoginForm(username, password) {
       const usernameValidation = validateUsername(username);
       if (!usernameValidation.valid) {
@@ -4535,7 +1188,7 @@
       }
 
       if (password !== confirmPassword) {
-        return { valid: false, message: '两次输入的密码不一致' };
+        return { valid: false, message: '涓ゆ杈撳叆鐨勫瘑鐮佷笉涓€鑷? };
       }
 
       const nicknameValidation = validateNickname(nickname);
@@ -4546,7 +1199,7 @@
       return { valid: true };
     }
 
-    // 等待socket连接
+    // 绛夊緟socket杩炴帴
     async function waitForSocketConnection(timeout = 10000) {
       return new Promise((resolve) => {
         if (socket && socket.connected) {
@@ -4568,7 +1221,7 @@
       });
     }
 
-    // 通过token从服务端获取账号信息
+    // 閫氳繃token浠庢湇鍔＄鑾峰彇璐﹀彿淇℃伅
     async function fetchAccountByToken() {
       return new Promise(async (resolve) => {
         const token = localStorage.getItem('userToken');
@@ -4577,21 +1230,21 @@
           return;
         }
 
-        // 等待socket连接
+        // 绛夊緟socket杩炴帴
         const isConnected = await waitForSocketConnection();
         if (!isConnected) {
-          console.warn('Socket未连接，无法获取账号信息');
+          console.warn('Socket鏈繛鎺ワ紝鏃犳硶鑾峰彇璐﹀彿淇℃伅');
           resolve(null);
           return;
         }
 
         socket.emit('get_account_by_token', { token });
 
-        // 设置一次性监听器来接收响应
+        // 璁剧疆涓€娆℃€х洃鍚櫒鏉ユ帴鏀跺搷搴?
         const handleAccountInfo = (data) => {
           socket.off('account_info', handleAccountInfo);
           if (data.success && data.data) {
-            // 保存服务端返回的新token（自动续期）
+            // 淇濆瓨鏈嶅姟绔繑鍥炵殑鏂皌oken锛堣嚜鍔ㄧ画鏈燂級
             if (data.data.token) {
               localStorage.setItem('userToken', data.data.token);
             }
@@ -4603,7 +1256,7 @@
 
         socket.on('account_info', handleAccountInfo);
 
-        // 设置超时
+        // 璁剧疆瓒呮椂
         setTimeout(() => {
           socket.off('account_info', handleAccountInfo);
           resolve(null);
@@ -4611,141 +1264,141 @@
       });
     }
 
-    // 加载保存的账号信息
+    // 鍔犺浇淇濆瓨鐨勮处鍙蜂俊鎭?
     async function loadSavedAccount() {
       try {
         const accountData = await fetchAccountByToken();
         if (accountData) {
-          // 设置正确的数据结构，保持与游戏结束后更新的数据结构一致
+          // 璁剧疆姝ｇ‘鐨勬暟鎹粨鏋勶紝淇濇寔涓庢父鎴忕粨鏉熷悗鏇存柊鐨勬暟鎹粨鏋勪竴鑷?
           currentAccount = {
             ...accountData,
             account: accountData.account,
             stats: accountData.account.stats || {}
           };
-          // 处理不同的数据结构
+          // 澶勭悊涓嶅悓鐨勬暟鎹粨鏋?
           const userAccountData = currentAccount.account.account || currentAccount.account;
           lastExp = userAccountData?.profile?.exp || 0;
           lastLevel = userAccountData?.profile?.level || 1;
           updateAccountBar();
-          console.log('已恢复登录状态', currentAccount);
+          console.log('宸叉仮澶嶇櫥褰曠姸鎬?, currentAccount);
           console.log('currentAccount.stats:', currentAccount.stats);
           console.log('currentAccount.account.stats:', currentAccount.account?.stats);
           return true;
         }
       } catch (e) {
-        console.error('加载账号信息失败', e);
+        console.error('鍔犺浇璐﹀彿淇℃伅澶辫触', e);
       }
       return false;
     }
 
-    // 保存token
+    // 淇濆瓨token
     function saveToken(token) {
       try {
         localStorage.setItem('userToken', token);
-        console.log('Token已保存');
+        console.log('Token宸蹭繚瀛?);
       } catch (e) {
-        console.error('保存token失败', e);
+        console.error('淇濆瓨token澶辫触', e);
       }
     }
 
-    // 清除账号信息
+    // 娓呴櫎璐﹀彿淇℃伅
     function clearAccount() {
       try {
         localStorage.removeItem('userToken');
         localStorage.removeItem('loginStatus');
         localStorage.removeItem('currentAccountId');
-        console.log('账号信息已清除');
+        console.log('璐﹀彿淇℃伅宸叉竻闄?);
       } catch (e) {
-        console.error('清除账号信息失败', e);
+        console.error('娓呴櫎璐﹀彿淇℃伅澶辫触', e);
       }
     }
 
-    // 设置Socket.io事件监听（在socket初始化后立即调用）
+    // 璁剧疆Socket.io浜嬩欢鐩戝惉锛堝湪socket鍒濆鍖栧悗绔嬪嵆璋冪敤锛?
     function setupSocketListeners() {
       let isInitialized = false;
 
       socket.on('connect', async () => {
-        console.log('Socket.io连接成功');
-        connectStatusEl.textContent = '已连接';
+        console.log('Socket.io杩炴帴鎴愬姛');
+        connectStatusEl.textContent = '宸茶繛鎺?;
         connectStatusEl.className = 'info-value value-connected';
 
-        // 隐藏断开连接提示框
+        // 闅愯棌鏂紑杩炴帴鎻愮ず妗?
         hideDisconnectWarning();
 
-        // 只在第一次连接时初始化
+        // 鍙湪绗竴娆¤繛鎺ユ椂鍒濆鍖?
         if (!isInitialized) {
           isInitialized = true;
           await init();
         }
 
-        // 发送客户端连接请求（包含版本号和token）
-        // 注意：init()函数会恢复currentAccount，所以这里可以获取到正确的token
+        // 鍙戦€佸鎴风杩炴帴璇锋眰锛堝寘鍚増鏈彿鍜宼oken锛?
+        // 娉ㄦ剰锛歩nit()鍑芥暟浼氭仮澶峜urrentAccount锛屾墍浠ヨ繖閲屽彲浠ヨ幏鍙栧埌姝ｇ‘鐨則oken
         socket.emit('client_connect', {
           clientVersion: CLIENT_VERSION,
           token: localStorage.getItem('userToken') || 'none'
         });
 
-        // 如果已经有账号信息，发送用户登录事件
-        // 处理不同的数据结构
+        // 濡傛灉宸茬粡鏈夎处鍙蜂俊鎭紝鍙戦€佺敤鎴风櫥褰曚簨浠?
+        // 澶勭悊涓嶅悓鐨勬暟鎹粨鏋?
         const accountData = currentAccount.account.account || currentAccount.account;
         if (currentAccount && accountData?.nickname) {
           socket.emit('user_login', { nickname: accountData.nickname });
         }
 
-        // 获取排行榜
+        // 鑾峰彇鎺掕姒?
         socket.emit('get_leaderboard', { limit: 10 });
 
-        // 检查是否有待播放的回放
+        // 妫€鏌ユ槸鍚︽湁寰呮挱鏀剧殑鍥炴斁
         checkReplayOnLoad();
       });
 
       socket.on('disconnect', () => {
-        console.log('Socket.io断开连接');
-        connectStatusEl.textContent = '已断开';
+        console.log('Socket.io鏂紑杩炴帴');
+        connectStatusEl.textContent = '宸叉柇寮€';
         connectStatusEl.className = 'info-value value-danger';
 
-        // 显示断开连接提示框
+        // 鏄剧ず鏂紑杩炴帴鎻愮ず妗?
         showDisconnectWarning();
       });
 
       socket.on('reconnect', () => {
-        console.log('Socket.io重新连接成功');
-        connectStatusEl.textContent = '已连接';
+        console.log('Socket.io閲嶆柊杩炴帴鎴愬姛');
+        connectStatusEl.textContent = '宸茶繛鎺?;
         connectStatusEl.className = 'info-value value-connected';
         hideDisconnectWarning();
-        updateStatus('重新连接成功');
+        updateStatus('閲嶆柊杩炴帴鎴愬姛');
       });
 
       socket.on('reconnect_attempt', (attemptNumber) => {
-        console.log('正在尝试重新连接...', attemptNumber);
-        updateStatus(`正在重新连接... (${attemptNumber}/5)`);
+        console.log('姝ｅ湪灏濊瘯閲嶆柊杩炴帴...', attemptNumber);
+        updateStatus(`姝ｅ湪閲嶆柊杩炴帴... (${attemptNumber}/5)`);
       });
 
       socket.on('reconnect_failed', () => {
-        console.log('重新连接失败');
-        updateStatus('重新连接失败，请点击重连按钮');
+        console.log('閲嶆柊杩炴帴澶辫触');
+        updateStatus('閲嶆柊杩炴帴澶辫触锛岃鐐瑰嚮閲嶈繛鎸夐挳');
       });
 
-      // 处理版本检查结果
+      // 澶勭悊鐗堟湰妫€鏌ョ粨鏋?
       socket.on('version_check', (data) => {
-        console.log('版本检查结果:', data);
+        console.log('鐗堟湰妫€鏌ョ粨鏋?', data);
         if (!data.compatible) {
-          alert('版本不兼容：' + data.reason + '\n请更新您的客户端或服务端');
+          alert('鐗堟湰涓嶅吋瀹癸細' + data.reason + '\n璇锋洿鏂版偍鐨勫鎴风鎴栨湇鍔＄');
         } else if (data.warning) {
-          console.warn('版本警告：', data.warning);
+          console.warn('鐗堟湰璀﹀憡锛?, data.warning);
         }
 
-        // 显示服务器版本号
+        // 鏄剧ず鏈嶅姟鍣ㄧ増鏈彿
         const serverVersionDisplay = document.getElementById('server-version-display');
         if (serverVersionDisplay && data.serverVersion) {
-          serverVersionDisplay.textContent = `(服务器: ${data.serverVersion})`;
+          serverVersionDisplay.textContent = `(鏈嶅姟鍣? ${data.serverVersion})`;
         }
       });
 
       socket.on('user_connected', (data) => {
         accountId = data.accountId;
-        console.log('获得用户ID:', accountId);
-        // 保存用户ID到localStorage
+        console.log('鑾峰緱鐢ㄦ埛ID:', accountId);
+        // 淇濆瓨鐢ㄦ埛ID鍒發ocalStorage
         saveUserId(accountId);
         initUserStatus();
       });
@@ -4780,22 +1433,22 @@
       });
 
       socket.on('match_success', (data) => {
-        console.log('匹配成功:', data);
+        console.log('鍖归厤鎴愬姛:', data);
         matchedOpponentId = data.opponentId;
         gameId = data.gameId;
         startGameWithOpponent(data.opponentId, data.color);
       });
 
       socket.on('move', (data) => {
-        console.log('收到移动:', data);
-        console.log('当前accountId:', accountId);
-        console.log('消息from:', data.from);
-        console.log('是否是自己的消息:', data.from === accountId);
+        console.log('鏀跺埌绉诲姩:', data);
+        console.log('褰撳墠accountId:', accountId);
+        console.log('娑堟伅from:', data.from);
+        console.log('鏄惁鏄嚜宸辩殑娑堟伅:', data.from === accountId);
         if (gameState.gameOver) return;
 
-        // 检查是否是自己的落子，如果是则跳过
+        // 妫€鏌ユ槸鍚︽槸鑷繁鐨勮惤瀛愶紝濡傛灉鏄垯璺宠繃
         if (data.from === accountId) {
-          console.log('收到自己的落子消息，跳过');
+          console.log('鏀跺埌鑷繁鐨勮惤瀛愭秷鎭紝璺宠繃');
           return;
         }
 
@@ -4810,45 +1463,45 @@
         resetGame(false);
       });
 
-      // 重置请求被接受
+      // 閲嶇疆璇锋眰琚帴鍙?
       socket.on('reset_accepted', (data) => {
-        console.log('重置请求被接受:', data);
+        console.log('閲嶇疆璇锋眰琚帴鍙?', data);
         resetGame(false);
-        showBroadcast(data.message || '对方已同意重置游戏', '系统', Date.now());
+        showBroadcast(data.message || '瀵规柟宸插悓鎰忛噸缃父鎴?, '绯荤粺', Date.now());
       });
 
-      // 重置请求被拒绝
+      // 閲嶇疆璇锋眰琚嫆缁?
       socket.on('reset_rejected', (data) => {
-        console.log('重置请求被拒绝:', data);
-        showBroadcast(data.message || '对方拒绝了重置请求', '系统', Date.now());
+        console.log('閲嶇疆璇锋眰琚嫆缁?', data);
+        showBroadcast(data.message || '瀵规柟鎷掔粷浜嗛噸缃姹?, '绯荤粺', Date.now());
       });
 
-      // 重置请求超时
+      // 閲嶇疆璇锋眰瓒呮椂
       socket.on('reset_request_timeout', (data) => {
-        console.log('重置请求超时:', data);
-        showBroadcast(data.message || '重置请求超时，对方未回应', '系统', Date.now());
+        console.log('閲嶇疆璇锋眰瓒呮椂:', data);
+        showBroadcast(data.message || '閲嶇疆璇锋眰瓒呮椂锛屽鏂规湭鍥炲簲', '绯荤粺', Date.now());
       });
 
       socket.on('reset_request', (data) => {
         let confirmMessage = '';
-        if (data.message && data.message.includes('再来一局')) {
-          confirmMessage = data.message + '，是否同意？';
+        if (data.message && data.message.includes('鍐嶆潵涓€灞€')) {
+          confirmMessage = data.message + '锛屾槸鍚﹀悓鎰忥紵';
         } else {
-          confirmMessage = `${data.from} 请求重置棋盘，是否同意？`;
+          confirmMessage = `${data.from} 璇锋眰閲嶇疆妫嬬洏锛屾槸鍚﹀悓鎰忥紵`;
         }
 
-        // 保存当前请求数据
+        // 淇濆瓨褰撳墠璇锋眰鏁版嵁
         currentResetRequest = data;
 
-        // 显示自定义模态框
+        // 鏄剧ず鑷畾涔夋ā鎬佹
         const confirmModal = document.getElementById('custom-confirm-modal');
         const confirmMessageEl = document.getElementById('confirm-message');
         const confirmTitle = document.getElementById('confirm-title');
 
-        if (data.message && data.message.includes('再来一局')) {
-          confirmTitle.textContent = '再来一局请求';
+        if (data.message && data.message.includes('鍐嶆潵涓€灞€')) {
+          confirmTitle.textContent = '鍐嶆潵涓€灞€璇锋眰';
         } else {
-          confirmTitle.textContent = '重置棋盘请求';
+          confirmTitle.textContent = '閲嶇疆妫嬬洏璇锋眰';
         }
 
         confirmMessageEl.textContent = confirmMessage;
@@ -4857,7 +1510,7 @@
 
       socket.on('return_lobby', (data) => {
         if (matchedOpponentId === data.userId) {
-          showToast('对手已返回大厅', 'warning');
+          showToast('瀵规墜宸茶繑鍥炲ぇ鍘?, 'warning');
           returnToLobby();
         }
         onlineUsers.set(data.userId, {
@@ -4870,61 +1523,61 @@
       });
 
       socket.on('opponent_left', (data) => {
-        console.log('对手离开游戏:', data);
+        console.log('瀵规墜绂诲紑娓告垙:', data);
 
         let message = '';
-        if (data.reason === '游戏刚开始，判定为无效游戏') {
-          message = `对方(${data.nickname})在游戏刚开始时离开，本局判定为无效游戏`;
-        } else if (data.reason === '游戏进行中，判定为平局') {
-          message = `对方(${data.nickname})在游戏进行中离开，本局判定为平局`;
+        if (data.reason === '娓告垙鍒氬紑濮嬶紝鍒ゅ畾涓烘棤鏁堟父鎴?) {
+          message = `瀵规柟(${data.nickname})鍦ㄦ父鎴忓垰寮€濮嬫椂绂诲紑锛屾湰灞€鍒ゅ畾涓烘棤鏁堟父鎴廯;
+        } else if (data.reason === '娓告垙杩涜涓紝鍒ゅ畾涓哄钩灞€') {
+          message = `瀵规柟(${data.nickname})鍦ㄦ父鎴忚繘琛屼腑绂诲紑锛屾湰灞€鍒ゅ畾涓哄钩灞€`;
         } else if (data.result === 'resign') {
-          message = `对方(${data.nickname})已认输，你获胜了！🎉`;
+          message = `瀵规柟(${data.nickname})宸茶杈擄紝浣犺幏鑳滀簡锛侌煄塦;
         } else {
-          message = `对方(${data.nickname})已离开游戏，${data.reason}`;
+          message = `瀵规柟(${data.nickname})宸茬寮€娓告垙锛?{data.reason}`;
         }
 
-        // 显示更友好的提示
+        // 鏄剧ず鏇村弸濂界殑鎻愮ず
         showWinAlert(message);
-        updateStatus(`🏆 ${message}`);
+        updateStatus(`馃弳 ${message}`);
 
-        // 延迟返回大厅，让用户看到提示
+        // 寤惰繜杩斿洖澶у巺锛岃鐢ㄦ埛鐪嬪埌鎻愮ず
         setTimeout(() => {
           returnToLobby();
         }, 3000);
       });
 
       socket.on('game_ended', (data) => {
-        console.log('游戏结束:', data);
+        console.log('娓告垙缁撴潫:', data);
         gameState.gameOver = true;
 
         let winMsg = '';
         if (data.result === 'win') {
           if (data.winner === accountId) {
-            winMsg = '🎉 你获胜了！';
+            winMsg = '馃帀 浣犺幏鑳滀簡锛?;
           } else {
-            winMsg = '😢 你输了！';
+            winMsg = '馃槩 浣犺緭浜嗭紒';
           }
         } else if (data.result === 'draw') {
-          winMsg = '🤝 平局！';
+          winMsg = '馃 骞冲眬锛?;
         } else if (data.result === 'resign') {
           if (data.winner === accountId) {
-            winMsg = '🎉 对方认输，你获胜了！';
+            winMsg = '馃帀 瀵规柟璁よ緭锛屼綘鑾疯儨浜嗭紒';
           } else {
-            winMsg = '😢 你认输了！';
+            winMsg = '馃槩 浣犺杈撲簡锛?;
           }
         } else if (data.result === 'timeout') {
-          winMsg = '⏰ 游戏超时！';
+          winMsg = '鈴?娓告垙瓒呮椂锛?;
         } else if (data.result === 'admin') {
-          winMsg = '🛑 ' + (data.reason || '游戏已结束');
+          winMsg = '馃洃 ' + (data.reason || '娓告垙宸茬粨鏉?);
         } else {
-          winMsg = '🛑 游戏已结束';
+          winMsg = '馃洃 娓告垙宸茬粨鏉?;
         }
 
-        winnerEl.textContent = data.winner === accountId ? '你' : '对手';
-        gameStatusEl.textContent = '游戏结束';
+        winnerEl.textContent = data.winner === accountId ? '浣? : '瀵规墜';
+        gameStatusEl.textContent = '娓告垙缁撴潫';
         gameStatusEl.className = 'info-value value-waiting';
         showWinAlert(winMsg);
-        updateStatus(`🏆 ${winMsg}`);
+        updateStatus(`馃弳 ${winMsg}`);
         updateAdvancedStats();
 
         const playAgainBtn = document.getElementById('play-again-btn');
@@ -4937,14 +1590,14 @@
         }, 500);
       });
 
-      // 成就解锁事件
+      // 鎴愬氨瑙ｉ攣浜嬩欢
       socket.on('achievements_unlocked', (data) => {
         if (data.achievements && data.achievements.length > 0) {
           showAchievementUnlockModal(data.achievements);
         }
       });
 
-      // 显示成就解锁模态框
+      // 鏄剧ず鎴愬氨瑙ｉ攣妯℃€佹
       function showAchievementUnlockModal(achievements) {
         const modal = document.createElement('div');
         modal.className = 'achievement-unlock-modal';
@@ -4954,7 +1607,7 @@
           achievementsHtml += `
             <div style="margin-bottom: 20px; padding: 20px; background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%); border-radius: 12px; border: 2px solid #48bb78;">
               <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                <div style="font-size: 32px; margin-right: 15px;">🏆</div>
+                <div style="font-size: 32px; margin-right: 15px;">馃弳</div>
                 <div>
                   <div style="font-size: 20px; font-weight: bold; color: #2d3748;">${achievement.name}</div>
                   <div style="font-size: 14px; color: #4a5568; margin-top: 2px;">${achievement.description}</div>
@@ -4969,16 +1622,16 @@
           <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;">
             <div style="background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3); max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;">
               <div style="text-align: center; margin-bottom: 20px;">
-                <div style="font-size: 48px; margin-bottom: 10px;">🎉</div>
-                <div style="font-size: 24px; font-weight: bold; color: #38a169;">解锁成就</div>
-                <div style="font-size: 14px; color: #718096; margin-top: 5px;">恭喜你解锁了 ${achievements.length} 个成就！</div>
+                <div style="font-size: 48px; margin-bottom: 10px;">馃帀</div>
+                <div style="font-size: 24px; font-weight: bold; color: #38a169;">瑙ｉ攣鎴愬氨</div>
+                <div style="font-size: 14px; color: #718096; margin-top: 5px;">鎭枩浣犺В閿佷簡 ${achievements.length} 涓垚灏憋紒</div>
               </div>
               <div style="margin-bottom: 20px;">
                 ${achievementsHtml}
               </div>
               <div style="text-align: center;">
                 <button onclick="this.closest('.achievement-unlock-modal').remove();" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px 30px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: all 0.3s ease;">
-                  确定
+                  纭畾
                 </button>
               </div>
             </div>
@@ -4988,7 +1641,7 @@
         document.body.appendChild(modal);
       }
 
-      // 成就列表事件
+      // 鎴愬氨鍒楄〃浜嬩欢
       socket.on('achievements_list', (data) => {
         if (!data.categories) return;
 
@@ -5001,17 +1654,17 @@
         let html = `
           <div style="margin-bottom: 20px; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; color: white;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <span style="font-size: 18px; font-weight: bold;">成就进度</span>
+              <span style="font-size: 18px; font-weight: bold;">鎴愬氨杩涘害</span>
               <span style="font-size: 24px; font-weight: bold;">${unlockedCount}/${totalAchievements}</span>
             </div>
             <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.3); border-radius: 4px; overflow: hidden;">
               <div style="width: ${progressPercent}%; height: 100%; background: #4ade80; border-radius: 4px; transition: width 0.5s ease;"></div>
             </div>
-            <div style="text-align: center; margin-top: 8px; font-size: 14px; opacity: 0.9;">已完成 ${progressPercent}%</div>
+            <div style="text-align: center; margin-top: 8px; font-size: 14px; opacity: 0.9;">宸插畬鎴?${progressPercent}%</div>
           </div>
         `;
 
-        // 渲染每个分类
+        // 娓叉煋姣忎釜鍒嗙被
         Object.entries(data.categories).forEach(([type, category]) => {
           if (!category.achievements || category.achievements.length === 0) return;
 
@@ -5030,9 +1683,9 @@
             const isUnlocked = unlockedIds.includes(achievement.id);
             const cardBg = isUnlocked ? 'linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%)' : '#f7fafc';
             const borderColor = isUnlocked ? '#48bb78' : '#e2e8f0';
-            const statusText = isUnlocked ? '✓ 已解锁' : '○ 未解锁';
+            const statusText = isUnlocked ? '鉁?宸茶В閿? : '鈼?鏈В閿?;
             const statusColor = isUnlocked ? '#38a169' : '#a0aec0';
-            const icon = isUnlocked ? '🏆' : '🔒';
+            const icon = isUnlocked ? '馃弳' : '馃敀';
             const opacity = isUnlocked ? '1' : '0.7';
 
             html += `
@@ -5045,7 +1698,7 @@
                 ${achievement.progress ? `
                   <div style="margin-bottom: 10px;">
                     <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px;">
-                      <span>进度</span>
+                      <span>杩涘害</span>
                       <span>${achievement.progress.current}/${achievement.progress.target}</span>
                     </div>
                     <div style="height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
@@ -5067,47 +1720,47 @@
         achievementsList.innerHTML = html;
       });
 
-      // ========== AI对战事件处理 ==========
+      // ========== AI瀵规垬浜嬩欢澶勭悊 ==========
 
-      // AI游戏开始
+      // AI娓告垙寮€濮?
       socket.on('ai_game_start', (data) => {
-        console.log('AI游戏开始:', data);
-        // 如果是象棋游戏，同步后端棋盘
+        console.log('AI娓告垙寮€濮?', data);
+        // 濡傛灉鏄薄妫嬫父鎴忥紝鍚屾鍚庣妫嬬洏
         if (data.gameType === 'chinese-chess' && data.board) {
           const pieces = convertBackendBoardToFrontend(data.board);
           chessPieces.red = pieces.red;
           chessPieces.black = pieces.black;
-          // 同步 gameState.board
+          // 鍚屾 gameState.board
           gameState.board = data.board;
           renderChessPieces();
         }
       });
 
-      // AI移动结果
+      // AI绉诲姩缁撴灉
       socket.on('ai_move_result', (data) => {
-        console.log('收到AI移动结果:', data);
+        console.log('鏀跺埌AI绉诲姩缁撴灉:', data);
         handleAIMoveResult(data);
       });
 
-      // AI游戏结束
+      // AI娓告垙缁撴潫
       socket.on('ai_game_end', (data) => {
-        console.log('AI游戏结束:', data);
+        console.log('AI娓告垙缁撴潫:', data);
         gameState.gameOver = true;
 
         let winMsg = '';
         if (data.result === 'win') {
-          winMsg = '🎉 你战胜了AI！';
+          winMsg = '馃帀 浣犳垬鑳滀簡AI锛?;
         } else if (data.result === 'loss') {
-          winMsg = '😢 你输给了AI！';
+          winMsg = '馃槩 浣犺緭缁欎簡AI锛?;
         } else {
-          winMsg = '🤝 游戏结束';
+          winMsg = '馃 娓告垙缁撴潫';
         }
 
-        winnerEl.textContent = data.result === 'win' ? '你' : 'AI';
-        gameStatusEl.textContent = '游戏结束';
+        winnerEl.textContent = data.result === 'win' ? '浣? : 'AI';
+        gameStatusEl.textContent = '娓告垙缁撴潫';
         gameStatusEl.className = 'info-value value-waiting';
         showWinAlert(winMsg);
-        updateStatus(`🏆 ${winMsg}`);
+        updateStatus(`馃弳 ${winMsg}`);
         updateAdvancedStats();
 
         const playAgainBtn = document.getElementById('play-again-btn');
@@ -5115,19 +1768,19 @@
           playAgainBtn.style.display = 'inline-block';
         }
 
-        // 发送AI游戏结果到服务器
+        // 鍙戦€丄I娓告垙缁撴灉鍒版湇鍔″櫒
         sendAIGameResult(data.result);
       });
 
       socket.on('chat_message', (data) => {
-        console.log('收到聊天消息:', data);
+        console.log('鏀跺埌鑱婂ぉ娑堟伅:', data);
         const isOther = data.userId !== accountId;
         const scope = data.scope || 'global';
 
-        // 保存到对应频道的历史记录
+        // 淇濆瓨鍒板搴旈閬撶殑鍘嗗彶璁板綍
         const messageData = {
           userId: data.userId,
-          nickname: data.nickname || '玩家',
+          nickname: data.nickname || '鐜╁',
           message: data.message,
           scope: scope,
           timestamp: Date.now()
@@ -5145,190 +1798,190 @@
           }
         }
 
-        // 如果是当前频道，则显示
+        // 濡傛灉鏄綋鍓嶉閬擄紝鍒欐樉绀?
         if (scope === currentChatChannel) {
-          addChatMessage(data.nickname || '玩家', data.message, isOther, scope);
+          addChatMessage(data.nickname || '鐜╁', data.message, isOther, scope);
         }
       });
 
       socket.on('chat_error', (data) => {
-        console.error('聊天错误:', data);
-        updateStatus('⚠️ ' + data.message);
-        // 如果是被禁言，显示广播通知
-        if (data.message && data.message.includes('禁言')) {
-          showBroadcast(data.message, '系统', Date.now());
+        console.error('鑱婂ぉ閿欒:', data);
+        updateStatus('鈿狅笍 ' + data.message);
+        // 濡傛灉鏄绂佽█锛屾樉绀哄箍鎾€氱煡
+        if (data.message && data.message.includes('绂佽█')) {
+          showBroadcast(data.message, '绯荤粺', Date.now());
         }
       });
 
       socket.on('error', (data) => {
-        console.error('服务器错误:', data);
-        alert('错误: ' + data.message);
+        console.error('鏈嶅姟鍣ㄩ敊璇?', data);
+        alert('閿欒: ' + data.message);
       });
 
-      // 系统广播
+      // 绯荤粺骞挎挱
       socket.on('system_broadcast', (data) => {
-        console.log('收到系统广播:', data);
+        console.log('鏀跺埌绯荤粺骞挎挱:', data);
         showBroadcast(data.message, data.from, data.timestamp);
       });
 
-      // 维护模式通知
+      // 缁存姢妯″紡閫氱煡
       socket.on('maintenance_notice', (data) => {
-        console.log('维护模式通知:', data);
+        console.log('缁存姢妯″紡閫氱煡:', data);
         if (data.enabled) {
-          showBroadcast(data.message, '系统维护', data.timestamp);
+          showBroadcast(data.message, '绯荤粺缁存姢', data.timestamp);
         }
       });
 
-      // 管理员消息
+      // 绠＄悊鍛樻秷鎭?
       socket.on('admin_message', (data) => {
-        console.log('收到管理员消息:', data);
-        showBroadcast(data.message, data.from || '管理员', data.timestamp);
+        console.log('鏀跺埌绠＄悊鍛樻秷鎭?', data);
+        showBroadcast(data.message, data.from || '绠＄悊鍛?, data.timestamp);
       });
 
-      // 游戏被重置
+      // 娓告垙琚噸缃?
       socket.on('game_reset', (data) => {
-        console.log('游戏被重置:', data);
+        console.log('娓告垙琚噸缃?', data);
         gameState.gameOver = true;
-        showBroadcast(data.message || '游戏已被管理员重置', '系统', Date.now());
+        showBroadcast(data.message || '娓告垙宸茶绠＄悊鍛橀噸缃?, '绯荤粺', Date.now());
         returnToLobby();
       });
 
-      // 游戏消息
+      // 娓告垙娑堟伅
       socket.on('game_message', (data) => {
-        console.log('收到游戏消息:', data);
+        console.log('鏀跺埌娓告垙娑堟伅:', data);
         if (data.type === 'opponent_left') {
-          showBroadcast(data.message, '系统', data.timestamp);
+          showBroadcast(data.message, '绯荤粺', data.timestamp);
         }
       });
 
-      // ========== 挑战相关事件 ==========
+      // ========== 鎸戞垬鐩稿叧浜嬩欢 ==========
 
       socket.on('challenge_received', (data) => {
-        console.log('收到挑战请求:', data);
+        console.log('鏀跺埌鎸戞垬璇锋眰:', data);
         currentChallenge = data;
         showChallengeModal(data.fromNickname, data.game);
       });
 
       socket.on('challenge_sent', (data) => {
-        console.log('挑战请求已发送:', data);
+        console.log('鎸戞垬璇锋眰宸插彂閫?', data);
         if (data.success) {
           updateStatus(data.message);
         } else {
-          updateStatus('❌ ' + data.message);
+          updateStatus('鉂?' + data.message);
         }
       });
 
       socket.on('challenge_accepted', (data) => {
-        console.log('挑战被接受:', data);
+        console.log('鎸戞垬琚帴鍙?', data);
         hideChallengeModal();
-        updateStatus(`✅ 玩家 ${data.fromNickname || data.toNickname} 接受了你的挑战！游戏开始！`);
-        // 游戏开始逻辑由 match_success 处理
+        updateStatus(`鉁?鐜╁ ${data.fromNickname || data.toNickname} 鎺ュ彈浜嗕綘鐨勬寫鎴橈紒娓告垙寮€濮嬶紒`);
+        // 娓告垙寮€濮嬮€昏緫鐢?match_success 澶勭悊
       });
 
       socket.on('challenge_rejected', (data) => {
-        console.log('挑战被拒绝:', data);
+        console.log('鎸戞垬琚嫆缁?', data);
         hideChallengeModal();
-        updateStatus(`❌ 玩家 ${data.fromNickname || data.toNickname} 拒绝了你的挑战。`);
+        updateStatus(`鉂?鐜╁ ${data.fromNickname || data.toNickname} 鎷掔粷浜嗕綘鐨勬寫鎴樸€俙);
       });
 
-      // ========== 账号系统事件 ==========
+      // ========== 璐﹀彿绯荤粺浜嬩欢 ==========
 
-      // 处理登录结果
+      // 澶勭悊鐧诲綍缁撴灉
       socket.on('login_result', (data) => {
-        console.log('登录结果:', data);
+        console.log('鐧诲綍缁撴灉:', data);
         const { success, message, data: resultData } = data;
 
-        // 恢复按钮状态
+        // 鎭㈠鎸夐挳鐘舵€?
         const loginBtn = document.querySelector('#account-modal .btn-primary');
-        if (loginBtn && loginBtn.textContent === '登录中...') {
-          loginBtn.textContent = '登录';
+        if (loginBtn && loginBtn.textContent === '鐧诲綍涓?..') {
+          loginBtn.textContent = '鐧诲綍';
           loginBtn.disabled = false;
         }
 
         if (success && resultData) {
-          // 登录成功
-          // 设置正确的数据结构，保持与页面刷新后一致
+          // 鐧诲綍鎴愬姛
+          // 璁剧疆姝ｇ‘鐨勬暟鎹粨鏋勶紝淇濇寔涓庨〉闈㈠埛鏂板悗涓€鑷?
           currentAccount = {
             ...resultData,
             account: resultData.account,
             stats: resultData.account.stats || {}
           };
 
-          // 保存token和账号ID到本地存储
+          // 淇濆瓨token鍜岃处鍙稩D鍒版湰鍦板瓨鍌?
           localStorage.setItem('userToken', resultData.token);
 
-          // 处理不同的数据结构
+          // 澶勭悊涓嶅悓鐨勬暟鎹粨鏋?
           let accountId, nickname, username;
           if (resultData.account.account) {
-            // 账号登录的数据结构
+            // 璐﹀彿鐧诲綍鐨勬暟鎹粨鏋?
             accountId = resultData.account.account.id;
             nickname = resultData.account.account.nickname;
             username = resultData.account.account.username;
           } else {
-            // 游客登录的数据结构
+            // 娓稿鐧诲綍鐨勬暟鎹粨鏋?
             accountId = resultData.account.id;
             nickname = resultData.account.nickname;
             username = resultData.account.username;
           }
 
           localStorage.setItem('currentAccountId', accountId);
-          localStorage.setItem('nickname', nickname || username || '玩家');
+          localStorage.setItem('nickname', nickname || username || '鐜╁');
 
-          // 更新界面
+          // 鏇存柊鐣岄潰
           updateAccountBar();
           closeAutoLoginModal();
           closeAccountModal();
 
-          // 发送用户登录事件
+          // 鍙戦€佺敤鎴风櫥褰曚簨浠?
           if (nickname) {
             socket.emit('user_login', { nickname: nickname });
           }
 
-          showToast('登录成功！欢迎 ' + (nickname || username), 'success');
+          showToast('鐧诲綍鎴愬姛锛佹杩?' + (nickname || username), 'success');
 
-          // 根据权限加载功能模块
+          // 鏍规嵁鏉冮檺鍔犺浇鍔熻兘妯″潡
           loadPermissions(resultData.permissions);
         } else {
-          // 登录失败
-          showToast(message || '登录失败，请检查用户名和密码', 'error');
+          // 鐧诲綍澶辫触
+          showToast(message || '鐧诲綍澶辫触锛岃妫€鏌ョ敤鎴峰悕鍜屽瘑鐮?, 'error');
         }
       });
 
       socket.on('account_action_result', (data) => {
-        console.log('账号操作结果:', data);
+        console.log('璐﹀彿鎿嶄綔缁撴灉:', data);
 
-        // 恢复按钮状态
+        // 鎭㈠鎸夐挳鐘舵€?
         const loginBtn = document.querySelector('#account-modal .btn-primary');
         const registerBtn = document.querySelector('#account-modal .btn-success');
-        if (loginBtn && loginBtn.textContent === '登录中...') {
-          loginBtn.textContent = '登录';
+        if (loginBtn && loginBtn.textContent === '鐧诲綍涓?..') {
+          loginBtn.textContent = '鐧诲綍';
           loginBtn.disabled = false;
         }
-        if (registerBtn && registerBtn.textContent === '注册中...') {
-          registerBtn.textContent = '注册';
+        if (registerBtn && registerBtn.textContent === '娉ㄥ唽涓?..') {
+          registerBtn.textContent = '娉ㄥ唽';
           registerBtn.disabled = false;
         }
 
         if (data.action === 'register') {
           if (data.success) {
-            // 注册成功后自动登录
+            // 娉ㄥ唽鎴愬姛鍚庤嚜鍔ㄧ櫥褰?
             if (pendingRegisterInfo) {
               socket.emit('account_login', {
                 username: pendingRegisterInfo.username,
                 password: pendingRegisterInfo.password
               });
-              pendingRegisterInfo = null; // 清除保存的信息
+              pendingRegisterInfo = null; // 娓呴櫎淇濆瓨鐨勪俊鎭?
             } else {
-              showToast('注册成功，请手动登录', 'success');
+              showToast('娉ㄥ唽鎴愬姛锛岃鎵嬪姩鐧诲綍', 'success');
             }
           } else {
-            showToast('注册失败：' + data.message, 'error');
-            pendingRegisterInfo = null; // 清除保存的信息
+            showToast('娉ㄥ唽澶辫触锛? + data.message, 'error');
+            pendingRegisterInfo = null; // 娓呴櫎淇濆瓨鐨勪俊鎭?
           }
         } else if (data.action === 'update_profile') {
           if (data.success) {
             if (data.account) {
-              // 设置正确的数据结构，保持与登录时一致
+              // 璁剧疆姝ｇ‘鐨勬暟鎹粨鏋勶紝淇濇寔涓庣櫥褰曟椂涓€鑷?
               currentAccount = {
                 ...currentAccount,
                 account: data.account,
@@ -5337,49 +1990,49 @@
               updateAccountBar();
             }
             closeAccountModal();
-            showToast('资料更新成功！', 'success');
+            showToast('璧勬枡鏇存柊鎴愬姛锛?, 'success');
           } else {
-            showToast('资料更新失败：' + data.message, 'error');
+            showToast('璧勬枡鏇存柊澶辫触锛? + data.message, 'error');
           }
         } else if (data.action === 'change_password') {
           if (data.success) {
             closeAccountModal();
-            showToast('密码修改成功！', 'success');
+            showToast('瀵嗙爜淇敼鎴愬姛锛?, 'success');
           } else {
-            showToast('密码修改失败：' + data.message, 'error');
+            showToast('瀵嗙爜淇敼澶辫触锛? + data.message, 'error');
           }
         } else if (data.action === 'reset_password') {
-          // 恢复重置按钮状态
+          // 鎭㈠閲嶇疆鎸夐挳鐘舵€?
           const resetBtn = document.querySelector('#account-modal .btn-primary');
-          if (resetBtn && resetBtn.textContent === '重置中...') {
-            resetBtn.textContent = '重置密码';
+          if (resetBtn && resetBtn.textContent === '閲嶇疆涓?..') {
+            resetBtn.textContent = '閲嶇疆瀵嗙爜';
             resetBtn.disabled = false;
           }
           if (data.success) {
             closeAccountModal();
             showLoginModal();
-            showToast('密码重置成功，请使用新密码登录', 'success');
+            showToast('瀵嗙爜閲嶇疆鎴愬姛锛岃浣跨敤鏂板瘑鐮佺櫥褰?, 'success');
           } else {
-            showToast('密码重置失败：' + data.message, 'error');
+            showToast('瀵嗙爜閲嶇疆澶辫触锛? + data.message, 'error');
           }
         }
       });
 
       socket.on('game_warning', (data) => {
-        console.warn('游戏警告:', data);
-        updateStatus('⚠️ ' + data.message);
+        console.warn('娓告垙璀﹀憡:', data);
+        updateStatus('鈿狅笍 ' + data.message);
       });
 
-      // 处理不活跃警告
+      // 澶勭悊涓嶆椿璺冭鍛?
       socket.on('inactive_warning', (data) => {
-        console.warn('不活跃警告:', data);
+        console.warn('涓嶆椿璺冭鍛?', data);
 
         if (data.level === 'warning') {
-          showToast(data.message, 'warning', 10000); // 10秒显示时间
+          showToast(data.message, 'warning', 10000); // 10绉掓樉绀烘椂闂?
         } else if (data.level === 'critical') {
-          showToast(data.message, 'error', 15000); // 15秒显示时间
+          showToast(data.message, 'error', 15000); // 15绉掓樉绀烘椂闂?
 
-          // 如果是严重警告，可以添加额外的视觉提示
+          // 濡傛灉鏄弗閲嶈鍛婏紝鍙互娣诲姞棰濆鐨勮瑙夋彁绀?
           const statusEl = document.getElementById('lobby-status');
           if (statusEl) {
             statusEl.style.animation = 'criticalFlash 1s infinite';
@@ -5391,34 +2044,34 @@
       });
 
       socket.on('leaderboard', (data) => {
-        console.log('收到排行榜数据:', data);
+        console.log('鏀跺埌鎺掕姒滄暟鎹?', data);
         updateLeaderboard(data.leaderboard, currentLeaderboardGameType);
       });
 
       socket.on('game_history', (data) => {
-        console.log('收到游戏历史记录:', data);
+        console.log('鏀跺埌娓告垙鍘嗗彶璁板綍:', data);
         updateGameHistory(data.history);
       });
 
-      // 贪吃蛇匹配相关事件
+      // 璐悆铔囧尮閰嶇浉鍏充簨浠?
       socket.on('snake_match_found', (data) => {
-        console.log('贪吃蛇匹配成功:', data);
+        console.log('璐悆铔囧尮閰嶆垚鍔?', data);
 
-        // 先恢复游戏界面，再启动游戏
+        // 鍏堟仮澶嶆父鎴忕晫闈紝鍐嶅惎鍔ㄦ父鎴?
         showSnakeGameInterface();
 
-        // 延迟启动游戏，确保DOM元素已创建
+        // 寤惰繜鍚姩娓告垙锛岀‘淇滵OM鍏冪礌宸插垱寤?
         setTimeout(() => {
           startMatchedSnakeGame(data);
 
-          // 请求全量状态同步
+          // 璇锋眰鍏ㄩ噺鐘舵€佸悓姝?
           if (socket && socket.connected) {
             socket.emit('snake_request_full_state', {
               matchId: data.matchId
             });
           }
 
-          // 定期请求状态同步，确保状态一致
+          // 瀹氭湡璇锋眰鐘舵€佸悓姝ワ紝纭繚鐘舵€佷竴鑷?
           if (snakeGameState.syncInterval) {
             clearInterval(snakeGameState.syncInterval);
           }
@@ -5433,10 +2086,10 @@
       });
 
       socket.on('match_timeout', (data) => {
-        console.log('匹配超时:', data);
-        showToast(data.message || '匹配超时，请稍后重试', 'warning');
+        console.log('鍖归厤瓒呮椂:', data);
+        showToast(data.message || '鍖归厤瓒呮椂锛岃绋嶅悗閲嶈瘯', 'warning');
         showSnakeGameInterface();
-        updateStatus('匹配已超时');
+        updateStatus('鍖归厤宸茶秴鏃?);
       });
 
       socket.on('snake_opponent_update', (data) => {
@@ -5444,25 +2097,25 @@
       });
 
       socket.on('snake_game_over', (data) => {
-        console.log('贪吃蛇游戏结束:', data);
+        console.log('璐悆铔囨父鎴忕粨鏉?', data);
         endDualSnakeGame();
       });
 
       socket.on('snake_match_cancelled', () => {
-        console.log('贪吃蛇匹配已取消');
+        console.log('璐悆铔囧尮閰嶅凡鍙栨秷');
         showSnakeGameInterface();
-        updateStatus('匹配已取消');
+        updateStatus('鍖归厤宸插彇娑?);
       });
 
       socket.on('snake_food_sync', (data) => {
-        console.log('同步食物状态:', data);
+        console.log('鍚屾椋熺墿鐘舵€?', data);
         if (snakeGameState.isDualMode && data.foods) {
           snakeGameState.foods = data.foods;
         }
       });
 
       socket.on('snake_full_state_sync', (data) => {
-        console.log('全量同步游戏状态:', data);
+        console.log('鍏ㄩ噺鍚屾娓告垙鐘舵€?', data);
         if (snakeGameState.isDualMode) {
           snakeGameState.snake = data.isPlayer1 ? data.player1Snake : data.player2Snake;
           snakeGameState.score = data.isPlayer1 ? data.player1Score : data.player2Score;
@@ -5471,7 +2124,7 @@
           snakeGameState.foods = data.foods || snakeGameState.foods;
           snakeGameState.gameTimeLeft = data.gameTimeLeft !== undefined ? data.gameTimeLeft : snakeGameState.gameTimeLeft;
 
-          // 更新UI
+          // 鏇存柊UI
           updateDualSnakeScore();
           updateDualGameTime();
         }
@@ -5479,7 +2132,7 @@
 
       socket.on('account_updated', (data) => {
         if (data.account) {
-          // 处理不同的数据结构
+          // 澶勭悊涓嶅悓鐨勬暟鎹粨鏋?
           const accountData = data.account.account || data.account;
           const newExp = accountData?.profile?.exp || 0;
           const newLevel = accountData?.profile?.level || 1;
@@ -5496,7 +2149,7 @@
           lastExp = newExp;
           lastLevel = newLevel;
 
-          // 正确更新 currentAccount，保持与登录时相同的数据结构
+          // 姝ｇ‘鏇存柊 currentAccount锛屼繚鎸佷笌鐧诲綍鏃剁浉鍚岀殑鏁版嵁缁撴瀯
           currentAccount = {
             ...data,
             account: data.account,
@@ -5504,16 +2157,16 @@
           };
           updateAccountBar();
 
-          // 同步服务端的贪吃蛇最高分到客户端显示
+          // 鍚屾鏈嶅姟绔殑璐悆铔囨渶楂樺垎鍒板鎴风鏄剧ず
           const serverSnakeHighScore = currentAccount.account?.games?.snake?.highScore ||
             currentAccount.stats?.snakeGames?.highScore || 0;
           if (serverSnakeHighScore > 0) {
-            // 更新 localStorage 取两者中的最大值
+            // 鏇存柊 localStorage 鍙栦袱鑰呬腑鐨勬渶澶у€?
             const localHighScore = parseInt(localStorage.getItem('snakeHighScore') || '0');
             if (serverSnakeHighScore > localHighScore) {
               localStorage.setItem('snakeHighScore', String(serverSnakeHighScore));
             }
-            // 如果贪吃蛇界面当前可见，更新显示
+            // 濡傛灉璐悆铔囩晫闈㈠綋鍓嶅彲瑙侊紝鏇存柊鏄剧ず
             const highScoreEl = document.getElementById('snake-highscore');
             if (highScoreEl) {
               const displayScore = Math.max(serverSnakeHighScore, parseInt(localStorage.getItem('snakeHighScore') || '0'));
@@ -5522,72 +2175,72 @@
             }
           }
 
-          // 如果资料模态框已打开，重新更新其内容
+          // 濡傛灉璧勬枡妯℃€佹宸叉墦寮€锛岄噸鏂版洿鏂板叾鍐呭
           const profileModal = document.getElementById('account-modal');
           if (profileModal) {
-            // 处理不同的数据结构
+            // 澶勭悊涓嶅悓鐨勬暟鎹粨鏋?
             const accountData = currentAccount.account.account || currentAccount.account;
             const statsData = currentAccount.stats || {};
 
-            // 重新打开资料模态框以显示最新数据
+            // 閲嶆柊鎵撳紑璧勬枡妯℃€佹浠ユ樉绀烘渶鏂版暟鎹?
             const modal = profileModal;
             modal.innerHTML = `
               <div class="account-modal" style="max-width: 500px;">
-                <div class="account-modal-title">👤 用户资料</div>
+                <div class="account-modal-title">馃懁 鐢ㄦ埛璧勬枡</div>
                 
                 <div class="account-form-group">
-                  <label class="account-form-label">用户名</label>
+                  <label class="account-form-label">鐢ㄦ埛鍚?/label>
                   <input type="text" class="account-form-input" value="${accountData?.username}" disabled style="background: #f7fafc; cursor: not-allowed;">
                 </div>
                 
                 <div class="account-form-group">
-                  <label class="account-form-label">昵称</label>
-                  <input type="text" class="account-form-input" id="profile-nickname" value="${accountData?.nickname || ''}" placeholder="请输入昵称">
+                  <label class="account-form-label">鏄电О</label>
+                  <input type="text" class="account-form-input" id="profile-nickname" value="${accountData?.nickname || ''}" placeholder="璇疯緭鍏ユ樀绉?>
                 </div>
                 
                 <div class="account-form-group">
-                  <label class="account-form-label">个人简介</label>
-                  <textarea class="account-form-input" id="profile-bio" rows="3" placeholder="介绍一下自己...">${accountData?.profile?.bio || ''}</textarea>
+                  <label class="account-form-label">涓汉绠€浠?/label>
+                  <textarea class="account-form-input" id="profile-bio" rows="3" placeholder="浠嬬粛涓€涓嬭嚜宸?..">${accountData?.profile?.bio || ''}</textarea>
                 </div>
                 
                 <div class="account-form-group">
-                  <label class="account-form-label">等级</label>
+                  <label class="account-form-label">绛夌骇</label>
                   <input type="text" class="account-form-input" value="Lv.${accountData?.profile?.level || 1}" disabled style="background: #f7fafc; cursor: not-allowed;">
                 </div>
                 
                 <div class="account-form-group">
-                  <label class="account-form-label">经验值</label>
+                  <label class="account-form-label">缁忛獙鍊?/label>
                   <div style="background: #f7fafc; padding: 12px; border-radius: 8px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px;">
                       <span>${accountData?.profile?.exp || 0} EXP</span>
-                      <span>经验: ${accountData?.profile?.exp || 0}</span>
+                      <span>缁忛獙: ${accountData?.profile?.exp || 0}</span>
                     </div>
                   </div>
                 </div>
                 
                 <div class="account-form-group">
-                  <label class="account-form-label">游戏统计</label>
+                  <label class="account-form-label">娓告垙缁熻</label>
                   <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
                     <div style="background: #f7fafc; padding: 10px; border-radius: 8px; text-align: center;">
                       <div style="font-size: 20px; font-weight: bold; color: #38a169;">${statsData?.wins || 0}</div>
-                      <div style="font-size: 12px; color: #718096;">胜</div>
+                      <div style="font-size: 12px; color: #718096;">鑳?/div>
                     </div>
                     <div style="background: #f7fafc; padding: 10px; border-radius: 8px; text-align: center;">
                       <div style="font-size: 20px; font-weight: bold; color: #e53e3e;">${statsData?.losses || 0}</div>
-                      <div style="font-size: 12px; color: #718096;">负</div>
+                      <div style="font-size: 12px; color: #718096;">璐?/div>
                     </div>
                     <div style="background: #f7fafc; padding: 10px; border-radius: 8px; text-align: center;">
                       <div style="font-size: 20px; font-weight: bold; color: #d69e2e;">${statsData?.draws || 0}</div>
-                      <div style="font-size: 12px; color: #718096;">平</div>
+                      <div style="font-size: 12px; color: #718096;">骞?/div>
                     </div>
                   </div>
                 </div>
                 
                 <div class="account-form-actions">
-                  <button class="account-btn btn-secondary" onclick="closeAccountModal()">返回</button>
-                  <button class="account-btn btn-info" onclick="showGameHistoryModal()">游戏历史</button>
-                  <button class="account-btn btn-warning" onclick="showChangePasswordModal()">修改密码</button>
-                  <button class="account-btn btn-primary" onclick="saveProfile()">保存资料</button>
+                  <button class="account-btn btn-secondary" onclick="closeAccountModal()">杩斿洖</button>
+                  <button class="account-btn btn-info" onclick="showGameHistoryModal()">娓告垙鍘嗗彶</button>
+                  <button class="account-btn btn-warning" onclick="showChangePasswordModal()">淇敼瀵嗙爜</button>
+                  <button class="account-btn btn-primary" onclick="saveProfile()">淇濆瓨璧勬枡</button>
                 </div>
               </div>
             `;
@@ -5596,24 +2249,24 @@
       });
     }
 
-    // 经验获得通知：显示基础经验 + 额外经验
+    // 缁忛獙鑾峰緱閫氱煡锛氭樉绀哄熀纭€缁忛獙 + 棰濆缁忛獙
     socket.on('exp_gained', (data) => {
       const r = data.expResult;
       if (!r) return;
       const bonus = r.bonusExp || 0;
       const base = r.baseExp || 0;
       const total = r.finalExp || (base + bonus);
-      let msg = `✨ 获得 ${total} 经验值`;
+      let msg = `鉁?鑾峰緱 ${total} 缁忛獙鍊糮;
       if (bonus > 0 && r.eventLabel) {
-        msg += `（基础 ${base} + ${r.eventLabel} 额外 ${bonus}）`;
+        msg += `锛堝熀纭€ ${base} + ${r.eventLabel} 棰濆 ${bonus}锛塦;
       } else if (bonus > 0) {
-        msg += `（基础 ${base} + 额外 ${bonus}）`;
+        msg += `锛堝熀纭€ ${base} + 棰濆 ${bonus}锛塦;
       }
       showToast(msg, 'success');
     });
 
-    // 更新排行榜显示
-    // 当前排行榜选中的游戏类型
+    // 鏇存柊鎺掕姒滄樉绀?
+    // 褰撳墠鎺掕姒滈€変腑鐨勬父鎴忕被鍨?
     let currentLeaderboardGameType = 'all';
 
     function updateLeaderboard(leaderboard, gameType) {
@@ -5621,13 +2274,13 @@
       if (!list) return;
 
       if (!leaderboard || leaderboard.length === 0) {
-        list.innerHTML = '<div style="color: #718096; font-size: 12px;">暂无数据</div>';
+        list.innerHTML = '<div style="color: #718096; font-size: 12px;">鏆傛棤鏁版嵁</div>';
         return;
       }
 
       list.innerHTML = leaderboard.map(player => {
         const rankClass = player.rank <= 3 ? `top-${player.rank}` : '';
-        const name = player.name || player.username || '未知玩家';
+        const name = player.name || player.username || '鏈煡鐜╁';
         const isSnake = gameType === 'snake';
         return `
           <div class="leaderboard-item ${rankClass}">
@@ -5640,10 +2293,10 @@
             </div>
             <div class="leaderboard-stats">
               ${isSnake ?
-            `<div class="leaderboard-wins">${player.score || 0}分</div>
-                     <div class="leaderboard-winrate">最高分数</div>` :
-            `<div class="leaderboard-wins">${player.wins || 0}胜</div>
-                     <div class="leaderboard-winrate">胜率 ${player.winrate || '0%'}</div>`
+            `<div class="leaderboard-wins">${player.score || 0}鍒?/div>
+                     <div class="leaderboard-winrate">鏈€楂樺垎鏁?/div>` :
+            `<div class="leaderboard-wins">${player.wins || 0}鑳?/div>
+                     <div class="leaderboard-winrate">鑳滅巼 ${player.winrate || '0%'}</div>`
           }
             </div>
           </div>
@@ -5681,47 +2334,47 @@
       });
     }
 
-    // 显示系统广播
-    function showBroadcast(message, from = '管理员', timestamp = Date.now()) {
+    // 鏄剧ず绯荤粺骞挎挱
+    function showBroadcast(message, from = '绠＄悊鍛?, timestamp = Date.now()) {
       broadcastContent.textContent = message;
       const time = new Date(timestamp);
       broadcastTime.textContent = time.toLocaleString('zh-CN');
       systemBroadcast.classList.add('show');
 
-      // 30秒后自动隐藏
+      // 30绉掑悗鑷姩闅愯棌
       setTimeout(() => {
         hideBroadcast();
       }, 30000);
     }
 
-    // ========== 悔棋系统 ==========
+    // ========== 鎮旀绯荤粺 ==========
 
-    // 收到对手的悔棋请求
+    // 鏀跺埌瀵规墜鐨勬倲妫嬭姹?
     socket.on('undo_request', (data) => {
-      const accepted = confirm(`玩家 ${data.fromNickname || '对手'} 请求悔棋，是否同意？`);
+      const accepted = confirm(`鐜╁ ${data.fromNickname || '瀵规墜'} 璇锋眰鎮旀锛屾槸鍚﹀悓鎰忥紵`);
       socket.emit('undo_response', { accepted });
     });
 
-    // 悔棋请求已发送
+    // 鎮旀璇锋眰宸插彂閫?
     socket.on('undo_request_sent', (data) => {
-      updateStatus(data.message || '⏪ 已发送悔棋请求，等待对手回应');
+      updateStatus(data.message || '鈴?宸插彂閫佹倲妫嬭姹傦紝绛夊緟瀵规墜鍥炲簲');
     });
 
-    // 悔棋被接受
+    // 鎮旀琚帴鍙?
     socket.on('undo_accepted', (data) => {
-      updateStatus('✅ 悔棋成功！');
+      updateStatus('鉁?鎮旀鎴愬姛锛?);
       handleUndoAccepted(data);
     });
 
-    // 悔棋被拒绝
+    // 鎮旀琚嫆缁?
     socket.on('undo_rejected', (data) => {
-      updateStatus(`❌ ${data.message || '悔棋请求被拒绝'}`);
+      updateStatus(`鉂?${data.message || '鎮旀璇锋眰琚嫆缁?}`);
     });
 
-    // 悔棋扣除反馈
+    // 鎮旀鎵ｉ櫎鍙嶉
     socket.on('undo_deduct', (data) => {
       if (data.success) {
-        // 更新本地库存
+        // 鏇存柊鏈湴搴撳瓨
         if (currentAccount) {
           const accData = currentAccount.account;
           if (accData.inventory) {
@@ -5732,15 +2385,15 @@
       }
     });
 
-    // 游戏内道具使用反馈
+    // 娓告垙鍐呴亾鍏蜂娇鐢ㄥ弽棣?
     socket.on('game_item_used', (data) => {
       if (data.success) {
-        // 更新本地库存数据
+        // 鏇存柊鏈湴搴撳瓨鏁版嵁
         if (currentAccount) {
           const accData = currentAccount.account;
           if (!accData.inventory) accData.inventory = {};
           if (data.itemId === 'item_undo') {
-            // 删除一张道具卡，加上3次直接使用次数
+            // 鍒犻櫎涓€寮犻亾鍏峰崱锛屽姞涓?娆＄洿鎺ヤ娇鐢ㄦ鏁?
             const items = accData.inventory.items || {};
             if (items.item_undo) items.item_undo -= 1;
             accData.inventory.undoCount = data.undoCount || 0;
@@ -5749,35 +2402,35 @@
             if (items.item_hint) items.item_hint -= 1;
             accData.inventory.hintCount = data.hintCount || 0;
           }
-          // 更新 items 数据
+          // 鏇存柊 items 鏁版嵁
           if (data.items) {
             accData.inventory.items = data.items;
           }
           updateAccountBar();
         }
-        // 重试请求
+        // 閲嶈瘯璇锋眰
         if (data.itemId === 'item_undo') {
           requestUndo();
         } else if (data.itemId === 'item_hint') {
           requestHint();
         }
       } else {
-        showToast(`❌ 使用道具失败：${data.message || '未知错误'}`, 'error');
-        updateStatus('❌ 使用道具失败');
+        showToast(`鉂?浣跨敤閬撳叿澶辫触锛?{data.message || '鏈煡閿欒'}`, 'error');
+        updateStatus('鉂?浣跨敤閬撳叿澶辫触');
       }
     });
 
-    // ========== 提示系统 ==========
+    // ========== 鎻愮ず绯荤粺 ==========
 
-    // 收到提示结果
+    // 鏀跺埌鎻愮ず缁撴灉
     socket.on('hint_result', (data) => {
       handleHintResult(data);
     });
 
-    // 提示扣除反馈
+    // 鎻愮ず鎵ｉ櫎鍙嶉
     socket.on('hint_deduct', (data) => {
       if (data.success) {
-        // 更新本地库存
+        // 鏇存柊鏈湴搴撳瓨
         if (currentAccount) {
           const accData = currentAccount.account;
           if (accData.inventory) {
@@ -5786,26 +2439,26 @@
           updateAccountBar();
         }
         if (data.message) {
-          updateStatus(`💡 ${data.message}`);
+          updateStatus(`馃挕 ${data.message}`);
         }
       } else {
-        updateStatus(`❌ ${data.message || '提示次数不足'}`);
+        updateStatus(`鉂?${data.message || '鎻愮ず娆℃暟涓嶈冻'}`);
       }
     });
 
-    // 隐藏系统广播
+    // 闅愯棌绯荤粺骞挎挱
     function hideBroadcast() {
       systemBroadcast.classList.remove('show');
     }
 
-    // 初始化所有棋盘
+    // 鍒濆鍖栨墍鏈夋鐩?
     function initBoards() {
       initGobangBoard();
       initGoBoard();
       initChessBoard();
     }
 
-    // 初始化五子棋棋盘
+    // 鍒濆鍖栦簲瀛愭妫嬬洏
     function initGobangBoard() {
       const config = gameConfigs.gobang;
       gobangBoard.innerHTML = '';
@@ -5823,7 +2476,7 @@
       }
     }
 
-    // 初始化围棋棋盘
+    // 鍒濆鍖栧洿妫嬫鐩?
     function initGoBoard() {
       const config = gameConfigs.go;
       goBoard.innerHTML = '';
@@ -5837,7 +2490,7 @@
           cell.onclick = () => handleGoClick(r, c);
           cell.onmousemove = () => updateMousePos(r, c);
 
-          // 添加星位
+          // 娣诲姞鏄熶綅
           if ((r === 3 || r === 9 || r === 15) && (c === 3 || c === 9 || c === 15)) {
             const star = document.createElement('div');
             star.className = 'go-star';
@@ -5848,16 +2501,16 @@
         }
       }
 
-      // 添加河界和九宫格标记（围棋不需要）
+      // 娣诲姞娌崇晫鍜屼節瀹牸鏍囪锛堝洿妫嬩笉闇€瑕侊級
     }
 
-    // 初始化象棋棋盘
+    // 鍒濆鍖栬薄妫嬫鐩?
     function initChessBoard() {
       const config = gameConfigs['chinese-chess'];
       chessBoard.innerHTML = '';
 
       // ========================================
-      // 1. 创建SVG来绘制精确的棋盘线条和九宫格
+      // 1. 鍒涘缓SVG鏉ョ粯鍒剁簿纭殑妫嬬洏绾挎潯鍜屼節瀹牸
       // ========================================
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       svg.style.position = 'absolute';
@@ -5868,24 +2521,24 @@
       svg.style.pointerEvents = 'none';
       svg.style.zIndex = '1';
 
-      // 绘制竖线（9条）
+      // 缁樺埗绔栫嚎锛?鏉★級
       for (let c = 0; c < 9; c++) {
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         line.setAttribute('x1', c * 40);
         line.setAttribute('y1', 0);
         line.setAttribute('x2', c * 40);
-        // 左右边线是连续的
+        // 宸﹀彸杈圭嚎鏄繛缁殑
         if (c === 0 || c === 8) {
           line.setAttribute('y2', 360);
         } else {
-          // 中间的竖线，河界上下分开画
-          line.setAttribute('y2', 160); // 0-4行
+          // 涓棿鐨勭珫绾匡紝娌崇晫涓婁笅鍒嗗紑鐢?
+          line.setAttribute('y2', 160); // 0-4琛?
         }
         line.setAttribute('stroke', 'rgba(0,0,0,0.35)');
         line.setAttribute('stroke-width', '1');
         svg.appendChild(line);
 
-        // 中间竖线的下半部分（5-9行）
+        // 涓棿绔栫嚎鐨勪笅鍗婇儴鍒嗭紙5-9琛岋級
         if (c > 0 && c < 8) {
           const lineBottom = document.createElementNS('http://www.w3.org/2000/svg', 'line');
           lineBottom.setAttribute('x1', c * 40);
@@ -5898,7 +2551,7 @@
         }
       }
 
-      // 绘制横线（10条）
+      // 缁樺埗妯嚎锛?0鏉★級
       for (let r = 0; r < 10; r++) {
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         line.setAttribute('x1', 0);
@@ -5910,7 +2563,7 @@
         svg.appendChild(line);
       }
 
-      // 绘制黑方九宫格斜线（0-2行，3-5列）
+      // 缁樺埗榛戞柟涔濆鏍兼枩绾匡紙0-2琛岋紝3-5鍒楋級
       const blackDiag1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       blackDiag1.setAttribute('x1', 120);
       blackDiag1.setAttribute('y1', 0);
@@ -5929,7 +2582,7 @@
       blackDiag2.setAttribute('stroke-width', '1');
       svg.appendChild(blackDiag2);
 
-      // 绘制红方九宫格斜线（7-9行，3-5列）
+      // 缁樺埗绾㈡柟涔濆鏍兼枩绾匡紙7-9琛岋紝3-5鍒楋級
       const redDiag1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       redDiag1.setAttribute('x1', 120);
       redDiag1.setAttribute('y1', 280);
@@ -5951,7 +2604,7 @@
       chessBoard.appendChild(svg);
 
       // ========================================
-      // 2. 创建交叉点
+      // 2. 鍒涘缓浜ゅ弶鐐?
       // ========================================
       for (let r = 0; r < config.size.height; r++) {
         for (let c = 0; c < config.size.width; c++) {
@@ -5964,7 +2617,7 @@
           intersection.onclick = () => handleChessClick(r, c);
           intersection.onmousemove = () => updateMousePos(r, c);
 
-          // 添加兵位标记
+          // 娣诲姞鍏典綅鏍囪
           if (((r === 3 || r === 6) && (c === 0 || c === 2 || c === 4 || c === 6 || c === 8)) ||
             ((r === 2 || r === 7) && (c === 1 || c === 7)) ||
             ((r === 0 || r === 9) && (c === 0 || c === 2 || c === 4 || c === 6 || c === 8))) {
@@ -5981,23 +2634,23 @@
       }
 
       // ========================================
-      // 3. 添加河界文字
+      // 3. 娣诲姞娌崇晫鏂囧瓧
       // ========================================
       const river = document.createElement('div');
       river.className = 'chess-river';
       chessBoard.appendChild(river);
 
-      // 渲染棋子
+      // 娓叉煋妫嬪瓙
       renderChessPieces();
     }
 
-    // 渲染象棋棋子
+    // 娓叉煋璞℃妫嬪瓙
     function renderChessPieces() {
-      // 清除现有棋子
+      // 娓呴櫎鐜版湁妫嬪瓙
       const existingPieces = chessBoard.querySelectorAll('.chess-piece');
       existingPieces.forEach(piece => piece.remove());
 
-      // 渲染红方棋子
+      // 娓叉煋绾㈡柟妫嬪瓙
       chessPieces.red.forEach(piece => {
         const pieceEl = document.createElement('div');
         pieceEl.className = 'chess-piece chess-red';
@@ -6014,7 +2667,7 @@
         chessBoard.appendChild(pieceEl);
       });
 
-      // 渲染黑方棋子
+      // 娓叉煋榛戞柟妫嬪瓙
       chessPieces.black.forEach(piece => {
         const pieceEl = document.createElement('div');
         pieceEl.className = 'chess-piece chess-black';
@@ -6032,42 +2685,42 @@
       });
     }
 
-    // 后端棋子类型到中文名称的映射
+    // 鍚庣妫嬪瓙绫诲瀷鍒颁腑鏂囧悕绉扮殑鏄犲皠
     const chessPieceMap = {
-      'ju': '车',
-      'ma': '马',
-      'xiang': '相',
-      'shi': '仕',
-      'shuai': '帅',
-      'pao': '炮',
-      'bing': '兵',
-      'jiang': '将',
-      'zu': '卒'
+      'ju': '杞?,
+      'ma': '椹?,
+      'xiang': '鐩?,
+      'shi': '浠?,
+      'shuai': '甯?,
+      'pao': '鐐?,
+      'bing': '鍏?,
+      'jiang': '灏?,
+      'zu': '鍗?
     };
 
-    // 中文名称到后端棋子类型的反向映射（红方）
+    // 涓枃鍚嶇О鍒板悗绔瀛愮被鍨嬬殑鍙嶅悜鏄犲皠锛堢孩鏂癸級
     const chessTypeMapRed = {
-      '车': 'ju',
-      '马': 'ma',
-      '相': 'xiang',
-      '仕': 'shi',
-      '帅': 'shuai',
-      '炮': 'pao',
-      '兵': 'bing'
+      '杞?: 'ju',
+      '椹?: 'ma',
+      '鐩?: 'xiang',
+      '浠?: 'shi',
+      '甯?: 'shuai',
+      '鐐?: 'pao',
+      '鍏?: 'bing'
     };
 
-    // 中文名称到后端棋子类型的反向映射（黑方）
+    // 涓枃鍚嶇О鍒板悗绔瀛愮被鍨嬬殑鍙嶅悜鏄犲皠锛堥粦鏂癸級
     const chessTypeMapBlack = {
-      '车': 'ju',
-      '马': 'ma',
-      '象': 'xiang',
-      '士': 'shi',
-      '将': 'jiang',
-      '炮': 'pao',
-      '卒': 'zu'
+      '杞?: 'ju',
+      '椹?: 'ma',
+      '璞?: 'xiang',
+      '澹?: 'shi',
+      '灏?: 'jiang',
+      '鐐?: 'pao',
+      '鍗?: 'zu'
     };
 
-    // 从后端棋盘数据转换为前端 chessPieces 格式
+    // 浠庡悗绔鐩樻暟鎹浆鎹负鍓嶇 chessPieces 鏍煎紡
     function convertBackendBoardToFrontend(board) {
       const pieces = { red: [], black: [] };
 
@@ -6092,7 +2745,7 @@
       return pieces;
     }
 
-    // 从前端 chessPieces 数据转换为后端棋盘格式
+    // 浠庡墠绔?chessPieces 鏁版嵁杞崲涓哄悗绔鐩樻牸寮?
     function convertFrontendPiecesToBackend() {
       const board = Array(10).fill().map(() => Array(9).fill(0));
 
@@ -6109,128 +2762,128 @@
       return board;
     }
 
-    // ========== 棋种切换功能 ==========
+    // ========== 妫嬬鍒囨崲鍔熻兘 ==========
     function switchGame(game) {
       if (isMatching || matchedOpponentId) {
-        updateStatus('❌ 匹配中或游戏中不能切换棋种');
+        updateStatus('鉂?鍖归厤涓垨娓告垙涓笉鑳藉垏鎹㈡绉?);
         return;
       }
 
       currentGame = game;
       updateGameDisplay();
 
-      // 更新导航按钮状态
+      // 鏇存柊瀵艰埅鎸夐挳鐘舵€?
       document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.classList.remove('active');
-        // 清除所有内联背景色（包括 data-game 和 data-page 的按钮）
+        // 娓呴櫎鎵€鏈夊唴鑱旇儗鏅壊锛堝寘鎷?data-game 鍜?data-page 鐨勬寜閽級
         btn.style.background = '';
       });
       const activeBtn = document.querySelector(`[data-game="${game}"]`);
       if (activeBtn) {
         activeBtn.classList.add('active');
-        // 如果有主题，应用主题颜色
+        // 濡傛灉鏈変富棰橈紝搴旂敤涓婚棰滆壊
         if (currentTheme && themes[currentTheme]) {
           activeBtn.style.background = themes[currentTheme].primaryColor;
         }
       }
 
-      // 隐藏成就、AI对战、主题页面
+      // 闅愯棌鎴愬氨銆丄I瀵规垬銆佷富棰橀〉闈?
       document.getElementById('achievements-container').style.display = 'none';
       document.getElementById('ai-game-container').style.display = 'none';
       document.getElementById('leaderboard-page').style.display = 'none';
       document.getElementById('theme-container').style.display = 'none';
 
-      // 显示在线玩家面板（带动画）
+      // 鏄剧ず鍦ㄧ嚎鐜╁闈㈡澘锛堝甫鍔ㄧ敾锛?
       const onlineUsersPanelEl = document.getElementById('online-users-panel');
       onlineUsersPanelEl.style.opacity = '0';
       onlineUsersPanelEl.style.transform = 'translateY(20px)';
       onlineUsersPanelEl.style.display = 'block';
 
-      // 添加动画效果
+      // 娣诲姞鍔ㄧ敾鏁堟灉
       setTimeout(() => {
         onlineUsersPanelEl.style.opacity = '1';
         onlineUsersPanelEl.style.transform = 'translateY(0)';
       }, 10);
 
-      // 贪吃蛇游戏特殊处理
+      // 璐悆铔囨父鎴忕壒娈婂鐞?
       if (game === 'snake') {
-        // 隐藏大厅和游戏控制
+        // 闅愯棌澶у巺鍜屾父鎴忔帶鍒?
         lobbyContainer.style.display = 'none';
         gameControls.style.display = 'none';
         statusBox.style.display = 'none';
         moveLogPanel.style.display = 'none';
         chatContainer.classList.remove('show');
 
-        // 隐藏其他棋盘
+        // 闅愯棌鍏朵粬妫嬬洏
         document.getElementById('gobang-board').style.display = 'none';
         document.getElementById('go-board').style.display = 'none';
         document.getElementById('chess-board').style.display = 'none';
 
-        // 显示贪吃蛇游戏
+        // 鏄剧ず璐悆铔囨父鎴?
         document.getElementById('snake-game-container').style.display = 'block';
 
-        // 初始化贪吃蛇游戏
+        // 鍒濆鍖栬椽鍚冭泧娓告垙
         initSnakeGame();
 
-        updateStatus('🐍 贪吃蛇游戏已准备就绪，点击"开始游戏"开始！');
+        updateStatus('馃悕 璐悆铔囨父鎴忓凡鍑嗗灏辩华锛岀偣鍑?寮€濮嬫父鎴?寮€濮嬶紒');
         return;
       }
 
-      // 显示大厅
+      // 鏄剧ず澶у巺
       lobbyContainer.style.display = 'block';
 
-      // 隐藏贪吃蛇游戏
+      // 闅愯棌璐悆铔囨父鎴?
       document.getElementById('snake-game-container').style.display = 'none';
 
-      // 显示对应游戏的棋盘
+      // 鏄剧ず瀵瑰簲娓告垙鐨勬鐩?
       document.getElementById('gobang-board').style.display = game === 'gobang' ? 'grid' : 'none';
       document.getElementById('go-board').style.display = game === 'go' ? 'grid' : 'none';
       document.getElementById('chess-board').style.display = game === 'chinese-chess' ? 'block' : 'none';
 
-      // 显示智能提示
+      // 鏄剧ず鏅鸿兘鎻愮ず
       showGameTips();
 
-      updateStatus(`✅ 已切换到${gameConfigs[game].emoji} ${gameConfigs[game].colorNames[0]}${gameConfigs[game].colorNames[1]}，点击"开始匹配"寻找对手`);
+      updateStatus(`鉁?宸插垏鎹㈠埌${gameConfigs[game].emoji} ${gameConfigs[game].colorNames[0]}${gameConfigs[game].colorNames[1]}锛岀偣鍑?寮€濮嬪尮閰?瀵绘壘瀵规墜`);
     }
 
-    // 更新导航按钮选中状态（用于成就、AI对战、主题页面）
+    // 鏇存柊瀵艰埅鎸夐挳閫変腑鐘舵€侊紙鐢ㄤ簬鎴愬氨銆丄I瀵规垬銆佷富棰橀〉闈級
     function updateNavActiveState(page) {
       document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.classList.remove('active');
-        // 清除内联背景色
+        // 娓呴櫎鍐呰仈鑳屾櫙鑹?
         btn.style.background = '';
       });
 
       const activeBtn = document.querySelector(`[data-page="${page}"]`);
       if (activeBtn) {
         activeBtn.classList.add('active');
-        // 如果有主题，应用主题颜色
+        // 濡傛灉鏈変富棰橈紝搴旂敤涓婚棰滆壊
         if (currentTheme && themes[currentTheme]) {
           activeBtn.style.background = themes[currentTheme].primaryColor;
         }
       }
     }
 
-    // 更新游戏显示
+    // 鏇存柊娓告垙鏄剧ず
     function updateGameDisplay() {
-      // 贪吃蛇游戏不需要更新棋盘显示
+      // 璐悆铔囨父鎴忎笉闇€瑕佹洿鏂版鐩樻樉绀?
       if (currentGame === 'snake') {
         return;
       }
 
       const config = gameConfigs[currentGame];
 
-      // 更新当前棋种显示
-      currentGameEl.textContent = `${config.emoji} ${currentGame === 'gobang' ? '五子棋' : currentGame === 'go' ? '围棋' : '象棋'}`;
+      // 鏇存柊褰撳墠妫嬬鏄剧ず
+      currentGameEl.textContent = `${config.emoji} ${currentGame === 'gobang' ? '浜斿瓙妫? : currentGame === 'go' ? '鍥存' : '璞℃'}`;
 
-      // 更新胜负判定显示
+      // 鏇存柊鑳滆礋鍒ゅ畾鏄剧ず
       winConditionEl.textContent = config.winCondition;
 
-      // 更新总格子数
+      // 鏇存柊鎬绘牸瀛愭暟
       totalCellsEl.textContent = config.totalCells;
       emptyCountEl.textContent = config.totalCells;
 
-      // 隐藏所有棋盘，显示当前棋种的棋盘
+      // 闅愯棌鎵€鏈夋鐩橈紝鏄剧ず褰撳墠妫嬬鐨勬鐩?
       document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
         board.style.display = 'none';
       });
@@ -6243,7 +2896,7 @@
         chessBoard.style.display = 'grid';
       }
 
-      // 添加切换动画
+      // 娣诲姞鍒囨崲鍔ㄧ敾
       const currentBoard = document.querySelector(`.${config.boardClass}`);
       if (currentBoard) {
         currentBoard.classList.add('board-fade');
@@ -6257,19 +2910,19 @@
 
 
 
-    // ========== 游戏核心逻辑 ==========
+    // ========== 娓告垙鏍稿績閫昏緫 ==========
     function resetGameState() {
       const config = gameConfigs[currentGame];
 
       if (currentGame === 'chinese-chess') {
         gameState.board = Array(config.size.height).fill().map(() => Array(config.size.width).fill(0));
-        // 重新渲染棋子
+        // 閲嶆柊娓叉煋妫嬪瓙
         renderChessPieces();
       } else {
         gameState.board = Array(config.size).fill().map(() => Array(config.size).fill(0));
       }
 
-      gameState.turn = 1; // 黑棋先手
+      gameState.turn = 1; // 榛戞鍏堟墜
       gameState.gameOver = false;
       gameState.isConnected = true;
       gameState.moveCount = 0;
@@ -6285,7 +2938,7 @@
 
 
 
-    // ========== 五子棋逻辑 ==========
+    // ========== 浜斿瓙妫嬮€昏緫 ==========
     function handleGobangClick(r, c) {
       if (currentGame !== 'gobang' || gameState.gameOver || gameState.turn !== gameState.me || gameState.board[r][c] !== 0 || (!matchedOpponentId && !gameState.difficulty)) return;
 
@@ -6299,7 +2952,7 @@
       });
       gameState.moveTimestamps.push(Date.now());
 
-      // 记录最新移动
+      // 璁板綍鏈€鏂扮Щ鍔?
       gameState.lastMove = { r: r, c: c, color: gameState.me };
 
       if (gameState.me === 1) {
@@ -6313,7 +2966,7 @@
         gameState.maxChain = chain;
       }
 
-      // 播放落子音效
+      // 鎾斁钀藉瓙闊虫晥
       playSound('stonePlace');
 
       requestAnimationFrame(() => {
@@ -6326,7 +2979,7 @@
         renderBoard();
       });
 
-      updateStatus(`📌 你已落子 (${r},${c})，等待对方回合`);
+      updateStatus(`馃搶 浣犲凡钀藉瓙 (${r},${c})锛岀瓑寰呭鏂瑰洖鍚坄);
 
       if (matchedOpponentId) {
         sendMessage({
@@ -6339,7 +2992,7 @@
           timestamp: Date.now()
         });
       } else {
-        // AI对战，发送移动给服务器
+        // AI瀵规垬锛屽彂閫佺Щ鍔ㄧ粰鏈嶅姟鍣?
         if (socket) {
           socket.emit('ai_move', {
             position: { r, c }
@@ -6349,21 +3002,21 @@
 
       if (checkGobangWin(r, c, gameState.me)) {
         gameState.gameOver = true;
-        const winMsg = gameState.me === 1 ? '黑棋获胜！' : '白棋获胜！';
-        const winColor = gameState.me === 1 ? '黑棋' : '白棋';
+        const winMsg = gameState.me === 1 ? '榛戞鑾疯儨锛? : '鐧芥鑾疯儨锛?;
+        const winColor = gameState.me === 1 ? '榛戞' : '鐧芥';
         winnerEl.textContent = winColor;
         winnerEl.className = `info-value ${gameState.me === 1 ? 'value-black' : 'value-white'}`;
-        gameStatusEl.textContent = '游戏结束';
+        gameStatusEl.textContent = '娓告垙缁撴潫';
         gameStatusEl.className = 'info-value value-waiting';
 
-        // 播放胜利音效
+        // 鎾斁鑳滃埄闊虫晥
         playSound('win');
 
         showWinAlert(winMsg);
-        updateStatus(`🏆 ${winMsg} 游戏结束`);
+        updateStatus(`馃弳 ${winMsg} 娓告垙缁撴潫`);
         updateAdvancedStats();
 
-        // 发送 AI 游戏结果
+        // 鍙戦€?AI 娓告垙缁撴灉
         sendAIGameResult('win');
       }
     }
@@ -6425,17 +3078,17 @@
       return false;
     }
 
-    // ========== 围棋逻辑 ==========
+    // ========== 鍥存閫昏緫 ==========
     function handleGoClick(r, c) {
       if (currentGame !== 'go' || gameState.gameOver || gameState.turn !== gameState.me || gameState.board[r][c] !== 0 || (!matchedOpponentId && !gameState.difficulty)) return;
 
-      // 检查是否打劫
+      // 妫€鏌ユ槸鍚︽墦鍔?
       if (isKo(r, c, gameState.me)) {
-        updateStatus(`❌ 打劫，不能立即回提`);
+        updateStatus(`鉂?鎵撳姭锛屼笉鑳界珛鍗冲洖鎻恅);
         return;
       }
 
-      // 简单的围棋落子逻辑（实际围棋规则更复杂）
+      // 绠€鍗曠殑鍥存钀藉瓙閫昏緫锛堝疄闄呭洿妫嬭鍒欐洿澶嶆潅锛?
       gameState.board[r][c] = gameState.me;
       gameState.moveCount++;
       gameState.moveLog.push({
@@ -6446,7 +3099,7 @@
       });
       gameState.moveTimestamps.push(Date.now());
 
-      // 记录最新移动
+      // 璁板綍鏈€鏂扮Щ鍔?
       gameState.lastMove = { r: r, c: c, color: gameState.me };
 
       if (gameState.me === 1) {
@@ -6455,19 +3108,19 @@
         gameState.whiteCount++;
       }
 
-      // 简单的提子逻辑
+      // 绠€鍗曠殑鎻愬瓙閫昏緫
       const captured = removeCapturedStones(3 - gameState.me);
 
-      // 检查是否形成打劫（只提了一个子）
+      // 妫€鏌ユ槸鍚﹀舰鎴愭墦鍔紙鍙彁浜嗕竴涓瓙锛?
       if (captured === 1) {
-        // 找到被提的子的位置
+        // 鎵惧埌琚彁鐨勫瓙鐨勪綅缃?
         for (let i = 0; i < gameConfigs.go.size; i++) {
           for (let j = 0; j < gameConfigs.go.size; j++) {
             if (gameState.board[i][j] === 0) {
-              // 检查这个位置是否是刚被提的子
+              // 妫€鏌ヨ繖涓綅缃槸鍚︽槸鍒氳鎻愮殑瀛?
               const wasCaptured = !gameState.moveLog.some(move => move.r === i && move.c === j && move.color === 3 - gameState.me);
               if (wasCaptured) {
-                // 设置打劫位置，对方下一回合不能立即回提
+                // 璁剧疆鎵撳姭浣嶇疆锛屽鏂逛笅涓€鍥炲悎涓嶈兘绔嬪嵆鍥炴彁
                 gameState.koPosition = { r: i, c: j };
                 gameState.koColor = 3 - gameState.me;
                 break;
@@ -6476,13 +3129,13 @@
           }
         }
       } else {
-        // 不是打劫，清除打劫状态
+        // 涓嶆槸鎵撳姭锛屾竻闄ゆ墦鍔姸鎬?
         gameState.koPosition = null;
         gameState.koColor = null;
       }
       const myGroup = getGoGroup(r, c, gameState.me);
       if (!hasGroupLiberty(myGroup)) {
-        // 自杀，撤销落子
+        // 鑷潃锛屾挙閿€钀藉瓙
         gameState.board[r][c] = 0;
         gameState.moveCount--;
         gameState.moveLog.pop();
@@ -6499,7 +3152,7 @@
           gameState.whiteCount--;
         }
 
-        // 恢复打劫状态
+        // 鎭㈠鎵撳姭鐘舵€?
         gameState.koPosition = null;
         gameState.koColor = null;
 
@@ -6510,7 +3163,7 @@
         updateAdvancedStats();
         renderBoard();
 
-        updateStatus(`❌ 该位置会导致自杀，无法落子`);
+        updateStatus(`鉂?璇ヤ綅缃細瀵艰嚧鑷潃锛屾棤娉曡惤瀛恅);
         return;
       }
 
@@ -6524,7 +3177,7 @@
         renderBoard();
       });
 
-      updateStatus(`📌 你已落子 (${r},${c})，等待对方回合`);
+      updateStatus(`馃搶 浣犲凡钀藉瓙 (${r},${c})锛岀瓑寰呭鏂瑰洖鍚坄);
 
       if (matchedOpponentId) {
         sendMessage({
@@ -6537,7 +3190,7 @@
           timestamp: Date.now()
         });
       } else {
-        // AI对战，发送移动给服务器
+        // AI瀵规垬锛屽彂閫佺Щ鍔ㄧ粰鏈嶅姟鍣?
         if (socket) {
           socket.emit('ai_move', {
             position: { r, c }
@@ -6545,44 +3198,44 @@
         }
       }
 
-      // 围棋通常通过领地判定胜负，这里简化处理
+      // 鍥存閫氬父閫氳繃棰嗗湴鍒ゅ畾鑳滆礋锛岃繖閲岀畝鍖栧鐞?
       if (checkGoWin()) {
         gameState.gameOver = true;
 
-        // 显示点目结果
+        // 鏄剧ず鐐圭洰缁撴灉
         setTimeout(() => {
           showGameResult();
         }, 500);
 
-        const winMsg = gameState.me === 1 ? '黑棋获胜！' : '白棋获胜！';
-        const winColor = gameState.me === 1 ? '黑棋' : '白棋';
+        const winMsg = gameState.me === 1 ? '榛戞鑾疯儨锛? : '鐧芥鑾疯儨锛?;
+        const winColor = gameState.me === 1 ? '榛戞' : '鐧芥';
         winnerEl.textContent = winColor;
         winnerEl.className = `info-value ${gameState.me === 1 ? 'value-black' : 'value-white'}`;
-        gameStatusEl.textContent = '游戏结束';
+        gameStatusEl.textContent = '娓告垙缁撴潫';
         gameStatusEl.className = 'info-value value-waiting';
         showWinAlert(winMsg);
-        updateStatus(`🏆 ${winMsg} 游戏结束`);
+        updateStatus(`馃弳 ${winMsg} 娓告垙缁撴潫`);
         updateAdvancedStats();
 
         socket.emit('game_result', {
           result: 'win',
-          reason: '棋盘填满'
+          reason: '妫嬬洏濉弧'
         });
       }
     }
 
-    // 围棋提子逻辑（完善版）
+    // 鍥存鎻愬瓙閫昏緫锛堝畬鍠勭増锛?
     function removeCapturedStones(color) {
       const capturedStones = [];
 
-      // 检查对手的棋子是否有气
+      // 妫€鏌ュ鎵嬬殑妫嬪瓙鏄惁鏈夋皵
       for (let r = 0; r < gameConfigs.go.size; r++) {
         for (let c = 0; c < gameConfigs.go.size; c++) {
           if (gameState.board[r][c] === color) {
-            // 检查这个棋子所在的一块棋是否有气
+            // 妫€鏌ヨ繖涓瀛愭墍鍦ㄧ殑涓€鍧楁鏄惁鏈夋皵
             const group = getGoGroup(r, c, color);
             if (!hasGroupLiberty(group)) {
-              // 整块棋都被提走
+              // 鏁村潡妫嬮兘琚彁璧?
               group.forEach(stone => {
                 if (!capturedStones.some(s => s.r === stone.r && s.c === stone.c)) {
                   capturedStones.push(stone);
@@ -6593,7 +3246,7 @@
         }
       }
 
-      // 移除被提的棋子
+      // 绉婚櫎琚彁鐨勬瀛?
       capturedStones.forEach(stone => {
         gameState.board[stone.r][stone.c] = 0;
         if (stone.color === 1) {
@@ -6606,7 +3259,7 @@
       return capturedStones.length;
     }
 
-    // 获取围棋棋子所在的整块
+    // 鑾峰彇鍥存妫嬪瓙鎵€鍦ㄧ殑鏁村潡
     function getGoGroup(startR, startC, color) {
       const group = [];
       const visited = new Set();
@@ -6620,7 +3273,7 @@
         visited.add(key);
         group.push({ r, c, color });
 
-        // 检查四个方向
+        // 妫€鏌ュ洓涓柟鍚?
         const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
         for (const [dr, dc] of directions) {
           const nr = r + dr;
@@ -6637,7 +3290,7 @@
       return group;
     }
 
-    // 检查整块棋是否有气
+    // 妫€鏌ユ暣鍧楁鏄惁鏈夋皵
     function hasGroupLiberty(group) {
       const checked = new Set();
 
@@ -6653,16 +3306,16 @@
 
           if (nr >= 0 && nr < gameConfigs.go.size && nc >= 0 && nc < gameConfigs.go.size) {
             if (gameState.board[nr][nc] === 0) {
-              return true; // 找到气
+              return true; // 鎵惧埌姘?
             }
           }
         }
       }
 
-      return false; // 没有气
+      return false; // 娌℃湁姘?
     }
 
-    // 检查单个棋子是否有气
+    // 妫€鏌ュ崟涓瀛愭槸鍚︽湁姘?
     function hasLiberty(r, c, color) {
       const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
       for (const [dr, dc] of directions) {
@@ -6670,16 +3323,16 @@
         const nc = c + dc;
         if (nr >= 0 && nr < gameConfigs.go.size && nc >= 0 && nc < gameConfigs.go.size) {
           if (gameState.board[nr][nc] === 0) {
-            return true; // 找到气
+            return true; // 鎵惧埌姘?
           }
         }
       }
       return false;
     }
 
-    // 检查是否打劫
+    // 妫€鏌ユ槸鍚︽墦鍔?
     function isKo(r, c, color) {
-      // 检查是否在打劫位置
+      // 妫€鏌ユ槸鍚﹀湪鎵撳姭浣嶇疆
       if (gameState.koPosition && gameState.koPosition.r === r && gameState.koPosition.c === c && gameState.koColor === color) {
         return true;
       }
@@ -6687,16 +3340,16 @@
     }
 
     function checkGoWin() {
-      // 围棋胜负判定：数子法
+      // 鍥存鑳滆礋鍒ゅ畾锛氭暟瀛愭硶
       const totalCells = gameConfigs.go.totalCells;
       const filledCells = gameState.blackCount + gameState.whiteCount;
 
-      // 当双方都 pass 或者棋盘基本填满时结束
+      // 褰撳弻鏂归兘 pass 鎴栬€呮鐩樺熀鏈～婊℃椂缁撴潫
       if (filledCells >= totalCells * 0.95) {
         return true;
       }
 
-      // 检查是否还有合法移动
+      // 妫€鏌ユ槸鍚﹁繕鏈夊悎娉曠Щ鍔?
       if (!hasValidGoMove(1) && !hasValidGoMove(2)) {
         return true;
       }
@@ -6704,22 +3357,22 @@
       return false;
     }
 
-    // 检查是否还有合法移动
+    // 妫€鏌ユ槸鍚﹁繕鏈夊悎娉曠Щ鍔?
     function hasValidGoMove(color) {
       for (let r = 0; r < gameConfigs.go.size; r++) {
         for (let c = 0; c < gameConfigs.go.size; c++) {
           if (gameState.board[r][c] === 0) {
-            // 检查这个位置是否可以落子（有气或能提子）
+            // 妫€鏌ヨ繖涓綅缃槸鍚﹀彲浠ヨ惤瀛愶紙鏈夋皵鎴栬兘鎻愬瓙锛?
             gameState.board[r][c] = color;
             const hasLib = hasLiberty(r, c, color);
 
-            // 保存当前的计数状态
+            // 淇濆瓨褰撳墠鐨勮鏁扮姸鎬?
             const originalBlackCount = gameState.blackCount;
             const originalWhiteCount = gameState.whiteCount;
 
             const canCapture = removeCapturedStones(3 - color) > 0;
 
-            // 恢复计数状态
+            // 鎭㈠璁℃暟鐘舵€?
             gameState.blackCount = originalBlackCount;
             gameState.whiteCount = originalWhiteCount;
 
@@ -6734,12 +3387,12 @@
       return false;
     }
 
-    // 围棋点目（简化版）
+    // 鍥存鐐圭洰锛堢畝鍖栫増锛?
     function countGoScore() {
       let blackScore = gameState.blackCount;
-      let whiteScore = gameState.whiteCount + 7.5; // 贴目
+      let whiteScore = gameState.whiteCount + 7.5; // 璐寸洰
 
-      // 计算空地归属
+      // 璁＄畻绌哄湴褰掑睘
       const visited = new Set();
 
       for (let r = 0; r < gameConfigs.go.size; r++) {
@@ -6760,7 +3413,7 @@
       return { black: blackScore, white: whiteScore };
     }
 
-    // 获取空地归属
+    // 鑾峰彇绌哄湴褰掑睘
     function getGoTerritory(startR, startC) {
       const visited = new Set();
       let emptyCount = 0;
@@ -6796,8 +3449,8 @@
       return { visited, emptyCount, blackBorder, whiteBorder };
     }
 
-    // ========== 象棋逻辑 ==========
-    // 处理棋子点击
+    // ========== 璞℃閫昏緫 ==========
+    // 澶勭悊妫嬪瓙鐐瑰嚮
     function handleChessPieceClick(r, c, name, color) {
       handleChessClick(r, c);
     }
@@ -6809,10 +3462,10 @@
 
       if (gameState.selectedPiece) {
         if (piece && piece.dataset.color === (gameState.turn === 1 ? 'red' : 'black')) {
-          // 选择新的棋子
+          // 閫夋嫨鏂扮殑妫嬪瓙
           selectChessPiece(r, c);
         } else {
-          // 移动棋子
+          // 绉诲姩妫嬪瓙
           moveChessPiece(gameState.selectedPiece.dataset.r, gameState.selectedPiece.dataset.c, r, c);
         }
       } else if (piece && piece.dataset.color === (gameState.turn === 1 ? 'red' : 'black')) {
@@ -6830,19 +3483,19 @@
       const piece = getChessPieceAt(r, c);
       if (!piece || piece.dataset.color !== (gameState.turn === 1 ? 'red' : 'black')) return;
 
-      // 清除之前的选中状态
+      // 娓呴櫎涔嬪墠鐨勯€変腑鐘舵€?
       clearChessSelection();
 
       gameState.selectedPiece = piece;
 
-      // 保存原始样式
+      // 淇濆瓨鍘熷鏍峰紡
       piece.dataset.originalBoxShadow = piece.style.boxShadow || '';
       piece.dataset.originalFilter = piece.style.filter || '';
 
-      // 添加选中状态
+      // 娣诲姞閫変腑鐘舵€?
       piece.classList.add('selected');
 
-      // 主题特殊处理
+      // 涓婚鐗规畩澶勭悊
       const theme = themes[currentTheme];
       const pieceEffects = theme.effects?.pieces;
       if (pieceEffects) {
@@ -6850,14 +3503,14 @@
         piece.style.filter = pieceEffects.filter || '';
       }
 
-      // 计算有效移动位置
+      // 璁＄畻鏈夋晥绉诲姩浣嶇疆
       gameState.validMoves = calculateChessMoves(r, c, piece.dataset.name, piece.dataset.color);
 
-      // 显示有效移动位置
+      // 鏄剧ず鏈夋晥绉诲姩浣嶇疆
       gameState.validMoves.forEach(pos => {
         const cell = document.querySelector(`.chess-intersection[data-r="${pos.r}"][data-c="${pos.c}"]`);
         if (cell) {
-          // 根据主题配置设置颜色
+          // 鏍规嵁涓婚閰嶇疆璁剧疆棰滆壊
           const theme = themes[currentTheme];
           const cellEffects = theme.effects?.cells;
           if (cellEffects) {
@@ -6872,7 +3525,7 @@
 
     function clearChessSelection() {
       if (gameState.selectedPiece) {
-        // 恢复原始样式
+        // 鎭㈠鍘熷鏍峰紡
         if (gameState.selectedPiece.dataset.originalBoxShadow !== undefined) {
           const theme = themes[currentTheme];
           const pieceEffects = theme.effects?.pieces;
@@ -6888,7 +3541,7 @@
         gameState.selectedPiece = null;
       }
 
-      // 清除有效移动标记
+      // 娓呴櫎鏈夋晥绉诲姩鏍囪
       document.querySelectorAll('.chess-intersection').forEach(cell => {
         cell.style.backgroundColor = '';
         cell.style.borderRadius = '';
@@ -6903,9 +3556,9 @@
       const isRed = color === 'red';
 
       switch (type) {
-        case '帅':
-        case '将':
-          // 将帅只能在九宫内移动
+        case '甯?:
+        case '灏?:
+          // 灏嗗竻鍙兘鍦ㄤ節瀹唴绉诲姩
           const palaceR = isRed ? [7, 8, 9] : [0, 1, 2];
           const palaceC = [3, 4, 5];
           const kingDirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
@@ -6922,9 +3575,9 @@
           });
           break;
 
-        case '仕':
-        case '士':
-          // 士只能走斜线
+        case '浠?:
+        case '澹?:
+          // 澹彧鑳借蛋鏂滅嚎
           const advisorDirs = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
           const advisorPalaceR = isRed ? [7, 8, 9] : [0, 1, 2];
           const advisorPalaceC = [3, 4, 5];
@@ -6941,9 +3594,9 @@
           });
           break;
 
-        case '相':
-        case '象':
-          // 象走田
+        case '鐩?:
+        case '璞?:
+          // 璞¤蛋鐢?
           const elephantDirs = [[-2, -2], [-2, 2], [2, -2], [2, 2]];
 
           elephantDirs.forEach(([dr, dc]) => {
@@ -6952,10 +3605,10 @@
             const midR = r + dr / 2;
             const midC = c + dc / 2;
 
-            // 不能过河
+            // 涓嶈兘杩囨渤
             if ((isRed && nr < 5) || (!isRed && nr > 4)) return;
 
-            // 象眼不能有棋子
+            // 璞＄溂涓嶈兘鏈夋瀛?
             if (!getChessPieceAt(midR, midC)) {
               const piece = getChessPieceAt(nr, nc);
               if (!piece || piece.dataset.color !== color) {
@@ -6965,8 +3618,8 @@
           });
           break;
 
-        case '马':
-          // 马走日
+        case '椹?:
+          // 椹蛋鏃?
           const horseDirs = [
             [-2, -1], [-2, 1], [-1, -2], [-1, 2],
             [1, -2], [1, 2], [2, -1], [2, 1]
@@ -6978,7 +3631,7 @@
             const midR = r + Math.sign(dr);
             const midC = c + Math.sign(dc);
 
-            // 马腿不能有棋子
+            // 椹吙涓嶈兘鏈夋瀛?
             if (!getChessPieceAt(midR, midC)) {
               if (nr >= 0 && nr < 10 && nc >= 0 && nc < 9) {
                 const piece = getChessPieceAt(nr, nc);
@@ -6990,8 +3643,8 @@
           });
           break;
 
-        case '车':
-          // 车走直线
+        case '杞?:
+          // 杞﹁蛋鐩寸嚎
           const chariotDirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
 
           chariotDirs.forEach(([dr, dc]) => {
@@ -7014,8 +3667,8 @@
           });
           break;
 
-        case '炮':
-          // 炮翻山
+        case '鐐?:
+          // 鐐炕灞?
           const cannonDirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
 
           cannonDirs.forEach(([dr, dc]) => {
@@ -7046,9 +3699,9 @@
           });
           break;
 
-        case '兵':
-        case '卒':
-          // 兵卒过河前只能向前，过河后可以左右
+        case '鍏?:
+        case '鍗?:
+          // 鍏靛崚杩囨渤鍓嶅彧鑳藉悜鍓嶏紝杩囨渤鍚庡彲浠ュ乏鍙?
           const soldierDirs = isRed ? [[-1, 0]] : [[1, 0]];
 
           if ((isRed && r < 5) || (!isRed && r > 4)) {
@@ -7087,10 +3740,10 @@
         return;
       }
 
-      // 1. 处理吃子，同时更新 DOM 和 chessPieces 数据
+      // 1. 澶勭悊鍚冨瓙锛屽悓鏃舵洿鏂?DOM 鍜?chessPieces 鏁版嵁
       const capturedPiece = getChessPieceAt(toR, toC);
       if (capturedPiece) {
-        // 从 chessPieces 数据中移除
+        // 浠?chessPieces 鏁版嵁涓Щ闄?
         const capturedColor = capturedPiece.dataset.color;
         if (capturedColor === 'red') {
           chessPieces.red = chessPieces.red.filter(p => !(p.r === toR && p.c === toC));
@@ -7099,11 +3752,11 @@
           chessPieces.black = chessPieces.black.filter(p => !(p.r === toR && p.c === toC));
           gameState.whiteCount--;
         }
-        // 从 DOM 中移除
+        // 浠?DOM 涓Щ闄?
         capturedPiece.remove();
       }
 
-      // 2. 更新 chessPieces 数据中的棋子位置
+      // 2. 鏇存柊 chessPieces 鏁版嵁涓殑妫嬪瓙浣嶇疆
       const pieceColor = piece.dataset.color;
       const pieceName = piece.dataset.name;
       if (pieceColor === 'red') {
@@ -7120,20 +3773,20 @@
         }
       }
 
-      // 3. 更新 DOM 中的棋子位置
+      // 3. 鏇存柊 DOM 涓殑妫嬪瓙浣嶇疆
       piece.dataset.r = toR;
       piece.dataset.c = toC;
       piece.style.top = `${toR * 40 + 20}px`;
       piece.style.left = `${toC * 40 + 20}px`;
       piece.style.transform = 'translate(-50%, -50%)';
 
-      // 4. 同步 gameState.board
+      // 4. 鍚屾 gameState.board
       gameState.board = convertFrontendPiecesToBackend();
 
-      // 记录最新移动
+      // 璁板綍鏈€鏂扮Щ鍔?
       gameState.lastMove = { r: toR, c: toC, color: gameState.turn };
 
-      // 标记最新移动位置
+      // 鏍囪鏈€鏂扮Щ鍔ㄤ綅缃?
       document.querySelectorAll('.chess-intersection.last-move').forEach(cell => {
         cell.classList.remove('last-move');
       });
@@ -7167,7 +3820,7 @@
         updateAdvancedStats();
       });
 
-      updateStatus(`📌 你已移动 ${piece.dataset.name} 到 (${toR},${toC})，等待对方回合`);
+      updateStatus(`馃搶 浣犲凡绉诲姩 ${piece.dataset.name} 鍒?(${toR},${toC})锛岀瓑寰呭鏂瑰洖鍚坄);
 
       if (matchedOpponentId) {
         sendMessage({
@@ -7183,7 +3836,7 @@
           timestamp: Date.now()
         });
       } else {
-        // AI对战，发送移动给服务器
+        // AI瀵规垬锛屽彂閫佺Щ鍔ㄧ粰鏈嶅姟鍣?
         if (socket) {
           socket.emit('ai_move', {
             position: { fromR: parseInt(fromR), fromC: parseInt(fromC), toR: toR, toC: toC }
@@ -7191,18 +3844,18 @@
         }
       }
 
-      // 检查游戏结束条件
+      // 妫€鏌ユ父鎴忕粨鏉熸潯浠?
       const winResult = checkChessWin();
       if (winResult) {
         gameState.gameOver = true;
-        const winMsg = winResult.winner === 1 ? '红方获胜！' : '绿方获胜！';
-        const winColor = winResult.winner === 1 ? '红方' : '绿方';
+        const winMsg = winResult.winner === 1 ? '绾㈡柟鑾疯儨锛? : '缁挎柟鑾疯儨锛?;
+        const winColor = winResult.winner === 1 ? '绾㈡柟' : '缁挎柟';
         winnerEl.textContent = winColor;
         winnerEl.className = `info-value ${winResult.winner === 1 ? 'value-red' : 'value-green'}`;
-        gameStatusEl.textContent = `游戏结束 - ${winResult.reason}`;
+        gameStatusEl.textContent = `娓告垙缁撴潫 - ${winResult.reason}`;
         gameStatusEl.className = 'info-value value-waiting';
-        showWinAlert(`${winMsg}（${winResult.reason}）`);
-        updateStatus(`🏆 ${winMsg} 游戏结束 - ${winResult.reason}`);
+        showWinAlert(`${winMsg}锛?{winResult.reason}锛塦);
+        updateStatus(`馃弳 ${winMsg} 娓告垙缁撴潫 - ${winResult.reason}`);
         updateAdvancedStats();
 
         if (socket && socket.connected) {
@@ -7212,37 +3865,37 @@
           });
         }
       } else {
-        // 切换回合到对方
+        // 鍒囨崲鍥炲悎鍒板鏂?
         gameState.turn = 3 - gameState.me;
         updateTurnDisplay();
       }
     }
 
     function checkChessWin() {
-      // 检查将帅是否被吃
-      const redGeneral = document.querySelector('.chess-piece[data-name="帅"]');
-      const blackGeneral = document.querySelector('.chess-piece[data-name="将"]');
+      // 妫€鏌ュ皢甯呮槸鍚﹁鍚?
+      const redGeneral = document.querySelector('.chess-piece[data-name="甯?]');
+      const blackGeneral = document.querySelector('.chess-piece[data-name="灏?]');
 
-      if (!redGeneral) return { winner: 2, reason: '红帅被吃' };
-      if (!blackGeneral) return { winner: 1, reason: '黑将被吃' };
+      if (!redGeneral) return { winner: 2, reason: '绾㈠竻琚悆' };
+      if (!blackGeneral) return { winner: 1, reason: '榛戝皢琚悆' };
 
-      // 检查将帅是否对面（当前玩家移动后造成对面，当前玩家输）
+      // 妫€鏌ュ皢甯呮槸鍚﹀闈紙褰撳墠鐜╁绉诲姩鍚庨€犳垚瀵归潰锛屽綋鍓嶇帺瀹惰緭锛?
       if (checkGeneralsFacing()) {
-        return { winner: 3 - gameState.turn, reason: '将帅对面' };
+        return { winner: 3 - gameState.turn, reason: '灏嗗竻瀵归潰' };
       }
 
-      // 检查对方是否困毙（无子可动，当前玩家赢）
+      // 妫€鏌ュ鏂规槸鍚﹀洶姣欙紙鏃犲瓙鍙姩锛屽綋鍓嶇帺瀹惰耽锛?
       if (isStalemate(3 - gameState.turn)) {
-        return { winner: gameState.turn, reason: '困毙' };
+        return { winner: gameState.turn, reason: '鍥版瘷' };
       }
 
       return null;
     }
 
-    // 检查将帅是否对面
+    // 妫€鏌ュ皢甯呮槸鍚﹀闈?
     function checkGeneralsFacing() {
-      const redGeneral = document.querySelector('.chess-piece[data-name="帅"]');
-      const blackGeneral = document.querySelector('.chess-piece[data-name="将"]');
+      const redGeneral = document.querySelector('.chess-piece[data-name="甯?]');
+      const blackGeneral = document.querySelector('.chess-piece[data-name="灏?]');
 
       if (!redGeneral || !blackGeneral) return false;
 
@@ -7251,23 +3904,23 @@
       const blackR = parseInt(blackGeneral.dataset.r);
       const blackC = parseInt(blackGeneral.dataset.c);
 
-      // 不在同一列
+      // 涓嶅湪鍚屼竴鍒?
       if (redC !== blackC) return false;
 
-      // 检查中间是否有棋子
+      // 妫€鏌ヤ腑闂存槸鍚︽湁妫嬪瓙
       const minR = Math.min(redR, blackR);
       const maxR = Math.max(redR, blackR);
 
       for (let r = minR + 1; r < maxR; r++) {
         if (getChessPieceAt(r, redC)) {
-          return false; // 中间有棋子
+          return false; // 涓棿鏈夋瀛?
         }
       }
 
-      return true; // 将帅对面
+      return true; // 灏嗗竻瀵归潰
     }
 
-    // 检查是否困毙
+    // 妫€鏌ユ槸鍚﹀洶姣?
     function isStalemate(color) {
       const colorStr = color === 1 ? 'red' : 'black';
       const pieces = document.querySelectorAll(`.chess-piece[data-color="${colorStr}"]`);
@@ -7279,23 +3932,23 @@
 
         const moves = calculateChessMoves(r, c, type, colorStr);
         if (moves.length > 0) {
-          return false; // 有合法移动
+          return false; // 鏈夊悎娉曠Щ鍔?
         }
       }
 
-      return true; // 困毙
+      return true; // 鍥版瘷
     }
 
-    // 检查移动后是否造成将帅对面
+    // 妫€鏌ョЩ鍔ㄥ悗鏄惁閫犳垚灏嗗竻瀵归潰
     function wouldCauseFacing(fromR, fromC, toR, toC) {
-      // 临时移动棋子
+      // 涓存椂绉诲姩妫嬪瓙
       const piece = getChessPieceAt(fromR, fromC);
       if (!piece) return false;
 
       const originalR = piece.dataset.r;
       const originalC = piece.dataset.c;
 
-      // 执行临时移动
+      // 鎵ц涓存椂绉诲姩
       piece.dataset.r = toR;
       piece.dataset.c = toC;
       piece.style.top = `${toR * 40 + 20}px`;
@@ -7303,7 +3956,7 @@
 
       const facing = checkGeneralsFacing();
 
-      // 恢复原位
+      // 鎭㈠鍘熶綅
       piece.dataset.r = originalR;
       piece.dataset.c = originalC;
       piece.style.top = `${originalR * 40 + 20}px`;
@@ -7312,37 +3965,37 @@
       return facing;
     }
 
-    // ========== 通信和消息处理 ==========
+    // ========== 閫氫俊鍜屾秷鎭鐞?==========
 
 
     function handleBoardMove(data) {
-      console.log('处理对手落子:', data);
-      console.log('当前棋盘状态:', gameState.board[data.r][data.c]);
-      console.log('是否是自己的消息:', data.from === accountId);
+      console.log('澶勭悊瀵规墜钀藉瓙:', data);
+      console.log('褰撳墠妫嬬洏鐘舵€?', gameState.board[data.r][data.c]);
+      console.log('鏄惁鏄嚜宸辩殑娑堟伅:', data.from === accountId);
 
-      // 检查是否是自己的落子，如果是则跳过
+      // 妫€鏌ユ槸鍚︽槸鑷繁鐨勮惤瀛愶紝濡傛灉鏄垯璺宠繃
       if (data.from === accountId) {
-        console.log('跳过自己的落子消息');
+        console.log('璺宠繃鑷繁鐨勮惤瀛愭秷鎭?);
         return;
       }
 
-      // 检查位置是否已经有棋子
+      // 妫€鏌ヤ綅缃槸鍚﹀凡缁忔湁妫嬪瓙
       if (gameState.board[data.r][data.c] !== 0) {
-        console.warn('位置已有棋子，跳过:', data);
+        console.warn('浣嶇疆宸叉湁妫嬪瓙锛岃烦杩?', data);
         return;
       }
 
-      // 检查是否已经记录过这个位置的落子
+      // 妫€鏌ユ槸鍚﹀凡缁忚褰曡繃杩欎釜浣嶇疆鐨勮惤瀛?
       const existingMove = gameState.moveLog.find(move => move.r === data.r && move.c === data.c);
       if (existingMove) {
-        console.warn('重复落子记录，跳过:', data);
+        console.warn('閲嶅钀藉瓙璁板綍锛岃烦杩?', data);
         return;
       }
 
-      // 确保颜色正确 - 对手的颜色就是他们的落子颜色
+      // 纭繚棰滆壊姝ｇ‘ - 瀵规墜鐨勯鑹插氨鏄粬浠殑钀藉瓙棰滆壊
       const opponentColor = data.color;
       gameState.board[data.r][data.c] = opponentColor;
-      gameState.turn = 3 - opponentColor; // 切换回合
+      gameState.turn = 3 - opponentColor; // 鍒囨崲鍥炲悎
       gameState.moveCount++;
       gameState.moveLog.push({
         color: opponentColor,
@@ -7375,18 +4028,18 @@
         renderBoard();
       });
 
-      updateStatus(`⚪ 对方已落子 (${data.r},${data.c})，该你了！`);
+      updateStatus(`鈿?瀵规柟宸茶惤瀛?(${data.r},${data.c})锛岃浣犱簡锛乣);
 
       if (currentGame === 'gobang' && checkGobangWin(data.r, data.c, opponentColor)) {
         gameState.gameOver = true;
-        const winMsg = opponentColor === 1 ? '黑棋获胜！' : '白棋获胜！';
-        const winColor = opponentColor === 1 ? '黑棋' : '白棋';
+        const winMsg = opponentColor === 1 ? '榛戞鑾疯儨锛? : '鐧芥鑾疯儨锛?;
+        const winColor = opponentColor === 1 ? '榛戞' : '鐧芥';
         winnerEl.textContent = winColor;
         winnerEl.className = `info-value ${opponentColor === 1 ? 'value-black' : 'value-white'}`;
-        gameStatusEl.textContent = '游戏结束';
+        gameStatusEl.textContent = '娓告垙缁撴潫';
         gameStatusEl.className = 'info-value value-waiting';
         showWinAlert(winMsg);
-        updateStatus(`🏆 ${winMsg} 游戏结束`);
+        updateStatus(`馃弳 ${winMsg} 娓告垙缁撴潫`);
         updateAdvancedStats();
       }
     }
@@ -7399,7 +4052,7 @@
       const color = data.color;
       const pieceType = data.piece;
 
-      // 移除被吃的棋子，同时更新 chessPieces 数据
+      // 绉婚櫎琚悆鐨勬瀛愶紝鍚屾椂鏇存柊 chessPieces 鏁版嵁
       const capturedPiece = getChessPieceAt(toR, toC);
       if (capturedPiece) {
         const capturedColor = capturedPiece.dataset.color;
@@ -7413,7 +4066,7 @@
         capturedPiece.remove();
       }
 
-      // 移动对方的棋子，同时更新 chessPieces 数据
+      // 绉诲姩瀵规柟鐨勬瀛愶紝鍚屾椂鏇存柊 chessPieces 鏁版嵁
       const opponentPiece = document.querySelector(`.chess-piece[data-r="${fromR}"][data-c="${fromC}"]`);
       if (opponentPiece) {
         const opponentColor = opponentPiece.dataset.color;
@@ -7436,7 +4089,7 @@
         opponentPiece.style.left = `${toC * 40 + 20}px`;
       }
 
-      // 同步 gameState.board
+      // 鍚屾 gameState.board
       gameState.board = convertFrontendPiecesToBackend();
 
       gameState.moveCount++;
@@ -7460,20 +4113,20 @@
         updateAdvancedStats();
       });
 
-      updateStatus(`⚪ 对方已移动 ${pieceType} 到 (${toR},${toC})，该你了！`);
+      updateStatus(`鈿?瀵规柟宸茬Щ鍔?${pieceType} 鍒?(${toR},${toC})锛岃浣犱簡锛乣);
 
       const winResult = checkChessWin();
       if (winResult) {
         gameState.gameOver = true;
         const isPlayerWin = winResult.winner !== color;
-        const winMsg = isPlayerWin ? '你获胜了！' : '你输了！';
-        const winColor = winResult.winner === 1 ? '红方' : '黑方';
+        const winMsg = isPlayerWin ? '浣犺幏鑳滀簡锛? : '浣犺緭浜嗭紒';
+        const winColor = winResult.winner === 1 ? '绾㈡柟' : '榛戞柟';
         winnerEl.textContent = winColor;
         winnerEl.className = `info-value ${winResult.winner === 1 ? 'value-red' : 'value-green'}`;
-        gameStatusEl.textContent = `游戏结束 - ${winResult.reason}`;
+        gameStatusEl.textContent = `娓告垙缁撴潫 - ${winResult.reason}`;
         gameStatusEl.className = 'info-value value-waiting';
         showWinAlert(winMsg);
-        updateStatus(`🏆 ${winMsg} 游戏结束 - ${winResult.reason}`);
+        updateStatus(`馃弳 ${winMsg} 娓告垙缁撴潫 - ${winResult.reason}`);
         updateAdvancedStats();
 
         if (gameState.difficulty) {
@@ -7498,21 +4151,21 @@
         });
       } catch (e) {
         if (userStatus === 'playing') {
-          updateStatus('❌ 消息发送失败，请刷新页面重试');
+          updateStatus('鉂?娑堟伅鍙戦€佸け璐ワ紝璇峰埛鏂伴〉闈㈤噸璇?);
         } else {
-          lobbyStatus.textContent = '❌ 消息发送失败，请刷新页面重试';
+          lobbyStatus.textContent = '鉂?娑堟伅鍙戦€佸け璐ワ紝璇峰埛鏂伴〉闈㈤噸璇?;
         }
       }
     }
 
-    // ========== 贪吃蛇游戏逻辑 ==========
+    // ========== 璐悆铔囨父鎴忛€昏緫 ==========
 
-    // 贪吃蛇游戏状态
+    // 璐悆铔囨父鎴忕姸鎬?
     const snakeGameState = {
       snake: [],
       direction: 'right',
       nextDirection: 'right',
-      foods: [],           // 多个食物数组（单人模式）
+      foods: [],           // 澶氫釜椋熺墿鏁扮粍锛堝崟浜烘ā寮忥級
       score: 0,
       highScore: 0,
       gameLoop: null,
@@ -7520,153 +4173,153 @@
       speed: snakeGameConfig.initialSpeed,
       canvas: null,
       ctx: null,
-      snakePositions: new Set(), // 用于快速碰撞检测
-      moveHistory: [], // 操作历史记录
-      maxLength: 0, // 蛇的最大长度
-      foodEaten: 0, // 吃到的食物数量
-      lastDirection: 'right', // 上一次的方向
-      lastFood: null, // 上一次的食物位置
-      lastScore: 0, // 上一次的分数
-      // 道具系统
-      activeItems: [],       // 当前生效的道具列表
-      itemEffects: {},       // 道具效果状态 { type: { remaining, multiplier, etc } }
-      resurrectionUsed: false, // 本局是否已使用复活卡
-      scoreMultiplier: 1,    // 得分倍率
-      speedBoostEndTime: 0,  // 加速结束时间
-      doubleScoreEndTime: 0, // 双倍得分结束时间
-      isDualMode: false, // 是否为双人模式
-      // 双人模式状态
+      snakePositions: new Set(), // 鐢ㄤ簬蹇€熺鎾炴娴?
+      moveHistory: [], // 鎿嶄綔鍘嗗彶璁板綍
+      maxLength: 0, // 铔囩殑鏈€澶ч暱搴?
+      foodEaten: 0, // 鍚冨埌鐨勯鐗╂暟閲?
+      lastDirection: 'right', // 涓婁竴娆＄殑鏂瑰悜
+      lastFood: null, // 涓婁竴娆＄殑椋熺墿浣嶇疆
+      lastScore: 0, // 涓婁竴娆＄殑鍒嗘暟
+      // 閬撳叿绯荤粺
+      activeItems: [],       // 褰撳墠鐢熸晥鐨勯亾鍏峰垪琛?
+      itemEffects: {},       // 閬撳叿鏁堟灉鐘舵€?{ type: { remaining, multiplier, etc } }
+      resurrectionUsed: false, // 鏈眬鏄惁宸蹭娇鐢ㄥ娲诲崱
+      scoreMultiplier: 1,    // 寰楀垎鍊嶇巼
+      speedBoostEndTime: 0,  // 鍔犻€熺粨鏉熸椂闂?
+      doubleScoreEndTime: 0, // 鍙屽€嶅緱鍒嗙粨鏉熸椂闂?
+      isDualMode: false, // 鏄惁涓哄弻浜烘ā寮?
+      // 鍙屼汉妯″紡鐘舵€?
       snake2: [],
       direction2: 'left',
       nextDirection2: 'left',
       score2: 0,
       snake2Positions: new Set(),
-      foods: [], // 多个食物
-      gameTimeLeft: 0, // 剩余时间（双人模式）
-      gameTimer: null, // 游戏计时器
-      isRespawning1: false, // 玩家1是否正在复活
-      isRespawning2: false, // 玩家2是否正在复活
-      respawnTimer1: null, // 玩家1复活计时器
-      respawnTimer2: null // 玩家2复活计时器
+      foods: [], // 澶氫釜椋熺墿
+      gameTimeLeft: 0, // 鍓╀綑鏃堕棿锛堝弻浜烘ā寮忥級
+      gameTimer: null, // 娓告垙璁℃椂鍣?
+      isRespawning1: false, // 鐜╁1鏄惁姝ｅ湪澶嶆椿
+      isRespawning2: false, // 鐜╁2鏄惁姝ｅ湪澶嶆椿
+      respawnTimer1: null, // 鐜╁1澶嶆椿璁℃椂鍣?
+      respawnTimer2: null // 鐜╁2澶嶆椿璁℃椂鍣?
     };
 
-    // 初始化贪吃蛇游戏
+    // 鍒濆鍖栬椽鍚冭泧娓告垙
     function initSnakeGame() {
       snakeGameState.canvas = document.getElementById('snake-canvas');
       snakeGameState.ctx = snakeGameState.canvas.getContext('2d');
 
-      // 加载最高分
+      // 鍔犺浇鏈€楂樺垎
       const savedHighScore = localStorage.getItem('snakeHighScore');
       if (savedHighScore) {
         snakeGameState.highScore = parseInt(savedHighScore);
         document.getElementById('snake-highscore').textContent = snakeGameState.highScore;
       }
 
-      // 同步客户端本地最高分到服务端（确保排行榜数据最新）
+      // 鍚屾瀹㈡埛绔湰鍦版渶楂樺垎鍒版湇鍔＄锛堢‘淇濇帓琛屾鏁版嵁鏈€鏂帮級
       if (socket && socket.connected) {
         socket.emit('snake_sync_highscore', {
           highScore: parseInt(localStorage.getItem('snakeHighScore') || '0')
         });
       }
 
-      // 显示游戏规则
+      // 鏄剧ず娓告垙瑙勫垯
       document.getElementById('snake-rules').textContent = snakeGameConfig.rules;
 
-      // 恢复虚拟按键的显示状态
+      // 鎭㈠铏氭嫙鎸夐敭鐨勬樉绀虹姸鎬?
       const savedVirt = localStorage.getItem('snakeVirtualControls');
       const virtEl = document.getElementById('snake-virtual-controls');
       if (savedVirt === 'visible' && virtEl) {
         virtEl.style.display = 'flex';
       }
 
-      // 绑定键盘事件
+      // 缁戝畾閿洏浜嬩欢
       document.addEventListener('keydown', handleSnakeKeydown);
 
       renderSnakeGame();
     }
 
-    // 获取当前游戏配置
+    // 鑾峰彇褰撳墠娓告垙閰嶇疆
     function getSnakeConfig() {
       return snakeGameState.isDualMode ? snakeDualConfig : snakeGameConfig;
     }
 
-    // 开始贪吃蛇游戏
+    // 寮€濮嬭椽鍚冭泧娓告垙
     function startSnakeGame() {
       if (snakeGameState.gameLoop) return;
 
-      // 计算食物数量（根据当前蛇最大长度动态调整）
+      // 璁＄畻椋熺墿鏁伴噺锛堟牴鎹綋鍓嶈泧鏈€澶ч暱搴﹀姩鎬佽皟鏁达級
       const currentConfig = snakeGameConfig;
       const baseFoodCount = currentConfig.initialFoodCount;
-      // 分数越高食物越多，最高不超过maxFoodCount
+      // 鍒嗘暟瓒婇珮椋熺墿瓒婂锛屾渶楂樹笉瓒呰繃maxFoodCount
       const extraFood = Math.min(Math.floor(snakeGameState.highScore / 200), currentConfig.maxFoodCount - baseFoodCount);
       const foodCount = Math.min(baseFoodCount + extraFood, currentConfig.maxFoodCount);
 
-      // 重置游戏状态
+      // 閲嶇疆娓告垙鐘舵€?
       snakeGameState.snake = [{ x: 10, y: 10 }];
       snakeGameState.direction = 'right';
       snakeGameState.nextDirection = 'right';
       snakeGameState.score = 0;
       snakeGameState.isPaused = false;
       snakeGameState.speed = snakeGameConfig.initialSpeed;
-      // 生成多个食物
+      // 鐢熸垚澶氫釜椋熺墿
       snakeGameState.foods = generateSnakeFoods(foodCount);
       snakeGameState.snakePositions.clear();
       snakeGameState.snakePositions.add('10,10');
-      snakeGameState.moveHistory = []; // 清空操作历史
-      snakeGameState.maxLength = 1; // 初始长度
-      snakeGameState.foodEaten = 0; // 初始食物数量
-      snakeGameState.lastDirection = 'right'; // 初始方向
-      snakeGameState.lastFood = snakeGameState.foods.length > 0 ? snakeGameState.foods[0] : null; // 初始食物位置
-      snakeGameState.lastScore = 0; // 初始分数
-      snakeGameState.lastTime = Date.now(); // 用于控制游戏速度
-      // 重置道具状态
+      snakeGameState.moveHistory = []; // 娓呯┖鎿嶄綔鍘嗗彶
+      snakeGameState.maxLength = 1; // 鍒濆闀垮害
+      snakeGameState.foodEaten = 0; // 鍒濆椋熺墿鏁伴噺
+      snakeGameState.lastDirection = 'right'; // 鍒濆鏂瑰悜
+      snakeGameState.lastFood = snakeGameState.foods.length > 0 ? snakeGameState.foods[0] : null; // 鍒濆椋熺墿浣嶇疆
+      snakeGameState.lastScore = 0; // 鍒濆鍒嗘暟
+      snakeGameState.lastTime = Date.now(); // 鐢ㄤ簬鎺у埗娓告垙閫熷害
+      // 閲嶇疆閬撳叿鐘舵€?
       snakeGameState.resurrectionUsed = false;
       snakeGameState.scoreMultiplier = 1;
       snakeGameState.speedBoostEndTime = 0;
       snakeGameState.doubleScoreEndTime = 0;
       snakeGameState.activeItems = [];
       snakeGameState.itemEffects = {};
-      // 加载背包中的道具
+      // 鍔犺浇鑳屽寘涓殑閬撳叿
       loadSnakeItems();
 
-      // 禁用触摸默认行为，防止双击放大
+      // 绂佺敤瑙︽懜榛樿琛屼负锛岄槻姝㈠弻鍑绘斁澶?
       const canvas = document.getElementById('snake-canvas');
       const virtualControls = document.querySelector('.virtual-controls');
       if (canvas) canvas.classList.add('touch-disabled');
       if (virtualControls) virtualControls.classList.add('touch-disabled');
 
-      // 记录初始状态（使用紧凑数组表示）
+      // 璁板綍鍒濆鐘舵€侊紙浣跨敤绱у噾鏁扮粍琛ㄧず锛?
       snakeGameState.moveHistory.push([
-        'init', // 类型
-        Date.now(), // 时间戳
-        snakeGameState.direction, // 方向
-        snakeGameState.snake.map(segment => [segment.x, segment.y]), // 蛇的初始位置
-        snakeGameState.foods.length > 0 ? [snakeGameState.foods[0].x, snakeGameState.foods[0].y] : null, // 初始食物位置
-        snakeGameState.score // 分数
+        'init', // 绫诲瀷
+        Date.now(), // 鏃堕棿鎴?
+        snakeGameState.direction, // 鏂瑰悜
+        snakeGameState.snake.map(segment => [segment.x, segment.y]), // 铔囩殑鍒濆浣嶇疆
+        snakeGameState.foods.length > 0 ? [snakeGameState.foods[0].x, snakeGameState.foods[0].y] : null, // 鍒濆椋熺墿浣嶇疆
+        snakeGameState.score // 鍒嗘暟
       ]);
 
-      // 更新UI
+      // 鏇存柊UI
       updateSnakeScore();
       updateSnakeSpeed();
       updateSnakeFoodCount();
 
-      // 启动游戏循环
+      // 鍚姩娓告垙寰幆
       function gameLoop() {
         if (snakeGameState.isPaused) {
           snakeGameState.gameLoop = requestAnimationFrame(gameLoop);
           return;
         }
 
-        // 控制游戏速度
+        // 鎺у埗娓告垙閫熷害
         const currentTime = Date.now();
         const deltaTime = currentTime - snakeGameState.lastTime;
 
-        // 只有当时间差超过speed时才执行游戏逻辑
+        // 鍙湁褰撴椂闂村樊瓒呰繃speed鏃舵墠鎵ц娓告垙閫昏緫
         if (deltaTime >= snakeGameState.speed) {
-          // 更新方向
+          // 鏇存柊鏂瑰悜
           snakeGameState.direction = snakeGameState.nextDirection;
 
-          // 计算新头部位置
+          // 璁＄畻鏂板ご閮ㄤ綅缃?
           const head = { x: snakeGameState.snake[0].x, y: snakeGameState.snake[0].y };
           switch (snakeGameState.direction) {
             case 'up': head.y--; break;
@@ -7675,14 +4328,14 @@
             case 'right': head.x++; break;
           }
 
-          // 碰撞检测
+          // 纰版挒妫€娴?
           if (checkSnakeCollision(head)) {
-            // 尝试使用复活卡
+            // 灏濊瘯浣跨敤澶嶆椿鍗?
             if (tryUseResurrection()) {
-              // 复活：取消本次移动，蛇保持原位
-              console.log('🐍 使用复活卡，蛇已复活！');
-              showToast('❤️ 使用复活卡，蛇已复活！', 'success', 2000);
-              // 重置蛇的位置到安全位置（倒退一步）
+              // 澶嶆椿锛氬彇娑堟湰娆＄Щ鍔紝铔囦繚鎸佸師浣?
+              console.log('馃悕 浣跨敤澶嶆椿鍗★紝铔囧凡澶嶆椿锛?);
+              showToast('鉂わ笍 浣跨敤澶嶆椿鍗★紝铔囧凡澶嶆椿锛?, 'success', 2000);
+              // 閲嶇疆铔囩殑浣嶇疆鍒板畨鍏ㄤ綅缃紙鍊掗€€涓€姝ワ級
               snakeGameState.snake = snakeGameState.snake.slice(0, Math.max(1, snakeGameState.snake.length - 1));
               if (snakeGameState.snake.length === 0) {
                 snakeGameState.snake = [{ x: 10, y: 10 }];
@@ -7694,37 +4347,37 @@
               snakeGameState.gameLoop = requestAnimationFrame(gameLoop);
               return;
             }
-            console.log('🐍 贪吃蛇碰撞检测', {
+            console.log('馃悕 璐悆铔囩鎾炴娴?, {
               headPosition: head,
               snakeLength: snakeGameState.snake.length,
               score: snakeGameState.score,
-              reason: '墙壁或自身碰撞'
+              reason: '澧欏鎴栬嚜韬鎾?
             });
             endSnakeGame();
             return;
           }
 
-          // 移动蛇
+          // 绉诲姩铔?
           const tail = snakeGameState.snake[snakeGameState.snake.length - 1];
           snakeGameState.snake.unshift(head);
           snakeGameState.snakePositions.add(`${head.x},${head.y}`);
 
-          // 检查速度增益是否过期
+          // 妫€鏌ラ€熷害澧炵泭鏄惁杩囨湡
           if (snakeGameState.speedBoostEndTime > 0 && Date.now() > snakeGameState.speedBoostEndTime) {
             snakeGameState.speedBoostEndTime = 0;
             snakeGameState.speed = snakeGameConfig.initialSpeed - Math.min(Math.floor(snakeGameState.score / 100) * 10, 90);
             updateSnakeSpeed();
-            showToast('⚡ 加速效果已结束', 'info', 1500);
+            showToast('鈿?鍔犻€熸晥鏋滃凡缁撴潫', 'info', 1500);
           }
 
-          // 检查双倍得分是否过期
+          // 妫€鏌ュ弻鍊嶅緱鍒嗘槸鍚﹁繃鏈?
           if (snakeGameState.doubleScoreEndTime > 0 && Date.now() > snakeGameState.doubleScoreEndTime) {
             snakeGameState.doubleScoreEndTime = 0;
             snakeGameState.scoreMultiplier = 1;
-            showToast('✖️2 双倍得分效果已结束', 'info', 1500);
+            showToast('鉁栵笍2 鍙屽€嶅緱鍒嗘晥鏋滃凡缁撴潫', 'info', 1500);
           }
 
-          // 检查是否吃到食物（遍历所有食物）
+          // 妫€鏌ユ槸鍚﹀悆鍒伴鐗╋紙閬嶅巻鎵€鏈夐鐗╋級
           let ateFood = false;
           let foodIndex = -1;
           let oldFood = null;
@@ -7739,17 +4392,17 @@
           }
 
           if (ateFood) {
-            // 移除被吃掉的食物
+            // 绉婚櫎琚悆鎺夌殑椋熺墿
             snakeGameState.foods.splice(foodIndex, 1);
 
-            // 计算得分（考虑双倍效果）
+            // 璁＄畻寰楀垎锛堣€冭檻鍙屽€嶆晥鏋滐級
             const baseScore = snakeGameConfig.foodScore;
             const finalScore = baseScore * snakeGameState.scoreMultiplier;
             snakeGameState.score += finalScore;
             snakeGameState.foodEaten += 1;
             updateSnakeScore();
 
-            // 生成新食物（保持食物数量在合理范围内）
+            // 鐢熸垚鏂伴鐗╋紙淇濇寔椋熺墿鏁伴噺鍦ㄥ悎鐞嗚寖鍥村唴锛?
             const currentFoodCount = snakeGameState.foods.length;
             const targetFoodCount = Math.min(
               snakeGameConfig.initialFoodCount + Math.min(Math.floor(snakeGameState.score / 200), snakeGameConfig.maxFoodCount - snakeGameConfig.initialFoodCount),
@@ -7760,12 +4413,12 @@
               if (newFood) snakeGameState.foods.push(newFood);
             }
 
-            // 更新蛇的最大长度
+            // 鏇存柊铔囩殑鏈€澶ч暱搴?
             if (snakeGameState.snake.length > snakeGameState.maxLength) {
               snakeGameState.maxLength = snakeGameState.snake.length;
             }
 
-            console.log('🐍 贪吃蛇吃到食物', {
+            console.log('馃悕 璐悆铔囧悆鍒伴鐗?, {
               position: oldFood,
               score: snakeGameState.score,
               foodEaten: snakeGameState.foodEaten,
@@ -7775,11 +4428,11 @@
               foodsRemaining: snakeGameState.foods.length
             });
 
-            // 加速（每100分加速一次）
+            // 鍔犻€燂紙姣?00鍒嗗姞閫熶竴娆★級
             if (snakeGameState.score % 100 === 0 && snakeGameState.speed > 50) {
               snakeGameState.speed -= 10;
               updateSnakeSpeed();
-              console.log('🐍 贪吃蛇加速', {
+              console.log('馃悕 璐悆铔囧姞閫?, {
                 newSpeed: snakeGameState.speed,
                 score: snakeGameState.score
               });
@@ -7789,15 +4442,15 @@
             snakeGameState.snakePositions.delete(`${tail.x},${tail.y}`);
           }
 
-          // 记录所有步骤（使用超紧凑格式）
+          // 璁板綍鎵€鏈夋楠わ紙浣跨敤瓒呯揣鍑戞牸寮忥級
           const moveRecord = [
-            snakeGameState.direction, // 方向（1字符）
-            head.x, // 头部x坐标（数字）
-            head.y, // 头部y坐标（数字）
-            ateFood ? 1 : 0 // 是否吃到食物（0/1）
+            snakeGameState.direction, // 鏂瑰悜锛?瀛楃锛?
+            head.x, // 澶撮儴x鍧愭爣锛堟暟瀛楋級
+            head.y, // 澶撮儴y鍧愭爣锛堟暟瀛楋級
+            ateFood ? 1 : 0 // 鏄惁鍚冨埌椋熺墿锛?/1锛?
           ];
 
-          // 只在吃到食物时添加所有食物的坐标信息
+          // 鍙湪鍚冨埌椋熺墿鏃舵坊鍔犳墍鏈夐鐗╃殑鍧愭爣淇℃伅
           if (ateFood) {
             moveRecord.push(snakeGameState.foods.length);
             snakeGameState.foods.forEach(f => moveRecord.push(f.x, f.y));
@@ -7805,66 +4458,66 @@
 
           snakeGameState.moveHistory.push(moveRecord);
 
-          // 更新lastTime，确保游戏速度稳定
+          // 鏇存柊lastTime锛岀‘淇濇父鎴忛€熷害绋冲畾
           snakeGameState.lastTime = currentTime;
         }
 
-        // 每次requestAnimationFrame都渲染，保证动画流畅
+        // 姣忔requestAnimationFrame閮芥覆鏌擄紝淇濊瘉鍔ㄧ敾娴佺晠
         renderSnakeGame();
         snakeGameState.gameLoop = requestAnimationFrame(gameLoop);
       }
 
       snakeGameState.gameLoop = requestAnimationFrame(gameLoop);
 
-      console.log('🐍 贪吃蛇游戏开始', {
+      console.log('馃悕 璐悆铔囨父鎴忓紑濮?, {
         initialSpeed: snakeGameState.speed,
         initialDirection: snakeGameState.direction,
         initialPosition: snakeGameState.snake[0],
         foodPosition: snakeGameState.food
       });
 
-      // 发送游戏开始事件到服务器
+      // 鍙戦€佹父鎴忓紑濮嬩簨浠跺埌鏈嶅姟鍣?
       if (socket && socket.connected) {
         socket.emit('snake_game_start', {
           gameType: 'snake'
         });
-        console.log('🐍 发送贪吃蛇游戏开始事件到服务器');
+        console.log('馃悕 鍙戦€佽椽鍚冭泧娓告垙寮€濮嬩簨浠跺埌鏈嶅姟鍣?);
       }
 
-      updateStatus('🎮 贪吃蛇游戏开始！');
+      updateStatus('馃幃 璐悆铔囨父鎴忓紑濮嬶紒');
     }
 
-    // 开始双人模式贪吃蛇游戏（匹配模式）
+    // 寮€濮嬪弻浜烘ā寮忚椽鍚冭泧娓告垙锛堝尮閰嶆ā寮忥級
     function startSnakeDualGame() {
       if (!socket || !socket.connected) {
-        alert('请先登录！');
+        alert('璇峰厛鐧诲綍锛?);
         return;
       }
 
-      // 发送匹配请求（使用统一的匹配系统）
+      // 鍙戦€佸尮閰嶈姹傦紙浣跨敤缁熶竴鐨勫尮閰嶇郴缁燂級
       socket.emit('match_request', {
         game: 'snake'
       });
 
-      // 显示匹配等待界面
+      // 鏄剧ず鍖归厤绛夊緟鐣岄潰
       showSnakeMatchWaiting();
     }
 
-    // 显示匹配等待界面
+    // 鏄剧ず鍖归厤绛夊緟鐣岄潰
     function showSnakeMatchWaiting() {
       const container = document.getElementById('snake-game-container');
       container.innerHTML = `
         <div style="text-align: center; padding: 40px;">
-          <div style="font-size: 48px; margin-bottom: 20px;">🔍</div>
+          <div style="font-size: 48px; margin-bottom: 20px;">馃攳</div>
           <div style="font-size: 24px; font-weight: bold; color: #2d3748; margin-bottom: 10px;">
-            正在寻找对手...
+            姝ｅ湪瀵绘壘瀵规墜...
           </div>
           <div style="font-size: 16px; color: #718096; margin-bottom: 30px;">
-            请稍候，系统正在为您匹配对手
+            璇风◢鍊欙紝绯荤粺姝ｅ湪涓烘偍鍖归厤瀵规墜
           </div>
           <div style="width: 60px; height: 60px; margin: 0 auto; border: 4px solid #e2e8f0; border-top-color: #4299e1; border-radius: 50%; animation: spin 1s linear infinite;"></div>
           <button onclick="cancelSnakeMatch()" style="margin-top: 30px; padding: 12px 24px; background: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">
-            取消匹配
+            鍙栨秷鍖归厤
           </button>
         </div>
         <style>
@@ -7875,90 +4528,90 @@
       `;
     }
 
-    // 取消匹配
+    // 鍙栨秷鍖归厤
     function cancelSnakeMatch() {
       if (socket && socket.connected) {
         socket.emit('cancel_match');
       }
-      // 恢复贪吃蛇界面
+      // 鎭㈠璐悆铔囩晫闈?
       showSnakeGameInterface();
     }
 
-    // 显示贪吃蛇游戏界面
+    // 鏄剧ず璐悆铔囨父鎴忕晫闈?
     function showSnakeGameInterface() {
       const container = document.getElementById('snake-game-container');
       container.innerHTML = `
         <div class="game-info">
           <div class="info-item">
-            <span class="info-label">分数：</span>
+            <span class="info-label">鍒嗘暟锛?/span>
             <span class="info-value" id="snake-score">0</span>
           </div>
           <div class="info-item">
-            <span class="info-label">最高分：</span>
+            <span class="info-label">鏈€楂樺垎锛?/span>
             <span class="info-value" id="snake-highscore">0</span>
           </div>
           <div class="info-item">
-            <span class="info-label">速度：</span>
+            <span class="info-label">閫熷害锛?/span>
             <span class="info-value" id="snake-speed">150</span>
           </div>
           <div class="info-item">
-            <span class="info-label">⏱️ 时间：</span>
+            <span class="info-label">鈴憋笍 鏃堕棿锛?/span>
             <span class="info-value" id="snake-time">2:00</span>
           </div>
           <div class="info-item">
-            <span class="info-label">🍎 食物：</span>
+            <span class="info-label">馃崕 椋熺墿锛?/span>
             <span class="info-value" id="snake-food-count">0</span>
           </div>
         </div>
         <canvas id="snake-canvas" width="400" height="400"></canvas>
 
-        <!-- 道具栏 -->
+        <!-- 閬撳叿鏍?-->
         <div class="snake-item-bar" id="snake-item-bar" style="display: none; margin: 10px auto; padding: 8px 12px; background: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 500px; border: 1px solid #e9ecef;">
           <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-            <span style="font-size: 14px; font-weight: 600; color: #495057;">🎒 道具</span>
-            <span style="font-size: 12px; color: #6c757d;">双击使用</span>
+            <span style="font-size: 14px; font-weight: 600; color: #495057;">馃帓 閬撳叿</span>
+            <span style="font-size: 12px; color: #6c757d;">鍙屽嚮浣跨敤</span>
           </div>
           <div id="snake-item-list" style="display: flex; gap: 8px; flex-wrap: wrap; min-height: 36px;"></div>
         </div>
 
-        <!-- 虚拟按键 -->
+        <!-- 铏氭嫙鎸夐敭 -->
         <div class="virtual-controls" id="snake-virtual-controls"
           style="display: none; flex-direction: column; align-items: center; margin-top: 30px;">
           <div class="virtual-btn up-btn" onclick="handleVirtualKey('up')"
             style="width: 80px; height: 80px; background: #4ecdc4; border: none; border-radius: 15px; color: white; font-size: 32px; margin-bottom: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);">
-            ↑</div>
+            鈫?/div>
           <div style="display: flex; gap: 15px;">
             <div class="virtual-btn left-btn" onclick="handleVirtualKey('left')"
               style="width: 80px; height: 80px; background: #4ecdc4; border: none; border-radius: 15px; color: white; font-size: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);">
-              ←</div>
+              鈫?/div>
             <div class="virtual-btn down-btn" onclick="handleVirtualKey('down')"
               style="width: 80px; height: 80px; background: #4ecdc4; border: none; border-radius: 15px; color: white; font-size: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);">
-              ↓</div>
+              鈫?/div>
             <div class="virtual-btn right-btn" onclick="handleVirtualKey('right')"
               style="width: 80px; height: 80px; background: #4ecdc4; border: none; border-radius: 15px; color: white; font-size: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);">
-              →</div>
+              鈫?/div>
           </div>
         </div>
 
         <div class="game-rules">
-          <div class="rules-title">📜 游戏规则</div>
+          <div class="rules-title">馃摐 娓告垙瑙勫垯</div>
           <div class="rules-content" id="snake-rules"></div>
         </div>
         <div class="game-controls">
-          <button class="lobby-btn" id="snake-start" onclick="startSnakeGame()">🎮 单人模式</button>
-          <button class="lobby-btn" id="snake-dual" onclick="startSnakeDualGame()" style="background: #667eea;">🐍🐍 双人模式</button>
-          <button class="lobby-btn" id="snake-restart" onclick="restartSnakeGame()">🔄 重新开始</button>
-          <button class="lobby-btn" id="snake-virt-btn" onclick="toggleVirtualControls()" style="background: #9b59b6;">🕹️ 按键</button>
-          <button class="lobby-btn" id="snake-quit" onclick="quitSnakeGame()" style="background: #e74c3c;">🚪 退出</button>
+          <button class="lobby-btn" id="snake-start" onclick="startSnakeGame()">馃幃 鍗曚汉妯″紡</button>
+          <button class="lobby-btn" id="snake-dual" onclick="startSnakeDualGame()" style="background: #667eea;">馃悕馃悕 鍙屼汉妯″紡</button>
+          <button class="lobby-btn" id="snake-restart" onclick="restartSnakeGame()">馃攧 閲嶆柊寮€濮?/button>
+          <button class="lobby-btn" id="snake-virt-btn" onclick="toggleVirtualControls()" style="background: #9b59b6;">馃暪锔?鎸夐敭</button>
+          <button class="lobby-btn" id="snake-quit" onclick="quitSnakeGame()" style="background: #e74c3c;">馃毆 閫€鍑?/button>
         </div>
       `;
 
-      // 重新初始化画布
+      // 閲嶆柊鍒濆鍖栫敾甯?
       snakeGameState.canvas = document.getElementById('snake-canvas');
       snakeGameState.ctx = snakeGameState.canvas.getContext('2d');
       renderSnakeGame();
 
-      // 恢复虚拟按键的显示状态
+      // 鎭㈠铏氭嫙鎸夐敭鐨勬樉绀虹姸鎬?
       const savedVirt = localStorage.getItem('snakeVirtualControls');
       if (savedVirt === 'visible') {
         const virtEl = document.getElementById('snake-virtual-controls');
@@ -7968,7 +4621,7 @@
       }
     }
 
-    // 切换虚拟按键显示/隐藏
+    // 鍒囨崲铏氭嫙鎸夐敭鏄剧ず/闅愯棌
     function toggleVirtualControls() {
       const virtEl = document.getElementById('snake-virtual-controls');
       if (!virtEl) return;
@@ -7981,40 +4634,40 @@
       }
     }
 
-    // 开始匹配后的双人游戏
+    // 寮€濮嬪尮閰嶅悗鐨勫弻浜烘父鎴?
     function startMatchedSnakeGame(gameData) {
-      // 设置为双人模式
+      // 璁剧疆涓哄弻浜烘ā寮?
       snakeGameState.isDualMode = true;
       snakeGameState.matchId = gameData.matchId;
       snakeGameState.playerId = gameData.playerId;
 
-      // 调整画布大小
+      // 璋冩暣鐢诲竷澶у皬
       const config = snakeDualConfig;
       const canvas = document.getElementById('snake-canvas');
       canvas.width = config.canvasWidth;
       canvas.height = config.canvasHeight;
 
-      // 重置游戏状态
+      // 閲嶇疆娓告垙鐘舵€?
       snakeGameState.snake = gameData.snake || [{ x: 5, y: Math.floor(config.gridSize / 2) }];
       snakeGameState.direction = 'right';
       snakeGameState.nextDirection = 'right';
       snakeGameState.score = 0;
 
-      // 确保snake2始终是有效的数组
+      // 纭繚snake2濮嬬粓鏄湁鏁堢殑鏁扮粍
       if (gameData.opponentSnake && Array.isArray(gameData.opponentSnake) && gameData.opponentSnake.length > 0) {
         snakeGameState.snake2 = gameData.opponentSnake;
       } else {
         snakeGameState.snake2 = [{ x: config.gridSize - 6, y: Math.floor(config.gridSize / 2) }];
       }
       snakeGameState.direction2 = 'left';
-      // 对手方向（仅用于显示）
+      // 瀵规墜鏂瑰悜锛堜粎鐢ㄤ簬鏄剧ず锛?
       snakeGameState.score2 = 0;
 
       snakeGameState.isPaused = false;
       snakeGameState.speed = config.initialSpeed;
       snakeGameState.gameTimeLeft = config.gameDuration;
 
-      // 生成多个食物
+      // 鐢熸垚澶氫釜椋熺墿
       snakeGameState.foods = gameData.foods || [];
       snakeGameState.snakePositions = new Set();
       snakeGameState.snake2Positions = new Set();
@@ -8024,18 +4677,18 @@
       snakeGameState.isRespawning1 = false;
       snakeGameState.isRespawning2 = false;
 
-      // 更新UI
+      // 鏇存柊UI
       updateDualSnakeScore();
       updateDualGameTime();
       document.getElementById('snake-rules').textContent = config.rules;
 
-      // 匹配模式隐藏暂停和重新开始按钮，保留退出按钮
+      // 鍖归厤妯″紡闅愯棌鏆傚仠鍜岄噸鏂板紑濮嬫寜閽紝淇濈暀閫€鍑烘寜閽?
       const pauseBtn = document.getElementById('snake-pause');
       const restartBtn = document.getElementById('snake-restart');
       if (pauseBtn) pauseBtn.style.display = 'none';
       if (restartBtn) restartBtn.style.display = 'none';
 
-      // 启动游戏计时器
+      // 鍚姩娓告垙璁℃椂鍣?
       snakeGameState.gameTimer = setInterval(() => {
         snakeGameState.gameTimeLeft--;
         updateDualGameTime();
@@ -8045,7 +4698,7 @@
         }
       }, 1000);
 
-      // 启动游戏循环
+      // 鍚姩娓告垙寰幆
       function gameLoop() {
         if (snakeGameState.isPaused) {
           snakeGameState.gameLoop = requestAnimationFrame(gameLoop);
@@ -8056,10 +4709,10 @@
         const deltaTime = currentTime - snakeGameState.lastTime;
 
         if (deltaTime >= snakeGameState.speed) {
-          // 只更新自己的蛇
+          // 鍙洿鏂拌嚜宸辩殑铔?
           if (!snakeGameState.isRespawning1) {
             updateSnakePlayer(1);
-            // 发送更新到服务器
+            // 鍙戦€佹洿鏂板埌鏈嶅姟鍣?
             sendSnakeUpdate();
           }
 
@@ -8073,11 +4726,11 @@
       snakeGameState.lastTime = Date.now();
       snakeGameState.gameLoop = requestAnimationFrame(gameLoop);
 
-      console.log('🐍🐍 匹配成功，双人贪吃蛇游戏开始');
-      updateStatus('🎮 匹配成功！双人贪吃蛇游戏开始！');
+      console.log('馃悕馃悕 鍖归厤鎴愬姛锛屽弻浜鸿椽鍚冭泧娓告垙寮€濮?);
+      updateStatus('馃幃 鍖归厤鎴愬姛锛佸弻浜鸿椽鍚冭泧娓告垙寮€濮嬶紒');
     }
 
-    // 发送蛇的更新到服务器
+    // 鍙戦€佽泧鐨勬洿鏂板埌鏈嶅姟鍣?
     function sendSnakeUpdate() {
       if (!socket || !socket.connected || !snakeGameState.matchId) return;
 
@@ -8092,20 +4745,20 @@
       });
     }
 
-    // 处理对手的更新
+    // 澶勭悊瀵规墜鐨勬洿鏂?
     function handleOpponentUpdate(data) {
-      console.log('收到对手更新:', data);
+      console.log('鏀跺埌瀵规墜鏇存柊:', data);
 
       snakeGameState.snake2 = data.snake;
       snakeGameState.score2 = data.score;
 
-      // 同步食物和时间
+      // 鍚屾椋熺墿鍜屾椂闂?
       if (data.foods) {
-        console.log('同步食物状态:', data.foods);
+        console.log('鍚屾椋熺墿鐘舵€?', data.foods);
         snakeGameState.foods = data.foods;
       }
       if (data.gameTimeLeft !== undefined) {
-        console.log('同步游戏时间:', data.gameTimeLeft);
+        console.log('鍚屾娓告垙鏃堕棿:', data.gameTimeLeft);
         snakeGameState.gameTimeLeft = data.gameTimeLeft;
       }
 
@@ -8113,22 +4766,22 @@
       updateDualGameTime();
     }
 
-    // 更新单个玩家蛇的逻辑
+    // 鏇存柊鍗曚釜鐜╁铔囩殑閫昏緫
     function updateSnakePlayer(player) {
       const config = snakeDualConfig;
       const state = snakeGameState;
       const isPlayer1 = player === 1;
 
-      // 获取玩家状态
+      // 鑾峰彇鐜╁鐘舵€?
       const snake = isPlayer1 ? state.snake : state.snake2;
       const positions = isPlayer1 ? state.snakePositions : state.snake2Positions;
       let direction = isPlayer1 ? state.direction : state.direction2;
       const nextDirection = isPlayer1 ? state.nextDirection : state.nextDirection2;
 
-      // 确保蛇状态有效
+      // 纭繚铔囩姸鎬佹湁鏁?
       if (!snake || !Array.isArray(snake) || snake.length === 0) {
-        console.error(`玩家${player}的蛇状态无效:`, snake);
-        // 初始化默认蛇状态
+        console.error(`鐜╁${player}鐨勮泧鐘舵€佹棤鏁?`, snake);
+        // 鍒濆鍖栭粯璁よ泧鐘舵€?
         const defaultSnake = isPlayer1 ?
           [{ x: 5, y: Math.floor(config.gridSize / 2) }] :
           [{ x: config.gridSize - 6, y: Math.floor(config.gridSize / 2) }];
@@ -8141,7 +4794,7 @@
         return;
       }
 
-      // 确保方向有效
+      // 纭繚鏂瑰悜鏈夋晥
       const validDirections = ['up', 'down', 'left', 'right'];
       if (!validDirections.includes(direction)) {
         direction = isPlayer1 ? 'right' : 'left';
@@ -8150,7 +4803,7 @@
         nextDirection = direction;
       }
 
-      // 更新方向
+      // 鏇存柊鏂瑰悜
       direction = nextDirection;
       if (isPlayer1) {
         state.direction = direction;
@@ -8158,7 +4811,7 @@
         state.direction2 = direction;
       }
 
-      // 计算新头部位置
+      // 璁＄畻鏂板ご閮ㄤ綅缃?
       const head = { x: snake[0].x, y: snake[0].y };
       switch (direction) {
         case 'up': head.y--; break;
@@ -8167,18 +4820,18 @@
         case 'right': head.x++; break;
       }
 
-      // 碰撞检测
+      // 纰版挒妫€娴?
       if (checkDualCollision(head, player)) {
         respawnPlayer(player);
         return;
       }
 
-      // 移动蛇
+      // 绉诲姩铔?
       const tail = snake[snake.length - 1];
       snake.unshift(head);
       positions.add(`${head.x},${head.y}`);
 
-      // 检查是否吃到食物
+      // 妫€鏌ユ槸鍚﹀悆鍒伴鐗?
       let ateFood = false;
       const foodIndex = state.foods.findIndex(f => f.x === head.x && f.y === head.y);
 
@@ -8188,7 +4841,7 @@
         const newFood = generateDualFood();
         state.foods.push(newFood);
 
-        // 发送食物更新到服务器
+        // 鍙戦€侀鐗╂洿鏂板埌鏈嶅姟鍣?
         if (socket && socket.connected && state.matchId) {
           socket.emit('snake_food_update', {
             matchId: state.matchId,
@@ -8209,24 +4862,24 @@
       }
     }
 
-    // 双人模式碰撞检测
+    // 鍙屼汉妯″紡纰版挒妫€娴?
     function checkDualCollision(head, player) {
       const config = snakeDualConfig;
       const state = snakeGameState;
 
-      // 墙壁碰撞
+      // 澧欏纰版挒
       if (head.x < 0 || head.x >= config.gridSize ||
         head.y < 0 || head.y >= config.gridSize) {
         return true;
       }
 
-      // 自身碰撞
+      // 鑷韩纰版挒
       const selfPositions = player === 1 ? state.snakePositions : state.snake2Positions;
       if (selfPositions.has(`${head.x},${head.y}`)) {
         return true;
       }
 
-      // 撞到对方蛇
+      // 鎾炲埌瀵规柟铔?
       const otherPositions = player === 1 ? state.snake2Positions : state.snakePositions;
       if (otherPositions.has(`${head.x},${head.y}`)) {
         return true;
@@ -8235,7 +4888,7 @@
       return false;
     }
 
-    // 玩家复活
+    // 鐜╁澶嶆椿
     function respawnPlayer(player) {
       const config = snakeDualConfig;
       const state = snakeGameState;
@@ -8270,7 +4923,7 @@
       }, config.respawnDelay);
     }
 
-    // 生成双人模式食物
+    // 鐢熸垚鍙屼汉妯″紡椋熺墿
     function generateDualFood() {
       const config = snakeDualConfig;
       let food;
@@ -8284,46 +4937,46 @@
       return food;
     }
 
-    // 结束双人模式游戏
+    // 缁撴潫鍙屼汉妯″紡娓告垙
     function endDualSnakeGame() {
-      // 停止游戏循环
+      // 鍋滄娓告垙寰幆
       if (snakeGameState.gameLoop) {
         cancelAnimationFrame(snakeGameState.gameLoop);
         snakeGameState.gameLoop = null;
       }
 
-      // 停止计时器
+      // 鍋滄璁℃椂鍣?
       if (snakeGameState.gameTimer) {
         clearInterval(snakeGameState.gameTimer);
         snakeGameState.gameTimer = null;
       }
 
-      // 判定胜负
+      // 鍒ゅ畾鑳滆礋
       let result;
       if (snakeGameState.score > snakeGameState.score2) {
-        result = '玩家1获胜！';
+        result = '鐜╁1鑾疯儨锛?;
       } else if (snakeGameState.score2 > snakeGameState.score) {
-        result = '玩家2获胜！';
+        result = '鐜╁2鑾疯儨锛?;
       } else {
-        result = '平局！';
+        result = '骞冲眬锛?;
       }
 
-      updateStatus(`⏰ 游戏结束！${result} 玩家1: ${snakeGameState.score}分, 玩家2: ${snakeGameState.score2}分`);
-      showToast(`游戏结束！${result} 玩家1: ${snakeGameState.score}分, 玩家2: ${snakeGameState.score2}分`, 'info', 5000);
+      updateStatus(`鈴?娓告垙缁撴潫锛?{result} 鐜╁1: ${snakeGameState.score}鍒? 鐜╁2: ${snakeGameState.score2}鍒哷);
+      showToast(`娓告垙缁撴潫锛?{result} 鐜╁1: ${snakeGameState.score}鍒? 鐜╁2: ${snakeGameState.score2}鍒哷, 'info', 5000);
 
-      // 重置为单人模式配置
+      // 閲嶇疆涓哄崟浜烘ā寮忛厤缃?
       resetSnakeCanvas();
 
-      // 恢复游戏界面（隐藏暂停/重新开始按钮，显示匹配/单人按钮）
+      // 鎭㈠娓告垙鐣岄潰锛堥殣钘忔殏鍋?閲嶆柊寮€濮嬫寜閽紝鏄剧ず鍖归厤/鍗曚汉鎸夐挳锛?
       showSnakeGameInterface();
 
-      // 告诉服务端返回大厅
+      // 鍛婅瘔鏈嶅姟绔繑鍥炲ぇ鍘?
       if (socket && socket.connected) {
         socket.emit('return_lobby');
       }
     }
 
-    // 重置画布为单人模式
+    // 閲嶇疆鐢诲竷涓哄崟浜烘ā寮?
     function resetSnakeCanvas() {
       snakeGameState.isDualMode = false;
       const canvas = document.getElementById('snake-canvas');
@@ -8332,25 +4985,25 @@
       document.getElementById('snake-rules').textContent = snakeGameConfig.rules;
     }
 
-    // 贪吃蛇游戏循环（已整合到startSnakeGame函数中）
+    // 璐悆铔囨父鎴忓惊鐜紙宸叉暣鍚堝埌startSnakeGame鍑芥暟涓級
     function snakeGameLoop() {
-      // 已整合到startSnakeGame函数中
+      // 宸叉暣鍚堝埌startSnakeGame鍑芥暟涓?
     }
 
-    // 碰撞检测
+    // 纰版挒妫€娴?
     function checkSnakeCollision(head) {
       const config = getSnakeConfig();
-      // 墙壁碰撞
+      // 澧欏纰版挒
       if (head.x < 0 || head.x >= config.gridSize ||
         head.y < 0 || head.y >= config.gridSize) {
         return true;
       }
 
-      // 自身碰撞（使用Set快速检测）
+      // 鑷韩纰版挒锛堜娇鐢⊿et蹇€熸娴嬶級
       return snakeGameState.snakePositions.has(`${head.x},${head.y}`);
     }
 
-    // 生成多个食物
+    // 鐢熸垚澶氫釜椋熺墿
     function generateSnakeFoods(count) {
       const foods = [];
       for (let i = 0; i < count; i++) {
@@ -8360,7 +5013,7 @@
       return foods;
     }
 
-    // 生成单个食物
+    // 鐢熸垚鍗曚釜椋熺墿
     function generateSnakeFood() {
       let food;
       let attempts = 0;
@@ -8370,14 +5023,14 @@
           y: Math.floor(Math.random() * snakeGameConfig.gridSize)
         };
         attempts++;
-        if (attempts > 500) return null; // 防止死循环
+        if (attempts > 500) return null; // 闃叉姝诲惊鐜?
       } while (snakeGameState.snakePositions.has(`${food.x},${food.y}`) ||
         snakeGameState.foods.some(f => f.x === food.x && f.y === food.y));
 
       return food;
     }
 
-    // 渲染贪吃蛇游戏
+    // 娓叉煋璐悆铔囨父鎴?
     function renderSnakeGame() {
       const ctx = snakeGameState.ctx;
       const cellSize = snakeGameConfig.cellSize;
@@ -8385,11 +5038,11 @@
       const canvasWidth = snakeGameState.canvas.width;
       const canvasHeight = snakeGameState.canvas.height;
 
-      // 清空画布
+      // 娓呯┖鐢诲竷
       ctx.fillStyle = snakeGameConfig.colors.background;
       ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-      // 绘制网格
+      // 缁樺埗缃戞牸
       ctx.strokeStyle = snakeGameConfig.colors.grid;
       ctx.lineWidth = 0.5;
       ctx.beginPath();
@@ -8401,25 +5054,25 @@
       }
       ctx.stroke();
 
-      // 绘制多个食物
+      // 缁樺埗澶氫釜椋熺墿
       const fr = cellSize / 2 - 2;
       snakeGameState.foods.forEach((food, index) => {
         const fx = food.x * cellSize + cellSize / 2;
         const fy = food.y * cellSize + cellSize / 2;
-        // 交替颜色增加辨识度
+        // 浜ゆ浛棰滆壊澧炲姞杈ㄨ瘑搴?
         ctx.fillStyle = index % 2 === 0 ? snakeGameConfig.colors.food : snakeGameConfig.colors.foodSpecial;
         ctx.beginPath();
         ctx.arc(fx, fy, fr, 0, Math.PI * 2);
         ctx.fill();
       });
 
-      // 绘制蛇 - 使用路径批量绘制
+      // 缁樺埗铔?- 浣跨敤璺緞鎵归噺缁樺埗
       const snakeHeadColor = snakeGameConfig.colors.snakeHead;
       const snakeBodyColor = snakeGameConfig.colors.snakeBody;
       const rectSize = cellSize - 2;
       const offset = 1;
 
-      // 批量绘制蛇身
+      // 鎵归噺缁樺埗铔囪韩
       if (snakeGameState.snake.length > 1) {
         ctx.fillStyle = snakeBodyColor;
         ctx.beginPath();
@@ -8430,7 +5083,7 @@
         ctx.fill();
       }
 
-      // 绘制蛇头
+      // 缁樺埗铔囧ご
       if (snakeGameState.snake.length > 0) {
         const head = snakeGameState.snake[0];
         ctx.fillStyle = snakeHeadColor;
@@ -8438,7 +5091,7 @@
       }
     }
 
-    // 双人模式渲染
+    // 鍙屼汉妯″紡娓叉煋
     function renderDualSnakeGame() {
       const ctx = snakeGameState.ctx;
       const config = snakeDualConfig;
@@ -8447,11 +5100,11 @@
       const canvasWidth = snakeGameState.canvas.width;
       const canvasHeight = snakeGameState.canvas.height;
 
-      // 清空画布
+      // 娓呯┖鐢诲竷
       ctx.fillStyle = config.colors.background;
       ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-      // 绘制网格
+      // 缁樺埗缃戞牸
       ctx.strokeStyle = config.colors.grid;
       ctx.lineWidth = 0.5;
       ctx.beginPath();
@@ -8463,7 +5116,7 @@
       }
       ctx.stroke();
 
-      // 绘制多个食物
+      // 缁樺埗澶氫釜椋熺墿
       ctx.fillStyle = config.colors.food;
       ctx.beginPath();
       snakeGameState.foods.forEach(food => {
@@ -8475,11 +5128,11 @@
       });
       ctx.fill();
 
-      // 绘制玩家1的蛇
+      // 缁樺埗鐜╁1鐨勮泧
       const rectSize = cellSize - 2;
       const offset = 1;
 
-      // 玩家1蛇身
+      // 鐜╁1铔囪韩
       if (snakeGameState.snake.length > 1) {
         ctx.fillStyle = config.colors.snake1Body;
         ctx.beginPath();
@@ -8490,16 +5143,16 @@
         ctx.fill();
       }
 
-      // 玩家1蛇头
+      // 鐜╁1铔囧ご
       if (snakeGameState.snake.length > 0) {
         const head = snakeGameState.snake[0];
         ctx.fillStyle = config.colors.snake1Head;
         ctx.fillRect(head.x * cellSize + offset, head.y * cellSize + offset, rectSize, rectSize);
       }
 
-      // 绘制玩家2的蛇
+      // 缁樺埗鐜╁2鐨勮泧
       if (snakeGameState.snake2 && Array.isArray(snakeGameState.snake2)) {
-        // 玩家2蛇身
+        // 鐜╁2铔囪韩
         if (snakeGameState.snake2.length > 1) {
           ctx.fillStyle = config.colors.snake2Body;
           ctx.beginPath();
@@ -8510,7 +5163,7 @@
           ctx.fill();
         }
 
-        // 玩家2蛇头
+        // 鐜╁2铔囧ご
         if (snakeGameState.snake2.length > 0) {
           const head = snakeGameState.snake2[0];
           ctx.fillStyle = config.colors.snake2Head;
@@ -8519,18 +5172,18 @@
       }
     }
 
-    // 更新双人模式分数显示
+    // 鏇存柊鍙屼汉妯″紡鍒嗘暟鏄剧ず
     function updateDualSnakeScore() {
       const scoreElement = document.getElementById('snake-score');
       if (scoreElement) {
         scoreElement.innerHTML = `
           <div style="display: flex; justify-content: space-around; gap: 20px;">
             <div style="text-align: center;">
-              <div style="font-size: 14px; color: #6c757d; margin-bottom: 4px;">玩家1 🔵</div>
+              <div style="font-size: 14px; color: #6c757d; margin-bottom: 4px;">鐜╁1 馃數</div>
               <div style="font-size: 20px; font-weight: 700; color: #4ecdc4;">${snakeGameState.score}</div>
             </div>
             <div style="text-align: center;">
-              <div style="font-size: 14px; color: #6c757d; margin-bottom: 4px;">玩家2 🔴</div>
+              <div style="font-size: 14px; color: #6c757d; margin-bottom: 4px;">鐜╁2 馃敶</div>
               <div style="font-size: 20px; font-weight: 700; color: #ff6b6b;">${snakeGameState.score2}</div>
             </div>
           </div>
@@ -8538,7 +5191,7 @@
       }
     }
 
-    // 更新双人模式游戏时间
+    // 鏇存柊鍙屼汉妯″紡娓告垙鏃堕棿
     function updateDualGameTime() {
       const timeElement = document.getElementById('snake-time');
       if (timeElement) {
@@ -8548,9 +5201,9 @@
       }
     }
 
-    // 键盘控制
+    // 閿洏鎺у埗
     function handleSnakeKeydown(e) {
-      // 单人模式和在线双人模式都使用相同的控制
+      // 鍗曚汉妯″紡鍜屽湪绾垮弻浜烘ā寮忛兘浣跨敤鐩稿悓鐨勬帶鍒?
       switch (e.key) {
         case 'ArrowUp':
         case 'w':
@@ -8585,7 +5238,7 @@
       e.preventDefault();
     }
 
-    // 虚拟按键控制
+    // 铏氭嫙鎸夐敭鎺у埗
     function handleVirtualKey(direction) {
       switch (direction) {
         case 'up':
@@ -8611,7 +5264,7 @@
       }
     }
 
-    // 更新分数
+    // 鏇存柊鍒嗘暟
     function updateSnakeScore() {
       document.getElementById('snake-score').textContent = snakeGameState.score;
       updateSnakeFoodCount();
@@ -8623,7 +5276,7 @@
       }
     }
 
-    // 更新食物数量显示
+    // 鏇存柊椋熺墿鏁伴噺鏄剧ず
     function updateSnakeFoodCount() {
       const el = document.getElementById('snake-food-count');
       if (el) {
@@ -8631,25 +5284,25 @@
       }
     }
 
-    // 更新速度显示
+    // 鏇存柊閫熷害鏄剧ず
     function updateSnakeSpeed() {
       document.getElementById('snake-speed').textContent = snakeGameState.speed;
     }
 
-    // ========== 贪吃蛇道具系统 ==========
+    // ========== 璐悆铔囬亾鍏风郴缁?==========
 
-    // 道具配置
+    // 閬撳叿閰嶇疆
     const SNAKE_ITEM_TYPES = {
-      'item_snake_revive': { id: 'item_snake_revive', name: '复活卡', icon: '❤️', desc: '撞墙或撞身后可原地复活一次', type: 'revive', price: 100 },
-      'item_snake_speed': { id: 'item_snake_speed', name: '加速卡', icon: '⚡', desc: '10秒内移动速度翻倍', type: 'speed', price: 80 },
-      'item_snake_double': { id: 'item_snake_double', name: '双倍卡', icon: '✖️2', desc: '15秒内得分翻倍', type: 'double', price: 120 },
-      'item_snake_shrink': { id: 'item_snake_shrink', name: '缩短卡', icon: '🔽', desc: '身体缩短3节', type: 'shrink', price: 60 }
+      'item_snake_revive': { id: 'item_snake_revive', name: '澶嶆椿鍗?, icon: '鉂わ笍', desc: '鎾炲鎴栨挒韬悗鍙師鍦板娲讳竴娆?, type: 'revive', price: 100 },
+      'item_snake_speed': { id: 'item_snake_speed', name: '鍔犻€熷崱', icon: '鈿?, desc: '10绉掑唴绉诲姩閫熷害缈诲€?, type: 'speed', price: 80 },
+      'item_snake_double': { id: 'item_snake_double', name: '鍙屽€嶅崱', icon: '鉁栵笍2', desc: '15绉掑唴寰楀垎缈诲€?, type: 'double', price: 120 },
+      'item_snake_shrink': { id: 'item_snake_shrink', name: '缂╃煭鍗?, icon: '馃斀', desc: '韬綋缂╃煭3鑺?, type: 'shrink', price: 60 }
     };
 
-    // 玩家背包中的贪吃蛇道具
+    // 鐜╁鑳屽寘涓殑璐悆铔囬亾鍏?
     let snakeInventory = {};
 
-    // 从localStorage加载道具（并尝试从服务器同步）
+    // 浠巐ocalStorage鍔犺浇閬撳叿锛堝苟灏濊瘯浠庢湇鍔″櫒鍚屾锛?
     function loadSnakeItems() {
       try {
         const saved = localStorage.getItem('snakeItemInventory');
@@ -8657,12 +5310,12 @@
       } catch (e) {
         snakeInventory = {};
       }
-      // 尝试从服务器同步道具
+      // 灏濊瘯浠庢湇鍔″櫒鍚屾閬撳叿
       syncServerSnakeItems();
       updateSnakeItemBar();
     }
 
-    // 从服务器同步贪吃蛇道具
+    // 浠庢湇鍔″櫒鍚屾璐悆铔囬亾鍏?
     async function syncServerSnakeItems() {
       try {
         const userId = localStorage.getItem('gameUserId') || 'guest';
@@ -8683,21 +5336,21 @@
           }
         }
       } catch (e) {
-        // 静默失败，使用本地数据
-        console.log('同步服务器道具失败，使用本地数据');
+        // 闈欓粯澶辫触锛屼娇鐢ㄦ湰鍦版暟鎹?
+        console.log('鍚屾鏈嶅姟鍣ㄩ亾鍏峰け璐ワ紝浣跨敤鏈湴鏁版嵁');
       }
     }
 
-    // 保存道具到localStorage
+    // 淇濆瓨閬撳叿鍒發ocalStorage
     function saveSnakeItems() {
       try {
         localStorage.setItem('snakeItemInventory', JSON.stringify(snakeInventory));
       } catch (e) {
-        console.warn('保存道具失败:', e);
+        console.warn('淇濆瓨閬撳叿澶辫触:', e);
       }
     }
 
-    // 添加道具
+    // 娣诲姞閬撳叿
     function addSnakeItem(itemId, count = 1) {
       if (!SNAKE_ITEM_TYPES[itemId]) return;
       snakeInventory[itemId] = (snakeInventory[itemId] || 0) + count;
@@ -8705,7 +5358,7 @@
       updateSnakeItemBar();
     }
 
-    // 更新道具栏显示
+    // 鏇存柊閬撳叿鏍忔樉绀?
     function updateSnakeItemBar() {
       const bar = document.getElementById('snake-item-bar');
       const list = document.getElementById('snake-item-list');
@@ -8715,7 +5368,7 @@
       bar.style.display = hasItems ? 'block' : 'none';
 
       if (!hasItems) {
-        list.innerHTML = '<span style="font-size: 12px; color: #adb5bd;">暂无道具，前往商店购买</span>';
+        list.innerHTML = '<span style="font-size: 12px; color: #adb5bd;">鏆傛棤閬撳叿锛屽墠寰€鍟嗗簵璐拱</span>';
         return;
       }
 
@@ -8727,97 +5380,97 @@
 
         const itemEl = document.createElement('div');
         itemEl.style.cssText = 'display: flex; align-items: center; gap: 4px; padding: 4px 10px; background: #f0f4ff; border: 1px solid #d0d8f0; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.2s;';
-        itemEl.title = `${config.name}: ${config.desc}\n双击使用`;
+        itemEl.title = `${config.name}: ${config.desc}\n鍙屽嚮浣跨敤`;
         itemEl.innerHTML = `
           <span>${config.icon}</span>
           <span style="font-weight: 600; color: #495057;">${config.name}</span>
-          <span style="color: #007bff; font-weight: 700;">×${count}</span>
+          <span style="color: #007bff; font-weight: 700;">脳${count}</span>
         `;
-        // 悬停效果
+        // 鎮仠鏁堟灉
         itemEl.onmouseenter = () => { itemEl.style.background = '#e0e8ff'; itemEl.style.borderColor = '#9ab0e8'; };
         itemEl.onmouseleave = () => { itemEl.style.background = '#f0f4ff'; itemEl.style.borderColor = '#d0d8f0'; };
-        // 双击使用
+        // 鍙屽嚮浣跨敤
         itemEl.ondblclick = () => useSnakeItem(itemId);
         list.appendChild(itemEl);
       }
     }
 
-    // 使用道具
+    // 浣跨敤閬撳叿
     function useSnakeItem(itemId) {
       if (!snakeGameState.gameLoop) {
-        showToast('请先开始游戏再使用道具', 'warning');
+        showToast('璇峰厛寮€濮嬫父鎴忓啀浣跨敤閬撳叿', 'warning');
         return;
       }
       if (snakeGameState.isPaused) {
-        showToast('请先继续游戏', 'warning');
+        showToast('璇峰厛缁х画娓告垙', 'warning');
         return;
       }
       if (!snakeInventory[itemId] || snakeInventory[itemId] <= 0) {
-        showToast('道具不足', 'error');
+        showToast('閬撳叿涓嶈冻', 'error');
         return;
       }
 
       const config = SNAKE_ITEM_TYPES[itemId];
       if (!config) return;
 
-      // 执行道具效果
+      // 鎵ц閬撳叿鏁堟灉
       switch (config.type) {
         case 'revive':
-          // 复活卡 - 设置标记，碰撞时自动使用
+          // 澶嶆椿鍗?- 璁剧疆鏍囪锛岀鎾炴椂鑷姩浣跨敤
           if (snakeGameState.resurrectionUsed) {
-            showToast('本局已使用过复活卡', 'warning');
+            showToast('鏈眬宸蹭娇鐢ㄨ繃澶嶆椿鍗?, 'warning');
             return;
           }
           snakeGameState.resurrectionUsed = true;
-          showToast('❤️ 复活卡已就绪，下次碰撞时自动生效', 'success', 2000);
+          showToast('鉂わ笍 澶嶆椿鍗″凡灏辩华锛屼笅娆＄鎾炴椂鑷姩鐢熸晥', 'success', 2000);
           break;
 
         case 'speed':
-          // 加速卡 - 速度翻倍持续10秒
+          // 鍔犻€熷崱 - 閫熷害缈诲€嶆寔缁?0绉?
           if (snakeGameState.speedBoostEndTime > Date.now()) {
-            showToast('加速效果已生效中', 'warning');
+            showToast('鍔犻€熸晥鏋滃凡鐢熸晥涓?, 'warning');
             return;
           }
           snakeGameState.speed = Math.max(30, Math.floor(snakeGameState.speed / 2));
           snakeGameState.speedBoostEndTime = Date.now() + 10000;
           updateSnakeSpeed();
-          showToast('⚡ 加速卡已使用，速度翻倍持续10秒！', 'success', 2000);
+          showToast('鈿?鍔犻€熷崱宸蹭娇鐢紝閫熷害缈诲€嶆寔缁?0绉掞紒', 'success', 2000);
           break;
 
         case 'double':
-          // 双倍得分卡 - 15秒内得分翻倍
+          // 鍙屽€嶅緱鍒嗗崱 - 15绉掑唴寰楀垎缈诲€?
           if (snakeGameState.doubleScoreEndTime > Date.now()) {
-            showToast('双倍得分已生效中', 'warning');
+            showToast('鍙屽€嶅緱鍒嗗凡鐢熸晥涓?, 'warning');
             return;
           }
           snakeGameState.scoreMultiplier = 2;
           snakeGameState.doubleScoreEndTime = Date.now() + 15000;
-          showToast('✖️2 双倍得分卡已使用，持续15秒！', 'success', 2000);
+          showToast('鉁栵笍2 鍙屽€嶅緱鍒嗗崱宸蹭娇鐢紝鎸佺画15绉掞紒', 'success', 2000);
           break;
 
         case 'shrink':
-          // 缩短卡 - 身体缩短3节
+          // 缂╃煭鍗?- 韬綋缂╃煭3鑺?
           if (snakeGameState.snake.length <= 2) {
-            showToast('蛇已经太短了，无法再缩短', 'warning');
+            showToast('铔囧凡缁忓お鐭簡锛屾棤娉曞啀缂╃煭', 'warning');
             return;
           }
           const shrinkCount = Math.min(3, snakeGameState.snake.length - 1);
           const removed = snakeGameState.snake.splice(snakeGameState.snake.length - shrinkCount, shrinkCount);
           removed.forEach(seg => snakeGameState.snakePositions.delete(`${seg.x},${seg.y}`));
-          showToast(`🔽 身体缩短${shrinkCount}节！`, 'success', 2000);
+          showToast(`馃斀 韬綋缂╃煭${shrinkCount}鑺傦紒`, 'success', 2000);
           break;
       }
 
-      // 消耗道具（本地）
+      // 娑堣€楅亾鍏凤紙鏈湴锛?
       snakeInventory[itemId]--;
       saveSnakeItems();
       updateSnakeItemBar();
 
-      // 同步到服务器（如果用户已登录）
+      // 鍚屾鍒版湇鍔″櫒锛堝鏋滅敤鎴峰凡鐧诲綍锛?
       consumeServerItem(itemId);
     }
 
-    // 消耗服务器端道具
+    // 娑堣€楁湇鍔″櫒绔亾鍏?
     async function consumeServerItem(itemId) {
       try {
         const userId = localStorage.getItem('gameUserId');
@@ -8828,15 +5481,15 @@
           body: JSON.stringify({ userId, itemId })
         });
       } catch (e) {
-        // 静默处理
-        console.log('同步消耗服务器道具失败');
+        // 闈欓粯澶勭悊
+        console.log('鍚屾娑堣€楁湇鍔″櫒閬撳叿澶辫触');
       }
     }
 
-    // 尝试使用复活卡（碰撞时调用）
+    // 灏濊瘯浣跨敤澶嶆椿鍗★紙纰版挒鏃惰皟鐢級
     function tryUseResurrection() {
       if (snakeGameState.resurrectionUsed) {
-        // 检查背包中是否有复活卡
+        // 妫€鏌ヨ儗鍖呬腑鏄惁鏈夊娲诲崱
         if (snakeInventory['item_snake_revive'] && snakeInventory['item_snake_revive'] > 0) {
           snakeInventory['item_snake_revive']--;
           saveSnakeItems();
@@ -8849,7 +5502,7 @@
       return false;
     }
 
-    // 清除道具效果（游戏结束时调用）
+    // 娓呴櫎閬撳叿鏁堟灉锛堟父鎴忕粨鏉熸椂璋冪敤锛?
     function clearSnakeItemEffects() {
       snakeGameState.resurrectionUsed = false;
       snakeGameState.scoreMultiplier = 1;
@@ -8857,34 +5510,34 @@
       snakeGameState.doubleScoreEndTime = 0;
     }
 
-    // 结束游戏
+    // 缁撴潫娓告垙
     function endSnakeGame() {
       if (snakeGameState.gameLoop) {
         cancelAnimationFrame(snakeGameState.gameLoop);
         snakeGameState.gameLoop = null;
       }
 
-      // 清除道具效果
+      // 娓呴櫎閬撳叿鏁堟灉
       clearSnakeItemEffects();
 
-      // 恢复触摸默认行为
+      // 鎭㈠瑙︽懜榛樿琛屼负
       const canvas = document.getElementById('snake-canvas');
       const virtualControls = document.querySelector('.virtual-controls');
       if (canvas) canvas.classList.remove('touch-disabled');
       if (virtualControls) virtualControls.classList.remove('touch-disabled');
 
-      const winMsg = `游戏结束！得分：${snakeGameState.score}`;
+      const winMsg = `娓告垙缁撴潫锛佸緱鍒嗭細${snakeGameState.score}`;
       showWinAlert(winMsg);
-      updateStatus(`🏆 ${winMsg}`);
+      updateStatus(`馃弳 ${winMsg}`);
 
-      console.log('🐍 贪吃蛇游戏结束', {
+      console.log('馃悕 璐悆铔囨父鎴忕粨鏉?, {
         score: snakeGameState.score,
         highScore: snakeGameState.highScore,
         snakeLength: snakeGameState.snake.length,
         finalSpeed: snakeGameState.speed
       });
 
-      // 发送分数到服务器
+      // 鍙戦€佸垎鏁板埌鏈嶅姟鍣?
       if (socket && socket.connected) {
         socket.emit('snake_game_end', {
           score: snakeGameState.score,
@@ -8894,7 +5547,7 @@
           maxLength: snakeGameState.maxLength,
           foodEaten: snakeGameState.foodEaten
         });
-        console.log('🐍 发送贪吃蛇游戏结果到服务器', {
+        console.log('馃悕 鍙戦€佽椽鍚冭泧娓告垙缁撴灉鍒版湇鍔″櫒', {
           score: snakeGameState.score,
           maxLength: snakeGameState.maxLength,
           foodEaten: snakeGameState.foodEaten,
@@ -8903,26 +5556,26 @@
       }
     }
 
-    // 重新开始
+    // 閲嶆柊寮€濮?
     function restartSnakeGame() {
-      // 停止游戏循环
+      // 鍋滄娓告垙寰幆
       if (snakeGameState.gameLoop) {
         cancelAnimationFrame(snakeGameState.gameLoop);
         snakeGameState.gameLoop = null;
       }
 
-      // 停止计时器（双人模式）
+      // 鍋滄璁℃椂鍣紙鍙屼汉妯″紡锛?
       if (snakeGameState.gameTimer) {
         clearInterval(snakeGameState.gameTimer);
         snakeGameState.gameTimer = null;
       }
 
-      console.log('🐍 贪吃蛇游戏重新开始', {
+      console.log('馃悕 璐悆铔囨父鎴忛噸鏂板紑濮?, {
         previousScore: snakeGameState.score,
         highScore: snakeGameState.highScore
       });
 
-      // 根据当前模式重新开始
+      // 鏍规嵁褰撳墠妯″紡閲嶆柊寮€濮?
       if (snakeGameState.isDualMode) {
         startSnakeDualGame();
       } else {
@@ -8930,53 +5583,53 @@
       }
     }
 
-    // 退出游戏
+    // 閫€鍑烘父鎴?
     function quitSnakeGame() {
-      showConfirmDialog('确定要退出当前游戏吗？', () => {
-        // 停止游戏循环
+      showConfirmDialog('纭畾瑕侀€€鍑哄綋鍓嶆父鎴忓悧锛?, () => {
+        // 鍋滄娓告垙寰幆
         if (snakeGameState.gameLoop) {
           cancelAnimationFrame(snakeGameState.gameLoop);
           snakeGameState.gameLoop = null;
         }
 
-        // 停止计时器（双人模式）
+        // 鍋滄璁℃椂鍣紙鍙屼汉妯″紡锛?
         if (snakeGameState.gameTimer) {
           clearInterval(snakeGameState.gameTimer);
           snakeGameState.gameTimer = null;
         }
 
-        // 如果是双人模式，通知服务器返回大厅
+        // 濡傛灉鏄弻浜烘ā寮忥紝閫氱煡鏈嶅姟鍣ㄨ繑鍥炲ぇ鍘?
         if (snakeGameState.isDualMode) {
           if (socket && socket.connected) {
             socket.emit('return_lobby');
           }
         }
 
-        // 重置为单人模式配置
+        // 閲嶇疆涓哄崟浜烘ā寮忛厤缃?
         resetSnakeCanvas();
 
-        // 恢复游戏界面
+        // 鎭㈠娓告垙鐣岄潰
         showSnakeGameInterface();
 
-        updateStatus('🚪 已退出游戏');
+        updateStatus('馃毆 宸查€€鍑烘父鎴?);
       });
     }
 
-    // ========== 渲染和更新函数 ==========
+    // ========== 娓叉煋鍜屾洿鏂板嚱鏁?==========
     function renderBoard() {
       if (currentGame === 'gobang') {
         renderGobangBoard();
       } else if (currentGame === 'go') {
         renderGoBoard();
       }
-      // 象棋棋盘不需要重新渲染，因为棋子是DOM元素
+      // 璞℃妫嬬洏涓嶉渶瑕侀噸鏂版覆鏌擄紝鍥犱负妫嬪瓙鏄疍OM鍏冪礌
     }
 
     function renderGobangBoard() {
       const config = gameConfigs.gobang;
       const cells = document.querySelectorAll(`.${config.cellClass}`);
 
-      // 移除所有 last-move 标记
+      // 绉婚櫎鎵€鏈?last-move 鏍囪
       document.querySelectorAll('.gobang-cell.last-move').forEach(cell => {
         cell.classList.remove('last-move');
       });
@@ -8992,7 +5645,7 @@
           cell.innerHTML = newContent;
         }
 
-        // 标记最新落子位置
+        // 鏍囪鏈€鏂拌惤瀛愪綅缃?
         if (gameState.lastMove && gameState.lastMove.r === r && gameState.lastMove.c === c) {
           cell.classList.add('last-move');
         }
@@ -9003,7 +5656,7 @@
       const config = gameConfigs.go;
       const cells = document.querySelectorAll(`.${config.cellClass}`);
 
-      // 移除所有 last-move 标记
+      // 绉婚櫎鎵€鏈?last-move 鏍囪
       document.querySelectorAll('.go-cell.last-move').forEach(cell => {
         cell.classList.remove('last-move');
       });
@@ -9024,7 +5677,7 @@
           cell.appendChild(piece);
         }
 
-        // 标记最新落子位置
+        // 鏍囪鏈€鏂拌惤瀛愪綅缃?
         if (gameState.lastMove && gameState.lastMove.r === r && gameState.lastMove.c === c) {
           cell.classList.add('last-move');
         }
@@ -9047,7 +5700,7 @@
 
       if (currentGame === 'chinese-chess') {
         const move = gameState.moveLog[gameState.moveLog.length - 1];
-        lastMoveEl.textContent = `${colorText} ${move.piece} (${move.fromR},${move.fromC})→(${r},${c})`;
+        lastMoveEl.textContent = `${colorText} ${move.piece} (${move.fromR},${move.fromC})鈫?${r},${c})`;
       } else {
         lastMoveEl.textContent = `${colorText} (${r},${c})`;
       }
@@ -9070,7 +5723,7 @@
 
     function updateMoveLog() {
       if (gameState.moveLog.length === 0) {
-        moveLogEl.innerHTML = '等待落子...';
+        moveLogEl.innerHTML = '绛夊緟钀藉瓙...';
         return;
       }
 
@@ -9079,13 +5732,13 @@
         gameState.moveLog.forEach((move, index) => {
           const config = gameConfigs[currentGame];
           const colorText = config.colorNames[move.color - 1];
-          const roleText = move.isOpponent ? '对方' : '自己';
+          const roleText = move.isOpponent ? '瀵规柟' : '鑷繁';
           const logClass = move.color === 1 ? (currentGame === 'chinese-chess' ? 'move-log-red' : 'move-log-black') : (currentGame === 'chinese-chess' ? 'move-log-green' : 'move-log-white');
 
           if (currentGame === 'chinese-chess') {
-            logHtml += `<div class="move-log-item ${logClass}">${index + 1}. ${roleText}(${colorText})${move.piece}：(${move.fromR},${move.fromC})→(${move.toR},${move.toC})</div>`;
+            logHtml += `<div class="move-log-item ${logClass}">${index + 1}. ${roleText}(${colorText})${move.piece}锛?${move.fromR},${move.fromC})鈫?${move.toR},${move.toC})</div>`;
           } else {
-            logHtml += `<div class="move-log-item ${logClass}">${index + 1}. ${roleText}(${colorText})：(${move.r},${move.c})</div>`;
+            logHtml += `<div class="move-log-item ${logClass}">${index + 1}. ${roleText}(${colorText})锛?${move.r},${move.c})</div>`;
           }
         });
         moveLogEl.innerHTML = logHtml;
@@ -9145,7 +5798,7 @@
 
       if (gameState.moveCount > 0 && diff > 0) {
         const frequency = (gameState.moveCount / diff).toFixed(2);
-        moveFrequencyEl.textContent = `${frequency} 步/秒`;
+        moveFrequencyEl.textContent = `${frequency} 姝?绉抈;
       }
     }
 
@@ -9154,7 +5807,7 @@
     }
 
     function updateStatus(text) {
-      statusEl.textContent = `状态：${text}`;
+      statusEl.textContent = `鐘舵€侊細${text}`;
     }
 
     function showWinAlert(text) {
@@ -9181,7 +5834,7 @@
         winner: winnerEl.textContent,
         maxChain: gameState.maxChain,
         myColor: gameState.me === 1 ? 'black' : 'white',
-        opponentId: matchedOpponentId ? matchedOpponentId.substring(0, 4) + '****' : '未知',
+        opponentId: matchedOpponentId ? matchedOpponentId.substring(0, 4) + '****' : '鏈煡',
         moveLog: gameState.moveLog.map((m, index) => {
           const log = {
             color: m.color === 1 ? 'black' : 'white',
@@ -9205,17 +5858,17 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `棋类对局数据_${currentGame}_${new Date().getTime()}.json`;
+      a.download = `妫嬬被瀵瑰眬鏁版嵁_${currentGame}_${new Date().getTime()}.json`;
       a.click();
       URL.revokeObjectURL(url);
 
-      updateStatus('✅ 对局数据已导出！');
+      updateStatus('鉁?瀵瑰眬鏁版嵁宸插鍑猴紒');
     }
 
-    // ========== 智能提示系统 ==========
+    // ========== 鏅鸿兘鎻愮ず绯荤粺 ==========
     function showGameTips() {
       const config = gameConfigs[currentGame];
-      tipPopupTitle.textContent = `${config.emoji} ${currentGame === 'gobang' ? '五子棋' : currentGame === 'go' ? '围棋' : '象棋'}规则`;
+      tipPopupTitle.textContent = `${config.emoji} ${currentGame === 'gobang' ? '浜斿瓙妫? : currentGame === 'go' ? '鍥存' : '璞℃'}瑙勫垯`;
       tipPopupContent.textContent = config.rules;
       tipPopup.classList.add('show');
 
@@ -9228,12 +5881,12 @@
       tipPopup.classList.remove('show');
     }
 
-    // ========== 聊天系统 ==========
+    // ========== 鑱婂ぉ绯荤粺 ==========
     function addChatMessage(nickname, message, isOther, scope = 'global') {
       const messageEl = document.createElement('div');
       messageEl.className = `chat-message ${isOther ? 'other' : 'self'}`;
 
-      const scopeLabel = scope === 'global' ? '大厅' : '局内';
+      const scopeLabel = scope === 'global' ? '澶у巺' : '灞€鍐?;
       const scopeClass = scope === 'global' ? 'global' : 'game';
 
       messageEl.innerHTML = `
@@ -9247,11 +5900,11 @@
       chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
-    // 切换聊天频道
+    // 鍒囨崲鑱婂ぉ棰戦亾
     function switchChatChannel(channel) {
       currentChatChannel = channel;
 
-      // 更新按钮状态
+      // 鏇存柊鎸夐挳鐘舵€?
       channelGlobalBtn.classList.remove('active');
       channelGameBtn.classList.remove('active');
 
@@ -9261,7 +5914,7 @@
         channelGameBtn.classList.add('active');
       }
 
-      // 清空并重新显示对应频道的消息
+      // 娓呯┖骞堕噸鏂版樉绀哄搴旈閬撶殑娑堟伅
       chatMessages.innerHTML = '';
       const history = channel === 'global' ? globalChatHistory : gameChatHistory;
       history.forEach(msg => {
@@ -9269,17 +5922,17 @@
       });
     }
 
-    // 更新局内频道按钮状态并自动切换
+    // 鏇存柊灞€鍐呴閬撴寜閽姸鎬佸苟鑷姩鍒囨崲
     function updateGameChannelButton() {
       const inGame = userStatus === 'playing' || userStatus === 'spectating';
       channelGameBtn.disabled = !inGame;
 
-      // 自动切换到对应频道
+      // 鑷姩鍒囨崲鍒板搴旈閬?
       if (inGame && currentChatChannel !== 'game') {
-        // 进入游戏时自动切换到局内频道
+        // 杩涘叆娓告垙鏃惰嚜鍔ㄥ垏鎹㈠埌灞€鍐呴閬?
         switchChatChannel('game');
       } else if (!inGame && currentChatChannel !== 'global') {
-        // 退出游戏时自动切换到大厅频道
+        // 閫€鍑烘父鎴忔椂鑷姩鍒囨崲鍒板ぇ鍘呴閬?
         switchChatChannel('global');
       }
     }
@@ -9307,7 +5960,7 @@
       }
     }
 
-    // ========== 匹配和游戏逻辑 ==========
+    // ========== 鍖归厤鍜屾父鎴忛€昏緫 ==========
     function initUserStatus() {
       onlineUsers.set(accountId, {
         status: 'online',
@@ -9325,7 +5978,7 @@
 
     function updateUserList() {
       if (onlineUsers.size === 0) {
-        userList.innerHTML = '暂无在线玩家';
+        userList.innerHTML = '鏆傛棤鍦ㄧ嚎鐜╁';
         return;
       }
 
@@ -9335,19 +5988,19 @@
         const statusClass = user.status === 'waiting' ? 'waiting' :
           user.status === 'playing' ? 'playing' : '';
         const gameClass = user.game || '';
-        const statusText = user.status === 'online' ? '在线' :
-          user.status === 'waiting' ? '等待中' :
-            user.status === 'playing' ? '游戏中' : '';
+        const statusText = user.status === 'online' ? '鍦ㄧ嚎' :
+          user.status === 'waiting' ? '绛夊緟涓? :
+            user.status === 'playing' ? '娓告垙涓? : '';
 
-        // 优先显示昵称，如果没有昵称则显示ID
-        const displayName = user.nickname || (isMe ? '我' : '玩家' + uid.substring(0, 4));
+        // 浼樺厛鏄剧ず鏄电О锛屽鏋滄病鏈夋樀绉板垯鏄剧ずID
+        const displayName = user.nickname || (isMe ? '鎴? : '鐜╁' + uid.substring(0, 4));
 
         html += `<div class="user-item ${statusClass} ${gameClass} ${isMe ? 'me' : ''}">
-          <span>${isMe ? '👤' : '👥'}</span>
-          <span>${displayName}${isMe ? ' (我)' : ''}</span>
-          <span style="color: #718096;">胜: ${user.stats?.wins || 0}</span>
+          <span>${isMe ? '馃懁' : '馃懃'}</span>
+          <span>${displayName}${isMe ? ' (鎴?' : ''}</span>
+          <span style="color: #718096;">鑳? ${user.stats?.wins || 0}</span>
           <span>${statusText}</span>
-          ${!isMe && user.status === 'online' ? `<button class="challenge-btn" onclick="sendChallenge('${uid}')">挑战</button>` : ''}
+          ${!isMe && user.status === 'online' ? `<button class="challenge-btn" onclick="sendChallenge('${uid}')">鎸戞垬</button>` : ''}
         </div>`;
       });
       userList.innerHTML = html;
@@ -9366,19 +6019,19 @@
 
     function sendChallenge(opponentId) {
       if (matchedOpponentId) {
-        updateStatus('❌ 正在游戏中，无法发起挑战');
+        updateStatus('鉂?姝ｅ湪娓告垙涓紝鏃犳硶鍙戣捣鎸戞垬');
         return;
       }
       if (isMatching) {
-        updateStatus('❌ 正在匹配中，无法发起挑战');
+        updateStatus('鉂?姝ｅ湪鍖归厤涓紝鏃犳硶鍙戣捣鎸戞垬');
         return;
       }
       if (opponentId === accountId) {
-        updateStatus('❌ 不能挑战自己');
+        updateStatus('鉂?涓嶈兘鎸戞垬鑷繁');
         return;
       }
 
-      updateStatus(`⏳ 正在向玩家 ${opponentId.substring(0, 4)}**** 发起挑战...`);
+      updateStatus(`鈴?姝ｅ湪鍚戠帺瀹?${opponentId.substring(0, 4)}**** 鍙戣捣鎸戞垬...`);
       socket.emit('challenge_request', {
         to: opponentId,
         game: currentGame
@@ -9406,8 +6059,8 @@
 
       matchBtn.disabled = true;
       cancelBtn.disabled = false;
-      matchBtn.innerHTML = '<div class="loading-spinner"></div>匹配中...';
-      lobbyStatus.textContent = `🔍 正在寻找${gameConfigs[currentGame].emoji} ${currentGame === 'gobang' ? '五子棋' : currentGame === 'go' ? '围棋' : '象棋'}对手...`;
+      matchBtn.innerHTML = '<div class="loading-spinner"></div>鍖归厤涓?..';
+      lobbyStatus.textContent = `馃攳 姝ｅ湪瀵绘壘${gameConfigs[currentGame].emoji} ${currentGame === 'gobang' ? '浜斿瓙妫? : currentGame === 'go' ? '鍥存' : '璞℃'}瀵规墜...`;
 
       socket.emit('match_request', { game: currentGame });
     }
@@ -9428,8 +6081,8 @@
 
       matchBtn.disabled = false;
       cancelBtn.disabled = true;
-      matchBtn.innerHTML = '🎯 开始匹配';
-      lobbyStatus.textContent = '欢迎来到多棋种联机大厅！选择棋种后点击"开始匹配"寻找对手';
+      matchBtn.innerHTML = '馃幆 寮€濮嬪尮閰?;
+      lobbyStatus.textContent = '娆㈣繋鏉ュ埌澶氭绉嶈仈鏈哄ぇ鍘咃紒閫夋嫨妫嬬鍚庣偣鍑?寮€濮嬪尮閰?瀵绘壘瀵规墜';
 
       socket.emit('cancel_match');
     }
@@ -9456,7 +6109,7 @@
       gameControls.style.display = 'flex';
       statusBox.style.display = 'block';
 
-      // 显示落子记录面板和在线玩家面板（带动画）
+      // 鏄剧ず钀藉瓙璁板綍闈㈡澘鍜屽湪绾跨帺瀹堕潰鏉匡紙甯﹀姩鐢伙級
       const moveLogPanelEl = document.getElementById('move-log-panel');
       moveLogPanelEl.style.opacity = '0';
       moveLogPanelEl.style.transform = 'translateY(20px)';
@@ -9467,7 +6120,7 @@
       onlineUsersPanelEl.style.transform = 'translateY(20px)';
       onlineUsersPanelEl.style.display = 'block';
 
-      // 添加动画效果
+      // 娣诲姞鍔ㄧ敾鏁堟灉
       setTimeout(() => {
         moveLogPanelEl.style.opacity = '1';
         moveLogPanelEl.style.transform = 'translateY(0)';
@@ -9500,11 +6153,11 @@
       gameState.selectedPiece = null;
       gameState.validMoves = [];
 
-      roleEl.textContent = '玩家';
+      roleEl.textContent = '鐜╁';
       const myColorText = config.colorNames[color - 1];
       myColorEl.textContent = myColorText;
       myColorEl.className = `info-value ${color === 1 ? (currentGame === 'chinese-chess' ? 'value-red' : 'value-black') : (currentGame === 'chinese-chess' ? 'value-green' : 'value-white')}`;
-      gameStatusEl.textContent = '游戏中';
+      gameStatusEl.textContent = '娓告垙涓?;
       gameStatusEl.className = 'info-value value-connected';
 
       if (gameState.gameTimer) clearInterval(gameState.gameTimer);
@@ -9512,9 +6165,9 @@
 
       updateTurnDisplay();
       updateGameDisplay();
-      updateStatus('🎮 匹配成功！你是 ' + myColorText + (color === 1 ? '，请先落子！' : '，等待对方落子！'));
+      updateStatus('馃幃 鍖归厤鎴愬姛锛佷綘鏄?' + myColorText + (color === 1 ? '锛岃鍏堣惤瀛愶紒' : '锛岀瓑寰呭鏂硅惤瀛愶紒'));
 
-      // 显示悔棋和提示按钮
+      // 鏄剧ず鎮旀鍜屾彁绀烘寜閽?
       showBoardGameActionButtons();
     }
 
@@ -9547,10 +6200,10 @@
         playAgainBtn.style.display = 'none';
       }
 
-      // 检查是否从AI对战返回
+      // 妫€鏌ユ槸鍚︿粠AI瀵规垬杩斿洖
       const isFromAI = gameState.difficulty !== null;
 
-      // 隐藏所有页面
+      // 闅愯棌鎵€鏈夐〉闈?
       lobbyContainer.style.display = isFromAI ? 'none' : 'flex';
       infoContainer.style.display = 'none';
       gameControls.style.display = 'none';
@@ -9560,26 +6213,26 @@
       document.getElementById('achievements-container').style.display = 'none';
       document.getElementById('ai-game-container').style.display = isFromAI ? 'block' : 'none';
 
-      // 显示在线玩家面板（带动画）
+      // 鏄剧ず鍦ㄧ嚎鐜╁闈㈡澘锛堝甫鍔ㄧ敾锛?
       if (!isFromAI) {
         const onlineUsersPanelEl = document.getElementById('online-users-panel');
         onlineUsersPanelEl.style.opacity = '0';
         onlineUsersPanelEl.style.transform = 'translateY(20px)';
         onlineUsersPanelEl.style.display = 'block';
 
-        // 添加动画效果
+        // 娣诲姞鍔ㄧ敾鏁堟灉
         setTimeout(() => {
           onlineUsersPanelEl.style.opacity = '1';
           onlineUsersPanelEl.style.transform = 'translateY(0)';
         }, 10);
       }
 
-      // 隐藏所有棋盘
+      // 闅愯棌鎵€鏈夋鐩?
       document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
         board.style.display = 'none';
       });
 
-      // 如果不是从AI对战返回，显示当前选中的棋种棋盘（空棋盘）
+      // 濡傛灉涓嶆槸浠嶢I瀵规垬杩斿洖锛屾樉绀哄綋鍓嶉€変腑鐨勬绉嶆鐩橈紙绌烘鐩橈級
       if (!isFromAI) {
         if (currentGame === 'gobang') {
           gobangBoard.style.display = 'grid';
@@ -9593,24 +6246,24 @@
       isMatching = false;
       matchedOpponentId = null;
 
-      // 先发送返回大厅请求
+      // 鍏堝彂閫佽繑鍥炲ぇ鍘呰姹?
       socket.emit('return_lobby');
 
-      // 再更新用户状态
+      // 鍐嶆洿鏂扮敤鎴风姸鎬?
       userStatus = 'online';
 
-      // 清除AI对战标记
+      // 娓呴櫎AI瀵规垬鏍囪
       gameState.difficulty = null;
 
       matchBtn.disabled = false;
       cancelBtn.disabled = true;
-      matchBtn.innerHTML = '🎯 开始匹配';
-      lobbyStatus.textContent = '欢迎来到多棋种联机大厅！选择棋种后点击"开始匹配"寻找对手';
+      matchBtn.innerHTML = '馃幆 寮€濮嬪尮閰?;
+      lobbyStatus.textContent = '娆㈣繋鏉ュ埌澶氭绉嶈仈鏈哄ぇ鍘咃紒閫夋嫨妫嬬鍚庣偣鍑?寮€濮嬪尮閰?瀵绘壘瀵规墜';
 
       if (gameState.gameTimer) clearInterval(gameState.gameTimer);
 
       resetGame(false);
-      // 确保游戏状态保持为结束状态
+      // 纭繚娓告垙鐘舵€佷繚鎸佷负缁撴潫鐘舵€?
       gameState.gameOver = true;
 
       socket.emit('user_status', {
@@ -9628,10 +6281,10 @@
     }
 
     function showAchievements() {
-      // 更新导航按钮状态
+      // 鏇存柊瀵艰埅鎸夐挳鐘舵€?
       updateNavActiveState('achievements');
 
-      // 隐藏其他页面
+      // 闅愯棌鍏朵粬椤甸潰
       lobbyContainer.style.display = 'none';
       infoContainer.style.display = 'none';
       gameControls.style.display = 'none';
@@ -9642,32 +6295,32 @@
       document.getElementById('theme-container').style.display = 'none';
       document.getElementById('snake-game-container').style.display = 'none';
 
-      // 隐藏所有棋盘
+      // 闅愯棌鎵€鏈夋鐩?
       document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
         board.style.display = 'none';
       });
 
-      // 显示成就页面
+      // 鏄剧ず鎴愬氨椤甸潰
       const achievementsContainer = document.getElementById('achievements-container');
       achievementsContainer.style.opacity = '0';
       achievementsContainer.style.transform = 'translateY(20px)';
       achievementsContainer.style.display = 'block';
 
-      // 添加动画效果
+      // 娣诲姞鍔ㄧ敾鏁堟灉
       setTimeout(() => {
         achievementsContainer.style.opacity = '1';
         achievementsContainer.style.transform = 'translateY(0)';
       }, 10);
 
-      // 加载成就
+      // 鍔犺浇鎴愬氨
       loadAchievements();
     }
 
     function showAIGame() {
-      // 更新导航按钮状态
+      // 鏇存柊瀵艰埅鎸夐挳鐘舵€?
       updateNavActiveState('ai');
 
-      // 隐藏其他页面
+      // 闅愯棌鍏朵粬椤甸潰
       lobbyContainer.style.display = 'none';
       infoContainer.style.display = 'none';
       gameControls.style.display = 'none';
@@ -9678,30 +6331,30 @@
       document.getElementById('theme-container').style.display = 'none';
       document.getElementById('snake-game-container').style.display = 'none';
 
-      // 隐藏所有棋盘
+      // 闅愯棌鎵€鏈夋鐩?
       document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
         board.style.display = 'none';
       });
 
-      // 显示AI对战页面
+      // 鏄剧ずAI瀵规垬椤甸潰
       const aiGameContainer = document.getElementById('ai-game-container');
       aiGameContainer.style.opacity = '0';
       aiGameContainer.style.transform = 'translateY(20px)';
       aiGameContainer.style.display = 'block';
 
-      // 添加动画效果
+      // 娣诲姞鍔ㄧ敾鏁堟灉
       setTimeout(() => {
         aiGameContainer.style.opacity = '1';
         aiGameContainer.style.transform = 'translateY(0)';
       }, 10);
     }
 
-    // 显示排行榜页面
+    // 鏄剧ず鎺掕姒滈〉闈?
     function showLeaderboard() {
-      // 更新导航按钮状态
+      // 鏇存柊瀵艰埅鎸夐挳鐘舵€?
       updateNavActiveState('leaderboard');
 
-      // 隐藏其他页面
+      // 闅愯棌鍏朵粬椤甸潰
       lobbyContainer.style.display = 'none';
       infoContainer.style.display = 'none';
       gameControls.style.display = 'none';
@@ -9712,36 +6365,36 @@
       document.getElementById('theme-container').style.display = 'none';
       document.getElementById('snake-game-container').style.display = 'none';
 
-      // 隐藏所有棋盘
+      // 闅愯棌鎵€鏈夋鐩?
       document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
         board.style.display = 'none';
       });
 
-      // 显示排行榜页面
+      // 鏄剧ず鎺掕姒滈〉闈?
       const leaderboardPage = document.getElementById('leaderboard-page');
       leaderboardPage.style.opacity = '0';
       leaderboardPage.style.transform = 'translateY(20px)';
       leaderboardPage.style.display = 'block';
 
-      // 添加动画效果
+      // 娣诲姞鍔ㄧ敾鏁堟灉
       setTimeout(() => {
         leaderboardPage.style.opacity = '1';
         leaderboardPage.style.transform = 'translateY(0)';
       }, 10);
 
-      // 加载排行榜数据
+      // 鍔犺浇鎺掕姒滄暟鎹?
       loadLeaderboard('all');
     }
 
-    // 加载排行榜数据
+    // 鍔犺浇鎺掕姒滄暟鎹?
     function loadLeaderboard(gameType) {
-      // 更新按钮选中状态
+      // 鏇存柊鎸夐挳閫変腑鐘舵€?
       document.querySelectorAll('.leaderboard-controls .lobby-btn').forEach(btn => {
         btn.style.backgroundColor = '';
         btn.style.fontWeight = 'normal';
       });
 
-      // 为当前选中的按钮添加样式
+      // 涓哄綋鍓嶉€変腑鐨勬寜閽坊鍔犳牱寮?
       if (gameType === 'all') {
         document.querySelector('button[onclick="loadLeaderboard(\'all\')"]').style.backgroundColor = '#3498db';
         document.querySelector('button[onclick="loadLeaderboard(\'all\')"]').style.fontWeight = 'bold';
@@ -9759,60 +6412,60 @@
         document.querySelector('button[onclick="loadLeaderboard(\'snake\')"]').style.fontWeight = 'bold';
       }
 
-      // 保存当前选中的游戏类型，供 updateLeaderboard 使用
+      // 淇濆瓨褰撳墠閫変腑鐨勬父鎴忕被鍨嬶紝渚?updateLeaderboard 浣跨敤
       currentLeaderboardGameType = gameType;
 
       const leaderboardList = document.getElementById('leaderboard-list');
-      leaderboardList.innerHTML = '加载中...';
+      leaderboardList.innerHTML = '鍔犺浇涓?..';
 
-      // 从服务器获取排行榜数据（由 socket.on('leaderboard') 统一处理响应）
+      // 浠庢湇鍔″櫒鑾峰彇鎺掕姒滄暟鎹紙鐢?socket.on('leaderboard') 缁熶竴澶勭悊鍝嶅簲锛?
       socket.emit('get_leaderboard', { limit: 10, gameType: gameType });
     }
 
-    // 选择游戏类型
+    // 閫夋嫨娓告垙绫诲瀷
     function selectGameType(gameType) {
-      // 移除所有卡片的选中状态
+      // 绉婚櫎鎵€鏈夊崱鐗囩殑閫変腑鐘舵€?
       document.querySelectorAll('.game-type-card').forEach(card => {
         card.classList.remove('selected');
       });
 
-      // 为当前选中的卡片添加选中状态
+      // 涓哄綋鍓嶉€変腑鐨勫崱鐗囨坊鍔犻€変腑鐘舵€?
       document.querySelector(`[data-game-type="${gameType}"]`).classList.add('selected');
 
-      // 更新隐藏输入框的值
+      // 鏇存柊闅愯棌杈撳叆妗嗙殑鍊?
       document.getElementById('ai-game-type').value = gameType;
     }
 
     function loadAchievements() {
-      // 处理不同的数据结构
+      // 澶勭悊涓嶅悓鐨勬暟鎹粨鏋?
       const accountData = currentAccount?.account?.account || currentAccount?.account;
       if (!currentAccount || !accountData?.id) {
         const achievementsList = document.getElementById('achievements-list');
-        achievementsList.innerHTML = '<div style="text-align: center; padding: 20px; color: #718096;">请先登录查看成就</div>';
+        achievementsList.innerHTML = '<div style="text-align: center; padding: 20px; color: #718096;">璇峰厛鐧诲綍鏌ョ湅鎴愬氨</div>';
         return;
       }
 
-      // 从服务器获取成就列表
+      // 浠庢湇鍔″櫒鑾峰彇鎴愬氨鍒楄〃
       socket.emit('get_achievements');
     }
 
     function startAIGame(difficulty) {
-      // 获取用户选择的游戏类型
+      // 鑾峰彇鐢ㄦ埛閫夋嫨鐨勬父鎴忕被鍨?
       const gameTypeSelect = document.getElementById('ai-game-type');
       const selectedGameType = gameTypeSelect ? gameTypeSelect.value : currentGame;
 
-      // 更新当前游戏类型
+      // 鏇存柊褰撳墠娓告垙绫诲瀷
       currentGame = selectedGameType;
 
-      // 隐藏AI对战页面
+      // 闅愯棌AI瀵规垬椤甸潰
       document.getElementById('ai-game-container').style.display = 'none';
 
-      // 显示游戏相关元素
+      // 鏄剧ず娓告垙鐩稿叧鍏冪礌
       infoContainer.style.display = 'flex';
       gameControls.style.display = 'flex';
       statusBox.style.display = 'block';
 
-      // 显示落子记录面板和在线玩家面板（带动画）
+      // 鏄剧ず钀藉瓙璁板綍闈㈡澘鍜屽湪绾跨帺瀹堕潰鏉匡紙甯﹀姩鐢伙級
       const moveLogPanelEl = document.getElementById('move-log-panel');
       moveLogPanelEl.style.opacity = '0';
       moveLogPanelEl.style.transform = 'translateY(20px)';
@@ -9823,7 +6476,7 @@
       onlineUsersPanelEl.style.transform = 'translateY(20px)';
       onlineUsersPanelEl.style.display = 'block';
 
-      // 添加动画效果
+      // 娣诲姞鍔ㄧ敾鏁堟灉
       setTimeout(() => {
         moveLogPanelEl.style.opacity = '1';
         moveLogPanelEl.style.transform = 'translateY(0)';
@@ -9831,12 +6484,12 @@
         onlineUsersPanelEl.style.transform = 'translateY(0)';
       }, 10);
 
-      // 隐藏所有棋盘
+      // 闅愯棌鎵€鏈夋鐩?
       document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
         board.style.display = 'none';
       });
 
-      // 显示选择的棋种的棋盘
+      // 鏄剧ず閫夋嫨鐨勬绉嶇殑妫嬬洏
       if (currentGame === 'gobang') {
         gobangBoard.style.display = 'grid';
       } else if (currentGame === 'go') {
@@ -9845,7 +6498,7 @@
         chessBoard.style.display = 'block';
       }
 
-      // 设置游戏状态
+      // 璁剧疆娓告垙鐘舵€?
       gameState = {
         gameType: currentGame,
         player: 1,
@@ -9865,26 +6518,26 @@
       };
       currentPlayer = 1;
 
-      // 初始化棋盘
+      // 鍒濆鍖栨鐩?
       initGameBoard();
 
-      // 更新显示
-      roleEl.textContent = '玩家';
+      // 鏇存柊鏄剧ず
+      roleEl.textContent = '鐜╁';
       const config = gameConfigs[currentGame];
       const myColorText = config.colorNames[0];
       myColorEl.textContent = myColorText;
       myColorEl.className = `info-value ${currentGame === 'chinese-chess' ? 'value-red' : 'value-black'}`;
-      gameStatusEl.textContent = '游戏中';
+      gameStatusEl.textContent = '娓告垙涓?;
       gameStatusEl.className = 'info-value value-connected';
 
-      // 启动游戏计时器
+      // 鍚姩娓告垙璁℃椂鍣?
       if (gameState.gameTimer) clearInterval(gameState.gameTimer);
       gameState.gameTimer = setInterval(updateGameTime, 1000);
 
-      // 更新状态
-      document.getElementById('status').innerHTML = `状态：🎮 正在与${difficulty === 'easy' ? '简单' : difficulty === 'medium' ? '中等' : '困难'}AI对战`;
+      // 鏇存柊鐘舵€?
+      document.getElementById('status').innerHTML = `鐘舵€侊細馃幃 姝ｅ湪涓?{difficulty === 'easy' ? '绠€鍗? : difficulty === 'medium' ? '涓瓑' : '鍥伴毦'}AI瀵规垬`;
 
-      // 通知服务器开始AI对战
+      // 閫氱煡鏈嶅姟鍣ㄥ紑濮婣I瀵规垬
       if (socket) {
         socket.emit('ai_game_start', {
           gameType: currentGame,
@@ -9892,11 +6545,11 @@
         });
       }
 
-      // 显示悔棋和提示按钮
+      // 鏄剧ず鎮旀鍜屾彁绀烘寜閽?
       showBoardGameActionButtons();
     }
 
-    // 发送 AI 游戏结果到服务器
+    // 鍙戦€?AI 娓告垙缁撴灉鍒版湇鍔″櫒
     function sendAIGameResult(result) {
       if (!socket || !gameState.difficulty) return;
 
@@ -9910,23 +6563,23 @@
       });
     }
 
-    // AI对战核心逻辑 - 现在由服务器处理
+    // AI瀵规垬鏍稿績閫昏緫 - 鐜板湪鐢辨湇鍔″櫒澶勭悊
     function handleAIMove() {
-      // 这个函数现在由服务器端处理AI移动
-      // 前端只需要在玩家移动后通知服务器
+      // 杩欎釜鍑芥暟鐜板湪鐢辨湇鍔″櫒绔鐞咥I绉诲姩
+      // 鍓嶇鍙渶瑕佸湪鐜╁绉诲姩鍚庨€氱煡鏈嶅姟鍣?
     }
 
-    // 处理AI移动结果（从服务器接收）
+    // 澶勭悊AI绉诲姩缁撴灉锛堜粠鏈嶅姟鍣ㄦ帴鏀讹級
     function handleAIMoveResult(data) {
       if (!gameState.difficulty || gameState.gameOver) return;
 
       const { position, color, currentPlayer, board } = data;
 
-      // 象棋直接同步后端给的整个board
+      // 璞℃鐩存帴鍚屾鍚庣缁欑殑鏁翠釜board
       if (currentGame === 'chinese-chess' && board) {
         const isOwnEcho = color === gameState.me;
 
-        // 统一从服务端棋盘数据重建 chessPieces 和 DOM，确保完全同步
+        // 缁熶竴浠庢湇鍔＄妫嬬洏鏁版嵁閲嶅缓 chessPieces 鍜?DOM锛岀‘淇濆畬鍏ㄥ悓姝?
         const newPieces = convertBackendBoardToFrontend(board);
         chessPieces.red = newPieces.red;
         chessPieces.black = newPieces.black;
@@ -9934,7 +6587,7 @@
         renderChessPieces();
 
         if (isOwnEcho) {
-          // 自己的移动回显 - 只需切换回合
+          // 鑷繁鐨勭Щ鍔ㄥ洖鏄?- 鍙渶鍒囨崲鍥炲悎
           gameState.turn = currentPlayer;
           clearChessSelection();
           requestAnimationFrame(() => {
@@ -9943,10 +6596,10 @@
           return;
         }
 
-        // AI 的移动 - 记录日志
-        console.log('AI 移动:', position);
+        // AI 鐨勭Щ鍔?- 璁板綍鏃ュ織
+        console.log('AI 绉诲姩:', position);
 
-        // 获取棋子名称用于记录
+        // 鑾峰彇妫嬪瓙鍚嶇О鐢ㄤ簬璁板綍
         const pieceCell = board[position.toR][position.toC];
         const pieceType = pieceCell ? pieceCell.substring(2) : '';
         const pieceName = chessPieceMap[pieceType] || '';
@@ -9974,34 +6627,34 @@
           updateAdvancedStats();
         });
 
-        updateStatus(`🤖 AI已移动到 (${position.toR},${position.toC})，你的回合`);
+        updateStatus(`馃 AI宸茬Щ鍔ㄥ埌 (${position.toR},${position.toC})锛屼綘鐨勫洖鍚坄);
 
         const winResult = checkChessWin();
         if (winResult) {
           gameState.gameOver = true;
           const isPlayerWin = winResult.winner === gameState.me;
-          const winMsg = isPlayerWin ? '你获胜了！' : '你输了！';
-          const winColor = winResult.winner === 1 ? '红方' : '黑方';
+          const winMsg = isPlayerWin ? '浣犺幏鑳滀簡锛? : '浣犺緭浜嗭紒';
+          const winColor = winResult.winner === 1 ? '绾㈡柟' : '榛戞柟';
           winnerEl.textContent = winColor;
           winnerEl.className = `info-value ${winResult.winner === 1 ? 'value-red' : 'value-green'}`;
-          gameStatusEl.textContent = `游戏结束 - ${winResult.reason}`;
+          gameStatusEl.textContent = `娓告垙缁撴潫 - ${winResult.reason}`;
           gameStatusEl.className = 'info-value value-waiting';
           showWinAlert(winMsg);
-          updateStatus(`🏆 ${winMsg} 游戏结束 - ${winResult.reason}`);
+          updateStatus(`馃弳 ${winMsg} 娓告垙缁撴潫 - ${winResult.reason}`);
           updateAdvancedStats();
         }
       } else {
-        // 检查位置是否已经有棋子（防止重复记录用户的落子）
+        // 妫€鏌ヤ綅缃槸鍚﹀凡缁忔湁妫嬪瓙锛堥槻姝㈤噸澶嶈褰曠敤鎴风殑钀藉瓙锛?
         if (currentGame === 'gobang' || currentGame === 'go') {
           if (gameState.board[position.r][position.c] !== 0) {
-            console.log('位置已有棋子，跳过AI移动结果:', data);
-            // 只更新回合，不记录落子
+            console.log('浣嶇疆宸叉湁妫嬪瓙锛岃烦杩嘇I绉诲姩缁撴灉:', data);
+            // 鍙洿鏂板洖鍚堬紝涓嶈褰曡惤瀛?
             gameState.turn = currentPlayer;
             return;
           }
         }
 
-        // 执行AI移动（使用color作为当前移动的颜色）
+        // 鎵цAI绉诲姩锛堜娇鐢╟olor浣滀负褰撳墠绉诲姩鐨勯鑹诧級
         if (currentGame === 'gobang') {
           handleGobangAIMove(position.r, position.c, color);
         } else if (currentGame === 'go') {
@@ -10009,11 +6662,11 @@
         }
       }
 
-      // 更新游戏状态为下一回合
+      // 鏇存柊娓告垙鐘舵€佷负涓嬩竴鍥炲悎
       gameState.turn = currentPlayer;
     }
 
-    // 生成随机落子（简单难度）
+    // 鐢熸垚闅忔満钀藉瓙锛堢畝鍗曢毦搴︼級
     function generateRandomMove() {
       const config = gameConfigs[currentGame];
       const emptyCells = [];
@@ -10027,7 +6680,7 @@
           }
         }
       } else if (currentGame === 'chinese-chess') {
-        // 象棋随机移动
+        // 璞℃闅忔満绉诲姩
         const pieces = document.querySelectorAll('.chess-piece');
         pieces.forEach(piece => {
           if (piece.dataset.color === (gameState.turn === 1 ? 'red' : 'black')) {
@@ -10048,7 +6701,7 @@
       return null;
     }
 
-    // 生成中等难度落子
+    // 鐢熸垚涓瓑闅惧害钀藉瓙
     function generateMediumMove() {
       if (currentGame === 'gobang') {
         return generateGobangMediumMove();
@@ -10060,7 +6713,7 @@
       return generateRandomMove();
     }
 
-    // 生成困难难度落子
+    // 鐢熸垚鍥伴毦闅惧害钀藉瓙
     function generateHardMove() {
       if (currentGame === 'gobang') {
         return generateGobangHardMove();
@@ -10072,70 +6725,70 @@
       return generateRandomMove();
     }
 
-    // ========== 五子棋AI算法 ==========
+    // ========== 浜斿瓙妫婣I绠楁硶 ==========
 
-    // 五子棋中等难度：基于规则的AI
+    // 浜斿瓙妫嬩腑绛夐毦搴︼細鍩轰簬瑙勫垯鐨凙I
     function generateGobangMediumMove() {
       const aiPlayer = gameState.turn;
       const humanPlayer = 3 - aiPlayer;
 
-      // 1. 检查是否可以赢
+      // 1. 妫€鏌ユ槸鍚﹀彲浠ヨ耽
       const winningMove = findGobangWinningMove(aiPlayer);
       if (winningMove) return winningMove;
 
-      // 2. 检查是否需要防守（对手即将获胜）
+      // 2. 妫€鏌ユ槸鍚﹂渶瑕侀槻瀹堬紙瀵规墜鍗冲皢鑾疯儨锛?
       const defensiveMove = findGobangWinningMove(humanPlayer);
       if (defensiveMove) return defensiveMove;
 
-      // 3. 检查是否可以形成活四
+      // 3. 妫€鏌ユ槸鍚﹀彲浠ュ舰鎴愭椿鍥?
       const liveFourMove = findGobangPattern(aiPlayer, 'liveFour');
       if (liveFourMove) return liveFourMove;
 
-      // 4. 防守对手的活四
+      // 4. 闃插畧瀵规墜鐨勬椿鍥?
       const blockLiveFour = findGobangPattern(humanPlayer, 'liveFour');
       if (blockLiveFour) return blockLiveFour;
 
-      // 5. 检查是否可以形成活三
+      // 5. 妫€鏌ユ槸鍚﹀彲浠ュ舰鎴愭椿涓?
       const liveThreeMove = findGobangPattern(aiPlayer, 'liveThree');
       if (liveThreeMove) return liveThreeMove;
 
-      // 6. 防守对手的活三
+      // 6. 闃插畧瀵规墜鐨勬椿涓?
       const blockLiveThree = findGobangPattern(humanPlayer, 'liveThree');
       if (blockLiveThree) return blockLiveThree;
 
-      // 7. 检查是否可以形成眠三
+      // 7. 妫€鏌ユ槸鍚﹀彲浠ュ舰鎴愮湢涓?
       const sleepThreeMove = findGobangPattern(aiPlayer, 'sleepThree');
       if (sleepThreeMove) return sleepThreeMove;
 
-      // 8. 检查是否可以形成活二
+      // 8. 妫€鏌ユ槸鍚﹀彲浠ュ舰鎴愭椿浜?
       const liveTwoMove = findGobangPattern(aiPlayer, 'liveTwo');
       if (liveTwoMove) return liveTwoMove;
 
-      // 9. 在中心附近落子
+      // 9. 鍦ㄤ腑蹇冮檮杩戣惤瀛?
       const centerMove = findGobangCenterMove();
       if (centerMove) return centerMove;
 
-      // 10. 随机落子
+      // 10. 闅忔満钀藉瓙
       return generateRandomMove();
     }
 
-    // 五子棋困难难度：使用Minimax算法
+    // 浜斿瓙妫嬪洶闅鹃毦搴︼細浣跨敤Minimax绠楁硶
     function generateGobangHardMove() {
       const aiPlayer = gameState.turn;
 
-      // 首先检查必胜和必防
+      // 棣栧厛妫€鏌ュ繀鑳滃拰蹇呴槻
       const winningMove = findGobangWinningMove(aiPlayer);
       if (winningMove) return winningMove;
 
       const defensiveMove = findGobangWinningMove(3 - aiPlayer);
       if (defensiveMove) return defensiveMove;
 
-      // 使用Minimax算法
+      // 浣跨敤Minimax绠楁硶
       const bestMove = gobangMinimax(3, aiPlayer, -Infinity, Infinity, true);
       return bestMove.move || generateRandomMove();
     }
 
-    // Minimax算法
+    // Minimax绠楁硶
     function gobangMinimax(depth, player, alpha, beta, isMaximizing) {
       if (depth === 0) {
         return { score: evaluateGobangBoard(player) };
@@ -10146,7 +6799,7 @@
         return { score: 0 };
       }
 
-      // 只考虑有棋子附近的空位
+      // 鍙€冭檻鏈夋瀛愰檮杩戠殑绌轰綅
       const candidateCells = getCandidateCells(emptyCells);
 
       if (isMaximizing) {
@@ -10203,12 +6856,12 @@
       }
     }
 
-    // 评估棋盘分数
+    // 璇勪及妫嬬洏鍒嗘暟
     function evaluateGobangBoard(player) {
       let score = 0;
       const opponent = 3 - player;
 
-      // 评估所有方向
+      // 璇勪及鎵€鏈夋柟鍚?
       for (let r = 0; r < 15; r++) {
         for (let c = 0; c < 15; c++) {
           if (gameState.board[r][c] === player) {
@@ -10222,7 +6875,7 @@
       return score;
     }
 
-    // 评估位置分数
+    // 璇勪及浣嶇疆鍒嗘暟
     function evaluateGobangPosition(r, c, player) {
       let score = 0;
       const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
@@ -10232,14 +6885,14 @@
         score += evaluateGobangLine(line, player);
       }
 
-      // 中心位置加分
+      // 涓績浣嶇疆鍔犲垎
       const centerDistance = Math.abs(r - 7) + Math.abs(c - 7);
       score += Math.max(0, 7 - centerDistance);
 
       return score;
     }
 
-    // 获取一条线
+    // 鑾峰彇涓€鏉＄嚎
     function getGobangLine(r, c, dr, dc, player) {
       const line = [];
 
@@ -10255,7 +6908,7 @@
       return line;
     }
 
-    // 评估一条线的分数
+    // 璇勪及涓€鏉＄嚎鐨勫垎鏁?
     function evaluateGobangLine(line, player) {
       const opponent = 3 - player;
       let score = 0;
@@ -10288,7 +6941,7 @@
       return score;
     }
 
-    // 获取空位
+    // 鑾峰彇绌轰綅
     function getGobangEmptyCells() {
       const cells = [];
       for (let r = 0; r < 15; r++) {
@@ -10301,7 +6954,7 @@
       return cells;
     }
 
-    // 获取候选位置（有棋子附近的空位）
+    // 鑾峰彇鍊欓€変綅缃紙鏈夋瀛愰檮杩戠殑绌轰綅锛?
     function getCandidateCells(emptyCells) {
       const candidates = [];
       const checked = new Set();
@@ -10309,7 +6962,7 @@
       for (let r = 0; r < 15; r++) {
         for (let c = 0; c < 15; c++) {
           if (gameState.board[r][c] !== 0) {
-            // 检查周围的空位
+            // 妫€鏌ュ懆鍥寸殑绌轰綅
             for (let dr = -2; dr <= 2; dr++) {
               for (let dc = -2; dc <= 2; dc++) {
                 const nr = r + dr;
@@ -10330,7 +6983,7 @@
       return candidates.length > 0 ? candidates : emptyCells.slice(0, 20);
     }
 
-    // 查找获胜位置
+    // 鏌ユ壘鑾疯儨浣嶇疆
     function findGobangWinningMove(player) {
       for (let r = 0; r < 15; r++) {
         for (let c = 0; c < 15; c++) {
@@ -10347,7 +7000,7 @@
       return null;
     }
 
-    // 查找特定棋型
+    // 鏌ユ壘鐗瑰畾妫嬪瀷
     function findGobangPattern(player, pattern) {
       const patterns = {
         liveFour: [[0, player, player, player, player, 0]],
@@ -10373,7 +7026,7 @@
       return null;
     }
 
-    // 匹配棋型
+    // 鍖归厤妫嬪瀷
     function matchGobangPattern(startR, startC, dr, dc, pattern, player) {
       const opponent = 3 - player;
 
@@ -10416,7 +7069,7 @@
       return null;
     }
 
-    // 在中心附近找落子位置
+    // 鍦ㄤ腑蹇冮檮杩戞壘钀藉瓙浣嶇疆
     function findGobangCenterMove() {
       const centerR = 7;
       const centerC = 7;
@@ -10437,10 +7090,10 @@
       return null;
     }
 
-    // ========== 围棋AI算法 ==========
+    // ========== 鍥存AI绠楁硶 ==========
 
     function generateGoMediumMove() {
-      // 围棋中等难度：优先占据角和边
+      // 鍥存涓瓑闅惧害锛氫紭鍏堝崰鎹鍜岃竟
       const corners = [[3, 3], [3, 15], [15, 3], [15, 15]];
       const edges = [];
 
@@ -10448,14 +7101,14 @@
         edges.push([3, i], [15, i], [i, 3], [i, 15]);
       }
 
-      // 优先角落
+      // 浼樺厛瑙掕惤
       for (const [r, c] of corners) {
         if (gameState.board[r] && gameState.board[r][c] === 0) {
           return { r, c };
         }
       }
 
-      // 其次边
+      // 鍏舵杈?
       for (const [r, c] of edges) {
         if (gameState.board[r] && gameState.board[r][c] === 0) {
           return { r, c };
@@ -10466,8 +7119,8 @@
     }
 
     function generateGoHardMove() {
-      // 围棋困难难度：考虑更多策略
-      // 简化实现：优先占据有利位置
+      // 鍥存鍥伴毦闅惧害锛氳€冭檻鏇村绛栫暐
+      // 绠€鍖栧疄鐜帮細浼樺厛鍗犳嵁鏈夊埄浣嶇疆
       const priorityPositions = [
         [3, 3], [3, 9], [3, 15], [9, 3], [9, 9], [9, 15], [15, 3], [15, 9], [15, 15],
         [3, 6], [3, 12], [6, 3], [6, 9], [6, 15], [9, 6], [9, 12], [12, 3], [12, 9], [12, 15], [15, 6], [15, 12]
@@ -10482,7 +7135,7 @@
       return generateRandomMove();
     }
 
-    // ========== 象棋AI算法 ==========
+    // ========== 璞℃AI绠楁硶 ==========
 
     function generateChessMediumMove() {
       const pieces = document.querySelectorAll('.chess-piece');
@@ -10504,43 +7157,43 @@
 
       if (moves.length === 0) return null;
 
-      // 选择得分最高的移动
+      // 閫夋嫨寰楀垎鏈€楂樼殑绉诲姩
       moves.sort((a, b) => b.score - a.score);
       return moves[0];
     }
 
     function generateChessHardMove() {
-      // 象棋困难难度：更深入的评估
+      // 璞℃鍥伴毦闅惧害锛氭洿娣卞叆鐨勮瘎浼?
       return generateChessMediumMove();
     }
 
-    // 评估象棋移动分数
+    // 璇勪及璞℃绉诲姩鍒嗘暟
     function evaluateChessMove(fromR, fromC, toR, toC, pieceName) {
       let score = 0;
 
-      // 检查是否可以吃子
+      // 妫€鏌ユ槸鍚﹀彲浠ュ悆瀛?
       const targetPiece = getChessPieceAt(toR, toC);
       if (targetPiece) {
         const pieceValues = {
-          '将': 10000, '帅': 10000,
-          '车': 900, '馬': 400, '象': 200, '士': 200, '炮': 450, '兵': 100, '卒': 100
+          '灏?: 10000, '甯?: 10000,
+          '杞?: 900, '棣?: 400, '璞?: 200, '澹?: 200, '鐐?: 450, '鍏?: 100, '鍗?: 100
         };
         score += pieceValues[targetPiece.dataset.name] || 100;
       }
 
-      // 位置分数：控制中心
+      // 浣嶇疆鍒嗘暟锛氭帶鍒朵腑蹇?
       const centerDistance = Math.abs(toR - 4.5) + Math.abs(toC - 4.5);
       score += Math.max(0, 5 - centerDistance);
 
-      // 过河加分（兵卒）
-      if ((pieceName === '兵' && toR >= 5) || (pieceName === '卒' && toR <= 4)) {
+      // 杩囨渤鍔犲垎锛堝叺鍗掞級
+      if ((pieceName === '鍏? && toR >= 5) || (pieceName === '鍗? && toR <= 4)) {
         score += 50;
       }
 
       return score;
     }
 
-    // 处理五子棋AI落子
+    // 澶勭悊浜斿瓙妫婣I钀藉瓙
     function handleGobangAIMove(r, c, color) {
       gameState.board[r][c] = color;
       gameState.moveCount++;
@@ -10568,27 +7221,27 @@
         renderBoard();
       });
 
-      updateStatus(`🤖 AI已落子 (${r},${c})，你的回合`);
+      updateStatus(`馃 AI宸茶惤瀛?(${r},${c})锛屼綘鐨勫洖鍚坄);
 
       if (checkGobangWin(r, c, color)) {
         gameState.gameOver = true;
-        const winMsg = color === 1 ? '黑棋获胜！' : '白棋获胜！';
-        const winColor = color === 1 ? '黑棋' : '白棋';
+        const winMsg = color === 1 ? '榛戞鑾疯儨锛? : '鐧芥鑾疯儨锛?;
+        const winColor = color === 1 ? '榛戞' : '鐧芥';
         winnerEl.textContent = winColor;
         winnerEl.className = `info-value ${color === 1 ? 'value-black' : 'value-white'}`;
-        gameStatusEl.textContent = '游戏结束';
+        gameStatusEl.textContent = '娓告垙缁撴潫';
         gameStateEl.className = 'info-value value-waiting';
         showWinAlert(winMsg);
-        updateStatus(`🏆 ${winMsg} 游戏结束`);
+        updateStatus(`馃弳 ${winMsg} 娓告垙缁撴潫`);
         updateAdvancedStats();
 
-        // 发送 AI 游戏结果
+        // 鍙戦€?AI 娓告垙缁撴灉
         sendAIGameResult('loss');
       }
-      // 注意：回合切换已经在 handleAIMoveResult 中处理，这里不需要再切换
+      // 娉ㄦ剰锛氬洖鍚堝垏鎹㈠凡缁忓湪 handleAIMoveResult 涓鐞嗭紝杩欓噷涓嶉渶瑕佸啀鍒囨崲
     }
 
-    // 处理围棋AI落子
+    // 澶勭悊鍥存AI钀藉瓙
     function handleGoAIMove(r, c, color) {
       gameState.board[r][c] = color;
       gameState.moveCount++;
@@ -10616,30 +7269,30 @@
         renderBoard();
       });
 
-      updateStatus(`🤖 AI已落子 (${r},${c})，你的回合`);
-      // 注意：回合切换已经在 handleAIMoveResult 中处理，这里不需要再切换
+      updateStatus(`馃 AI宸茶惤瀛?(${r},${c})锛屼綘鐨勫洖鍚坄);
+      // 娉ㄦ剰锛氬洖鍚堝垏鎹㈠凡缁忓湪 handleAIMoveResult 涓鐞嗭紝杩欓噷涓嶉渶瑕佸啀鍒囨崲
     }
 
-    // 处理象棋AI落子
+    // 澶勭悊璞℃AI钀藉瓙
     function handleChessAIMove(fromR, fromC, toR, toC, color) {
       const piece = getChessPieceAt(fromR, fromC);
       if (!piece) return;
 
-      // 1. 先检查是否有对方棋子在目标位置（吃子）
+      // 1. 鍏堟鏌ユ槸鍚︽湁瀵规柟妫嬪瓙鍦ㄧ洰鏍囦綅缃紙鍚冨瓙锛?
       const capturedPiece = getChessPieceAt(toR, toC);
       if (capturedPiece) {
-        // 从 chessPieces 数据中移除被吃的棋子
+        // 浠?chessPieces 鏁版嵁涓Щ闄よ鍚冪殑妫嬪瓙
         const capturedColor = capturedPiece.dataset.color;
         if (capturedColor === 'red') {
           chessPieces.red = chessPieces.red.filter(p => !(p.r === toR && p.c === toC));
         } else {
           chessPieces.black = chessPieces.black.filter(p => !(p.r === toR && p.c === toC));
         }
-        // 从 DOM 中移除
+        // 浠?DOM 涓Щ闄?
         capturedPiece.remove();
       }
 
-      // 2. 更新 chessPieces 数据中的棋子位置
+      // 2. 鏇存柊 chessPieces 鏁版嵁涓殑妫嬪瓙浣嶇疆
       const pieceColor = piece.dataset.color;
       const pieceName = piece.dataset.name;
       if (pieceColor === 'red') {
@@ -10656,17 +7309,17 @@
         }
       }
 
-      // 3. 更新 DOM 中的棋子位置
+      // 3. 鏇存柊 DOM 涓殑妫嬪瓙浣嶇疆
       piece.dataset.r = toR;
       piece.dataset.c = toC;
       piece.style.top = `${toR * 40 + 20}px`;
       piece.style.left = `${toC * 40 + 20}px`;
       piece.style.transform = 'translate(-50%, -50%)';
 
-      // 4. 同步 gameState.board
+      // 4. 鍚屾 gameState.board
       gameState.board = convertFrontendPiecesToBackend();
 
-      // 更新游戏状态
+      // 鏇存柊娓告垙鐘舵€?
       gameState.moveCount++;
       gameState.moveLog.push({
         color: color,
@@ -10690,40 +7343,40 @@
         updateAdvancedStats();
       });
 
-      updateStatus(`🤖 AI已移动 ${pieceName} 到 (${toR},${toC})，你的回合`);
+      updateStatus(`馃 AI宸茬Щ鍔?${pieceName} 鍒?(${toR},${toC})锛屼綘鐨勫洖鍚坄);
 
       if (checkChessWin()) {
         gameState.gameOver = true;
-        const winMsg = gameState.turn === 1 ? '红方获胜！' : '黑方获胜！';
-        const winColor = gameState.turn === 1 ? '红方' : '黑方';
+        const winMsg = gameState.turn === 1 ? '绾㈡柟鑾疯儨锛? : '榛戞柟鑾疯儨锛?;
+        const winColor = gameState.turn === 1 ? '绾㈡柟' : '榛戞柟';
         winnerEl.textContent = winColor;
         winnerEl.className = `info-value ${gameState.turn === 1 ? 'value-red' : 'value-green'}`;
-        gameStatusEl.textContent = '游戏结束';
+        gameStatusEl.textContent = '娓告垙缁撴潫';
         gameStatusEl.className = 'info-value value-waiting';
         showWinAlert(winMsg);
-        updateStatus(`🏆 ${winMsg} 游戏结束`);
+        updateStatus(`馃弳 ${winMsg} 娓告垙缁撴潫`);
         updateAdvancedStats();
       }
-      // 注意：回合切换已经在 handleAIMoveResult 中处理，这里不需要再切换
+      // 娉ㄦ剰锛氬洖鍚堝垏鎹㈠凡缁忓湪 handleAIMoveResult 涓鐞嗭紝杩欓噷涓嶉渶瑕佸啀鍒囨崲
     }
 
     function playAgain() {
-      // 检查是否是AI对战
+      // 妫€鏌ユ槸鍚︽槸AI瀵规垬
       if (gameState.difficulty) {
-        // AI对战，直接重新开始
+        // AI瀵规垬锛岀洿鎺ラ噸鏂板紑濮?
         restartAIGame();
       } else {
-        // PVP对战，发送重置请求
+        // PVP瀵规垬锛屽彂閫侀噸缃姹?
         socket.emit('reset', {
-          message: '对方请求再来一局'
+          message: '瀵规柟璇锋眰鍐嶆潵涓€灞€'
         });
-        updateStatus('⏳ 等待对方同意再来一局...');
+        updateStatus('鈴?绛夊緟瀵规柟鍚屾剰鍐嶆潵涓€灞€...');
       }
     }
 
-    // AI对战再来一把
+    // AI瀵规垬鍐嶆潵涓€鎶?
     function restartAIGame() {
-      // 重置游戏状态 - 完全重置为初始状态
+      // 閲嶇疆娓告垙鐘舵€?- 瀹屽叏閲嶇疆涓哄垵濮嬬姸鎬?
       gameState.gameType = currentGame;
       gameState.player = 1;
       gameState.difficulty = gameState.difficulty;
@@ -10742,17 +7395,17 @@
       gameState.lastMove = null;
       currentPlayer = 1;
 
-      // 重置棋盘数组和UI
+      // 閲嶇疆妫嬬洏鏁扮粍鍜孶I
       initGameBoard();
 
-      // 重新渲染棋盘
+      // 閲嶆柊娓叉煋妫嬬洏
       if (currentGame === 'gobang' || currentGame === 'go') {
         renderBoard();
       } else if (currentGame === 'chinese-chess') {
         renderChessPieces();
       }
 
-      // 重置UI
+      // 閲嶇疆UI
       const playAgainBtn = document.getElementById('play-again-btn');
       if (playAgainBtn) {
         playAgainBtn.style.display = 'none';
@@ -10760,32 +7413,32 @@
 
       winnerEl.textContent = '-';
       winnerEl.className = 'info-value';
-      gameStatusEl.textContent = '游戏中';
+      gameStatusEl.textContent = '娓告垙涓?;
       gameStatusEl.className = 'info-value value-connected';
 
-      // 重置玩家颜色显示
+      // 閲嶇疆鐜╁棰滆壊鏄剧ず
       const config = gameConfigs[currentGame];
       const myColorText = config.colorNames[0];
       myColorEl.textContent = myColorText;
       myColorEl.className = `info-value ${currentGame === 'chinese-chess' ? 'value-red' : 'value-black'}`;
 
-      // 重新开始计时
+      // 閲嶆柊寮€濮嬭鏃?
       gameState.gameStartTime = Date.now();
       if (gameState.gameTimer) clearInterval(gameState.gameTimer);
       gameState.gameTimer = setInterval(updateGameTime, 1000);
 
-      // 更新显示
+      // 鏇存柊鏄剧ず
       updateTurnDisplay();
       updateMoveCount();
       updateColorCount();
       updateMoveLog();
       updateAdvancedStats();
 
-      // 更新状态
-      const difficultyText = gameState.difficulty === 'easy' ? '简单' : gameState.difficulty === 'medium' ? '中等' : '困难';
-      updateStatus(`🎮 正在与${difficultyText}AI对战，你先落子！`);
+      // 鏇存柊鐘舵€?
+      const difficultyText = gameState.difficulty === 'easy' ? '绠€鍗? : gameState.difficulty === 'medium' ? '涓瓑' : '鍥伴毦';
+      updateStatus(`馃幃 姝ｅ湪涓?{difficultyText}AI瀵规垬锛屼綘鍏堣惤瀛愶紒`);
 
-      // 通知服务器重新开始AI对战
+      // 閫氱煡鏈嶅姟鍣ㄩ噸鏂板紑濮婣I瀵规垬
       if (socket) {
         socket.emit('ai_game_start', {
           gameType: currentGame,
@@ -10794,11 +7447,11 @@
       }
     }
 
-    // 显示游戏结束结果（围棋点目）
+    // 鏄剧ず娓告垙缁撴潫缁撴灉锛堝洿妫嬬偣鐩級
     function showGameResult() {
       if (currentGame === 'go') {
         const score = countGoScore();
-        const winner = score.black > score.white ? '黑棋' : '白棋';
+        const winner = score.black > score.white ? '榛戞' : '鐧芥';
         const diff = Math.abs(score.black - score.white).toFixed(1);
 
         const modal = document.createElement('div');
@@ -10807,33 +7460,33 @@
         modal.innerHTML = `
           <div class="modal" style="max-width: 500px;">
             <div class="modal-title">
-              <span>🏁 游戏结束 - 数子结果</span>
+              <span>馃弫 娓告垙缁撴潫 - 鏁板瓙缁撴灉</span>
               <button class="modal-close" onclick="closeGameResultModal()">&times;</button>
             </div>
             <div class="modal-content" style="text-align: center; padding: 20px;">
               <h2 style="color: ${score.black > score.white ? '#000' : '#666'}; margin-bottom: 20px;">
-                ${winner}获胜！
+                ${winner}鑾疯儨锛?
               </h2>
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                 <div style="background: #000; color: white; padding: 15px; border-radius: 8px;">
-                  <div style="font-size: 24px; font-weight: bold;">黑棋</div>
+                  <div style="font-size: 24px; font-weight: bold;">榛戞</div>
                   <div style="font-size: 36px; font-weight: bold; margin-top: 10px;">${score.black.toFixed(1)}</div>
-                  <div style="font-size: 14px; opacity: 0.8;">子数：${gameState.blackCount}</div>
-                  <div style="font-size: 14px; opacity: 0.8;">领地：${(score.black - gameState.blackCount).toFixed(1)}</div>
+                  <div style="font-size: 14px; opacity: 0.8;">瀛愭暟锛?{gameState.blackCount}</div>
+                  <div style="font-size: 14px; opacity: 0.8;">棰嗗湴锛?{(score.black - gameState.blackCount).toFixed(1)}</div>
                 </div>
                 <div style="background: #fff; color: #000; padding: 15px; border-radius: 8px; border: 2px solid #ccc;">
-                  <div style="font-size: 24px; font-weight: bold;">白棋</div>
+                  <div style="font-size: 24px; font-weight: bold;">鐧芥</div>
                   <div style="font-size: 36px; font-weight: bold; margin-top: 10px;">${score.white.toFixed(1)}</div>
-                  <div style="font-size: 14px; opacity: 0.8;">子数：${gameState.whiteCount}</div>
-                  <div style="font-size: 14px; opacity: 0.8;">领地：${(score.white - gameState.whiteCount).toFixed(1)}</div>
-                  <div style="font-size: 12px; margin-top: 5px; color: #666;">贴目：7.5</div>
+                  <div style="font-size: 14px; opacity: 0.8;">瀛愭暟锛?{gameState.whiteCount}</div>
+                  <div style="font-size: 14px; opacity: 0.8;">棰嗗湴锛?{(score.white - gameState.whiteCount).toFixed(1)}</div>
+                  <div style="font-size: 12px; margin-top: 5px; color: #666;">璐寸洰锛?.5</div>
                 </div>
               </div>
               <div style="font-size: 18px; font-weight: bold; color: #2c3e50;">
-                胜负差：${diff}子
+                鑳滆礋宸細${diff}瀛?
               </div>
               <button onclick="closeGameResultModal()" style="margin-top: 20px; padding: 10px 30px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">
-                确定
+                纭畾
               </button>
             </div>
           </div>
@@ -10843,7 +7496,7 @@
       }
     }
 
-    // 关闭游戏结果模态框
+    // 鍏抽棴娓告垙缁撴灉妯℃€佹
     function closeGameResultModal() {
       const modal = document.getElementById('game-result-modal');
       if (modal) {
@@ -10858,13 +7511,13 @@
       }
 
       if (sendToServer) {
-        // 发送重置请求给服务器，等待对方确认
+        // 鍙戦€侀噸缃姹傜粰鏈嶅姟鍣紝绛夊緟瀵规柟纭
         socket.emit('reset');
-        // 不立即重置本地游戏，等待服务器确认
+        // 涓嶇珛鍗抽噸缃湰鍦版父鎴忥紝绛夊緟鏈嶅姟鍣ㄧ‘璁?
         return;
       }
 
-      // 只有收到服务器确认或本地重置时才执行重置
+      // 鍙湁鏀跺埌鏈嶅姟鍣ㄧ‘璁ゆ垨鏈湴閲嶇疆鏃舵墠鎵ц閲嶇疆
       initGameBoard();
       gameState.turn = 1;
       gameState.gameOver = false;
@@ -10880,7 +7533,7 @@
 
       winnerEl.textContent = '--';
       winnerEl.className = 'info-value';
-      gameStatusEl.textContent = '游戏中';
+      gameStatusEl.textContent = '娓告垙涓?;
       gameStatusEl.className = 'info-value value-connected';
 
       updateTurnDisplay();
@@ -10891,19 +7544,19 @@
       renderBoard();
 
       if (currentGame === 'gobang') {
-        updateStatus('🎮 游戏已重置，' + (gameState.me === 1 ? '你先落子！' : '等待对方落子！'));
+        updateStatus('馃幃 娓告垙宸查噸缃紝' + (gameState.me === 1 ? '浣犲厛钀藉瓙锛? : '绛夊緟瀵规柟钀藉瓙锛?));
       } else if (currentGame === 'chinese-chess') {
-        updateStatus('🎮 游戏已重置，红方先行！');
+        updateStatus('馃幃 娓告垙宸查噸缃紝绾㈡柟鍏堣锛?);
       }
     }
 
-    // 自定义确认模态框事件处理
+    // 鑷畾涔夌‘璁ゆā鎬佹浜嬩欢澶勭悊
     document.addEventListener('DOMContentLoaded', () => {
       const confirmModal = document.getElementById('custom-confirm-modal');
       const confirmYesBtn = document.getElementById('confirm-yes');
       const confirmNoBtn = document.getElementById('confirm-no');
 
-      // 同意按钮
+      // 鍚屾剰鎸夐挳
       confirmYesBtn.addEventListener('click', () => {
         confirmModal.style.display = 'none';
 
@@ -10919,11 +7572,11 @@
         currentResetRequest = null;
       });
 
-      // 拒绝按钮
+      // 鎷掔粷鎸夐挳
       confirmNoBtn.addEventListener('click', () => {
         confirmModal.style.display = 'none';
 
-        // 通知服务器拒绝重置请求
+        // 閫氱煡鏈嶅姟鍣ㄦ嫆缁濋噸缃姹?
         if (currentResetRequest && socket) {
           socket.emit('reset_reject', {
             requestId: currentResetRequest.requestId
@@ -10933,7 +7586,7 @@
         currentResetRequest = null;
       });
 
-      // 点击模态框背景关闭
+      // 鐐瑰嚮妯℃€佹鑳屾櫙鍏抽棴
       confirmModal.addEventListener('click', (e) => {
         if (e.target === confirmModal) {
           confirmModal.style.display = 'none';
@@ -10942,7 +7595,7 @@
       });
     });
 
-    // ========== 棋盘点击事件 ==========
+    // ========== 妫嬬洏鐐瑰嚮浜嬩欢 ==========
     function handleGobangClick(r, c) {
       if (gameState.gameOver || gameState.turn !== gameState.me) return;
       if (gameState.board[r][c] !== 0) return;
@@ -10978,18 +7631,18 @@
         renderBoard();
       });
 
-      updateStatus(`📌 你已落子(${r}, ${c})，等待对方回合`);
+      updateStatus(`馃搶 浣犲凡钀藉瓙(${r}, ${c})锛岀瓑寰呭鏂瑰洖鍚坄);
 
-      // 检查是否是AI对战
+      // 妫€鏌ユ槸鍚︽槸AI瀵规垬
       if (gameState.difficulty) {
-        // AI对战，发送移动给服务器
+        // AI瀵规垬锛屽彂閫佺Щ鍔ㄧ粰鏈嶅姟鍣?
         if (socket) {
           socket.emit('ai_move', {
             position: { r, c }
           });
         }
       } else {
-        // PVP对战
+        // PVP瀵规垬
         socket.emit('move', {
           game: currentGame,
           r: r,
@@ -11000,24 +7653,24 @@
 
       if (checkGobangWin(r, c, gameState.me)) {
         gameState.gameOver = true;
-        const winMsg = '你获胜了！';
-        const winColor = gameState.me === 1 ? '黑棋' : '白棋';
+        const winMsg = '浣犺幏鑳滀簡锛?;
+        const winColor = gameState.me === 1 ? '榛戞' : '鐧芥';
         winnerEl.textContent = winColor;
         winnerEl.className = `info-value ${gameState.me === 1 ? 'value-black' : 'value-white'}`;
-        gameStatusEl.textContent = '游戏结束';
+        gameStatusEl.textContent = '娓告垙缁撴潫';
         gameStatusEl.className = 'info-value value-waiting';
         showWinAlert(winMsg);
-        updateStatus(`🏆 ${winMsg} 游戏结束`);
+        updateStatus(`馃弳 ${winMsg} 娓告垙缁撴潫`);
         updateAdvancedStats();
 
         if (gameState.difficulty) {
-          // AI对战
+          // AI瀵规垬
           sendAIGameResult('win');
         } else {
-          // PVP对战
+          // PVP瀵规垬
           socket.emit('game_result', {
             result: 'win',
-            reason: '五子连珠'
+            reason: '浜斿瓙杩炵彔'
           });
         }
       } else {
@@ -11056,18 +7709,18 @@
         renderBoard();
       });
 
-      updateStatus(`📌 你已落子(${r}, ${c})，等待对方回合`);
+      updateStatus(`馃搶 浣犲凡钀藉瓙(${r}, ${c})锛岀瓑寰呭鏂瑰洖鍚坄);
 
-      // 检查是否是AI对战
+      // 妫€鏌ユ槸鍚︽槸AI瀵规垬
       if (gameState.difficulty) {
-        // AI对战，发送移动给服务器
+        // AI瀵规垬锛屽彂閫佺Щ鍔ㄧ粰鏈嶅姟鍣?
         if (socket) {
           socket.emit('ai_move', {
             position: { r, c }
           });
         }
       } else {
-        // PVP对战
+        // PVP瀵规垬
         socket.emit('move', {
           game: currentGame,
           r: r,
@@ -11078,24 +7731,24 @@
 
       if (checkGoWin()) {
         gameState.gameOver = true;
-        const winMsg = gameState.me === 1 ? '黑棋获胜！' : '白棋获胜！';
-        const winColor = gameState.me === 1 ? '黑棋' : '白棋';
+        const winMsg = gameState.me === 1 ? '榛戞鑾疯儨锛? : '鐧芥鑾疯儨锛?;
+        const winColor = gameState.me === 1 ? '榛戞' : '鐧芥';
         winnerEl.textContent = winColor;
         winnerEl.className = `info-value ${gameState.me === 1 ? 'value-black' : 'value-white'}`;
-        gameStatusEl.textContent = '游戏结束';
+        gameStatusEl.textContent = '娓告垙缁撴潫';
         gameStatusEl.className = 'info-value value-waiting';
         showWinAlert(winMsg);
-        updateStatus(`🏆 ${winMsg} 游戏结束`);
+        updateStatus(`馃弳 ${winMsg} 娓告垙缁撴潫`);
         updateAdvancedStats();
 
         if (gameState.difficulty) {
-          // AI对战
+          // AI瀵规垬
           sendAIGameResult('win');
         } else {
-          // PVP对战
+          // PVP瀵规垬
           socket.emit('game_result', {
             result: 'win',
-            reason: '棋盘填满'
+            reason: '妫嬬洏濉弧'
           });
         }
       } else {
@@ -11104,7 +7757,7 @@
       }
     }
 
-    // ========== 五子棋胜负判定 ==========
+    // ========== 浜斿瓙妫嬭儨璐熷垽瀹?==========
     function calculateGobangChain(r, c, color) {
       const config = gameConfigs.gobang;
       let maxChain = 0;
@@ -11150,16 +7803,16 @@
       return calculateGobangChain(r, c, color) >= 5;
     }
 
-    // ========== 账号系统函数 ==========
+    // ========== 璐﹀彿绯荤粺鍑芥暟 ==========
 
     function updateAccountBar() {
       const accountBar = document.getElementById('account-bar');
       if (currentAccount) {
-        // 处理不同的数据结构
+        // 澶勭悊涓嶅悓鐨勬暟鎹粨鏋?
         let accountType, nickname, username, level, exp, starCoins;
         let undoCount = 0, hintCount = 0;
         if (currentAccount.account.account) {
-          // 账号登录的数据结构
+          // 璐﹀彿鐧诲綍鐨勬暟鎹粨鏋?
           accountType = currentAccount.account.account.type;
           nickname = currentAccount.account.account.nickname;
           username = currentAccount.account.account.username;
@@ -11168,12 +7821,12 @@
           starCoins = currentAccount.account.currency?.starCoins || 0;
           undoCount = currentAccount.account.inventory?.undoCount || 0;
           hintCount = currentAccount.account.inventory?.hintCount || 0;
-          // 加上道具卡可兑换的次数（每张悔棋卡=3次，每张提示卡=5次）
+          // 鍔犱笂閬撳叿鍗″彲鍏戞崲鐨勬鏁帮紙姣忓紶鎮旀鍗?3娆★紝姣忓紶鎻愮ず鍗?5娆★級
           const items = currentAccount.account.inventory?.items || {};
           undoCount += (items.item_undo || 0) * 3;
           hintCount += (items.item_hint || 0) * 5;
         } else {
-          // 游客登录的数据结构
+          // 娓稿鐧诲綍鐨勬暟鎹粨鏋?
           accountType = currentAccount.account.type;
           nickname = currentAccount.account.nickname;
           username = currentAccount.account.username;
@@ -11182,33 +7835,33 @@
           starCoins = currentAccount.currency?.starCoins || 0;
           undoCount = currentAccount.account.inventory?.undoCount || 0;
           hintCount = currentAccount.account.inventory?.hintCount || 0;
-          // 加上道具卡可兑换的次数
+          // 鍔犱笂閬撳叿鍗″彲鍏戞崲鐨勬鏁?
           const items = currentAccount.account.inventory?.items || {};
           undoCount += (items.item_undo || 0) * 3;
           hintCount += (items.item_hint || 0) * 5;
         }
 
-        // 根据用户类型显示不同的退出按钮
+        // 鏍规嵁鐢ㄦ埛绫诲瀷鏄剧ず涓嶅悓鐨勯€€鍑烘寜閽?
         const isGuest = accountType === 'guest' || currentAccount.loginType === 'guest';
-        const logoutText = isGuest ? '退出游客' : '退出登录';
+        const logoutText = isGuest ? '閫€鍑烘父瀹? : '閫€鍑虹櫥褰?;
         const logoutFunction = isGuest ? 'guestLogout()' : 'logout()';
 
-        // 游客用户也显示资料按钮（可查看个人信息和转正）
-        const profileButton = '<button class="account-btn btn-info" onclick="window.location.href=\'/profile.html\'">👤 资料</button>';
-        const historyButton = '<button class="account-btn" onclick="showGameHistoryModal()" style="background: #9b59b6;">📜 历史</button>';
+        // 娓稿鐢ㄦ埛涔熸樉绀鸿祫鏂欐寜閽紙鍙煡鐪嬩釜浜轰俊鎭拰杞锛?
+        const profileButton = '<button class="account-btn btn-info" onclick="window.location.href=\'/profile.html\'">馃懁 璧勬枡</button>';
+        const historyButton = '<button class="account-btn" onclick="showGameHistoryModal()" style="background: #9b59b6;">馃摐 鍘嗗彶</button>';
 
         accountBar.innerHTML = `
           <div class="account-info">
             <div class="account-user-section">
-              <span class="account-avatar">👤</span>
+              <span class="account-avatar">馃懁</span>
               <div class="account-user-details">
                 <span class="account-nickname">${nickname || username}</span>
                 <div class="account-stats">
                   <span class="account-level">Lv.${level}</span>
                   <span class="account-exp">${exp} EXP</span>
-                  <span class="account-starcoins">💎 ${starCoins}</span>
+                  <span class="account-starcoins">馃拵 ${starCoins}</span>
                   <span class="account-items" style="font-size:11px;color:#718096;">
-                    ⏪${undoCount} 💡${hintCount}
+                    鈴?{undoCount} 馃挕${hintCount}
                   </span>
                 </div>
               </div>
@@ -11222,8 +7875,8 @@
         `;
       } else {
         accountBar.innerHTML = `
-          <button class="account-btn btn-primary" onclick="showLoginModal()">登录</button>
-          <button class="account-btn btn-success" onclick="showRegisterModal()">注册</button>
+          <button class="account-btn btn-primary" onclick="showLoginModal()">鐧诲綍</button>
+          <button class="account-btn btn-success" onclick="showRegisterModal()">娉ㄥ唽</button>
         `;
       }
     }
@@ -11254,9 +7907,9 @@
       const levelDiv = document.createElement('div');
       levelDiv.className = 'levelup-animation';
       levelDiv.innerHTML = `
-        <div style="font-size: 48px; margin-bottom: 10px;">🎉</div>
-        <div style="font-size: 36px; font-weight: bold; color: #f6ad55;">升级啦！</div>
-        <div style="font-size: 24px; margin-top: 10px;">Lv.${oldLevel} → Lv.${newLevel}</div>
+        <div style="font-size: 48px; margin-bottom: 10px;">馃帀</div>
+        <div style="font-size: 36px; font-weight: bold; color: #f6ad55;">鍗囩骇鍟︼紒</div>
+        <div style="font-size: 24px; margin-top: 10px;">Lv.${oldLevel} 鈫?Lv.${newLevel}</div>
       `;
       levelDiv.style.position = 'fixed';
       levelDiv.style.top = '50%';
@@ -11279,7 +7932,7 @@
       }, 3000);
     }
 
-    // 显示断开连接提示框
+    // 鏄剧ず鏂紑杩炴帴鎻愮ず妗?
     function showDisconnectWarning() {
       const warning = document.getElementById('disconnect-warning');
       if (warning) {
@@ -11287,7 +7940,7 @@
       }
     }
 
-    // 隐藏断开连接提示框
+    // 闅愯棌鏂紑杩炴帴鎻愮ず妗?
     function hideDisconnectWarning() {
       const warning = document.getElementById('disconnect-warning');
       if (warning) {
@@ -11295,21 +7948,21 @@
       }
     }
 
-    // 重连服务器
+    // 閲嶈繛鏈嶅姟鍣?
     function reconnectServer() {
       const warning = document.getElementById('disconnect-warning');
       if (warning) {
         warning.style.display = 'none';
       }
 
-      // 如果socket已经存在，先断开
+      // 濡傛灉socket宸茬粡瀛樺湪锛屽厛鏂紑
       if (socket && socket.connected) {
         socket.disconnect();
       }
 
-      // 重新连接
+      // 閲嶆柊杩炴帴
       socket.connect();
-      updateStatus('正在重新连接...');
+      updateStatus('姝ｅ湪閲嶆柊杩炴帴...');
     }
 
     function showLoginModal() {
@@ -11318,24 +7971,24 @@
       modal.id = 'account-modal';
       modal.innerHTML = `
         <div class="account-modal">
-          <div class="account-modal-title">🔑 用户登录</div>
+          <div class="account-modal-title">馃攽 鐢ㄦ埛鐧诲綍</div>
           <div class="account-form-group">
-            <label class="account-form-label">用户名</label>
-            <input type="text" class="account-form-input" id="login-username" placeholder="请输入用户名">
+            <label class="account-form-label">鐢ㄦ埛鍚?/label>
+            <input type="text" class="account-form-input" id="login-username" placeholder="璇疯緭鍏ョ敤鎴峰悕">
           </div>
           <div class="account-form-group">
-            <label class="account-form-label">密码</label>
-            <input type="password" class="account-form-input" id="login-password" placeholder="请输入密码">
+            <label class="account-form-label">瀵嗙爜</label>
+            <input type="password" class="account-form-input" id="login-password" placeholder="璇疯緭鍏ュ瘑鐮?>
           </div>
           <div class="account-modal-footer">
-            <button class="account-btn" onclick="closeAccountModal();showAutoLoginModal();">取消</button>
-            <button class="account-btn btn-primary" onclick="doLogin()">登录</button>
+            <button class="account-btn" onclick="closeAccountModal();showAutoLoginModal();">鍙栨秷</button>
+            <button class="account-btn btn-primary" onclick="doLogin()">鐧诲綍</button>
           </div>
           <div class="account-switch-text">
-            还没有账号？<span class="account-switch-link" onclick="closeAccountModal();showRegisterModal();">立即注册</span>
+            杩樻病鏈夎处鍙凤紵<span class="account-switch-link" onclick="closeAccountModal();showRegisterModal();">绔嬪嵆娉ㄥ唽</span>
           </div>
           <div class="account-switch-text" style="margin-top: 8px;">
-            忘记密码？<span class="account-switch-link" onclick="closeAccountModal();showResetPasswordModal();">找回密码</span>
+            蹇樿瀵嗙爜锛?span class="account-switch-link" onclick="closeAccountModal();showResetPasswordModal();">鎵惧洖瀵嗙爜</span>
           </div>
         </div>
       `;
@@ -11348,29 +8001,29 @@
       modal.id = 'account-modal';
       modal.innerHTML = `
         <div class="account-modal">
-          <div class="account-modal-title">📝 用户注册</div>
+          <div class="account-modal-title">馃摑 鐢ㄦ埛娉ㄥ唽</div>
           <div class="account-form-group">
-            <label class="account-form-label">用户名</label>
-            <input type="text" class="account-form-input" id="register-username" placeholder="3-20位字母/数字/下划线">
+            <label class="account-form-label">鐢ㄦ埛鍚?/label>
+            <input type="text" class="account-form-input" id="register-username" placeholder="3-20浣嶅瓧姣?鏁板瓧/涓嬪垝绾?>
           </div>
           <div class="account-form-group">
-            <label class="account-form-label">密码</label>
-            <input type="password" class="account-form-input" id="register-password" placeholder="至少6位密码">
+            <label class="account-form-label">瀵嗙爜</label>
+            <input type="password" class="account-form-input" id="register-password" placeholder="鑷冲皯6浣嶅瘑鐮?>
           </div>
           <div class="account-form-group">
-            <label class="account-form-label">确认密码</label>
-            <input type="password" class="account-form-input" id="register-password2" placeholder="再次输入密码">
+            <label class="account-form-label">纭瀵嗙爜</label>
+            <input type="password" class="account-form-input" id="register-password2" placeholder="鍐嶆杈撳叆瀵嗙爜">
           </div>
           <div class="account-form-group">
-            <label class="account-form-label">昵称（可选）</label>
-            <input type="text" class="account-form-input" id="register-nickname" placeholder="显示的昵称">
+            <label class="account-form-label">鏄电О锛堝彲閫夛級</label>
+            <input type="text" class="account-form-input" id="register-nickname" placeholder="鏄剧ず鐨勬樀绉?>
           </div>
           <div class="account-modal-footer">
-            <button class="account-btn" onclick="closeAccountModal();showAutoLoginModal();">取消</button>
-            <button class="account-btn btn-success" onclick="doRegister()">注册</button>
+            <button class="account-btn" onclick="closeAccountModal();showAutoLoginModal();">鍙栨秷</button>
+            <button class="account-btn btn-success" onclick="doRegister()">娉ㄥ唽</button>
           </div>
           <div class="account-switch-text">
-            已有账号？<span class="account-switch-link" onclick="closeAccountModal();showLoginModal();">立即登录</span>
+            宸叉湁璐﹀彿锛?span class="account-switch-link" onclick="closeAccountModal();showLoginModal();">绔嬪嵆鐧诲綍</span>
           </div>
         </div>
       `;
@@ -11383,25 +8036,25 @@
       modal.id = 'account-modal';
       modal.innerHTML = `
         <div class="account-modal">
-          <div class="account-modal-title">🔄 找回密码</div>
+          <div class="account-modal-title">馃攧 鎵惧洖瀵嗙爜</div>
           <div class="account-form-group">
-            <label class="account-form-label">用户名</label>
-            <input type="text" class="account-form-input" id="reset-username" placeholder="请输入用户名">
+            <label class="account-form-label">鐢ㄦ埛鍚?/label>
+            <input type="text" class="account-form-input" id="reset-username" placeholder="璇疯緭鍏ョ敤鎴峰悕">
           </div>
           <div class="account-form-group">
-            <label class="account-form-label">新密码</label>
-            <input type="password" class="account-form-input" id="reset-password" placeholder="至少6位新密码">
+            <label class="account-form-label">鏂板瘑鐮?/label>
+            <input type="password" class="account-form-input" id="reset-password" placeholder="鑷冲皯6浣嶆柊瀵嗙爜">
           </div>
           <div class="account-form-group">
-            <label class="account-form-label">确认新密码</label>
-            <input type="password" class="account-form-input" id="reset-password2" placeholder="再次输入新密码">
+            <label class="account-form-label">纭鏂板瘑鐮?/label>
+            <input type="password" class="account-form-input" id="reset-password2" placeholder="鍐嶆杈撳叆鏂板瘑鐮?>
           </div>
           <div class="account-modal-footer">
-            <button class="account-btn" onclick="closeAccountModal();showAutoLoginModal();">取消</button>
-            <button class="account-btn btn-primary" onclick="doResetPassword()">重置密码</button>
+            <button class="account-btn" onclick="closeAccountModal();showAutoLoginModal();">鍙栨秷</button>
+            <button class="account-btn btn-primary" onclick="doResetPassword()">閲嶇疆瀵嗙爜</button>
           </div>
           <div class="account-switch-text">
-            想起密码了？<span class="account-switch-link" onclick="closeAccountModal();showLoginModal();">立即登录</span>
+            鎯宠捣瀵嗙爜浜嗭紵<span class="account-switch-link" onclick="closeAccountModal();showLoginModal();">绔嬪嵆鐧诲綍</span>
           </div>
         </div>
       `;
@@ -11419,24 +8072,24 @@
       const username = document.getElementById('login-username').value.trim();
       const password = document.getElementById('login-password').value;
 
-      // 使用增强的验证
+      // 浣跨敤澧炲己鐨勯獙璇?
       const validation = validateLoginForm(username, password);
       if (!validation.valid) {
         showToast(validation.message, 'error');
         return;
       }
 
-      // 显示加载状态
+      // 鏄剧ず鍔犺浇鐘舵€?
       const loginBtn = document.querySelector('#account-modal .btn-primary');
       const originalText = loginBtn.textContent;
-      loginBtn.textContent = '登录中...';
+      loginBtn.textContent = '鐧诲綍涓?..';
       loginBtn.disabled = true;
 
       socket.emit('account_login', { username, password });
 
-      // 3秒后恢复按钮状态（如果服务器没有响应）
+      // 3绉掑悗鎭㈠鎸夐挳鐘舵€侊紙濡傛灉鏈嶅姟鍣ㄦ病鏈夊搷搴旓級
       setTimeout(() => {
-        if (loginBtn.textContent === '登录中...') {
+        if (loginBtn.textContent === '鐧诲綍涓?..') {
           loginBtn.textContent = originalText;
           loginBtn.disabled = false;
         }
@@ -11448,31 +8101,31 @@
       const password = document.getElementById('reset-password').value;
       const password2 = document.getElementById('reset-password2').value;
 
-      // 验证表单
+      // 楠岃瘉琛ㄥ崟
       if (!username) {
-        showToast('请输入用户名', 'error');
+        showToast('璇疯緭鍏ョ敤鎴峰悕', 'error');
         return;
       }
       if (password.length < 6) {
-        showToast('密码至少6位', 'error');
+        showToast('瀵嗙爜鑷冲皯6浣?, 'error');
         return;
       }
       if (password !== password2) {
-        showToast('两次输入的密码不一致', 'error');
+        showToast('涓ゆ杈撳叆鐨勫瘑鐮佷笉涓€鑷?, 'error');
         return;
       }
 
-      // 显示加载状态
+      // 鏄剧ず鍔犺浇鐘舵€?
       const resetBtn = document.querySelector('#account-modal .btn-primary');
       const originalText = resetBtn.textContent;
-      resetBtn.textContent = '重置中...';
+      resetBtn.textContent = '閲嶇疆涓?..';
       resetBtn.disabled = true;
 
       socket.emit('account_reset_password', { username, password });
 
-      // 3秒后恢复按钮状态（如果服务器没有响应）
+      // 3绉掑悗鎭㈠鎸夐挳鐘舵€侊紙濡傛灉鏈嶅姟鍣ㄦ病鏈夊搷搴旓級
       setTimeout(() => {
-        if (resetBtn.textContent === '重置中...') {
+        if (resetBtn.textContent === '閲嶇疆涓?..') {
           resetBtn.textContent = originalText;
           resetBtn.disabled = false;
         }
@@ -11485,27 +8138,27 @@
       const password2 = document.getElementById('register-password2').value;
       const nickname = document.getElementById('register-nickname').value.trim();
 
-      // 使用增强的验证
+      // 浣跨敤澧炲己鐨勯獙璇?
       const validation = validateRegisterForm(username, password, password2, nickname);
       if (!validation.valid) {
         showToast(validation.message, 'error');
         return;
       }
 
-      // 保存注册信息用于自动登录（用户名转小写）
+      // 淇濆瓨娉ㄥ唽淇℃伅鐢ㄤ簬鑷姩鐧诲綍锛堢敤鎴峰悕杞皬鍐欙級
       pendingRegisterInfo = { username: username.toLowerCase(), password };
 
-      // 显示加载状态
+      // 鏄剧ず鍔犺浇鐘舵€?
       const registerBtn = document.querySelector('#account-modal .btn-success');
       const originalText = registerBtn.textContent;
-      registerBtn.textContent = '注册中...';
+      registerBtn.textContent = '娉ㄥ唽涓?..';
       registerBtn.disabled = true;
 
       socket.emit('account_register', { username, password, nickname: nickname || null });
 
-      // 3秒后恢复按钮状态（如果服务器没有响应）
+      // 3绉掑悗鎭㈠鎸夐挳鐘舵€侊紙濡傛灉鏈嶅姟鍣ㄦ病鏈夊搷搴旓級
       setTimeout(() => {
-        if (registerBtn.textContent === '注册中...') {
+        if (registerBtn.textContent === '娉ㄥ唽涓?..') {
           registerBtn.textContent = originalText;
           registerBtn.disabled = false;
         }
@@ -11513,26 +8166,26 @@
     }
 
     function logout() {
-      if (confirm('确定要退出登录吗？')) {
+      if (confirm('纭畾瑕侀€€鍑虹櫥褰曞悧锛?)) {
         currentAccount = null;
         clearAccount();
         updateAccountBar();
 
-        // 显示自动登录窗口
+        // 鏄剧ず鑷姩鐧诲綍绐楀彛
         setTimeout(() => {
           showAutoLoginModal();
         }, 500);
       }
     }
 
-    // 游客退出
+    // 娓稿閫€鍑?
     function guestLogout() {
-      if (confirm('确定要退出游客模式吗？')) {
+      if (confirm('纭畾瑕侀€€鍑烘父瀹㈡ā寮忓悧锛?)) {
         currentAccount = null;
         clearAccount();
         updateAccountBar();
 
-        // 显示自动登录窗口
+        // 鏄剧ず鑷姩鐧诲綍绐楀彛
         setTimeout(() => {
           showAutoLoginModal();
         }, 500);
@@ -11540,7 +8193,7 @@
     }
 
     function showProfileModal() {
-      // 处理不同的数据结构
+      // 澶勭悊涓嶅悓鐨勬暟鎹粨鏋?
       const accountData = currentAccount.account.account || currentAccount.account;
       const statsData = currentAccount.stats || {};
 
@@ -11553,83 +8206,83 @@
       modal.id = 'account-modal';
       modal.innerHTML = `
         <div class="account-modal" style="max-width: 500px;">
-          <div class="account-modal-title">👤 用户资料</div>
+          <div class="account-modal-title">馃懁 鐢ㄦ埛璧勬枡</div>
           
           <div class="account-form-group">
-            <label class="account-form-label">用户名</label>
+            <label class="account-form-label">鐢ㄦ埛鍚?/label>
             <input type="text" class="account-form-input" value="${accountData?.username}" disabled style="background: #f7fafc; cursor: not-allowed;">
           </div>
           
           <div class="account-form-group">
-            <label class="account-form-label">昵称</label>
-            <input type="text" class="account-form-input" id="profile-nickname" value="${accountData?.nickname || ''}" placeholder="请输入昵称">
+            <label class="account-form-label">鏄电О</label>
+            <input type="text" class="account-form-input" id="profile-nickname" value="${accountData?.nickname || ''}" placeholder="璇疯緭鍏ユ樀绉?>
           </div>
           
           <div class="account-form-group">
-            <label class="account-form-label">个人简介</label>
-            <textarea class="account-form-input" id="profile-bio" rows="3" placeholder="介绍一下自己...">${accountData?.profile?.bio || ''}</textarea>
+            <label class="account-form-label">涓汉绠€浠?/label>
+            <textarea class="account-form-input" id="profile-bio" rows="3" placeholder="浠嬬粛涓€涓嬭嚜宸?..">${accountData?.profile?.bio || ''}</textarea>
           </div>
           
           <div class="account-form-group">
-            <label class="account-form-label">等级</label>
+            <label class="account-form-label">绛夌骇</label>
             <input type="text" class="account-form-input" value="Lv.${accountData?.profile?.level || 1}" disabled style="background: #f7fafc; cursor: not-allowed;">
           </div>
           
           <div class="account-form-group">
-            <label class="account-form-label">经验值</label>
+            <label class="account-form-label">缁忛獙鍊?/label>
             <div style="background: #f7fafc; padding: 12px; border-radius: 8px;">
               <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px;">
                 <span>${accountData?.profile?.exp || 0} EXP</span>
-                <span>经验: ${accountData?.profile?.exp || 0}</span>
+                <span>缁忛獙: ${accountData?.profile?.exp || 0}</span>
               </div>
             </div>
           </div>
           
           <div class="account-form-group">
-            <label class="account-form-label">总游戏统计</label>
+            <label class="account-form-label">鎬绘父鎴忕粺璁?/label>
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
               <div style="background: #f7fafc; padding: 10px; border-radius: 8px; text-align: center;">
                 <div style="font-size: 20px; font-weight: bold; color: #38a169;">${statsData?.totalWins || 0}</div>
-                <div style="font-size: 12px; color: #718096;">胜</div>
+                <div style="font-size: 12px; color: #718096;">鑳?/div>
               </div>
               <div style="background: #f7fafc; padding: 10px; border-radius: 8px; text-align: center;">
                 <div style="font-size: 20px; font-weight: bold; color: #e53e3e;">${statsData?.totalLosses || 0}</div>
-                <div style="font-size: 12px; color: #718096;">负</div>
+                <div style="font-size: 12px; color: #718096;">璐?/div>
               </div>
               <div style="background: #f7fafc; padding: 10px; border-radius: 8px; text-align: center;">
                 <div style="font-size: 20px; font-weight: bold; color: #4299e1;">${statsData?.totalDraws || 0}</div>
-                <div style="font-size: 12px; color: #718096;">平</div>
+                <div style="font-size: 12px; color: #718096;">骞?/div>
               </div>
             </div>
           </div>
           
           <div class="account-form-group">
-            <label class="account-form-label">对战类型统计</label>
+            <label class="account-form-label">瀵规垬绫诲瀷缁熻</label>
             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
               <div style="background: #ebf8ff; padding: 12px; border-radius: 8px; border: 1px solid #90cdf4;">
-                <div style="font-size: 14px; font-weight: bold; color: #2b6cb0; margin-bottom: 8px;">👥 真人对战</div>
+                <div style="font-size: 14px; font-weight: bold; color: #2b6cb0; margin-bottom: 8px;">馃懃 鐪熶汉瀵规垬</div>
                 <div style="display: flex; justify-content: space-between; font-size: 12px;">
-                  <span>胜: <span style="color: #38a169; font-weight: bold;">${statsData?.humanWins || 0}</span></span>
-                  <span>负: <span style="color: #e53e3e; font-weight: bold;">${statsData?.humanLosses || 0}</span></span>
-                  <span>平: <span style="color: #4299e1; font-weight: bold;">${statsData?.humanDraws || 0}</span></span>
+                  <span>鑳? <span style="color: #38a169; font-weight: bold;">${statsData?.humanWins || 0}</span></span>
+                  <span>璐? <span style="color: #e53e3e; font-weight: bold;">${statsData?.humanLosses || 0}</span></span>
+                  <span>骞? <span style="color: #4299e1; font-weight: bold;">${statsData?.humanDraws || 0}</span></span>
                 </div>
               </div>
               <div style="background: #faf5ff; padding: 12px; border-radius: 8px; border: 1px solid #d6bcfa;">
-                <div style="font-size: 14px; font-weight: bold; color: #6b46c1; margin-bottom: 8px;">🤖 AI对战</div>
+                <div style="font-size: 14px; font-weight: bold; color: #6b46c1; margin-bottom: 8px;">馃 AI瀵规垬</div>
                 <div style="display: flex; justify-content: space-between; font-size: 12px;">
-                  <span>胜: <span style="color: #38a169; font-weight: bold;">${statsData?.aiWins || 0}</span></span>
-                  <span>负: <span style="color: #e53e3e; font-weight: bold;">${statsData?.aiLosses || 0}</span></span>
-                  <span>平: <span style="color: #4299e1; font-weight: bold;">${statsData?.aiDraws || 0}</span></span>
+                  <span>鑳? <span style="color: #38a169; font-weight: bold;">${statsData?.aiWins || 0}</span></span>
+                  <span>璐? <span style="color: #e53e3e; font-weight: bold;">${statsData?.aiLosses || 0}</span></span>
+                  <span>骞? <span style="color: #4299e1; font-weight: bold;">${statsData?.aiDraws || 0}</span></span>
                 </div>
               </div>
             </div>
           </div>
           
           <div class="account-modal-footer">
-            <button class="account-btn" onclick="closeAccountModal();">返回</button>
-            <button class="account-btn" onclick="showGameHistoryModal()">游戏历史</button>
-            <button class="account-btn" onclick="showChangePasswordModal()">修改密码</button>
-            <button class="account-btn btn-primary" onclick="doUpdateProfile()">保存资料</button>
+            <button class="account-btn" onclick="closeAccountModal();">杩斿洖</button>
+            <button class="account-btn" onclick="showGameHistoryModal()">娓告垙鍘嗗彶</button>
+            <button class="account-btn" onclick="showChangePasswordModal()">淇敼瀵嗙爜</button>
+            <button class="account-btn btn-primary" onclick="doUpdateProfile()">淇濆瓨璧勬枡</button>
           </div>
         </div>
       `;
@@ -11643,26 +8296,26 @@
       modal.id = 'account-modal';
       modal.innerHTML = `
         <div class="account-modal">
-          <div class="account-modal-title">🔐 修改密码</div>
+          <div class="account-modal-title">馃攼 淇敼瀵嗙爜</div>
           
           <div class="account-form-group">
-            <label class="account-form-label">原密码</label>
-            <input type="password" class="account-form-input" id="old-password" placeholder="请输入原密码">
+            <label class="account-form-label">鍘熷瘑鐮?/label>
+            <input type="password" class="account-form-input" id="old-password" placeholder="璇疯緭鍏ュ師瀵嗙爜">
           </div>
           
           <div class="account-form-group">
-            <label class="account-form-label">新密码</label>
-            <input type="password" class="account-form-input" id="new-password" placeholder="请输入新密码（至少6位）">
+            <label class="account-form-label">鏂板瘑鐮?/label>
+            <input type="password" class="account-form-input" id="new-password" placeholder="璇疯緭鍏ユ柊瀵嗙爜锛堣嚦灏?浣嶏級">
           </div>
           
           <div class="account-form-group">
-            <label class="account-form-label">确认新密码</label>
-            <input type="password" class="account-form-input" id="new-password2" placeholder="请再次输入新密码">
+            <label class="account-form-label">纭鏂板瘑鐮?/label>
+            <input type="password" class="account-form-input" id="new-password2" placeholder="璇峰啀娆¤緭鍏ユ柊瀵嗙爜">
           </div>
           
           <div class="account-modal-footer">
-            <button class="account-btn" onclick="closeAccountModal();showProfileModal();">返回</button>
-            <button class="account-btn btn-primary" onclick="doChangePassword()">确认修改</button>
+            <button class="account-btn" onclick="closeAccountModal();showProfileModal();">杩斿洖</button>
+            <button class="account-btn btn-primary" onclick="doChangePassword()">纭淇敼</button>
           </div>
         </div>
       `;
@@ -11676,14 +8329,14 @@
       modal.id = 'account-modal';
       modal.innerHTML = `
         <div class="account-modal" style="max-width: 600px;">
-          <div class="account-modal-title">📜 游戏历史记录</div>
+          <div class="account-modal-title">馃摐 娓告垙鍘嗗彶璁板綍</div>
           
           <div class="game-history-list" id="game-history-list" style="max-height: 400px; overflow-y: auto;">
-            <div style="color: #718096; text-align: center; padding: 20px;">加载中...</div>
+            <div style="color: #718096; text-align: center; padding: 20px;">鍔犺浇涓?..</div>
           </div>
           
           <div class="account-modal-footer">
-            <button class="account-btn" onclick="closeAccountModal();">关闭</button>
+            <button class="account-btn" onclick="closeAccountModal();">鍏抽棴</button>
           </div>
         </div>
       `;
@@ -11697,22 +8350,22 @@
       if (!list) return;
 
       if (!history || history.length === 0) {
-        list.innerHTML = '<div style="color: #718096; text-align: center; padding: 20px;">暂无游戏记录</div>';
+        list.innerHTML = '<div style="color: #718096; text-align: center; padding: 20px;">鏆傛棤娓告垙璁板綍</div>';
         return;
       }
 
       const gameTypeNames = {
-        'gobang': '五子棋',
-        'go': '围棋',
-        'chinese-chess': '中国象棋',
-        'snake': '贪吃蛇'
+        'gobang': '浜斿瓙妫?,
+        'go': '鍥存',
+        'chinese-chess': '涓浗璞℃',
+        'snake': '璐悆铔?
       };
 
       const resultNames = {
-        'win': '✓ 胜利',
-        'loss': '✗ 失败',
-        'draw': '平局',
-        'end': '结束'
+        'win': '鉁?鑳滃埄',
+        'loss': '鉁?澶辫触',
+        'draw': '骞冲眬',
+        'end': '缁撴潫'
       };
 
       const resultColors = {
@@ -11735,15 +8388,15 @@
               <div style="font-weight: bold; color: ${resultColors[game.result]};">${resultNames[game.result]}</div>
             </div>
             <div style="display: flex; justify-content: space-between; font-size: 12px; color: #718096;">
-              <span>对手: ${game.opponent || '未知'}</span>
-              <span>${game.moves} 步</span>
+              <span>瀵规墜: ${game.opponent || '鏈煡'}</span>
+              <span>${game.moves} 姝?/span>
             </div>
             <div style="display: flex; justify-content: space-between; font-size: 12px; color: #718096; margin-top: 4px;">
               <span>${date.toLocaleString('zh-CN')}</span>
-              <span>${minutes}分${seconds}秒</span>
+              <span>${minutes}鍒?{seconds}绉?/span>
             </div>
             <div style="margin-top: 8px; text-align: right;">
-              <button onclick="startReplay('${game.gameId}')" style="padding: 6px 12px; font-size: 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer;">🎬 回放</button>
+              <button onclick="startReplay('${game.gameId}')" style="padding: 6px 12px; font-size: 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer;">馃幀 鍥炴斁</button>
             </div>
           </div>
         `;
@@ -11752,11 +8405,11 @@
 
     function doUpdateProfile() {
       if (!currentAccount) {
-        alert('请先登录');
+        alert('璇峰厛鐧诲綍');
         return;
       }
 
-      // 处理不同的数据结构
+      // 澶勭悊涓嶅悓鐨勬暟鎹粨鏋?
       const accountData = currentAccount.account.account || currentAccount.account;
 
       const nickname = document.getElementById('profile-nickname').value.trim();
@@ -11776,11 +8429,11 @@
 
     function doChangePassword() {
       if (!currentAccount) {
-        alert('请先登录');
+        alert('璇峰厛鐧诲綍');
         return;
       }
 
-      // 处理不同的数据结构
+      // 澶勭悊涓嶅悓鐨勬暟鎹粨鏋?
       const accountData = currentAccount.account.account || currentAccount.account;
 
       const oldPassword = document.getElementById('old-password').value;
@@ -11788,17 +8441,17 @@
       const newPassword2 = document.getElementById('new-password2').value;
 
       if (!oldPassword || !newPassword || !newPassword2) {
-        alert('请填写完整信息');
+        alert('璇峰～鍐欏畬鏁翠俊鎭?);
         return;
       }
 
       if (newPassword !== newPassword2) {
-        alert('两次输入的新密码不一致');
+        alert('涓ゆ杈撳叆鐨勬柊瀵嗙爜涓嶄竴鑷?);
         return;
       }
 
       if (newPassword.length < 6) {
-        alert('新密码至少需要6位');
+        alert('鏂板瘑鐮佽嚦灏戦渶瑕?浣?);
         return;
       }
 
@@ -11809,24 +8462,24 @@
       });
     }
 
-    let currentChallenge = null; // 存储当前收到的挑战信息
+    let currentChallenge = null; // 瀛樺偍褰撳墠鏀跺埌鐨勬寫鎴樹俊鎭?
 
-    // 显示挑战请求模态框
+    // 鏄剧ず鎸戞垬璇锋眰妯℃€佹
     function showChallengeModal(fromNickname, gameType) {
-      const gameTypeName = gameConfigs[gameType] ? gameConfigs[gameType].emoji + ' ' + (gameType === 'gobang' ? '五子棋' : gameType === 'go' ? '围棋' : '象棋') : gameType;
-      challengeMessage.innerHTML = `玩家 <strong>${fromNickname}</strong> 邀请您进行一场 <strong>${gameTypeName}</strong> 对战！`;
+      const gameTypeName = gameConfigs[gameType] ? gameConfigs[gameType].emoji + ' ' + (gameType === 'gobang' ? '浜斿瓙妫? : gameType === 'go' ? '鍥存' : '璞℃') : gameType;
+      challengeMessage.innerHTML = `鐜╁ <strong>${fromNickname}</strong> 閭€璇锋偍杩涜涓€鍦?<strong>${gameTypeName}</strong> 瀵规垬锛乣;
       challengeModal.style.display = 'flex';
     }
 
-    // 隐藏挑战请求模态框
+    // 闅愯棌鎸戞垬璇锋眰妯℃€佹
     function hideChallengeModal() {
       challengeModal.style.display = 'none';
       currentChallenge = null;
     }
 
-    // 挑战请求模态框事件处理
+    // 鎸戞垬璇锋眰妯℃€佹浜嬩欢澶勭悊
     document.addEventListener('DOMContentLoaded', () => {
-      // 初始化挑战相关DOM
+      // 鍒濆鍖栨寫鎴樼浉鍏矰OM
       challengeModal = document.getElementById('challenge-modal');
       challengeTitle = document.getElementById('challenge-title');
       challengeMessage = document.getElementById('challenge-message');
@@ -11856,7 +8509,7 @@
 
         challengeModal.addEventListener('click', (e) => {
           if (e.target === challengeModal) {
-            // 点击背景默认拒绝
+            // 鐐瑰嚮鑳屾櫙榛樿鎷掔粷
             if (currentChallenge) {
               socket.emit('challenge_response', {
                 from: currentChallenge.from,
@@ -11869,7 +8522,7 @@
       }
     });
 
-    // ========== 游戏回放系统（委托到 replay-module.js） ==========
+    // ========== 娓告垙鍥炴斁绯荤粺锛堝鎵樺埌 replay-module.js锛?==========
     let replayState = {
       replay: null,
       currentMoveIndex: 0,
@@ -11883,7 +8536,7 @@
       socket.emit('get_game_replay', { gameId });
     }
 
-    // 检查是否有待播放的回放（从游戏历史页面跳转过来的）
+    // 妫€鏌ユ槸鍚︽湁寰呮挱鏀剧殑鍥炴斁锛堜粠娓告垙鍘嗗彶椤甸潰璺宠浆杩囨潵鐨勶級
     function checkReplayOnLoad() {
       const replayGameId = localStorage.getItem('replayGameId');
       if (replayGameId) {
@@ -11898,12 +8551,12 @@
       }
     });
 
-    // ========== 主题系统 ==========
+    // ========== 涓婚绯荤粺 ==========
 
-    // 本地默认主题（始终保留）
+    // 鏈湴榛樿涓婚锛堝缁堜繚鐣欙級
     const defaultThemes = {
       'default': {
-        name: '默认',
+        name: '榛樿',
         background: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
         primaryColor: '#007bff',
         secondaryColor: '#6c757d',
@@ -11942,10 +8595,10 @@
       }
     };
 
-    // 合并后的主题对象（本地 + 服务器）
+    // 鍚堝苟鍚庣殑涓婚瀵硅薄锛堟湰鍦?+ 鏈嶅姟鍣級
     let themes = { ...defaultThemes };
 
-    // 从服务器获取主题
+    // 浠庢湇鍔″櫒鑾峰彇涓婚
     async function fetchThemesFromServer() {
       try {
         const response = await fetch('/api/themes');
@@ -11953,20 +8606,20 @@
 
         if (result.success && result.data) {
           themes = { ...defaultThemes, ...result.data };
-          console.log('从服务器加载主题', { count: Object.keys(result.data).length });
+          console.log('浠庢湇鍔″櫒鍔犺浇涓婚', { count: Object.keys(result.data).length });
         }
       } catch (err) {
-        console.warn('从服务器获取主题失败', { error: err.message });
+        console.warn('浠庢湇鍔″櫒鑾峰彇涓婚澶辫触', { error: err.message });
       }
     }
 
     let currentTheme = localStorage.getItem('selectedTheme') || 'default';
 
     function showThemeModal() {
-      // 更新导航按钮状态
+      // 鏇存柊瀵艰埅鎸夐挳鐘舵€?
       updateNavActiveState('theme');
 
-      // 隐藏其他页面
+      // 闅愯棌鍏朵粬椤甸潰
       lobbyContainer.style.display = 'none';
       infoContainer.style.display = 'none';
       gameControls.style.display = 'none';
@@ -11976,26 +8629,26 @@
       document.getElementById('ai-game-container').style.display = 'none';
       document.getElementById('leaderboard-page').style.display = 'none';
 
-      // 隐藏所有棋盘
+      // 闅愯棌鎵€鏈夋鐩?
       document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
         board.style.display = 'none';
       });
 
-      // 显示主题页面
+      // 鏄剧ず涓婚椤甸潰
       const themeContainer = document.getElementById('theme-container');
       themeContainer.style.opacity = '0';
       themeContainer.style.transform = 'translateY(20px)';
       themeContainer.style.display = 'block';
 
-      // 添加动画效果
+      // 娣诲姞鍔ㄧ敾鏁堟灉
       setTimeout(() => {
         themeContainer.style.opacity = '1';
         themeContainer.style.transform = 'translateY(0)';
       }, 10);
 
-      // 加载主题列表
+      // 鍔犺浇涓婚鍒楄〃
       const themeListEl = document.getElementById('theme-list-container');
-      themeListEl.innerHTML = ''; // 清空现有列表
+      themeListEl.innerHTML = ''; // 娓呯┖鐜版湁鍒楄〃
 
       for (const themeKey in themes) {
         const theme = themes[themeKey];
@@ -12012,13 +8665,13 @@
         themeItem.onclick = () => applyTheme(themeKey);
 
         const textColor = themeKey === 'default' ? '#2d3748' : 'white';
-        const description = theme.description || '点击切换到此主题';
+        const description = theme.description || '鐐瑰嚮鍒囨崲鍒版涓婚';
 
         themeItem.innerHTML = `
           <div style="font-weight: bold; color: ${textColor}; margin-bottom: 10px; font-size: 16px;">${theme.name}</div>
           <div style="width: 100%; height: 80px; background: ${theme.primaryColor}; border-radius: 4px; margin-bottom: 10px;"></div>
           <div style="font-size: 12px; color: ${textColor}; opacity: 0.8; margin-bottom: 8px;">${description}</div>
-          <div style="font-size: 12px; color: ${textColor}; opacity: 0.9;">${currentTheme === themeKey ? '✓ 当前主题' : '点击切换'}</div>
+          <div style="font-size: 12px; color: ${textColor}; opacity: 0.9;">${currentTheme === themeKey ? '鉁?褰撳墠涓婚' : '鐐瑰嚮鍒囨崲'}</div>
         `;
         themeListEl.appendChild(themeItem);
       }
@@ -12030,7 +8683,7 @@
       currentTheme = themeKey;
       const theme = themes[themeKey];
 
-      // 移除之前的特效元素和面板
+      // 绉婚櫎涔嬪墠鐨勭壒鏁堝厓绱犲拰闈㈡澘
       document.querySelectorAll('.theme-effect, .theme-panel').forEach(el => el.remove());
       document.body.style.background = theme.background;
 
@@ -12040,52 +8693,52 @@
         themeBg.style.transform = 'translateY(0px)';
       }
 
-      // 重置棋盘类名
+      // 閲嶇疆妫嬬洏绫诲悕
       gobangBoard.className = 'gobang-board';
 
-      // 重置棋盘样式
+      // 閲嶇疆妫嬬洏鏍峰紡
       gobangBoard.style.border = '';
       gobangBoard.style.boxShadow = '';
       gobangBoard.style.animation = '';
       gobangBoard.style.backgroundImage = '';
 
-      // 重置所有棋子样式
+      // 閲嶇疆鎵€鏈夋瀛愭牱寮?
       document.querySelectorAll('.gobang-black, .gobang-white, .go-black, .go-white, .chess-red, .chess-black').forEach(piece => {
         piece.style.background = '';
         piece.style.boxShadow = '';
         piece.style.filter = '';
       });
 
-      // 重置所有格子样式
+      // 閲嶇疆鎵€鏈夋牸瀛愭牱寮?
       document.querySelectorAll('.gobang-cell, .go-cell, .chess-intersection').forEach(cell => {
         cell.style.background = '';
         cell.style.boxShadow = '';
       });
 
-      // 重置所有按钮样式
+      // 閲嶇疆鎵€鏈夋寜閽牱寮?
       document.querySelectorAll('.nav-btn, .match-btn, .cancel-btn, .lobby-btn').forEach(btn => {
         btn.style.background = '';
         btn.style.boxShadow = '';
         btn.style.border = '';
       });
 
-      // 重置所有文字样式
+      // 閲嶇疆鎵€鏈夋枃瀛楁牱寮?
       document.querySelectorAll('h1, h2, h3').forEach(el => {
         el.style.color = '';
         el.style.textShadow = '';
       });
 
-      // 移除主题动画样式
+      // 绉婚櫎涓婚鍔ㄧ敾鏍峰紡
       const themeAnimations = document.getElementById('theme-animations');
       if (themeAnimations) {
         themeAnimations.remove();
       }
 
-      // 应用全局效果
+      // 搴旂敤鍏ㄥ眬鏁堟灉
       if (theme.effects && theme.effects.global) {
         const globalEffects = theme.effects.global;
 
-        // 应用文本阴影
+        // 搴旂敤鏂囨湰闃村奖
         if (globalEffects.textShadow) {
           document.querySelectorAll('h1, h2, h3, .nav-btn, .lobby-btn').forEach(el => {
             el.style.textShadow = globalEffects.textShadow;
@@ -12096,7 +8749,7 @@
           });
         }
 
-        // 应用按钮效果
+        // 搴旂敤鎸夐挳鏁堟灉
         if (globalEffects.buttonShadow || globalEffects.buttonBorder) {
           document.querySelectorAll('.nav-btn, .match-btn, .cancel-btn, .lobby-btn').forEach(btn => {
             btn.style.boxShadow = globalEffects.buttonShadow || '';
@@ -12109,7 +8762,7 @@
           });
         }
       } else {
-        // 重置全局效果
+        // 閲嶇疆鍏ㄥ眬鏁堟灉
         document.querySelectorAll('h1, h2, h3, .nav-btn, .lobby-btn').forEach(el => {
           el.style.textShadow = '';
         });
@@ -12119,16 +8772,16 @@
         });
       }
 
-      // 应用棋盘效果
+      // 搴旂敤妫嬬洏鏁堟灉
       if (theme.effects && theme.effects.board) {
         const boardEffects = theme.effects.board;
 
-        // 添加棋盘类名
+        // 娣诲姞妫嬬洏绫诲悕
         if (boardEffects.className) {
           gobangBoard.classList.add(boardEffects.className);
         }
 
-        // 应用棋盘样式
+        // 搴旂敤妫嬬洏鏍峰紡
         if (boardEffects.style) {
           const boardStyle = boardEffects.style;
           gobangBoard.style.border = boardStyle.border || '';
@@ -12136,7 +8789,7 @@
           gobangBoard.style.animation = boardStyle.animation || '';
         }
 
-        // 添加全局发光效果
+        // 娣诲姞鍏ㄥ眬鍙戝厜鏁堟灉
         if (boardEffects.glowEffect) {
           const glowEffect = document.createElement('div');
           glowEffect.className = 'theme-effect board-glow';
@@ -12160,11 +8813,11 @@
         }
       }
 
-      // 应用动画
+      // 搴旂敤鍔ㄧ敾
       if (theme.effects && theme.effects.animations) {
         const animations = theme.effects.animations;
 
-        // 创建霓虹脉冲动画
+        // 鍒涘缓闇撹櫣鑴夊啿鍔ㄧ敾
         if (animations.neonPulse) {
           const neonPulse = animations.neonPulse;
           const styleElement = document.createElement('style');
@@ -12180,11 +8833,11 @@
         }
       }
 
-      // 应用UI元素样式
+      // 搴旂敤UI鍏冪礌鏍峰紡
       if (theme.uiColors) {
         const uiColors = theme.uiColors;
 
-        // 应用按钮样式
+        // 搴旂敤鎸夐挳鏍峰紡
         if (uiColors.buttons) {
           const buttons = uiColors.buttons;
 
@@ -12219,7 +8872,7 @@
           }
         }
 
-        // 应用文字样式
+        // 搴旂敤鏂囧瓧鏍峰紡
         if (uiColors.text) {
           const text = uiColors.text;
 
@@ -12246,13 +8899,13 @@
         }
       }
 
-      // 设置背景图片
+      // 璁剧疆鑳屾櫙鍥剧墖
       if (themeBg && theme.images && theme.images.background) {
         themeBg.style.backgroundImage = `url('${theme.images.background}')`;
         themeBg.classList.add('visible');
       }
 
-      // 创建主题面板
+      // 鍒涘缓涓婚闈㈡澘
       if (theme.panels && Array.isArray(theme.panels)) {
         theme.panels.forEach(panelConfig => {
           if (panelConfig.enabled) {
@@ -12261,13 +8914,13 @@
         });
       }
 
-      // 创建主题面板的辅助函数
+      // 鍒涘缓涓婚闈㈡澘鐨勮緟鍔╁嚱鏁?
       function createThemePanel(panelConfig) {
         const panel = document.createElement('div');
         panel.id = `${panelConfig.id}-panel`;
         panel.className = 'theme-panel';
 
-        // 设置面板样式
+        // 璁剧疆闈㈡澘鏍峰紡
         const position = panelConfig.position || { right: '40px', bottom: '80px', width: '220px' };
         const style = panelConfig.style || {};
 
@@ -12286,7 +8939,7 @@
           display: block;
         `;
 
-        // 根据面板类型创建内容
+        // 鏍规嵁闈㈡澘绫诲瀷鍒涘缓鍐呭
         let panelContent = '';
         if (panelConfig.type === 'character' && panelConfig.image) {
           const avatarStyle = style.avatarBorder ? `border: ${style.avatarBorder}; box-shadow: ${style.avatarShadow};` : '';
@@ -12320,7 +8973,7 @@
         document.body.appendChild(panel);
       }
 
-      // 更新按钮颜色等
+      // 鏇存柊鎸夐挳棰滆壊绛?
       document.querySelectorAll('.nav-btn.active').forEach(btn => {
         btn.style.background = theme.primaryColor;
       });
@@ -12334,7 +8987,7 @@
         btn.style.boxShadow = `0 3px 6px ${theme.primaryColor}33`;
       });
 
-      // 更新大厅UI元素样式
+      // 鏇存柊澶у巺UI鍏冪礌鏍峰紡
       if (lobbyContainer) {
         lobbyContainer.style.background = theme.uiColors.containerBg;
       }
@@ -12359,7 +9012,7 @@
         });
       }
 
-      // 更新排行榜UI元素样式
+      // 鏇存柊鎺掕姒淯I鍏冪礌鏍峰紡
       if (leaderboardContainer) {
         leaderboardContainer.style.background = theme.uiColors.leaderboardBg;
       }
@@ -12393,14 +9046,14 @@
         });
       }
 
-      // 更新棋盘颜色
+      // 鏇存柊妫嬬洏棰滆壊
       gobangBoard.style.background = theme.boardBackground.gobang;
       goBoard.style.background = theme.boardBackground.go;
       chessBoard.style.background = theme.boardBackground['chinese-chess'];
 
-      // 更新棋子颜色和效果
+      // 鏇存柊妫嬪瓙棰滆壊鍜屾晥鏋?
       const pieceEffects = theme.effects?.pieces;
-      // 五子棋黑白子
+      // 浜斿瓙妫嬮粦鐧藉瓙
       document.querySelectorAll('.gobang-black').forEach(piece => {
         piece.style.background = theme.pieceColor.gobangBlack;
         if (pieceEffects) {
@@ -12421,7 +9074,7 @@
           piece.style.filter = '';
         }
       });
-      // 围棋黑白子
+      // 鍥存榛戠櫧瀛?
       document.querySelectorAll('.go-black').forEach(piece => {
         piece.style.background = theme.pieceColor.goBlack;
         if (pieceEffects) {
@@ -12442,7 +9095,7 @@
           piece.style.filter = '';
         }
       });
-      // 象棋红黑子
+      // 璞℃绾㈤粦瀛?
       document.querySelectorAll('.chess-red').forEach(piece => {
         piece.style.background = theme.pieceColor.chessRed;
         if (pieceEffects) {
@@ -12464,7 +9117,7 @@
         }
       });
 
-      // 更新棋盘格子悬停效果
+      // 鏇存柊妫嬬洏鏍煎瓙鎮仠鏁堟灉
       const cellEffects = theme.effects?.cells;
       if (cellEffects) {
         document.querySelectorAll('.gobang-cell').forEach(cell => {
@@ -12480,7 +9133,7 @@
           cell.style.boxShadow = cellEffects.boxShadow || 'none';
         });
 
-        // 应用最后一步效果
+        // 搴旂敤鏈€鍚庝竴姝ユ晥鏋?
         if (cellEffects.lastMove) {
           const lastMoveEffects = cellEffects.lastMove;
           document.querySelectorAll('.gobang-cell.last-move').forEach(cell => {
@@ -12511,10 +9164,10 @@
         });
       }
 
-      // 保存主题选择到 localStorage
+      // 淇濆瓨涓婚閫夋嫨鍒?localStorage
       localStorage.setItem('selectedTheme', themeKey);
 
-      // 如果主题页面正在显示，刷新主题列表以更新选中状态
+      // 濡傛灉涓婚椤甸潰姝ｅ湪鏄剧ず锛屽埛鏂颁富棰樺垪琛ㄤ互鏇存柊閫変腑鐘舵€?
       const themeContainer = document.getElementById('theme-container');
       if (themeContainer && themeContainer.style.display === 'block') {
         showThemeModal();
@@ -12523,7 +9176,7 @@
 
     window.applyTheme = applyTheme;
 
-    // 初始化时加载默认主题
+    // 鍒濆鍖栨椂鍔犺浇榛樿涓婚
     document.addEventListener('DOMContentLoaded', () => {
       applyTheme(currentTheme);
 
@@ -12548,11 +9201,11 @@
       }
     });
 
-    // ========== 自动登录功能 ==========
+    // ========== 鑷姩鐧诲綍鍔熻兘 ==========
 
     let selectedLoginOption = null;
 
-    // 显示自动登录模态窗口
+    // 鏄剧ず鑷姩鐧诲綍妯℃€佺獥鍙?
     function showAutoLoginModal() {
       const modal = document.getElementById('auto-login-modal');
       if (modal) {
@@ -12562,7 +9215,7 @@
       }
     }
 
-    // 关闭自动登录模态窗口
+    // 鍏抽棴鑷姩鐧诲綍妯℃€佺獥鍙?
     function closeAutoLoginModal() {
       const modal = document.getElementById('auto-login-modal');
       if (modal) {
@@ -12570,27 +9223,27 @@
       }
     }
 
-    // 选择登录选项
+    // 閫夋嫨鐧诲綍閫夐」
     function selectLoginOption(option) {
       selectedLoginOption = option;
 
-      // 重置所有选项样式
+      // 閲嶇疆鎵€鏈夐€夐」鏍峰紡
       resetLoginOptions();
 
-      // 设置选中选项样式
+      // 璁剧疆閫変腑閫夐」鏍峰紡
       const selectedElement = document.querySelector(`.login-option:nth-child(${option === 'guest' ? 1 : 2})`);
       if (selectedElement) {
         selectedElement.classList.add('active');
       }
 
-      // 显示/隐藏账号登录表单
+      // 鏄剧ず/闅愯棌璐﹀彿鐧诲綍琛ㄥ崟
       const accountForm = document.getElementById('account-login-form');
       if (accountForm) {
         accountForm.style.display = option === 'account' ? 'block' : 'none';
       }
     }
 
-    // 重置登录选项样式
+    // 閲嶇疆鐧诲綍閫夐」鏍峰紡
     function resetLoginOptions() {
       const options = document.querySelectorAll('.login-option');
       options.forEach(option => {
@@ -12598,23 +9251,23 @@
       });
     }
 
-    // 确认登录
+    // 纭鐧诲綍
     function confirmLogin() {
       if (!selectedLoginOption) {
-        showToast('请先选择登录方式（点击游客登录或账号密码登录选项）', 'warning');
+        showToast('璇峰厛閫夋嫨鐧诲綍鏂瑰紡锛堢偣鍑绘父瀹㈢櫥褰曟垨璐﹀彿瀵嗙爜鐧诲綍閫夐」锛?, 'warning');
         return;
       }
 
       if (selectedLoginOption === 'guest') {
-        // 游客登录
+        // 娓稿鐧诲綍
         guestLogin();
       } else if (selectedLoginOption === 'account') {
-        // 账号密码登录
+        // 璐﹀彿瀵嗙爜鐧诲綍
         const username = document.getElementById('auto-login-username').value.trim();
         const password = document.getElementById('auto-login-password').value;
 
         if (!username || !password) {
-          showToast('请输入用户名和密码', 'warning');
+          showToast('璇疯緭鍏ョ敤鎴峰悕鍜屽瘑鐮?, 'warning');
           return;
         }
 
@@ -12622,41 +9275,41 @@
       }
     }
 
-    // 游客登录
+    // 娓稿鐧诲綍
     function guestLogin() {
       if (currentAccount) {
-        // 已经登录，显示提示
-        showToast('您已经登录了账号', 'info');
+        // 宸茬粡鐧诲綍锛屾樉绀烘彁绀?
+        showToast('鎮ㄥ凡缁忕櫥褰曚簡璐﹀彿', 'info');
         return;
       }
 
       if (socket && socket.connected) {
         socket.emit('guest_login');
-        showToast('正在创建游客账号...', 'info');
+        showToast('姝ｅ湪鍒涘缓娓稿璐﹀彿...', 'info');
       }
     }
 
-    // 账号密码登录
+    // 璐﹀彿瀵嗙爜鐧诲綍
     function accountLogin(username, password) {
       if (socket && socket.connected) {
         socket.emit('account_login', { username, password });
-        showToast('正在登录...', 'info');
+        showToast('姝ｅ湪鐧诲綍...', 'info');
       }
     }
 
-    // 检查登录状态并显示模态窗口
+    // 妫€鏌ョ櫥褰曠姸鎬佸苟鏄剧ず妯℃€佺獥鍙?
     async function checkLoginStatus() {
       const isLoggedIn = await loadSavedAccount();
 
       if (isLoggedIn) {
-        // 加载已保存的权限
+        // 鍔犺浇宸蹭繚瀛樼殑鏉冮檺
         if (currentAccount.permissions) {
           loadPermissions(currentAccount.permissions);
         }
         return true;
       }
 
-      // 如果没有登录，显示自动登录模态窗口
+      // 濡傛灉娌℃湁鐧诲綍锛屾樉绀鸿嚜鍔ㄧ櫥褰曟ā鎬佺獥鍙?
       setTimeout(() => {
         showAutoLoginModal();
       }, 1000);
@@ -12664,11 +9317,11 @@
       return false;
     }
 
-    // 根据权限加载功能模块
+    // 鏍规嵁鏉冮檺鍔犺浇鍔熻兘妯″潡
     function loadPermissions(permissions) {
-      console.log('加载权限:', permissions);
+      console.log('鍔犺浇鏉冮檺:', permissions);
 
-      // 游戏功能控制
+      // 娓告垙鍔熻兘鎺у埗
       const gameButtons = document.querySelectorAll('.match-btn, .lobby-btn');
       if (permissions.canPlayGames) {
         gameButtons.forEach(btn => {
@@ -12680,7 +9333,7 @@
         });
       }
 
-      // 聊天功能控制
+      // 鑱婂ぉ鍔熻兘鎺у埗
       const chatElements = document.querySelectorAll('.chat-input, .chat-send-btn');
       if (permissions.canChat) {
         chatElements.forEach(el => {
@@ -12692,7 +9345,7 @@
         });
       }
 
-      // 排行榜功能控制
+      // 鎺掕姒滃姛鑳芥帶鍒?
       const leaderboardElements = document.querySelectorAll('#leaderboard-container');
       if (permissions.canViewLeaderboard) {
         leaderboardElements.forEach(el => {
@@ -12704,7 +9357,7 @@
         });
       }
 
-      // 个人资料功能控制
+      // 涓汉璧勬枡鍔熻兘鎺у埗
       const profileButtons = document.querySelectorAll('.account-btn[onclick*="showProfileModal"]');
       if (permissions.canEditProfile) {
         profileButtons.forEach(btn => {
@@ -12716,7 +9369,7 @@
         });
       }
 
-      // 房间创建功能控制
+      // 鎴块棿鍒涘缓鍔熻兘鎺у埗
       const roomButtons = document.querySelectorAll('.btn[onclick*="createRoom"]');
       if (permissions.canCreateRooms) {
         roomButtons.forEach(btn => {
@@ -12728,7 +9381,7 @@
         });
       }
 
-      // 好友邀请功能控制
+      // 濂藉弸閭€璇峰姛鑳芥帶鍒?
       const inviteButtons = document.querySelectorAll('.btn[onclick*="inviteFriend"]');
       if (permissions.canInviteFriends) {
         inviteButtons.forEach(btn => {
@@ -12740,15 +9393,15 @@
         });
       }
 
-      // 显示权限提示
-      // 处理不同的数据结构
+      // 鏄剧ず鏉冮檺鎻愮ず
+      // 澶勭悊涓嶅悓鐨勬暟鎹粨鏋?
       const accountData = currentAccount.account.account || currentAccount.account;
       if (currentAccount.loginType === 'guest' || accountData?.type === 'guest') {
-        showToast('您当前以游客身份登录，部分功能受限', 'info', 5000);
+        showToast('鎮ㄥ綋鍓嶄互娓稿韬唤鐧诲綍锛岄儴鍒嗗姛鑳藉彈闄?, 'info', 5000);
       }
     }
 
-    // ========== 账号栏浮动效果 ==========
+    // ========== 璐﹀彿鏍忔诞鍔ㄦ晥鏋?==========
     const accountBar = document.getElementById('account-bar');
     let scrollTimeout;
 
@@ -12765,7 +9418,7 @@
       scrollTimeout = setTimeout(handleScroll, 50);
     });
 
-    // ========== 页面清理 ==========
+    // ========== 椤甸潰娓呯悊 ==========
     window.onunload = () => {
       if (gameState.gameTimer) clearInterval(gameState.gameTimer);
       socket.emit('user_status', {
@@ -12774,261 +9427,5 @@
       });
     };
 
-    // init函数现在由setupSocketListeners在socket连接成功后自动调用
+    // init鍑芥暟鐜板湪鐢眘etupSocketListeners鍦╯ocket杩炴帴鎴愬姛鍚庤嚜鍔ㄨ皟鐢?
   </script>
-
-  <style>
-    @keyframes expFloat {
-      0% {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1);
-      }
-
-      50% {
-        opacity: 1;
-        transform: translate(-50%, -100%) scale(1.2);
-      }
-
-      100% {
-        opacity: 0;
-        transform: translate(-50%, -150%) scale(0.8);
-      }
-    }
-
-    @keyframes levelupPop {
-      0% {
-        opacity: 0;
-        transform: translate(-50%, -50%) scale(0.5);
-      }
-
-      50% {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1.1);
-      }
-
-      100% {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1);
-      }
-    }
-
-    @keyframes levelupFade {
-      0% {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1);
-      }
-
-      100% {
-        opacity: 0;
-        transform: translate(-50%, -50%) scale(1.1);
-      }
-    }
-
-    .replay-board {
-      display: grid !important;
-    }
-
-    .replay-board.gobang-board {
-      background: linear-gradient(135deg, #e8c49a 0%, #d4a76a 50%, #c4956a 100%);
-      padding: 15px;
-      border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.3);
-      border: 4px solid #8b6914;
-      position: relative;
-    }
-
-    .replay-board.gobang-board::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-image:
-        repeating-linear-gradient(90deg, transparent, transparent 29px, rgba(0, 0, 0, 0.3) 29px, rgba(0, 0, 0, 0.3) 30px),
-        repeating-linear-gradient(0deg, transparent, transparent 29px, rgba(0, 0, 0, 0.3) 29px, rgba(0, 0, 0, 0.3) 30px);
-      pointer-events: none;
-      z-index: 1;
-    }
-
-    .replay-board.go-board {
-      background: linear-gradient(135deg, #e5c085 0%, #d4a76a 50%, #c4955a 100%);
-      padding: 15px;
-      border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.3);
-      border: 4px solid #8b6914;
-      position: relative;
-    }
-
-    .replay-board.go-board::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-image:
-        repeating-linear-gradient(90deg, transparent, transparent 27px, rgba(0, 0, 0, 0.4) 27px, rgba(0, 0, 0, 0.4) 28px),
-        repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(0, 0, 0, 0.4) 27px, rgba(0, 0, 0, 0.4) 28px);
-      pointer-events: none;
-      z-index: 1;
-    }
-
-    /* 断开连接提示框样式 */
-    .disconnect-warning {
-      position: fixed;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 10000;
-      animation: slideDown 0.5s ease-out;
-    }
-
-    .disconnect-content {
-      background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
-      border: 3px solid #fc8181;
-      border-radius: 15px;
-      padding: 20px 30px;
-      box-shadow: 0 10px 30px rgba(252, 129, 129, 0.3);
-      text-align: center;
-      min-width: 300px;
-    }
-
-    .disconnect-icon {
-      font-size: 48px;
-      margin-bottom: 15px;
-      animation: pulse 2s infinite;
-    }
-
-    .disconnect-title {
-      font-size: 24px;
-      font-weight: bold;
-      color: #c53030;
-      margin-bottom: 10px;
-    }
-
-    .disconnect-message {
-      font-size: 16px;
-      color: #742a2a;
-      margin-bottom: 20px;
-      line-height: 1.5;
-    }
-
-    .reconnect-btn {
-      background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
-      color: white;
-      border: none;
-      padding: 12px 30px;
-      font-size: 16px;
-      font-weight: bold;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 15px rgba(66, 153, 225, 0.3);
-    }
-
-    .reconnect-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(66, 153, 225, 0.4);
-    }
-
-    .reconnect-btn:active {
-      transform: translateY(0);
-    }
-
-    @keyframes slideDown {
-      0% {
-        opacity: 0;
-        transform: translateX(-50%) translateY(-20px);
-      }
-
-      100% {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-      }
-    }
-
-    @keyframes pulse {
-
-      0%,
-      100% {
-        transform: scale(1);
-      }
-
-      50% {
-        transform: scale(1.1);
-      }
-    }
-  </style>
-
-  <!-- 自定义确认模态框 -->
-  <div id="custom-confirm-modal"
-    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 9999;">
-    <div
-      style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 20px rgba(0, 0, 0, 0.3); text-align: center;">
-      <h3 id="confirm-title" style="margin-top: 0; color: #333;">确认请求</h3>
-      <p id="confirm-message" style="font-size: 18px; margin: 20px 0; color: #666;"></p>
-      <div style="display: flex; gap: 15px; justify-content: center;">
-        <button id="confirm-yes"
-          style="padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">确定</button>
-        <button id="confirm-no"
-          style="padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">取消</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 自动登录模态窗口 -->
-  <div id="auto-login-modal" class="auto-login-modal" style="display: none;">
-    <div class="auto-login-content">
-      <div class="auto-login-title">🎮 欢迎来到多棋种联机大厅</div>
-      <div class="auto-login-subtitle">请选择登录方式开始游戏体验</div>
-
-      <div class="auto-login-buttons">
-        <button class="auto-login-btn btn-primary" onclick="showLoginModal(); closeAutoLoginModal();">
-          <div class="btn-icon">🔐</div>
-          <div class="btn-title">账号登录</div>
-          <div class="btn-desc">使用已有账号</div>
-        </button>
-
-        <button class="auto-login-btn btn-success" onclick="showRegisterModal(); closeAutoLoginModal();">
-          <div class="btn-icon">📝</div>
-          <div class="btn-title">注册账号</div>
-          <div class="btn-desc">创建新账号</div>
-        </button>
-      </div>
-
-      <div class="auto-login-guest-section">
-        <button class="auto-login-btn btn-secondary" onclick="guestLogin(); closeAutoLoginModal();">
-          <div class="btn-icon">👤</div>
-          <div class="btn-title">游客体验</div>
-          <div class="btn-desc">无需注册，立即开始</div>
-        </button>
-      </div>
-
-      <div class="auto-login-footer">
-        <button class="auto-login-close-btn" onclick="closeAutoLoginModal()">
-          稍后再说
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 挑战请求模态框 -->
-  <div id="challenge-modal"
-    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 9999;">
-    <div
-      style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 20px rgba(0, 0, 0, 0.3); text-align: center;">
-      <h3 id="challenge-title" style="margin-top: 0; color: #333;">收到挑战请求！</h3>
-      <p id="challenge-message" style="font-size: 18px; margin: 20px 0; color: #666;"></p>
-      <div style="display: flex; gap: 15px; justify-content: center;">
-        <button id="challenge-accept"
-          style="padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">接受</button>
-        <button id="challenge-reject"
-          style="padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">拒绝</button>
-      </div>
-    </div>
-  </div>
-
-</body>
-
-</html>

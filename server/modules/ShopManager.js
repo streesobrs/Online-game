@@ -164,8 +164,13 @@ class ShopManager {
     return allItems.find(item => item.id === itemId);
   }
 
-  // 购买商品
-  async purchaseItem(userId, itemId, accountManager) {
+  // VIP折扣（百分比）
+  getVipDiscountPercent() {
+    return this.config?.vipDiscount || 10; // 默认9折
+  }
+
+  // 购买商品（支持批量数量）
+  async purchaseItem(userId, itemId, quantity = 1, accountManager) {
     this.checkUpdate();
 
     const item = this.findItem(itemId);
@@ -176,16 +181,43 @@ class ShopManager {
       return { success: false, message: '该商品暂未上线' };
     }
 
-    const currencyResult = await accountManager.getCurrency(userId);
-    const balance = currencyResult?.balance ?? 0;
-    if (balance < item.price) {
-      return { success: false, message: '星钻不足' };
+    // 检查VIP折扣
+    let discount = 0;
+    try {
+      const vipInfo = await accountManager.getVip(userId);
+      if (vipInfo?.vip?.expireAt > Date.now()) {
+        discount = this.getVipDiscountPercent();
+      }
+    } catch (e) {
+      // VIP查询失败不影响购买
     }
 
-    await accountManager.useCurrency(userId, item.price, `购买${item.name}`);
-    await this.deliverItem(userId, item, accountManager);
+    const unitPrice = item.price;
+    const discountedPrice = Math.floor(unitPrice * (100 - discount) / 100);
+    const totalPrice = discountedPrice * quantity;
+    const savedAmount = (unitPrice - discountedPrice) * quantity;
 
-    return { success: true, message: '购买成功', item };
+    const currencyResult = await accountManager.getCurrency(userId);
+    const balance = currencyResult?.balance ?? 0;
+    if (balance < totalPrice) {
+      return { success: false, message: `星钻不足，需要${totalPrice}💎，当前${balance}💎` };
+    }
+
+    await accountManager.useCurrency(userId, totalPrice, `购买${item.name}×${quantity}`);
+    for (let i = 0; i < quantity; i++) {
+      await this.deliverItem(userId, item, accountManager);
+    }
+
+    return {
+      success: true,
+      message: discount > 0
+        ? `购买成功！VIP折扣(${discount}%OFF) 省${savedAmount}💎，实付${totalPrice}💎`
+        : `购买成功 ×${quantity}，共${totalPrice}💎`,
+      item,
+      quantity,
+      totalPrice,
+      discount
+    };
   }
 
   // 发放商品
