@@ -15,7 +15,22 @@
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-      transition: all 0.3s ease;
+    }
+
+    /* 仅对交互元素添加过渡，避免全局性能问题 */
+    button,
+    .nav-btn,
+    .info-panel,
+    .lobby-container,
+    .chat-container,
+    .online-users-panel,
+    .move-log-panel,
+    .controls button,
+    .modal,
+    .tip-popup,
+    .win-alert,
+    .toast {
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, opacity 0.2s ease;
     }
 
 
@@ -1657,17 +1672,17 @@
       flex-direction: column;
       gap: 12px;
       flex: 0 0 260px;
-      transition: all 0.3s ease;
+      transition: flex 0.2s ease;
     }
 
     /* 右侧面板容器 */
     .right-panels-container {
-      transition: all 0.3s ease;
+      transition: width 0.2s ease;
     }
 
     /* 聊天面板 */
     .chat-container {
-      transition: all 0.3s ease;
+      transition: width 0.2s ease, opacity 0.2s ease;
     }
 
     /* 在线玩家面板 */
@@ -1676,7 +1691,7 @@
       padding: 12px;
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-      transition: all 0.3s ease;
+      transition: box-shadow 0.2s ease, transform 0.2s ease;
     }
 
     .online-users-panel .user-list {
@@ -2474,7 +2489,7 @@
       border-radius: 10px;
       background: #f7fafc;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
       display: flex;
       align-items: center;
       gap: 15px;
@@ -2532,7 +2547,7 @@
       border: none;
       border-radius: 15px;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
       background: #f7fafc;
       border: 2px solid transparent;
       display: flex;
@@ -2993,7 +3008,7 @@
     <!-- 左侧面板 - 在线玩家和落子记录 -->
     <div class="left-panels-container">
       <!-- 在线玩家面板 -->
-      <div class="online-users-panel" id="online-users-panel" style="transition: all 0.3s ease;">
+      <div class="online-users-panel" id="online-users-panel">
         <div class="move-log-title">👥 在线玩家</div>
         <div class="user-list" id="user-list">
           暂无在线玩家
@@ -3001,7 +3016,7 @@
       </div>
 
       <!-- 落子记录面板 -->
-      <div class="move-log-panel" id="move-log-panel" style="transition: all 0.3s ease;">
+      <div class="move-log-panel" id="move-log-panel">
         <div class="move-log-title">📜 落子记录（实时更新）</div>
         <div class="move-log-list" id="move-log">
           等待落子...
@@ -3013,7 +3028,7 @@
     <div class="center-content-container">
       <!-- 成就页面 -->
       <div class="achievements-container" id="achievements-container"
-        style="display: none; width: 100%; max-width: 100%; min-width: 500px; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07); margin: 0 0 15px; box-sizing: border-box; transition: all 0.3s ease;">
+        style="display: none; width: 100%; max-width: 100%; min-width: 500px; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07); margin: 0 0 15px; box-sizing: border-box;">
         <div class="lobby-title" style="font-size: 24px; margin-bottom: 15px;">🏆 成就系统</div>
         <div class="lobby-status" style="font-size: 16px; margin-bottom: 25px;">
           解锁成就，获得丰厚奖励！
@@ -3026,7 +3041,7 @@
 
       <!-- 排行榜页面 -->
       <div class="leaderboard-page" id="leaderboard-page"
-        style="display: none; width: 100%; max-width: 100%; min-width: 500px; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07); margin: 0 0 15px; box-sizing: border-box; transition: all 0.3s ease;">
+        style="display: none; width: 100%; max-width: 100%; min-width: 500px; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07); margin: 0 0 15px; box-sizing: border-box;">
         <div class="lobby-title" style="font-size: 24px; margin-bottom: 15px;">📊 排行榜</div>
         <div class="lobby-status" style="font-size: 16px; margin-bottom: 25px;">
           查看玩家排名和战绩！
@@ -3063,7 +3078,7 @@
 
       <!-- AI对战页面 -->
       <div class="ai-game-container" id="ai-game-container"
-        style="display: none; width: 100%; max-width: 100%; min-width: 500px; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07); margin: 0 0 15px; box-sizing: border-box; transition: all 0.3s ease;">
+        style="display: none; width: 100%; max-width: 100%; min-width: 500px; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07); margin: 0 0 15px; box-sizing: border-box;">
         <div class="lobby-title" style="font-size: 24px; text-align: center; margin-bottom: 15px; color: #2d3748;">
           🤖 AI对战
         </div>
@@ -3139,7 +3154,7 @@
 
       <!-- 主题选择页面 -->
       <div class="theme-container" id="theme-container"
-        style="display: none; width: 100%; max-width: 100%; min-width: 500px; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07); margin: 0 0 15px; box-sizing: border-box; transition: all 0.3s ease;">
+        style="display: none; width: 100%; max-width: 100%; min-width: 500px; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07); margin: 0 0 15px; box-sizing: border-box;">
         <div class="lobby-title" style="font-size: 24px; margin-bottom: 15px;">🎨 主题选择</div>
         <div class="lobby-status" style="font-size: 16px; margin-bottom: 25px;">
           选择你喜欢的主题风格！
@@ -3157,7 +3172,7 @@
       </div>
 
       <!-- 棋盘容器 -->
-      <div class="board-container" style="transition: all 0.3s ease;">
+      <div class="board-container" style="transition: transform 0.2s ease;">
         <!-- 五子棋棋盘 -->
         <div class="gobang-board" id="gobang-board"></div>
 
@@ -3242,9 +3257,9 @@
     </div>
 
     <!-- 右侧面板 - 聊天 -->
-    <div class="right-panels-container" style="transition: all 0.3s ease;">
+    <div class="right-panels-container">
       <!-- 聊天面板 -->
-      <div class="chat-container" id="chat-container" style="transition: all 0.3s ease;">
+      <div class="chat-container" id="chat-container">
         <div class="move-log-title">💬 聊天</div>
         <div class="chat-channel-selector">
           <button class="chat-channel-btn active" id="channel-global" onclick="switchChatChannel('global')">
@@ -3607,10 +3622,6 @@
       'ArrowDown': { action: 'snakeDown', description: '贪吃蛇向下', category: '贪吃蛇操作' },
       'ArrowLeft': { action: 'snakeLeft', description: '贪吃蛇向左', category: '贪吃蛇操作' },
       'ArrowRight': { action: 'snakeRight', description: '贪吃蛇向右', category: '贪吃蛇操作' },
-      'w': { action: 'snakeUp', description: '贪吃蛇向上(W)', category: '贪吃蛇操作' },
-      's': { action: 'snakeDown', description: '贪吃蛇向下(S)', category: '贪吃蛇操作' },
-      'a': { action: 'snakeLeft', description: '贪吃蛇向左(A)', category: '贪吃蛇操作' },
-      'd': { action: 'snakeRight', description: '贪吃蛇向右(D)', category: '贪吃蛇操作' },
       ' ': { action: 'snakePause', description: '贪吃蛇暂停(空格)', category: '贪吃蛇操作' }
     };
 
@@ -4131,10 +4142,14 @@
     }
 
     function handleResign() {
-      if (confirm('确定要认输吗？')) {
-        updateStatus('🏳️ 已认输');
-        // 实际认输逻辑
+      if (!gameState.isInGame) {
+        showToast('❌ 当前不在游戏中', 'warning');
+        return;
       }
+      showConfirmDialog('确定要认输吗？认输后将直接判负。', () => {
+        socket.emit('resign');
+        updateStatus('🏳️ 已认输');
+      });
     }
 
     // 显示悔棋和提示按钮（仅对棋类游戏）
@@ -4161,18 +4176,18 @@
       } else if (gameState && gameState.difficulty) {
         restartAIGame();
       } else {
-        if (confirm('确定要重新开始当前游戏吗？')) {
+        showConfirmDialog('确定要重新开始当前游戏吗？', () => {
           updateStatus('🔄 重新开始游戏');
-          // 实际重新开始逻辑
-        }
+          resetGame(true);
+        });
       }
     }
 
     function handleNewGame() {
-      if (confirm('确定要开始新游戏吗？')) {
+      showConfirmDialog('确定要开始新游戏吗？', () => {
         updateStatus('🆕 新游戏开始');
-        // 实际新游戏逻辑
-      }
+        resetGame(true);
+      });
     }
 
     function togglePause() {
@@ -9408,6 +9423,7 @@
       cancelBtn.disabled = false;
       matchBtn.innerHTML = '<div class="loading-spinner"></div>匹配中...';
       lobbyStatus.textContent = `🔍 正在寻找${gameConfigs[currentGame].emoji} ${currentGame === 'gobang' ? '五子棋' : currentGame === 'go' ? '围棋' : '象棋'}对手...`;
+      showToast('🔍 开始匹配，请稍候...', 'info');
 
       socket.emit('match_request', { game: currentGame });
     }
@@ -9430,6 +9446,7 @@
       cancelBtn.disabled = true;
       matchBtn.innerHTML = '🎯 开始匹配';
       lobbyStatus.textContent = '欢迎来到多棋种联机大厅！选择棋种后点击"开始匹配"寻找对手';
+      showToast('❌ 已取消匹配', 'warning');
 
       socket.emit('cancel_match');
     }
@@ -9542,6 +9559,17 @@
     }
 
     function returnToLobby() {
+      // 如果在游戏中，需要确认
+      if (gameState.isInGame && !gameState.gameOver) {
+        showConfirmDialog('确定要返回大厅吗？当前对局将中断。', () => {
+          _returnToLobby();
+        });
+        return;
+      }
+      _returnToLobby();
+    }
+
+    function _returnToLobby() {
       const playAgainBtn = document.getElementById('play-again-btn');
       if (playAgainBtn) {
         playAgainBtn.style.display = 'none';
@@ -12923,7 +12951,7 @@
       font-weight: bold;
       border-radius: 8px;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
       box-shadow: 0 4px 15px rgba(66, 153, 225, 0.3);
     }
 
