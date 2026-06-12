@@ -3901,7 +3901,7 @@
       // 检查是否已被其他功能占用
       const existingAction = Object.entries(shortcuts).find(([k, v]) => k === key);
       if (existingAction && existingAction[0] !== input.dataset.oldValue) {
-        alert(`快捷键 ${key === ' ' ? 'Space' : key} 已被 "${existingAction[1].description}" 使用`);
+        showToast(`快捷键 ${key === ' ' ? 'Space' : key} 已被 "${existingAction[1].description}" 使用`, 'warning');
         input.value = input.dataset.oldValue;
         return;
       }
@@ -4416,6 +4416,14 @@
       initBoards();
     }
 
+    // HTML 转义函数，防止 XSS
+    function escapeHtml(text) {
+      if (text == null) return '';
+      const div = document.createElement('div');
+      div.textContent = String(text);
+      return div.innerHTML;
+    }
+
     // 统一错误提示函数
     function showToast(message, type = 'info', duration = 3000) {
       // 移除现有的提示
@@ -4734,7 +4742,7 @@
       // 处理版本检查结果
       socket.on('version_check', (data) => {
         if (!data.compatible) {
-          alert('版本不兼容：' + data.reason + '\n请更新您的客户端或服务端');
+          showToast('版本不兼容：' + data.reason + '，请更新您的客户端或服务端', 'error', 5000);
         } else if (data.warning) {
           console.warn('版本警告：', data.warning);
         }
@@ -4949,8 +4957,8 @@
               <div style="display: flex; align-items: center; margin-bottom: 10px;">
                 <div style="font-size: 32px; margin-right: 15px;">🏆</div>
                 <div>
-                  <div style="font-size: 20px; font-weight: bold; color: #2d3748;">${achievement.name}</div>
-                  <div style="font-size: 14px; color: #4a5568; margin-top: 2px;">${achievement.description}</div>
+                  <div style="font-size: 20px; font-weight: bold; color: #2d3748;">${escapeHtml(achievement.name)}</div>
+                  <div style="font-size: 14px; color: #4a5568; margin-top: 2px;">${escapeHtml(achievement.description)}</div>
                 </div>
               </div>
               ${achievement.reward ? `<div style="font-size: 16px; font-weight: bold; color: #ed8936; margin-top: 5px;">+${achievement.reward.exp} EXP</div>` : ''}
@@ -5151,7 +5159,7 @@
 
       socket.on('error', (data) => {
         console.error('服务器错误:', data);
-        alert('错误: ' + data.message);
+        showToast('错误: ' + data.message, 'error');
       });
 
       // 系统广播
@@ -5595,7 +5603,7 @@
 
       list.innerHTML = leaderboard.map(player => {
         const rankClass = player.rank <= 3 ? `top-${player.rank}` : '';
-        const name = player.name || player.username || '未知玩家';
+        const name = escapeHtml(player.name || player.username || '未知玩家');
         const isSnake = gameType === 'snake';
         return `
           <div class="leaderboard-item ${rankClass}">
@@ -5666,8 +5674,17 @@
 
     // 收到对手的悔棋请求
     socket.on('undo_request', (data) => {
-      const accepted = confirm(`玩家 ${data.fromNickname || '对手'} 请求悔棋，是否同意？`);
-      socket.emit('undo_response', { accepted });
+      showConfirmDialog(`玩家 ${data.fromNickname || '对手'} 请求悔棋，是否同意？`, () => {
+        socket.emit('undo_response', { accepted: true });
+      });
+      // 拒绝按钮需要单独处理
+      const noBtn = document.getElementById('confirm-no');
+      if (noBtn) {
+        noBtn.onclick = () => {
+          document.getElementById('custom-confirm-modal').style.display = 'none';
+          socket.emit('undo_response', { accepted: false });
+        };
+      }
     });
 
     // 悔棋请求已发送
@@ -7771,7 +7788,7 @@
     // 开始双人模式贪吃蛇游戏（匹配模式）
     function startSnakeDualGame() {
       if (!socket || !socket.connected) {
-        alert('请先登录！');
+        showToast('请先登录！', 'warning');
         return;
       }
 
@@ -8613,6 +8630,7 @@
         }
       } catch (e) {
         // 静默失败，使用本地数据
+        console.warn('同步服务器道具失败:', e.message);
       }
     }
 
@@ -8657,8 +8675,8 @@
         itemEl.style.cssText = 'display: flex; align-items: center; gap: 4px; padding: 4px 10px; background: #f0f4ff; border: 1px solid #d0d8f0; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.2s;';
         itemEl.title = `${config.name}: ${config.desc}\n双击使用`;
         itemEl.innerHTML = `
-          <span>${config.icon}</span>
-          <span style="font-weight: 600; color: #495057;">${config.name}</span>
+          <span>${escapeHtml(config.icon)}</span>
+          <span style="font-weight: 600; color: #495057;">${escapeHtml(config.name)}</span>
           <span style="color: #007bff; font-weight: 700;">×${count}</span>
         `;
         // 悬停效果
@@ -8757,6 +8775,7 @@
         });
       } catch (e) {
         // 静默处理
+        console.warn('同步消耗服务器道具失败:', e.message);
       }
     }
 
@@ -8790,6 +8809,9 @@
         cancelAnimationFrame(snakeGameState.gameLoop);
         snakeGameState.gameLoop = null;
       }
+
+      // 移除键盘事件监听器，防止泄漏
+      document.removeEventListener('keydown', handleSnakeKeydown);
 
       // 清除道具效果
       clearSnakeItemEffects();
@@ -8853,6 +8875,9 @@
           clearInterval(snakeGameState.gameTimer);
           snakeGameState.gameTimer = null;
         }
+
+        // 移除键盘事件监听器，防止泄漏
+        document.removeEventListener('keydown', handleSnakeKeydown);
 
         // 如果是双人模式，通知服务器返回大厅
         if (snakeGameState.isDualMode) {
@@ -9148,9 +9173,9 @@
       messageEl.innerHTML = `
         <div class="chat-sender">
           <span class="chat-scope ${scopeClass}">${scopeLabel}</span>
-          <span>${nickname}</span>
+          <span>${escapeHtml(nickname)}</span>
         </div>
-        <div>${message}</div>
+        <div>${escapeHtml(message)}</div>
       `;
       chatMessages.appendChild(messageEl);
       chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -9249,14 +9274,14 @@
             user.status === 'playing' ? '游戏中' : '';
 
         // 优先显示昵称，如果没有昵称则显示ID
-        const displayName = user.nickname || (isMe ? '我' : '玩家' + uid.substring(0, 4));
+        const displayName = user.nickname ? escapeHtml(user.nickname) : (isMe ? '我' : '玩家' + uid.substring(0, 4));
 
         html += `<div class="user-item ${statusClass} ${gameClass} ${isMe ? 'me' : ''}">
           <span>${isMe ? '👤' : '👥'}</span>
           <span>${displayName}${isMe ? ' (我)' : ''}</span>
           <span style="color: #718096;">胜: ${user.stats?.wins || 0}</span>
           <span>${statusText}</span>
-          ${!isMe && user.status === 'online' ? `<button class="challenge-btn" onclick="sendChallenge('${uid}')">挑战</button>` : ''}
+          ${!isMe && user.status === 'online' ? `<button class="challenge-btn" onclick="sendChallenge('${escapeHtml(uid)}')">挑战</button>` : ''}
         </div>`;
       });
       userList.innerHTML = html;
@@ -11433,7 +11458,7 @@
     }
 
     function logout() {
-      if (confirm('确定要退出登录吗？')) {
+      showConfirmDialog('确定要退出登录吗？', () => {
         currentAccount = null;
         clearAccount();
         updateAccountBar();
@@ -11442,12 +11467,12 @@
         setTimeout(() => {
           showAutoLoginModal();
         }, 500);
-      }
+      });
     }
 
     // 游客退出
     function guestLogout() {
-      if (confirm('确定要退出游客模式吗？')) {
+      showConfirmDialog('确定要退出游客模式吗？', () => {
         currentAccount = null;
         clearAccount();
         updateAccountBar();
@@ -11456,7 +11481,7 @@
         setTimeout(() => {
           showAutoLoginModal();
         }, 500);
-      }
+      });
     }
 
     function showProfileModal() {
@@ -11668,7 +11693,7 @@
 
     function doUpdateProfile() {
       if (!currentAccount) {
-        alert('请先登录');
+        showToast('请先登录', 'warning');
         return;
       }
 
@@ -11692,7 +11717,7 @@
 
     function doChangePassword() {
       if (!currentAccount) {
-        alert('请先登录');
+        showToast('请先登录', 'warning');
         return;
       }
 
@@ -11704,17 +11729,17 @@
       const newPassword2 = document.getElementById('new-password2').value;
 
       if (!oldPassword || !newPassword || !newPassword2) {
-        alert('请填写完整信息');
+        showToast('请填写完整信息', 'warning');
         return;
       }
 
       if (newPassword !== newPassword2) {
-        alert('两次输入的新密码不一致');
+        showToast('两次输入的新密码不一致', 'error');
         return;
       }
 
       if (newPassword.length < 6) {
-        alert('新密码至少需要6位');
+        showToast('新密码至少需要6位', 'warning');
         return;
       }
 
@@ -11730,7 +11755,7 @@
     // 显示挑战请求模态框
     function showChallengeModal(fromNickname, gameType) {
       const gameTypeName = gameConfigs[gameType] ? gameConfigs[gameType].emoji + ' ' + (gameType === 'gobang' ? '五子棋' : gameType === 'go' ? '围棋' : '象棋') : gameType;
-      challengeMessage.innerHTML = `玩家 <strong>${fromNickname}</strong> 邀请您进行一场 <strong>${gameTypeName}</strong> 对战！`;
+      challengeMessage.innerHTML = `玩家 <strong>${escapeHtml(fromNickname)}</strong> 邀请您进行一场 <strong>${escapeHtml(gameTypeName)}</strong> 对战！`;
       challengeModal.style.display = 'flex';
     }
 
