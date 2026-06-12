@@ -39,7 +39,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      font-family: 'Microsoft Yahei', Arial, sans-serif;
+      font-family: 'PingFang SC', 'Microsoft Yahei', Arial, sans-serif;
       padding: 20px;
       padding-top: 20px;
       min-height: 100vh;
@@ -3354,11 +3354,11 @@
 
   <!-- 版本信息 -->
   <div class="version-info">
-    版本说明：多棋种联机大厅版 - 支持五子棋/围棋/象棋 | 智能提示系统 | 性能优化版 | 快捷键系统 v<span id="client-version-display">1.5.0</span>
+    多棋种联机大厅 v<span id="client-version-display">1.5.0</span>
     <span id="server-version-display" style="margin-left: 10px; font-size: 12px; color: #666;"></span>
   </div>
 
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
   <script src="replay-module.js"></script>
   <script>
     // 版本号 (语义化版本: MAJOR.MINOR.PATCH)
@@ -4642,9 +4642,6 @@
           lastExp = userAccountData?.profile?.exp || 0;
           lastLevel = userAccountData?.profile?.level || 1;
           updateAccountBar();
-          console.log('已恢复登录状态', currentAccount);
-          console.log('currentAccount.stats:', currentAccount.stats);
-          console.log('currentAccount.account.stats:', currentAccount.account?.stats);
           return true;
         }
       } catch (e) {
@@ -4657,7 +4654,6 @@
     function saveToken(token) {
       try {
         localStorage.setItem('userToken', token);
-        console.log('Token已保存');
       } catch (e) {
         console.error('保存token失败', e);
       }
@@ -4669,7 +4665,6 @@
         localStorage.removeItem('userToken');
         localStorage.removeItem('loginStatus');
         localStorage.removeItem('currentAccountId');
-        console.log('账号信息已清除');
       } catch (e) {
         console.error('清除账号信息失败', e);
       }
@@ -4680,7 +4675,6 @@
       let isInitialized = false;
 
       socket.on('connect', async () => {
-        console.log('Socket.io连接成功');
         connectStatusEl.textContent = '已连接';
         connectStatusEl.className = 'info-value value-connected';
 
@@ -4715,7 +4709,6 @@
       });
 
       socket.on('disconnect', () => {
-        console.log('Socket.io断开连接');
         connectStatusEl.textContent = '已断开';
         connectStatusEl.className = 'info-value value-danger';
 
@@ -4724,7 +4717,6 @@
       });
 
       socket.on('reconnect', () => {
-        console.log('Socket.io重新连接成功');
         connectStatusEl.textContent = '已连接';
         connectStatusEl.className = 'info-value value-connected';
         hideDisconnectWarning();
@@ -4732,18 +4724,15 @@
       });
 
       socket.on('reconnect_attempt', (attemptNumber) => {
-        console.log('正在尝试重新连接...', attemptNumber);
         updateStatus(`正在重新连接... (${attemptNumber}/5)`);
       });
 
       socket.on('reconnect_failed', () => {
-        console.log('重新连接失败');
         updateStatus('重新连接失败，请点击重连按钮');
       });
 
       // 处理版本检查结果
       socket.on('version_check', (data) => {
-        console.log('版本检查结果:', data);
         if (!data.compatible) {
           alert('版本不兼容：' + data.reason + '\n请更新您的客户端或服务端');
         } else if (data.warning) {
@@ -4759,7 +4748,6 @@
 
       socket.on('user_connected', (data) => {
         accountId = data.accountId;
-        console.log('获得用户ID:', accountId);
         // 保存用户ID到localStorage
         saveUserId(accountId);
         initUserStatus();
@@ -4795,22 +4783,16 @@
       });
 
       socket.on('match_success', (data) => {
-        console.log('匹配成功:', data);
         matchedOpponentId = data.opponentId;
         gameId = data.gameId;
         startGameWithOpponent(data.opponentId, data.color);
       });
 
       socket.on('move', (data) => {
-        console.log('收到移动:', data);
-        console.log('当前accountId:', accountId);
-        console.log('消息from:', data.from);
-        console.log('是否是自己的消息:', data.from === accountId);
         if (gameState.gameOver) return;
 
         // 检查是否是自己的落子，如果是则跳过
         if (data.from === accountId) {
-          console.log('收到自己的落子消息，跳过');
           return;
         }
 
@@ -4827,20 +4809,17 @@
 
       // 重置请求被接受
       socket.on('reset_accepted', (data) => {
-        console.log('重置请求被接受:', data);
         resetGame(false);
         showBroadcast(data.message || '对方已同意重置游戏', '系统', Date.now());
       });
 
       // 重置请求被拒绝
       socket.on('reset_rejected', (data) => {
-        console.log('重置请求被拒绝:', data);
         showBroadcast(data.message || '对方拒绝了重置请求', '系统', Date.now());
       });
 
       // 重置请求超时
       socket.on('reset_request_timeout', (data) => {
-        console.log('重置请求超时:', data);
         showBroadcast(data.message || '重置请求超时，对方未回应', '系统', Date.now());
       });
 
@@ -4885,8 +4864,6 @@
       });
 
       socket.on('opponent_left', (data) => {
-        console.log('对手离开游戏:', data);
-
         let message = '';
         if (data.reason === '游戏刚开始，判定为无效游戏') {
           message = `对方(${data.nickname})在游戏刚开始时离开，本局判定为无效游戏`;
@@ -4909,8 +4886,9 @@
       });
 
       socket.on('game_ended', (data) => {
-        console.log('游戏结束:', data);
         gameState.gameOver = true;
+        // 清理对局数据，防止内存泄漏
+        gameState.moveLog = [];
 
         let winMsg = '';
         if (data.result === 'win') {
@@ -5086,7 +5064,6 @@
 
       // AI游戏开始
       socket.on('ai_game_start', (data) => {
-        console.log('AI游戏开始:', data);
         // 如果是象棋游戏，同步后端棋盘
         if (data.gameType === 'chinese-chess' && data.board) {
           const pieces = convertBackendBoardToFrontend(data.board);
@@ -5100,13 +5077,11 @@
 
       // AI移动结果
       socket.on('ai_move_result', (data) => {
-        console.log('收到AI移动结果:', data);
         handleAIMoveResult(data);
       });
 
       // AI游戏结束
       socket.on('ai_game_end', (data) => {
-        console.log('AI游戏结束:', data);
         gameState.gameOver = true;
 
         let winMsg = '';
@@ -5135,7 +5110,6 @@
       });
 
       socket.on('chat_message', (data) => {
-        console.log('收到聊天消息:', data);
         const isOther = data.userId !== accountId;
         const scope = data.scope || 'global';
 
@@ -5182,13 +5156,11 @@
 
       // 系统广播
       socket.on('system_broadcast', (data) => {
-        console.log('收到系统广播:', data);
         showBroadcast(data.message, data.from, data.timestamp);
       });
 
       // 维护模式通知
       socket.on('maintenance_notice', (data) => {
-        console.log('维护模式通知:', data);
         if (data.enabled) {
           showBroadcast(data.message, '系统维护', data.timestamp);
         }
@@ -5196,13 +5168,11 @@
 
       // 管理员消息
       socket.on('admin_message', (data) => {
-        console.log('收到管理员消息:', data);
         showBroadcast(data.message, data.from || '管理员', data.timestamp);
       });
 
       // 游戏被重置
       socket.on('game_reset', (data) => {
-        console.log('游戏被重置:', data);
         gameState.gameOver = true;
         showBroadcast(data.message || '游戏已被管理员重置', '系统', Date.now());
         returnToLobby();
@@ -5210,7 +5180,6 @@
 
       // 游戏消息
       socket.on('game_message', (data) => {
-        console.log('收到游戏消息:', data);
         if (data.type === 'opponent_left') {
           showBroadcast(data.message, '系统', data.timestamp);
         }
@@ -5219,13 +5188,11 @@
       // ========== 挑战相关事件 ==========
 
       socket.on('challenge_received', (data) => {
-        console.log('收到挑战请求:', data);
         currentChallenge = data;
         showChallengeModal(data.fromNickname, data.game);
       });
 
       socket.on('challenge_sent', (data) => {
-        console.log('挑战请求已发送:', data);
         if (data.success) {
           updateStatus(data.message);
         } else {
@@ -5234,14 +5201,12 @@
       });
 
       socket.on('challenge_accepted', (data) => {
-        console.log('挑战被接受:', data);
         hideChallengeModal();
         updateStatus(`✅ 玩家 ${data.fromNickname || data.toNickname} 接受了你的挑战！游戏开始！`);
         // 游戏开始逻辑由 match_success 处理
       });
 
       socket.on('challenge_rejected', (data) => {
-        console.log('挑战被拒绝:', data);
         hideChallengeModal();
         updateStatus(`❌ 玩家 ${data.fromNickname || data.toNickname} 拒绝了你的挑战。`);
       });
@@ -5250,7 +5215,6 @@
 
       // 处理登录结果
       socket.on('login_result', (data) => {
-        console.log('登录结果:', data);
         const { success, message, data: resultData } = data;
 
         // 恢复按钮状态
@@ -5310,8 +5274,6 @@
       });
 
       socket.on('account_action_result', (data) => {
-        console.log('账号操作结果:', data);
-
         // 恢复按钮状态
         const loginBtn = document.querySelector('#account-modal .btn-primary');
         const registerBtn = document.querySelector('#account-modal .btn-success');
@@ -5406,19 +5368,15 @@
       });
 
       socket.on('leaderboard', (data) => {
-        console.log('收到排行榜数据:', data);
         updateLeaderboard(data.leaderboard, currentLeaderboardGameType);
       });
 
       socket.on('game_history', (data) => {
-        console.log('收到游戏历史记录:', data);
         updateGameHistory(data.history);
       });
 
       // 贪吃蛇匹配相关事件
       socket.on('snake_match_found', (data) => {
-        console.log('贪吃蛇匹配成功:', data);
-
         // 先恢复游戏界面，再启动游戏
         showSnakeGameInterface();
 
@@ -5448,7 +5406,6 @@
       });
 
       socket.on('match_timeout', (data) => {
-        console.log('匹配超时:', data);
         showToast(data.message || '匹配超时，请稍后重试', 'warning');
         showSnakeGameInterface();
         updateStatus('匹配已超时');
@@ -5459,25 +5416,21 @@
       });
 
       socket.on('snake_game_over', (data) => {
-        console.log('贪吃蛇游戏结束:', data);
         endDualSnakeGame();
       });
 
       socket.on('snake_match_cancelled', () => {
-        console.log('贪吃蛇匹配已取消');
         showSnakeGameInterface();
         updateStatus('匹配已取消');
       });
 
       socket.on('snake_food_sync', (data) => {
-        console.log('同步食物状态:', data);
         if (snakeGameState.isDualMode && data.foods) {
           snakeGameState.foods = data.foods;
         }
       });
 
       socket.on('snake_full_state_sync', (data) => {
-        console.log('全量同步游戏状态:', data);
         if (snakeGameState.isDualMode) {
           snakeGameState.snake = data.isPlayer1 ? data.player1Snake : data.player2Snake;
           snakeGameState.score = data.isPlayer1 ? data.player1Score : data.player2Score;
@@ -7331,13 +7284,8 @@
 
 
     function handleBoardMove(data) {
-      console.log('处理对手落子:', data);
-      console.log('当前棋盘状态:', gameState.board[data.r][data.c]);
-      console.log('是否是自己的消息:', data.from === accountId);
-
       // 检查是否是自己的落子，如果是则跳过
       if (data.from === accountId) {
-        console.log('跳过自己的落子消息');
         return;
       }
 
@@ -7695,7 +7643,6 @@
             // 尝试使用复活卡
             if (tryUseResurrection()) {
               // 复活：取消本次移动，蛇保持原位
-              console.log('🐍 使用复活卡，蛇已复活！');
               showToast('❤️ 使用复活卡，蛇已复活！', 'success', 2000);
               // 重置蛇的位置到安全位置（倒退一步）
               snakeGameState.snake = snakeGameState.snake.slice(0, Math.max(1, snakeGameState.snake.length - 1));
@@ -7709,12 +7656,6 @@
               snakeGameState.gameLoop = requestAnimationFrame(gameLoop);
               return;
             }
-            console.log('🐍 贪吃蛇碰撞检测', {
-              headPosition: head,
-              snakeLength: snakeGameState.snake.length,
-              score: snakeGameState.score,
-              reason: '墙壁或自身碰撞'
-            });
             endSnakeGame();
             return;
           }
@@ -7780,24 +7721,10 @@
               snakeGameState.maxLength = snakeGameState.snake.length;
             }
 
-            console.log('🐍 贪吃蛇吃到食物', {
-              position: oldFood,
-              score: snakeGameState.score,
-              foodEaten: snakeGameState.foodEaten,
-              maxLength: snakeGameState.maxLength,
-              snakeLength: snakeGameState.snake.length,
-              multiplier: snakeGameState.scoreMultiplier,
-              foodsRemaining: snakeGameState.foods.length
-            });
-
             // 加速（每100分加速一次）
             if (snakeGameState.score % 100 === 0 && snakeGameState.speed > 50) {
               snakeGameState.speed -= 10;
               updateSnakeSpeed();
-              console.log('🐍 贪吃蛇加速', {
-                newSpeed: snakeGameState.speed,
-                score: snakeGameState.score
-              });
             }
           } else {
             snakeGameState.snake.pop();
@@ -7831,19 +7758,11 @@
 
       snakeGameState.gameLoop = requestAnimationFrame(gameLoop);
 
-      console.log('🐍 贪吃蛇游戏开始', {
-        initialSpeed: snakeGameState.speed,
-        initialDirection: snakeGameState.direction,
-        initialPosition: snakeGameState.snake[0],
-        foodPosition: snakeGameState.food
-      });
-
       // 发送游戏开始事件到服务器
       if (socket && socket.connected) {
         socket.emit('snake_game_start', {
           gameType: 'snake'
         });
-        console.log('🐍 发送贪吃蛇游戏开始事件到服务器');
       }
 
       updateStatus('🎮 贪吃蛇游戏开始！');
@@ -8088,7 +8007,6 @@
       snakeGameState.lastTime = Date.now();
       snakeGameState.gameLoop = requestAnimationFrame(gameLoop);
 
-      console.log('🐍🐍 匹配成功，双人贪吃蛇游戏开始');
       updateStatus('🎮 匹配成功！双人贪吃蛇游戏开始！');
     }
 
@@ -8109,18 +8027,14 @@
 
     // 处理对手的更新
     function handleOpponentUpdate(data) {
-      console.log('收到对手更新:', data);
-
       snakeGameState.snake2 = data.snake;
       snakeGameState.score2 = data.score;
 
       // 同步食物和时间
       if (data.foods) {
-        console.log('同步食物状态:', data.foods);
         snakeGameState.foods = data.foods;
       }
       if (data.gameTimeLeft !== undefined) {
-        console.log('同步游戏时间:', data.gameTimeLeft);
         snakeGameState.gameTimeLeft = data.gameTimeLeft;
       }
 
@@ -8699,7 +8613,6 @@
         }
       } catch (e) {
         // 静默失败，使用本地数据
-        console.log('同步服务器道具失败，使用本地数据');
       }
     }
 
@@ -8844,7 +8757,6 @@
         });
       } catch (e) {
         // 静默处理
-        console.log('同步消耗服务器道具失败');
       }
     }
 
@@ -8892,13 +8804,6 @@
       showWinAlert(winMsg);
       updateStatus(`🏆 ${winMsg}`);
 
-      console.log('🐍 贪吃蛇游戏结束', {
-        score: snakeGameState.score,
-        highScore: snakeGameState.highScore,
-        snakeLength: snakeGameState.snake.length,
-        finalSpeed: snakeGameState.speed
-      });
-
       // 发送分数到服务器
       if (socket && socket.connected) {
         socket.emit('snake_game_end', {
@@ -8908,12 +8813,6 @@
           moveHistory: snakeGameState.moveHistory,
           maxLength: snakeGameState.maxLength,
           foodEaten: snakeGameState.foodEaten
-        });
-        console.log('🐍 发送贪吃蛇游戏结果到服务器', {
-          score: snakeGameState.score,
-          maxLength: snakeGameState.maxLength,
-          foodEaten: snakeGameState.foodEaten,
-          moveCount: snakeGameState.moveHistory.length
         });
       }
     }
@@ -8931,11 +8830,6 @@
         clearInterval(snakeGameState.gameTimer);
         snakeGameState.gameTimer = null;
       }
-
-      console.log('🐍 贪吃蛇游戏重新开始', {
-        previousScore: snakeGameState.score,
-        highScore: snakeGameState.highScore
-      });
 
       // 根据当前模式重新开始
       if (snakeGameState.isDualMode) {
@@ -9971,8 +9865,7 @@
           return;
         }
 
-        // AI 的移动 - 记录日志
-        console.log('AI 移动:', position);
+        // AI 的移动
 
         // 获取棋子名称用于记录
         const pieceCell = board[position.toR][position.toC];
@@ -10022,7 +9915,6 @@
         // 检查位置是否已经有棋子（防止重复记录用户的落子）
         if (currentGame === 'gobang' || currentGame === 'go') {
           if (gameState.board[position.r][position.c] !== 0) {
-            console.log('位置已有棋子，跳过AI移动结果:', data);
             // 只更新回合，不记录落子
             gameState.turn = currentPlayer;
             return;
@@ -11572,10 +11464,6 @@
       const accountData = currentAccount.account.account || currentAccount.account;
       const statsData = currentAccount.stats || {};
 
-      console.log('showProfileModal - currentAccount:', currentAccount);
-      console.log('showProfileModal - statsData:', statsData);
-      console.log('showProfileModal - statsData.totalWins:', statsData?.totalWins);
-
       const modal = document.createElement('div');
       modal.className = 'account-modal-overlay';
       modal.id = 'account-modal';
@@ -11981,7 +11869,6 @@
 
         if (result.success && result.data) {
           themes = { ...defaultThemes, ...result.data };
-          console.log('从服务器加载主题', { count: Object.keys(result.data).length });
         }
       } catch (err) {
         console.warn('从服务器获取主题失败', { error: err.message });
@@ -12694,8 +12581,6 @@
 
     // 根据权限加载功能模块
     function loadPermissions(permissions) {
-      console.log('加载权限:', permissions);
-
       // 游戏功能控制
       const gameButtons = document.querySelectorAll('.match-btn, .lobby-btn');
       if (permissions.canPlayGames) {
