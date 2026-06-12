@@ -41,7 +41,7 @@ echo ========================================
 echo   URLs:
 echo   Game: http://localhost:8080
 echo   Admin: http://localhost:8080/admin
-echo   Token: admin-secret-token
+echo   Admin Login: Use game account to login (requires admin permission)
 echo ========================================
 echo.
 

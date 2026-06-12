@@ -70,6 +70,9 @@ function authenticateToken(req, res, next) {
 app.use(express.static(path.join(__dirname, '..', 'client')));
 app.use(express.static(path.join(__dirname, '..')));
 
+// 静态资源服务 - 勋章图标等
+app.use('/assets', express.static(path.join(__dirname, 'assets')));
+
 // API路由
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'admin.html'));
@@ -1143,7 +1146,8 @@ app.get('/api/profile/:accountId', async (req, res) => {
           nickname: account.account?.nickname,
           type: account.account?.type,
           createdAt: account.account?.createdAt,
-          loginCount: account.account?.loginCount || 0
+          loginCount: account.account?.loginCount || 0,
+          hasPassword: account.hasPassword || false
         },
         profile: account.account?.profile || { level: 1, exp: 0 },
         currency: currency.balance || 0,
@@ -1156,7 +1160,8 @@ app.get('/api/profile/:accountId', async (req, res) => {
         achievements: {
           unlocked: unlockedAchievements,
           progress: achievementProgress,
-          badges: account.badges || []
+          badges: account.badges || [],
+          badgeDefinitions: achievementManager.getBadgeDefinitions()
         },
         stats: {
           totalGames,
@@ -1187,6 +1192,8 @@ const accountManager = new AccountManager();
 AccountManager.initHolidays().catch(err => logger.warn('节假日初始化失败', { error: err.message }));
 const userManager = new UserManager(accountManager);
 const achievementManager = new AchievementManager(accountManager, userManager);
+// 启动时同步勋章数据
+achievementManager.syncAllBadges().catch(err => logger.warn('勋章数据同步失败', { error: err.message }));
 const aiManager = new AIManager();
 const gameManager = new GameManager(userManager, accountManager, achievementManager, aiManager);
 const chatManager = new ChatManager(userManager, gameManager, accountManager);
@@ -1531,6 +1538,40 @@ io.on('connection', (socket) => {
     });
   });
 
+  // 设置密码（用于没有密码的账号首次设置密码）
+  socket.on('account_set_password', async (data) => {
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (!userSession) {
+      socket.emit('account_action_result', {
+        action: 'set_password',
+        success: false,
+        message: '用户未登录'
+      });
+      return;
+    }
+
+    const { password } = data;
+    const result = await accountManager.setPassword(userSession.accountId, password);
+    socket.emit('account_action_result', {
+      action: 'set_password',
+      ...result
+    });
+  });
+
+  // 升级为管理员
+  socket.on('admin_upgrade_account', async (data) => {
+    const { accountId, upgradeKey } = data;
+
+    logger.info('收到升级为管理员请求', {
+      socketId: socket.id,
+      accountId
+    });
+
+    const result = await adminManager.upgradeToAdmin(accountId, upgradeKey);
+
+    socket.emit('admin_upgrade_result', result);
+  });
+
   // 重置密码（找回密码）
   socket.on('account_reset_password', async (data) => {
     const { username, password } = data;
@@ -1781,10 +1822,11 @@ io.on('connection', (socket) => {
       const activity = account?.account?.activity || {};
       const level = account?.account?.profile?.level || 1;
 
-      // 聚合所有游戏类型的胜利数据
+      // 聚合所有游戏类型的胜利数据和最高分数据
       let bestStreak = 0;
       let bestMaxStreak = 0;
       const gameTypeWins = {};
+      const gameTypeHighScores = {};
       if (account?.games) {
         Object.values(account.games).forEach(g => {
           bestStreak = Math.max(bestStreak, g.streak || 0);
@@ -1792,6 +1834,7 @@ io.on('connection', (socket) => {
         });
         for (const [gameKey, gameData] of Object.entries(account.games)) {
           gameTypeWins[gameKey] = gameData.wins || 0;
+          gameTypeHighScores[gameKey] = gameData.highScore || 0;
         }
       }
 
@@ -1816,6 +1859,7 @@ io.on('connection', (socket) => {
         losses: stats.totalLosses || 0,
         draws: stats.totalDraws || 0,
         gameTypeWins,
+        gameTypeHighScores,
       });
 
       // 为每个成就添加解锁状态
@@ -2400,10 +2444,11 @@ io.on('connection', (socket) => {
           const isWinner = score > 100;
           const playedGameTypes = postAccount.games ? Object.keys(postAccount.games).filter(k => postAccount.games[k].totalGames > 0).length : 0;
 
-          // 聚合所有游戏类型的连胜数据
+          // 聚合所有游戏类型的连胜数据和最高分
           let snakeBestStreak = 0;
           let snakeBestMaxStreak = 0;
           const gameTypeWins = {};
+          const gameTypeHighScores = {};
           if (postAccount.games) {
             Object.values(postAccount.games).forEach(g => {
               snakeBestStreak = Math.max(snakeBestStreak, g.streak || 0);
@@ -2411,37 +2456,40 @@ io.on('connection', (socket) => {
             });
             for (const [gk, gd] of Object.entries(postAccount.games)) {
               gameTypeWins[gk] = gd.wins || 0;
+              gameTypeHighScores[gk] = gd.highScore || 0;
             }
           }
-
-          await gameManager.achievementManager.checkAchievements(accountId, {
-            ...postAccount.stats,
-            ...(postAccount.stats?.flags || {}),
-            // 用当前游戏时间覆盖持久标志位
-            nightGame: (() => { const h = new Date().getHours(); return h >= 2 && h <= 6; })(),
-            weekendGame: (() => { const d = new Date().getDay(); return d === 0 || d === 6; })(),
-            ...(postAccount.account?.activity || {}),
-            gameType: 'snake',
-            score: score,
-            level: snakeLevel,
-            streak: snakeBestStreak,
-            maxStreak: snakeBestMaxStreak,
-            result: isWinner ? 'win' : 'loss',
-            silentWin: true,
-            lonerWin: true,
-            allGameTypes: playedGameTypes >= 3,
-            singleGameType: playedGameTypes === 1 && (postAccount.stats?.totalGames || 0) > 1,
-            quickGame: score < 50,
-            slowGame: score > 300,
-            maxMoves: moveHistory ? moveHistory.length : 0,
-            wins: postAccount.stats?.totalWins || 0,
-            losses: postAccount.stats?.totalLosses || 0,
-            draws: postAccount.stats?.totalDraws || 0,
-            gameTypeWins,
-            timestamp: Date.now()
-          });
         }
+
+        await gameManager.achievementManager.checkAchievements(accountId, {
+          ...postAccount.stats,
+          ...(postAccount.stats?.flags || {}),
+          // 用当前游戏时间覆盖持久标志位
+          nightGame: (() => { const h = new Date().getHours(); return h >= 2 && h <= 6; })(),
+          weekendGame: (() => { const d = new Date().getDay(); return d === 0 || d === 6; })(),
+          ...(postAccount.account?.activity || {}),
+          gameType: 'snake',
+          score: score,
+          level: snakeLevel,
+          streak: snakeBestStreak,
+          maxStreak: snakeBestMaxStreak,
+          result: isWinner ? 'win' : 'loss',
+          silentWin: true,
+          lonerWin: true,
+          allGameTypes: playedGameTypes >= 3,
+          singleGameType: playedGameTypes === 1 && (postAccount.stats?.totalGames || 0) > 1,
+          quickGame: score < 50,
+          slowGame: score > 300,
+          maxMoves: moveHistory ? moveHistory.length : 0,
+          wins: postAccount.stats?.totalWins || 0,
+          losses: postAccount.stats?.totalLosses || 0,
+          draws: postAccount.stats?.totalDraws || 0,
+          gameTypeWins,
+          gameTypeHighScores,
+          timestamp: Date.now()
+        });
       }
+
 
     } catch (err) {
       logger.error('处理贪吃蛇游戏结果失败', { error: err.message });
@@ -2602,6 +2650,10 @@ const adminNamespace = io.of('/admin');
 
 adminNamespace.use((socket, next) => {
   const token = socket.handshake.auth.token || socket.handshake.query.token;
+  // 允许不带 token 的连接（用于账号登录）
+  if (!token) {
+    return next();
+  }
   if (adminManager.verifyToken(token)) {
     next();
   } else {
@@ -2613,7 +2665,41 @@ adminNamespace.on('connection', (socket) => {
   logger.info('管理员连接', { socketId: socket.id });
 
   const token = socket.handshake.auth.token || socket.handshake.query.token;
-  adminManager.handleAdminConnection(socket, token, io);
+
+  // 如果有 token，直接使用 token 登录
+  if (token) {
+    adminManager.handleAdminConnection(socket, token, io);
+  }
+
+  // 处理账号登录请求
+  socket.on('admin_account_login', async (data) => {
+    const { username, password } = data;
+
+    logger.info('收到后台账号登录请求', {
+      socketId: socket.id,
+      username
+    });
+
+    const result = await adminManager.verifyAccountLogin(username, password);
+
+    if (result.success) {
+      // 登录成功，发送结果和 token
+      socket.emit('admin_login_result', {
+        success: true,
+        token: result.token,
+        account: result.account
+      });
+
+      // 使用新 token 建立管理员连接
+      adminManager.handleAdminConnection(socket, result.token, io);
+    } else {
+      // 登录失败
+      socket.emit('admin_login_result', {
+        success: false,
+        message: result.message
+      });
+    }
+  });
 
   // 踢出用户
   socket.on('kick_user', (data) => {
@@ -2832,7 +2918,7 @@ server.listen(PORT, HOST, () => {
   console.log(`🎮 游戏服务器已启动`);
   console.log(`📍 地址: http://${displayHost}:${PORT}`);
   console.log(`🔧 管理后台: http://${displayHost}:${PORT}/admin`);
-  console.log(`🔑 管理员Token: ${config.admin.token}`);
+  console.log(`� 管理员登录: 使用游戏大厅账号登录（需管理员权限）`);
   console.log(`=================================`);
 
   if (addresses.length > 1) {

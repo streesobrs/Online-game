@@ -54,8 +54,8 @@ function migrateUserData(oldData) {
         aiResult: oldData.stats?.aiResult || null,
         lastPlayedAt: null
       },
-      chess: {
-        wins: oldData.stats?.gameTypeWins?.chess || 0,
+      'chinese-chess': {
+        wins: oldData.stats?.gameTypeWins?.['chinese-chess'] || 0,
         losses: 0,
         draws: 0,
         totalGames: 0,
@@ -127,7 +127,7 @@ function migrateUserData(oldData) {
   }
 
   // 计算各游戏的总数
-  const gameTypes = ['gobang', 'chess', 'go'];
+  const gameTypes = ['gobang', 'chinese-chess', 'go'];
   gameTypes.forEach(gameType => {
     const wins = newData.games[gameType].wins || 0;
     const losses = newData.games[gameType].losses || 0;

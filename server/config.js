@@ -39,7 +39,11 @@ module.exports = {
     updateInterval: 2000, // 管理后台数据更新间隔(ms)
     tokenExpiry: 24 * 60 * 60 * 1000, // Token有效期24小时
     maxActiveSessions: 3, // 最大活跃会话数
-    enableDynamicTokens: true // 启用动态Token生成
+    enableDynamicTokens: true, // 启用动态Token生成
+    // 管理员账号列表（用户名），只有这些账号可以登录后台
+    allowedUsernames: process.env.ADMIN_USERNAMES ? process.env.ADMIN_USERNAMES.split(',') : ['admin'],
+    // 管理员升级密钥（用于普通账号升级为管理员）
+    upgradeKey: process.env.ADMIN_UPGRADE_KEY || 'ADMIN-UPGRADE-2026-SECRET'
   },
 
   // 游戏配置

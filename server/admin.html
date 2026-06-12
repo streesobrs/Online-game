@@ -928,7 +928,10 @@
   <div id="login-page" class="login-page">
     <div class="login-box">
       <div class="login-title">🔐 后台管理系统</div>
-      <input type="password" id="admin-token" class="login-input" placeholder="请输入管理Token">
+      <input type="text" id="admin-username" class="login-input" placeholder="请输入管理员账号"
+        onkeypress="if(event.key==='Enter')login()">
+      <input type="password" id="admin-password" class="login-input" placeholder="请输入密码"
+        onkeypress="if(event.key==='Enter')login()">
       <button class="login-btn" onclick="login()">登录系统</button>
       <div style="text-align: center; margin-top: 16px; font-size: 12px; color: #64748b;">
         <span id="server-version">加载版本中...</span>
@@ -1397,7 +1400,30 @@
     window.addEventListener('DOMContentLoaded', () => {
       const savedToken = localStorage.getItem('adminToken');
       if (savedToken) {
-        connectSocket(savedToken);
+        // 使用已保存的 token 直接连接
+        socket = io('/admin', {
+          query: { token: savedToken },
+          reconnection: true,
+          reconnectionAttempts: maxReconnectAttempts,
+          reconnectionDelay: reconnectDelay
+        });
+
+        socket.on('connect', () => {
+          reconnectAttempts = 0;
+          document.getElementById('login-page').classList.add('hidden');
+          document.getElementById('admin-app').classList.remove('hidden');
+          showToast('自动登录成功', 'success');
+          loadDashboardData();
+          loadServerVersion();
+        });
+
+        socket.on('auth_error', (data) => {
+          showToast(data.message || '认证失败，请重新登录', 'error');
+          socket.disconnect();
+          localStorage.removeItem('adminToken');
+          document.getElementById('login-page').classList.remove('hidden');
+          document.getElementById('admin-app').classList.add('hidden');
+        });
       }
     });
 
@@ -1446,41 +1472,57 @@
       }
     }
 
-    // ==================== 登录/退出 ====================    let reconnectAttempts = 0;
+    // ==================== 登录/退出 ====================
+    let reconnectAttempts = 0;
     const maxReconnectAttempts = 5;
     const reconnectDelay = 3000;
 
     function login() {
-      const token = document.getElementById('admin-token').value.trim();
-      if (!token) return showToast('请输入Token', 'error');
+      const username = document.getElementById('admin-username').value.trim();
+      const password = document.getElementById('admin-password').value.trim();
+      if (!username) return showToast('请输入账号', 'error');
+      if (!password) return showToast('请输入密码', 'error');
 
-      // 存储 token 到 localStorage
-      localStorage.setItem('adminToken', token);
-
-      connectSocket(token);
+      // 先连接 socket，然后发送账号登录请求
+      connectSocketWithAccount(username, password);
     }
 
-    function connectSocket(token) {
+    function connectSocketWithAccount(username, password) {
+      // 先建立 socket 连接（不带 token）
       socket = io('/admin', {
-        query: { token },
         reconnection: true,
         reconnectionAttempts: maxReconnectAttempts,
         reconnectionDelay: reconnectDelay
       });
 
-      socket.on('connect', () => {
-        reconnectAttempts = 0;
-        document.getElementById('login-page').classList.add('hidden');
-        document.getElementById('admin-app').classList.remove('hidden');
-        showToast('登录成功', 'success');
-        loadDashboardData();
-        loadServerVersion();
+      // 监听登录结果
+      socket.once('admin_login_result', (data) => {
+        if (data.success) {
+          // 登录成功，存储 token
+          localStorage.setItem('adminToken', data.token);
+          document.getElementById('login-page').classList.add('hidden');
+          document.getElementById('admin-app').classList.remove('hidden');
+          showToast('登录成功', 'success');
+          loadDashboardData();
+          loadServerVersion();
+        } else {
+          // 登录失败
+          showToast(data.message || '认证失败', 'error');
+          socket.disconnect();
+          document.getElementById('login-page').classList.remove('hidden');
+          document.getElementById('admin-app').classList.add('hidden');
+        }
       });
 
+      // 连接成功后发送账号登录请求
+      socket.on('connect', () => {
+        socket.emit('admin_account_login', { username, password });
+      });
+
+      // 监听认证错误
       socket.on('auth_error', (data) => {
         showToast(data.message || '认证失败', 'error');
         socket.disconnect();
-        // 清除无效的 token
         localStorage.removeItem('adminToken');
         document.getElementById('login-page').classList.remove('hidden');
         document.getElementById('admin-app').classList.add('hidden');

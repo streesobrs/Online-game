@@ -68,6 +68,106 @@ class AdminManager {
     return true;
   }
 
+  // 验证账号登录（用于后台管理）
+  async verifyAccountLogin(username, password) {
+    logger.info('验证管理员账号登录', { username });
+
+    // 验证账号密码
+    if (!this.accountManager) {
+      return {
+        success: false,
+        message: '账号管理模块未初始化'
+      };
+    }
+
+    logger.info('调用 accountManager.login', { username });
+    const account = await this.accountManager.login(username, password);
+    logger.info('accountManager.login 结果', { success: account.success, message: account.message });
+
+    if (!account.success) {
+      return {
+        success: false,
+        message: account.message || '账号或密码错误'
+      };
+    }
+
+    // 检查账号是否有管理员标记
+    const rawAccount = await dataStore.findOne('accounts', { 'account.id': account.account.account?.id });
+    const isAdmin = rawAccount?.account?.isAdmin;
+
+    // 兼容旧配置：检查用户名是否在管理员列表中
+    const allowedUsernames = config.admin.allowedUsernames || ['admin'];
+    const isInList = allowedUsernames.includes(username.toLowerCase());
+
+    if (!isAdmin && !isInList) {
+      return {
+        success: false,
+        message: '该账号不是管理员账号'
+      };
+    }
+
+    // 生成动态Token
+    const token = this.generateDynamicToken();
+
+    return {
+      success: true,
+      token: token,
+      account: account.account
+    };
+  }
+
+  // 升级账号为管理员
+  async upgradeToAdmin(accountId, upgradeKey) {
+    // 验证升级密钥
+    if (upgradeKey !== config.admin.upgradeKey) {
+      return {
+        success: false,
+        message: '升级密钥错误'
+      };
+    }
+
+    // 获取账号信息（从数据库读取原始数据）
+    const account = await dataStore.findOne('accounts', { 'account.id': accountId });
+    if (!account) {
+      return {
+        success: false,
+        message: '账号不存在'
+      };
+    }
+
+    const username = account.account?.username;
+    if (!username) {
+      return {
+        success: false,
+        message: '账号信息不完整'
+      };
+    }
+
+    // 检查是否已经是管理员
+    if (account.account?.isAdmin) {
+      return {
+        success: false,
+        message: '该账号已经是管理员'
+      };
+    }
+
+    // 在账号文件中存储管理员标记
+    await dataStore.update('accounts', { 'account.id': accountId }, {
+      'account.isAdmin': true,
+      'account.updatedAt': Date.now()
+    });
+
+    logger.info('账号已升级为管理员', {
+      accountId,
+      username
+    });
+
+    return {
+      success: true,
+      message: '升级成功，您现在是管理员'
+    };
+  }
+
   // 清理过期Token
   cleanupExpiredTokens() {
     const now = Date.now();

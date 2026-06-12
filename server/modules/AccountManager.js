@@ -414,9 +414,12 @@ class AccountManager {
         return null;
       }
 
+      const hasPassword = !!(account.account?.security?.passwordSalt && account.account?.security?.passwordHash);
+
       // 不返回密码相关信息
       return {
         ...account,
+        hasPassword,
         account: {
           ...account.account,
           security: undefined
@@ -1137,8 +1140,10 @@ class AccountManager {
       const loginToken = crypto.randomBytes(32).toString('hex');
 
       // 不返回敏感信息
+      const hasPassword = !!(account.account?.security?.passwordSalt && account.account?.security?.passwordHash);
       const safeAccount = {
         ...account,
+        hasPassword,
         account: {
           ...account.account,
           security: undefined
@@ -1729,6 +1734,51 @@ class AccountManager {
       return {
         success: false,
         message: '修改失败，请稍后重试'
+      };
+    }
+  }
+
+  // 设置密码（用于没有密码的账号首次设置密码）
+  async setPassword(id, newPassword) {
+    try {
+      const account = await dataStore.findOne('accounts', { 'account.id': id });
+      if (!account) {
+        return {
+          success: false,
+          message: '账号不存在'
+        };
+      }
+
+      // 验证密码
+      if (!this.validatePassword(newPassword)) {
+        return {
+          success: false,
+          message: '密码长度至少6位'
+        };
+      }
+
+      // 生成密码哈希
+      const salt = this.generateSalt();
+      const hash = this.hashPassword(newPassword, salt);
+
+      await dataStore.update('accounts', { 'account.id': id }, {
+        'account.security': {
+          passwordSalt: salt,
+          passwordHash: hash
+        },
+        'account.updatedAt': Date.now()
+      });
+
+      logger.info('密码设置', { id });
+      return {
+        success: true,
+        message: '密码设置成功'
+      };
+    } catch (err) {
+      logger.error('设置密码失败', { id, error: err.message });
+      return {
+        success: false,
+        message: '设置失败，请稍后重试'
       };
     }
   }

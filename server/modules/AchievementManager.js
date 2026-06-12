@@ -135,6 +135,55 @@ class AchievementManager {
         condition: { gameType: 'chinese-chess', wins: 100 },
         reward: { exp: 5000, badge: 'chess_legend' }
       },
+      // 贪吃蛇成就
+      {
+        id: 24,
+        name: '贪吃蛇新手',
+        description: '在贪吃蛇中获得5场胜利',
+        type: 'game_type',
+        condition: { gameType: 'snake', wins: 5 },
+        reward: { exp: 200, badge: 'snake_beginner' }
+      },
+      {
+        id: 25,
+        name: '贪吃蛇高手',
+        description: '在贪吃蛇中获得20场胜利',
+        type: 'game_type',
+        condition: { gameType: 'snake', wins: 20 },
+        reward: { exp: 1000, badge: 'snake_expert' }
+      },
+      {
+        id: 26,
+        name: '贪吃蛇大师',
+        description: '在贪吃蛇中获得50场胜利',
+        type: 'game_type',
+        condition: { gameType: 'snake', wins: 50 },
+        reward: { exp: 2000, badge: 'snake_master' }
+      },
+      {
+        id: 27,
+        name: '贪吃蛇传奇',
+        description: '在贪吃蛇中获得100场胜利',
+        type: 'game_type',
+        condition: { gameType: 'snake', wins: 100 },
+        reward: { exp: 4000, badge: 'snake_legend' }
+      },
+      {
+        id: 28,
+        name: '蛇王',
+        description: '贪吃蛇最高分达到200分',
+        type: 'game_type',
+        condition: { gameType: 'snake', highScore: 200 },
+        reward: { exp: 500, badge: 'snake_king' }
+      },
+      {
+        id: 29,
+        name: '蛇神',
+        description: '贪吃蛇最高分达到500分',
+        type: 'game_type',
+        condition: { gameType: 'snake', highScore: 500 },
+        reward: { exp: 1500, badge: 'snake_god' }
+      },
       {
         id: 30,
         name: '围棋新手',
@@ -616,19 +665,31 @@ class AchievementManager {
       logger.info('成就解锁', { id, achievements: unlockedAchievements.map(a => a.id) });
     }
 
-    // 重新计算徽章数量（基于实际解锁的成就）
+    // 重新计算徽章数量并更新勋章列表
     if (unlockedAchievements.length > 0) {
       const updatedAccount = await this.accountManager.getAccount(id);
       if (updatedAccount && updatedAccount.achievements) {
+        // 获取已有勋章列表
+        const existingBadges = updatedAccount.badges || [];
+        const newBadges = [];
+
         const badgeCount = updatedAccount.achievements.filter(aid => {
           const achievement = this.achievements.find(a => a.id === aid);
-          return achievement && achievement.reward && achievement.reward.badge;
+          if (achievement && achievement.reward && achievement.reward.badge) {
+            // 如果勋章不在已有列表中，添加到新列表
+            if (!existingBadges.includes(achievement.reward.badge)) {
+              newBadges.push(achievement.reward.badge);
+            }
+            return true;
+          }
+          return false;
         }).length;
 
-        if (updatedAccount.stats) {
-          updatedAccount.stats.badges = badgeCount;
-          await dataStore.update('accounts', id, { stats: updatedAccount.stats });
-        }
+        const allBadges = [...new Set([...existingBadges, ...newBadges])];
+        await dataStore.update('accounts', { 'account.id': id }, {
+          badges: allBadges,
+          'stats.badges': badgeCount
+        });
       }
     }
 
@@ -654,8 +715,15 @@ class AchievementManager {
       case 'streak':
         return stats.streak >= achievement.condition.streak || stats.maxStreak >= achievement.condition.streak;
       case 'game_type':
-        return stats.gameTypeWins &&
-          stats.gameTypeWins[achievement.condition.gameType] >= achievement.condition.wins;
+        if (achievement.condition.wins !== undefined) {
+          return stats.gameTypeWins &&
+            stats.gameTypeWins[achievement.condition.gameType] >= achievement.condition.wins;
+        }
+        if (achievement.condition.highScore !== undefined) {
+          return stats.gameTypeHighScores &&
+            stats.gameTypeHighScores[achievement.condition.gameType] >= achievement.condition.highScore;
+        }
+        return false;
       case 'ai':
         if (achievement.condition.wins !== undefined) {
           return stats.aiWins >= achievement.condition.wins;
@@ -782,11 +850,21 @@ class AchievementManager {
           percent: Math.min(100, Math.round(((stats.maxStreak || 0) / achievement.condition.streak) * 100))
         };
       case 'game_type':
-        return {
-          current: stats.gameTypeWins?.[achievement.condition.gameType] || 0,
-          target: achievement.condition.wins,
-          percent: Math.min(100, Math.round(((stats.gameTypeWins?.[achievement.condition.gameType] || 0) / achievement.condition.wins) * 100))
-        };
+        if (achievement.condition.wins !== undefined) {
+          return {
+            current: stats.gameTypeWins?.[achievement.condition.gameType] || 0,
+            target: achievement.condition.wins,
+            percent: Math.min(100, Math.round(((stats.gameTypeWins?.[achievement.condition.gameType] || 0) / achievement.condition.wins) * 100))
+          };
+        }
+        if (achievement.condition.highScore !== undefined) {
+          return {
+            current: stats.gameTypeHighScores?.[achievement.condition.gameType] || 0,
+            target: achievement.condition.highScore,
+            percent: Math.min(100, Math.round(((stats.gameTypeHighScores?.[achievement.condition.gameType] || 0) / achievement.condition.highScore) * 100))
+          };
+        }
+        break;
       case 'ai':
         if (achievement.condition.wins !== undefined) {
           return {
@@ -875,6 +953,140 @@ class AchievementManager {
     });
 
     return categories;
+  }
+
+  // 获取勋章定义列表
+  getBadgeDefinitions() {
+    const badgeDefs = {};
+    this.achievements.forEach(achievement => {
+      if (achievement.reward && achievement.reward.badge) {
+        badgeDefs[achievement.reward.badge] = {
+          name: achievement.name,
+          description: achievement.description,
+          icon: `/assets/badges/${achievement.reward.badge}.svg`
+        };
+      }
+    });
+    return badgeDefs;
+  }
+
+  // 根据勋章ID获取图标
+  getBadgeIcon(badgeId) {
+    const iconMap = {
+      // 胜利系列
+      first_win: '🏆',
+      five_wins: '⭐',
+      ten_wins: '',
+      twenty_wins: '💫',
+      fifty_wins: '✨',
+      hundred_wins: '💯',
+      thousand_wins: '👑',
+      // 五子棋系列
+      gobang_beginner: '🔴',
+      gobang_expert: '🔴',
+      gobang_master: '🔴',
+      gobang_legend: '',
+      // 象棋系列
+      chess_beginner: '♟️',
+      chess_expert: '♟️',
+      chess_master: '♟️',
+      chess_legend: '♟️',
+      // 围棋系列
+      go_beginner: '⚫',
+      go_expert: '⚫',
+      go_master: '⚫',
+      go_legend: '⚫',
+      // 贪吃蛇系列
+      snake_beginner: '🐍',
+      snake_expert: '🐍',
+      snake_master: '🐍',
+      snake_legend: '🐍',
+      snake_king: '👑',
+      snake_god: '💎',
+      // 等级系列
+      level_5: '5️',
+      level_10: '🔟',
+      level_15: '🎯',
+      level_20: '🎖️',
+      level_25: '🏆',
+      level_30: '👑',
+      level_50: '💎',
+      // 连胜系列
+      streak_3: '🔥',
+      streak_5: '🔥',
+      streak_10: '🔥',
+      streak_15: '🔥',
+      streak_20: '🔥',
+      streak_50: '🔥',
+      // 特殊系列
+      perfect_win: '💯',
+      comeback_win: '💪',
+      first_draw: '🤝',
+      hundred_draws: '🤝',
+      beat_ai_easy: '🤖',
+      beat_ai_medium: '🤖',
+      beat_ai_hard: '🤖',
+      ai_killer: '🤖',
+      ai_master: '',
+      ai_terminator: '🤖',
+      first_move: '',
+      night_owl: '',
+      weekend_warrior: '🎮',
+      chatty_cathy: '💬',
+      silent_killer: '',
+      comeback_kid: '💪',
+      jack_of_all_trades: '🌟',
+      specialist: '🎯'
+    };
+    return iconMap[badgeId] || '🏅';
+  }
+
+  // 同步所有账号的勋章列表（迁移用）
+  async syncAllBadges() {
+    try {
+      const accounts = await dataStore.find('accounts', {});
+      let syncedCount = 0;
+
+      for (const account of accounts) {
+        const acctId = account.account?.id;
+        if (!acctId) continue;
+
+        const achievements = account.achievements || [];
+        const existingBadges = account.badges || [];
+
+        // 如果已经有勋章列表且不为空，跳过
+        if (existingBadges.length > 0) continue;
+
+        // 计算应该有哪些勋章
+        const newBadges = [];
+        for (const aid of achievements) {
+          const achievement = this.achievements.find(a => a.id === aid);
+          if (achievement && achievement.reward && achievement.reward.badge) {
+            if (!newBadges.includes(achievement.reward.badge)) {
+              newBadges.push(achievement.reward.badge);
+            }
+          }
+        }
+
+        // 如果有勋章需要添加
+        if (newBadges.length > 0) {
+          await dataStore.update('accounts', { 'account.id': acctId }, {
+            badges: newBadges,
+            'stats.badges': newBadges.length
+          });
+          syncedCount++;
+          logger.info(`同步勋章: ${acctId} badges=${newBadges.length}`);
+        }
+      }
+
+      if (syncedCount > 0) {
+        logger.info(`勋章数据同步完成，共处理 ${syncedCount} 个账号`);
+      } else {
+        logger.info('勋章数据同步完成，无需更新的账号');
+      }
+    } catch (err) {
+      logger.error('勋章数据同步失败', err);
+    }
   }
 }
 

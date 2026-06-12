@@ -796,26 +796,59 @@
     /* ===== 勋章 ===== */
     .badge-grid {
       display: flex;
-      gap: 8px;
+      gap: 10px;
       flex-wrap: wrap;
     }
 
     .badge-item {
-      width: 48px;
-      height: 48px;
+      width: 56px;
+      height: 56px;
       border-radius: 50%;
-      background: #f8f9fa;
-      border: 2px solid #dee2e6;
+      background: linear-gradient(145deg, #f0f0f0, #e6e6e6);
+      border: 3px solid #d0d0d0;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 22px;
       cursor: default;
+      position: relative;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1), inset 0 1px 2px rgba(255, 255, 255, 0.8);
+    }
+
+    .badge-item::before {
+      content: '';
+      position: absolute;
+      top: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60%;
+      height: 30%;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), transparent);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .badge-item:hover {
+      transform: translateY(-3px) scale(1.08);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2), inset 0 1px 2px rgba(255, 255, 255, 0.8);
     }
 
     .badge-item.unlocked {
-      border-color: #ffc107;
-      background: #fffbe6;
+      background: linear-gradient(145deg, #fff9e6, #ffe066);
+      border-color: #ffd700;
+      box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.8);
+    }
+
+    .badge-item.unlocked:hover {
+      box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.8);
+    }
+
+    .badge-icon {
+      width: 38px;
+      height: 38px;
+      object-fit: contain;
+      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+      z-index: 1;
     }
 
     /* ===== 状态 ===== */
@@ -1457,7 +1490,7 @@
       const types = [
         { key: 'gobang', icon: '🔴', name: '五子棋' },
         { key: 'go', icon: '⚪', name: '围棋' },
-        { key: 'chess', icon: '🟥', name: '象棋' },
+        { key: 'chinese-chess', icon: '🟥', name: '象棋' },
         { key: 'snake', icon: '🐍', name: '贪吃蛇' }
       ];
       let html = '';
@@ -1606,10 +1639,12 @@
         return;
       }
       const badges = ach.badges;
+      const badgeDefs = ach.badgeDefinitions || {};
       count.textContent = badges.length + ' 个';
       let html = '';
       for (const b of badges) {
-        html += `<div class="badge-item unlocked" title="${b}">${b.includes('level') ? '🎖️' : '🏅'}</div>`;
+        const def = badgeDefs[b] || { icon: '', name: b };
+        html += `<div class="badge-item unlocked" title="${def.name}"><img src="${def.icon}" alt="${def.name}" class="badge-icon"></div>`;
       }
       grid.innerHTML = html;
     }
@@ -2095,6 +2130,14 @@
       document.getElementById('settingsOldPass').value = '';
       document.getElementById('settingsNewPass').value = '';
       document.getElementById('settingsNewPass2').value = '';
+      document.getElementById('settingsSetPass').value = '';
+      document.getElementById('settingsSetPass2').value = '';
+
+      // 检查账号是否有密码，决定显示修改密码还是设置密码
+      const hasPassword = currentAccountData?.hasPassword || false;
+      document.getElementById('changePasswordSection').style.display = hasPassword ? 'block' : 'none';
+      document.getElementById('setPasswordSection').style.display = hasPassword ? 'none' : 'block';
+
       document.getElementById('settingsOverlay').style.display = 'flex';
     }
 
@@ -2128,6 +2171,50 @@
       showToast('正在修改...', 'info');
     }
 
+    function setPassword() {
+      const pass = document.getElementById('settingsSetPass').value;
+      const pass2 = document.getElementById('settingsSetPass2').value;
+      if (pass.length < 6) { showToast('密码至少6位', 'warning'); return; }
+      if (pass !== pass2) { showToast('两次密码输入不一致', 'warning'); return; }
+      socket.emit('account_set_password', { password: pass });
+      showToast('正在设置...', 'info');
+    }
+
+    function upgradeToAdmin() {
+      if (!currentAccountId) {
+        showToast('请先登录账号', 'warning');
+        return;
+      }
+
+      const upgradeKey = document.getElementById('adminUpgradeKey').value.trim();
+      if (!upgradeKey) {
+        showToast('请输入管理员升级密钥', 'warning');
+        return;
+      }
+
+      socket.emit('admin_upgrade_account', {
+        accountId: currentAccountId,
+        upgradeKey: upgradeKey
+      });
+      showToast('正在升级...', 'info');
+    }
+
+    // 监听升级结果
+    socket.on('admin_upgrade_result', (data) => {
+      if (data.success) {
+        showToast('🎉 升级成功！您现在是管理员', 'success');
+        document.getElementById('adminUpgradeKey').value = '';
+        // 提示用户可以访问后台
+        setTimeout(() => {
+          if (confirm('升级成功！您现在可以访问后台管理系统了。\n\n是否立即前往？')) {
+            window.open('/admin', '_blank');
+          }
+        }, 300);
+      } else {
+        showToast(data.message || '升级失败', 'error');
+      }
+    });
+
     // 监听账号操作结果
     socket.on('account_action_result', (result) => {
       console.log('账号操作结果:', result);
@@ -2147,6 +2234,13 @@
         } else {
           showToast('❌ ' + (result.message || '修改失败'), 'error');
         }
+      } else if (result.action === 'set_password') {
+        if (result.success) {
+          showToast('✅ 密码设置成功！', 'success');
+          closeSettings();
+        } else {
+          showToast('❌ ' + (result.message || '设置失败'), 'error');
+        }
       }
     });
 
@@ -2164,6 +2258,7 @@
       <div class="settings-tabs">
         <button class="settings-tab active" onclick="switchSettingsTab('profile')">📝 个人资料</button>
         <button class="settings-tab" onclick="switchSettingsTab('password')">🔑 修改密码</button>
+        <button class="settings-tab" onclick="switchSettingsTab('admin')">👑 升级为管理员</button>
       </div>
       <!-- 个人资料 -->
       <div class="settings-panel active" id="panel-profile">
@@ -2184,20 +2279,51 @@
       </div>
       <!-- 修改密码 -->
       <div class="settings-panel" id="panel-password">
-        <div class="form-group">
-          <label>当前密码</label>
-          <input type="password" id="settingsOldPass" placeholder="输入当前密码">
+        <div id="changePasswordSection">
+          <div class="form-group">
+            <label>当前密码</label>
+            <input type="password" id="settingsOldPass" placeholder="输入当前密码">
+          </div>
+          <div class="form-group">
+            <label>新密码</label>
+            <input type="password" id="settingsNewPass" placeholder="至少6位新密码">
+            <div class="hint">密码长度至少6个字符</div>
+          </div>
+          <div class="form-group">
+            <label>确认新密码</label>
+            <input type="password" id="settingsNewPass2" placeholder="再次输入新密码">
+          </div>
+          <button class="btn-primary" onclick="changePassword()">修改密码</button>
+        </div>
+        <div id="setPasswordSection" style="display:none;">
+          <div
+            style="background: #fffbeb; border: 1px solid #f59e0b; border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 13px; color: #92400e;">
+            ⚠️ 您的账号还没有设置密码，请设置密码以便登录后台管理系统。
+          </div>
+          <div class="form-group">
+            <label>设置密码</label>
+            <input type="password" id="settingsSetPass" placeholder="至少6位密码">
+            <div class="hint">密码长度至少6个字符</div>
+          </div>
+          <div class="form-group">
+            <label>确认密码</label>
+            <input type="password" id="settingsSetPass2" placeholder="再次输入密码">
+          </div>
+          <button class="btn-primary" onclick="setPassword()">设置密码</button>
+        </div>
+      </div>
+      <!-- 升级为管理员 -->
+      <div class="settings-panel" id="panel-admin">
+        <div
+          style="background: #fffbeb; border: 1px solid #f59e0b; border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 13px; color: #92400e;">
+          ⚠️ 升级后您可以访问后台管理系统（/admin），执行用户管理、游戏管理等操作。请妥善保管管理员权限。
         </div>
         <div class="form-group">
-          <label>新密码</label>
-          <input type="password" id="settingsNewPass" placeholder="至少6位新密码">
-          <div class="hint">密码长度至少6个字符</div>
+          <label>管理员升级密钥</label>
+          <input type="password" id="adminUpgradeKey" placeholder="请输入管理员升级密钥"
+            onkeypress="if(event.key==='Enter')upgradeToAdmin()">
         </div>
-        <div class="form-group">
-          <label>确认新密码</label>
-          <input type="password" id="settingsNewPass2" placeholder="再次输入新密码">
-        </div>
-        <button class="btn-primary" onclick="changePassword()">修改密码</button>
+        <button class="btn-primary" onclick="upgradeToAdmin()">确认升级</button>
       </div>
     </div>
   </div>

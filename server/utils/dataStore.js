@@ -250,12 +250,25 @@ class DataStore {
         return await this.update(collection, id, item);
       }
 
+      // 保护 accounts 集合的 security 字段不被意外删除
+      let writeItem = item;
+      if (collection === 'accounts') {
+        const existing = await this.readOne(collection, id);
+        if (existing && existing.account && existing.account.security) {
+          // 如果写入的对象没有 security 字段，保留原有的
+          if (!writeItem.account || !writeItem.account.security) {
+            writeItem = { ...writeItem };
+            writeItem.account = { ...writeItem.account, security: existing.account.security };
+          }
+        }
+      }
+
       let subDir = this.splitByIdCollections[collection];
       let dirPath;
 
       // 游戏记录按类型存储到不同子文件夹
-      if (collection === 'games' && item.gameType) {
-        dirPath = path.join(this.dataDir, subDir, item.gameType);
+      if (collection === 'games' && writeItem.gameType) {
+        dirPath = path.join(this.dataDir, subDir, writeItem.gameType);
       } else {
         dirPath = path.join(this.dataDir, subDir);
       }
@@ -265,14 +278,14 @@ class DataStore {
       const filePath = path.join(dirPath, `${id}.json`);
       // 先写临时文件，再重命名，避免写入过程中崩溃导致文件损坏
       const tmpPath = filePath + '.tmp';
-      await fs.writeFile(tmpPath, JSON.stringify(item, null, 2), 'utf8');
+      await fs.writeFile(tmpPath, JSON.stringify(writeItem, null, 2), 'utf8');
       await fs.rename(tmpPath, filePath);
 
       logger.info('数据已保存到文件', { collection, id, path: filePath });
 
       // 更新缓存
       const cacheKey = `${collection}:${id}`;
-      this.cache.set(cacheKey, item);
+      this.cache.set(cacheKey, writeItem);
       // 清除集合缓存，确保下次读取时重新加载所有数据
       this.cache.delete(collection);
 

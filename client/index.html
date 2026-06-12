@@ -1139,11 +1139,6 @@
       color: white;
     }
 
-    #snake-pause {
-      background: #ff9800;
-      color: white;
-    }
-
     #snake-restart {
       background: #2196f3;
       color: white;
@@ -4999,6 +4994,41 @@
         const unlockedCount = unlockedIds.length;
         const progressPercent = totalAchievements > 0 ? Math.round((unlockedCount / totalAchievements) * 100) : 0;
 
+        // 游戏类型配置
+        const gameTypeConfig = {
+          gobang: { name: '🔴 五子棋成就' },
+          'chinese-chess': { name: '🟥 象棋成就' },
+          go: { name: '⚫ 围棋成就' },
+          snake: { name: '🐍 贪吃蛇成就' }
+        };
+        const gameOrder = ['gobang', 'chinese-chess', 'go', 'snake'];
+
+        // 重组成就分类：将 game_type 按游戏类型拆分
+        const reorganizedCategories = [];
+        const gameTypeGroups = {};
+
+        Object.entries(data.categories).forEach(([type, category]) => {
+          if (type === 'game_type') {
+            category.achievements.forEach(ach => {
+              const gt = ach.condition && ach.condition.gameType;
+              if (gt) {
+                if (!gameTypeGroups[gt]) gameTypeGroups[gt] = [];
+                gameTypeGroups[gt].push(ach);
+              }
+            });
+          } else {
+            reorganizedCategories.push({ name: category.name, achievements: category.achievements });
+          }
+        });
+
+        // 按固定顺序添加游戏分类
+        gameOrder.forEach(gt => {
+          if (gameTypeGroups[gt] && gameTypeGroups[gt].length > 0) {
+            const cfg = gameTypeConfig[gt] || { name: '🎮 其他成就' };
+            reorganizedCategories.push({ name: cfg.name, achievements: gameTypeGroups[gt] });
+          }
+        });
+
         let html = `
           <div style="margin-bottom: 20px; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; color: white;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -5012,8 +5042,8 @@
           </div>
         `;
 
-        // 渲染每个分类
-        Object.entries(data.categories).forEach(([type, category]) => {
+        // 渲染重组的分类
+        reorganizedCategories.forEach(category => {
           if (!category.achievements || category.achievements.length === 0) return;
 
           const categoryUnlocked = category.achievements.filter(a => unlockedIds.includes(a.id)).length;
@@ -5047,10 +5077,10 @@
                   <div style="margin-bottom: 10px;">
                     <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px;">
                       <span>进度</span>
-                      <span>${achievement.progress.current}/${achievement.progress.target}</span>
+                      <span>${isUnlocked ? achievement.progress.target : achievement.progress.current}/${achievement.progress.target}</span>
                     </div>
                     <div style="height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
-                      <div style="width: ${achievement.progress.percent}%; height: 100%; background: ${isUnlocked ? '#48bb78' : '#ed8936'}; transition: width 0.5s ease;"></div>
+                      <div style="width: ${isUnlocked ? 100 : achievement.progress.percent}%; height: 100%; background: ${isUnlocked ? '#48bb78' : '#ed8936'}; transition: width 0.5s ease;"></div>
                     </div>
                   </div>
                 ` : ''}
@@ -7521,7 +7551,6 @@
       nextDirection2: 'left',
       score2: 0,
       snake2Positions: new Set(),
-      foods: [], // 多个食物
       gameTimeLeft: 0, // 剩余时间（双人模式）
       gameTimer: null, // 游戏计时器
       isRespawning1: false, // 玩家1是否正在复活
@@ -7981,9 +8010,7 @@
       document.getElementById('snake-rules').textContent = config.rules;
 
       // 匹配模式隐藏暂停和重新开始按钮，保留退出按钮
-      const pauseBtn = document.getElementById('snake-pause');
       const restartBtn = document.getElementById('snake-restart');
-      if (pauseBtn) pauseBtn.style.display = 'none';
       if (restartBtn) restartBtn.style.display = 'none';
 
       // 启动游戏计时器
