@@ -9,39 +9,49 @@ class AIManager {
 
   // 获取 AI 移动
   getAIMove(gameType, board, difficulty, currentPlayer) {
-    switch (gameType) {
-      case 'gobang':
-        return this.getGobangAIMove(board, difficulty, currentPlayer);
-      case 'chinese-chess':
-        return this.getChessAIMove(board, difficulty, currentPlayer);
-      case 'go':
-        return this.getGoAIMove(board, difficulty, currentPlayer);
-      default:
-        return null;
+    try {
+      switch (gameType) {
+        case 'gobang':
+          return this.getGobangAIMove(board, difficulty, currentPlayer);
+        case 'chinese-chess':
+          return this.getChessAIMove(board, difficulty, currentPlayer);
+        case 'go':
+          return this.getGoAIMove(board, difficulty, currentPlayer);
+        default:
+          return null;
+      }
+    } catch (error) {
+      console.error('getAIMove 出错:', error.message, error.stack);
+      return null;
     }
   }
 
   // 五子棋 AI 移动
   getGobangAIMove(board, difficulty, currentPlayer) {
-    // 第一步时，所有难度都只下在用户棋子附近
-    if (this.isFirstMove(board)) {
-      const nearPositions = this.getPositionsNearUserPiece(board);
-      if (nearPositions.length > 0) {
-        // 随机选择一个附近的位置
-        const randomIndex = Math.floor(Math.random() * nearPositions.length);
-        return nearPositions[randomIndex];
+    try {
+      // 第一步时，所有难度都只下在用户棋子附近
+      if (this.isFirstMove(board)) {
+        const nearPositions = this.getPositionsNearUserPiece(board);
+        if (nearPositions.length > 0) {
+          // 随机选择一个附近的位置
+          const randomIndex = Math.floor(Math.random() * nearPositions.length);
+          return nearPositions[randomIndex];
+        }
       }
-    }
 
-    switch (difficulty) {
-      case 'easy':
-        return this.getGobangEasyMove(board, currentPlayer);
-      case 'medium':
-        return this.getGobangMediumMove(board, currentPlayer);
-      case 'hard':
-        return this.getGobangHardMove(board, currentPlayer);
-      default:
-        return this.getGobangEasyMove(board, currentPlayer);
+      switch (difficulty) {
+        case 'easy':
+          return this.getGobangEasyMove(board, currentPlayer);
+        case 'medium':
+          return this.getGobangMediumMove(board, currentPlayer);
+        case 'hard':
+          return this.getGobangHardMove(board, currentPlayer);
+        default:
+          return this.getGobangEasyMove(board, currentPlayer);
+      }
+    } catch (error) {
+      console.error('getGobangAIMove 出错:', error.message, error.stack);
+      return this.getGobangEasyMove(board, currentPlayer);
     }
   }
 
@@ -336,114 +346,119 @@ class AIManager {
 
   // 五子棋困难难度 - 基于 Minimax 算法（增强进攻版）
   getGobangHardMove(board, currentPlayer) {
-    const opponent = currentPlayer === 1 ? 2 : 1;
+    try {
+      const opponent = currentPlayer === 1 ? 2 : 1;
 
-    // ===== 立即检测关键位置 =====
-    // 检查是否可以赢
-    const winningMove = this.findWinningMove(board, currentPlayer);
-    if (winningMove) {
-      return winningMove;
-    }
-
-    // 检查是否需要防守（对手即将获胜）
-    const defensiveMove = this.findWinningMove(board, opponent);
-    if (defensiveMove) {
-      return defensiveMove;
-    }
-
-    // 检查是否需要防守4连珠
-    const defensiveFourInRow = this.findFourInRowDefense(board, opponent);
-    if (defensiveFourInRow) {
-      return defensiveFourInRow;
-    }
-
-    // 检查是否需要防守对手可以形成的4连珠（包括间隔的情况）
-    const defensiveFourInRowMove = this.findFourInRowMove(board, opponent);
-    if (defensiveFourInRowMove) {
-      return defensiveFourInRowMove;
-    }
-
-    // 检查是否可以形成活四
-    const liveFourMove = this.findLiveFourMove(board, currentPlayer);
-    if (liveFourMove) {
-      return liveFourMove;
-    }
-
-    // 检查是否需要防守活四
-    const defensiveLiveFourMove = this.findLiveFourMove(board, opponent);
-    if (defensiveLiveFourMove) {
-      return defensiveLiveFourMove;
-    }
-
-    // 检查是否可以形成4连珠（更全面的检测）
-    const fourInRowMove = this.findFourInRowMove(board, currentPlayer);
-    if (fourInRowMove) {
-      return fourInRowMove;
-    }
-
-    // 检查是否可以形成冲四（形成4连珠）
-    const rushFourMove = this.findRushFourMove(board, currentPlayer);
-    if (rushFourMove) {
-      return rushFourMove;
-    }
-
-    // 检查是否需要防守冲四
-    const defensiveRushFourMove = this.findRushFourMove(board, opponent);
-    if (defensiveRushFourMove) {
-      return defensiveRushFourMove;
-    }
-
-    // 检查是否可以形成双活三（必胜）
-    const doubleLiveThreeMove = this.findDoubleLiveThreeMove(board, currentPlayer);
-    if (doubleLiveThreeMove) {
-      return doubleLiveThreeMove;
-    }
-
-    // 检查是否需要防守对手的双活三
-    const defensiveDoubleLiveThree = this.findDoubleLiveThreeMove(board, opponent);
-    if (defensiveDoubleLiveThree) {
-      return defensiveDoubleLiveThree;
-    }
-
-    // ===== 预测玩家关键落子位置 =====
-    // 预测玩家最可能的下一步（高威胁位置）
-    const predictedPlayerMove = this.predictPlayerMove(board, opponent);
-    if (predictedPlayerMove && predictedPlayerMove.score >= 2000) {
-      // 优先阻断玩家的高威胁位置
-      const blockMove = this.findBlockingMove(board, opponent, predictedPlayerMove);
-      if (blockMove) {
-        return blockMove;
+      // ===== 立即检测关键位置 =====
+      // 检查是否可以赢
+      const winningMove = this.findWinningMove(board, currentPlayer);
+      if (winningMove) {
+        return winningMove;
       }
+
+      // 检查是否需要防守（对手即将获胜）
+      const defensiveMove = this.findWinningMove(board, opponent);
+      if (defensiveMove) {
+        return defensiveMove;
+      }
+
+      // 检查是否需要防守4连珠
+      const defensiveFourInRow = this.findFourInRowDefense(board, opponent);
+      if (defensiveFourInRow) {
+        return defensiveFourInRow;
+      }
+
+      // 检查是否需要防守对手可以形成的4连珠（包括间隔的情况）
+      const defensiveFourInRowMove = this.findFourInRowMove(board, opponent);
+      if (defensiveFourInRowMove) {
+        return defensiveFourInRowMove;
+      }
+
+      // 检查是否可以形成活四
+      const liveFourMove = this.findLiveFourMove(board, currentPlayer);
+      if (liveFourMove) {
+        return liveFourMove;
+      }
+
+      // 检查是否需要防守活四
+      const defensiveLiveFourMove = this.findLiveFourMove(board, opponent);
+      if (defensiveLiveFourMove) {
+        return defensiveLiveFourMove;
+      }
+
+      // 检查是否可以形成4连珠（更全面的检测）
+      const fourInRowMove = this.findFourInRowMove(board, currentPlayer);
+      if (fourInRowMove) {
+        return fourInRowMove;
+      }
+
+      // 检查是否可以形成冲四（形成4连珠）
+      const rushFourMove = this.findRushFourMove(board, currentPlayer);
+      if (rushFourMove) {
+        return rushFourMove;
+      }
+
+      // 检查是否需要防守冲四
+      const defensiveRushFourMove = this.findRushFourMove(board, opponent);
+      if (defensiveRushFourMove) {
+        return defensiveRushFourMove;
+      }
+
+      // 检查是否可以形成双活三（必胜）
+      const doubleLiveThreeMove = this.findDoubleLiveThreeMove(board, currentPlayer);
+      if (doubleLiveThreeMove) {
+        return doubleLiveThreeMove;
+      }
+
+      // 检查是否需要防守对手的双活三
+      const defensiveDoubleLiveThree = this.findDoubleLiveThreeMove(board, opponent);
+      if (defensiveDoubleLiveThree) {
+        return defensiveDoubleLiveThree;
+      }
+
+      // ===== 预测玩家关键落子位置 =====
+      // 预测玩家最可能的下一步（高威胁位置）
+      const predictedPlayerMove = this.predictPlayerMove(board, opponent);
+      if (predictedPlayerMove && predictedPlayerMove.score >= 2000) {
+        // 优先阻断玩家的高威胁位置
+        const blockMove = this.findBlockingMove(board, opponent, predictedPlayerMove);
+        if (blockMove) {
+          return blockMove;
+        }
+      }
+
+      // ===== 使用增强的 Minimax 算法 =====
+      // 获取候选位置（只搜索最有威胁的位置）
+      const candidateMoves = this.getCandidateMovesEnhanced(board, currentPlayer);
+
+      if (candidateMoves.length === 0) {
+        // 如果没有候选位置，下在中心
+        const centerR = Math.floor(board.length / 2);
+        const centerC = Math.floor(board[0].length / 2);
+        return { r: centerR, c: centerC };
+      }
+
+      // 搜索深度 4-6 层（优化性能，减少计算时间）
+      // 根据棋盘复杂度动态调整深度
+      let depth = 4;  // 降低基础深度
+      const emptyCount = this.getEmptyCells(board).length;
+      if (emptyCount < 20) depth = 6;   // 残局时深度更深
+      else if (emptyCount < 100) depth = 5;  // 中局
+      else depth = 4;  // 开局时最浅，保证响应速度
+
+      const result = this.minimaxOptimized(board, depth, currentPlayer, -Infinity, Infinity, true, candidateMoves);
+
+      // 返回最佳移动位置
+      if (result && result.move) {
+        return result.move;
+      }
+
+      // 如果 Minimax 没有找到好棋，回退到中等难度
+      return this.getGobangMediumMove(board, currentPlayer);
+    } catch (error) {
+      console.error('getGobangHardMove 出错:', error.message, error.stack);
+      return this.getGobangMediumMove(board, currentPlayer);
     }
-
-    // ===== 使用增强的 Minimax 算法 =====
-    // 获取候选位置（只搜索最有威胁的位置）
-    const candidateMoves = this.getCandidateMovesEnhanced(board, currentPlayer);
-
-    if (candidateMoves.length === 0) {
-      // 如果没有候选位置，下在中心
-      const centerR = Math.floor(board.length / 2);
-      const centerC = Math.floor(board[0].length / 2);
-      return { r: centerR, c: centerC };
-    }
-
-    // 搜索深度 4-6 层（优化性能，减少计算时间）
-    // 根据棋盘复杂度动态调整深度
-    let depth = 4;  // 降低基础深度
-    const emptyCount = this.getEmptyCells(board).length;
-    if (emptyCount < 20) depth = 6;   // 残局时深度更深
-    else if (emptyCount < 100) depth = 5;  // 中局
-    else depth = 4;  // 开局时最浅，保证响应速度
-
-    const result = this.minimaxOptimized(board, depth, currentPlayer, -Infinity, Infinity, true, candidateMoves);
-
-    // 返回最佳移动位置
-    if (result && result.move) {
-      return result.move;
-    }
-
-    // 如果 Minimax 没有找到好棋，回退到中等难度
-    return this.getGobangMediumMove(board, currentPlayer);
   }
 
   // 获取候选位置（更大范围搜索，更多候选位置）
@@ -489,12 +504,12 @@ class AIManager {
 
     // 进攻评分
     board[r][c] = currentPlayer;
-    score += this.evaluatePositionV2(board, r, c, currentPlayer) * 1.5;
+    score += this.evaluatePosition(board, r, c, currentPlayer) * 1.5;
     board[r][c] = 0;
 
     // 防守评分
     board[r][c] = opponent;
-    score += this.evaluatePositionV2(board, r, c, opponent);
+    score += this.evaluatePosition(board, r, c, opponent);
     board[r][c] = 0;
 
     return score;
@@ -502,76 +517,81 @@ class AIManager {
 
   // 优化的 Minimax 算法
   minimaxOptimized(board, depth, currentPlayer, alpha, beta, maximizingPlayer, candidateMoves) {
-    const opponent = currentPlayer === 1 ? 2 : 1;
+    try {
+      const opponent = currentPlayer === 1 ? 2 : 1;
 
-    // 终止条件
-    if (depth === 0 || this.isGameOver(board)) {
-      const score = this.evaluateBoardAdvanced(board, currentPlayer);
-      return { score };
-    }
-
-    // 获取候选位置
-    let moves = candidateMoves;
-    if (!moves || moves.length === 0) {
-      moves = this.getCandidateMoves(board, currentPlayer);
-    }
-
-    if (moves.length === 0) {
-      return { score: this.evaluateBoardAdvanced(board, currentPlayer) };
-    }
-
-    if (maximizingPlayer) {
-      let bestScore = -Infinity;
-      let bestMove = null;
-
-      for (const cell of moves) {
-        // 验证位置是否为空
-        if (board[cell.r][cell.c] !== 0) {
-          continue;
-        }
-
-        board[cell.r][cell.c] = currentPlayer;
-        const result = this.minimaxOptimized(board, depth - 1, currentPlayer, alpha, beta, false, null);
-        board[cell.r][cell.c] = 0;
-
-        if (result.score > bestScore) {
-          bestScore = result.score;
-          bestMove = { r: cell.r, c: cell.c };
-        }
-
-        alpha = Math.max(alpha, bestScore);
-        if (beta <= alpha) {
-          break;
-        }
+      // 终止条件
+      if (depth === 0 || this.isGameOver(board)) {
+        const score = this.evaluateBoardAdvanced(board, currentPlayer);
+        return { score };
       }
 
-      return { score: bestScore, move: bestMove };
-    } else {
-      let bestScore = Infinity;
-      let bestMove = null;
-
-      for (const cell of moves) {
-        // 验证位置是否为空
-        if (board[cell.r][cell.c] !== 0) {
-          continue;
-        }
-
-        board[cell.r][cell.c] = opponent;
-        const result = this.minimaxOptimized(board, depth - 1, currentPlayer, alpha, beta, true, null);
-        board[cell.r][cell.c] = 0;
-
-        if (result.score < bestScore) {
-          bestScore = result.score;
-          bestMove = { r: cell.r, c: cell.c };
-        }
-
-        beta = Math.min(beta, bestScore);
-        if (beta <= alpha) {
-          break;
-        }
+      // 获取候选位置
+      let moves = candidateMoves;
+      if (!moves || moves.length === 0) {
+        moves = this.getCandidateMoves(board, currentPlayer);
       }
 
-      return { score: bestScore, move: bestMove };
+      if (moves.length === 0) {
+        return { score: this.evaluateBoardAdvanced(board, currentPlayer) };
+      }
+
+      if (maximizingPlayer) {
+        let bestScore = -Infinity;
+        let bestMove = null;
+
+        for (const cell of moves) {
+          // 验证位置是否为空
+          if (board[cell.r][cell.c] !== 0) {
+            continue;
+          }
+
+          board[cell.r][cell.c] = currentPlayer;
+          const result = this.minimaxOptimized(board, depth - 1, currentPlayer, alpha, beta, false, null);
+          board[cell.r][cell.c] = 0;
+
+          if (result.score > bestScore) {
+            bestScore = result.score;
+            bestMove = { r: cell.r, c: cell.c };
+          }
+
+          alpha = Math.max(alpha, bestScore);
+          if (beta <= alpha) {
+            break;
+          }
+        }
+
+        return { score: bestScore, move: bestMove };
+      } else {
+        let bestScore = Infinity;
+        let bestMove = null;
+
+        for (const cell of moves) {
+          // 验证位置是否为空
+          if (board[cell.r][cell.c] !== 0) {
+            continue;
+          }
+
+          board[cell.r][cell.c] = opponent;
+          const result = this.minimaxOptimized(board, depth - 1, currentPlayer, alpha, beta, true, null);
+          board[cell.r][cell.c] = 0;
+
+          if (result.score < bestScore) {
+            bestScore = result.score;
+            bestMove = { r: cell.r, c: cell.c };
+          }
+
+          beta = Math.min(beta, bestScore);
+          if (beta <= alpha) {
+            break;
+          }
+        }
+
+        return { score: bestScore, move: bestMove };
+      }
+    } catch (error) {
+      console.error('minimaxOptimized 出错:', error.message, error.stack);
+      return { score: 0, move: null };
     }
   }
 
@@ -1873,46 +1893,66 @@ class AIManager {
     const tp = this.chessType(board[fromR][fromC]);
     const captured = board[toR][toC];
     const isR = aiCol === 'r';
+    const movingPieceVal = this.chessPieceValue(tp);
 
-    // 1. 吃子价值
+    // 1. 吃子价值（只有真正赚的交换才给高分）
+    let captureScore = 0;
     if (captured !== 0) {
       const capturedType = this.chessType(captured);
-      s += this.chessPieceValue(capturedType) * 10;
+      const capturedVal = this.chessPieceValue(capturedType);
+      const netGain = capturedVal - movingPieceVal;
 
-      // 吃高价值棋子额外加分
-      if (this.chessPieceValue(capturedType) >= 400) s += 300;
-      if (this.chessPieceValue(capturedType) >= 900) s += 500;
+      if (netGain > 0) {
+        // 赚了：低价值吃高价值（如马吃车），大幅加分
+        captureScore = capturedVal * 5 + netGain * 15;
+        if (capturedVal >= 900) captureScore += 800; // 吃车额外加分
+      } else if (netGain === 0) {
+        // 等价交换（如炮换马）：基础加分但不高
+        captureScore = capturedVal * 2;
+      } else {
+        // 亏了：高价值吃低价值，只给少量加分
+        captureScore = capturedVal * 1;
+      }
     }
 
-    // 2. 己方棋子被吃风险评估（走之后这个棋子是否会被对方吃掉）
+    // 2. 吃子后的反击评估（走之后这个棋子是否会被对方吃掉）
     const simBoard = this.chessSimMove(board, fromR, fromC, toR, toC);
     if (this.chessIsAttacked(simBoard, toR, toC, opCol)) {
-      // 如果移动到被攻击的位置且会被吃
-      const movingPieceVal = this.chessPieceValue(tp);
-      // 看对方是否有能吃这个位置的棋子
+      const capturedVal = captured !== 0 ? this.chessPieceValue(this.chessType(captured)) : 0;
+      let willBeCaptured = false;
+      let attackerVal = 0;
+
       for (const op of this.chessPieces(simBoard, opCol)) {
         for (const om of this.chessLegal(simBoard, op.r, op.c)) {
           if (om.r === toR && om.c === toC) {
-            const attackerVal = this.chessPieceValue(this.chessType(simBoard[op.r][op.c]));
-            if (attackerVal < movingPieceVal) {
-              // 低价值换高价值，可以接受
-              s -= (movingPieceVal - attackerVal) * 3;
-            } else if (attackerVal > movingPieceVal) {
-              // 高价值送吃，严重扣分
-              s -= movingPieceVal * 10;
-            } else {
-              s -= movingPieceVal * 5;
-            }
+            willBeCaptured = true;
+            attackerVal = this.chessPieceValue(this.chessType(simBoard[op.r][op.c]));
             break;
           }
         }
+        if (willBeCaptured) break;
+      }
+
+      if (willBeCaptured) {
+        const netGain = capturedVal - movingPieceVal;
+        if (netGain > 0) {
+          // 赚了但会被吃回：只保留净收益的部分加分
+          captureScore = netGain * 5;
+          if (capturedVal >= 900) captureScore += 200;
+        } else if (netGain === 0) {
+          // 等价交换后会被吃回：这是无意义的换子，扣分
+          captureScore = -movingPieceVal * 3;
+        } else {
+          // 亏了：高价值吃低价值后被吃回，严重扣分
+          captureScore = -Math.abs(netGain) * 10 - movingPieceVal * 2;
+        }
       }
     }
+    s += captureScore;
 
     // 3. 将军/将杀加分
     if (this.chessCheck(simBoard, opCol)) {
       s += 800;
-      // 检查是否将杀
       const opAllLegal = this.chessAllLegal(simBoard, opCol);
       if (opAllLegal.length === 0) {
         s += 10000; // 将杀！最高优先级
@@ -1921,7 +1961,6 @@ class AIManager {
 
     // 4. 己方被将军时解围
     if (this.chessCheck(board, aiCol)) {
-      // 当前被将军，能解围的走法加高分
       if (!this.chessCheck(simBoard, aiCol)) {
         s += 1000;
       }
@@ -1930,14 +1969,11 @@ class AIManager {
     // 5. 向前推进（红方r减小，黑方r增大）
     if ((isR && toR < fromR) || (!isR && toR > fromR)) {
       s += 10;
-      // 兵/卒过河后向前价值更高
       if (tp === 'bing' || tp === 'zu') s += 20;
     }
 
     // 6. 棋子位置价值
-    // 中心控制
     s += 12 - Math.abs(toR - 4.5) - Math.abs(toC - 4);
-    // 河界附近（战略要地）
     if (toR >= 4 && toR <= 5) s += 5;
 
     // 7. 兵/卒过河加分
@@ -1951,13 +1987,11 @@ class AIManager {
       if (startPos) s += 15;
     }
 
-    // 9. 保护己方高价值棋子（如果走到可以保护被攻击的高价值棋子的位置）
+    // 9. 保护己方高价值棋子
     for (const p of this.chessPieces(simBoard, aiCol)) {
       const pt = this.chessType(simBoard[p.r][p.c]);
       if (this.chessPieceValue(pt) >= 400 && this.chessIsAttacked(simBoard, p.r, p.c, opCol)) {
-        // 是否因为这次走棋而形成了保护
         if (this.chessFriend(simBoard, toR, toC, aiCol)) {
-          // 走到这个位置保护了被攻击的棋子
           s += 60;
         }
       }
@@ -2319,7 +2353,7 @@ class AIManager {
 
     for (const cell of emptyCells) {
       board[cell.r][cell.c] = opponent;
-      const threatScore = this.evaluatePositionV2(board, cell.r, cell.c, opponent);
+      const threatScore = this.evaluatePosition(board, cell.r, cell.c, opponent);
       board[cell.r][cell.c] = 0;
 
       if (threatScore > maxScore) {
@@ -2349,12 +2383,12 @@ class AIManager {
 
       // 评估这个位置的进攻价值
       board[cell.r][cell.c] = currentPlayer;
-      score += this.evaluatePositionV2(board, cell.r, cell.c, currentPlayer) * 1.2;
+      score += this.evaluatePosition(board, cell.r, cell.c, currentPlayer) * 1.2;
       board[cell.r][cell.c] = 0;
 
       // 评估这个位置的防守价值（阻断玩家）
       board[cell.r][cell.c] = opponent;
-      score += this.evaluatePositionV2(board, cell.r, cell.c, opponent) * 0.8;
+      score += this.evaluatePosition(board, cell.r, cell.c, opponent) * 0.8;
       board[cell.r][cell.c] = 0;
 
       if (score > maxScore) {
@@ -2412,12 +2446,12 @@ class AIManager {
 
     // 进攻评分（极高权重）
     board[r][c] = currentPlayer;
-    score += this.evaluatePositionV2(board, r, c, currentPlayer) * 2.5;
+    score += this.evaluatePosition(board, r, c, currentPlayer) * 2.5;
     board[r][c] = 0;
 
     // 防守评分（降低权重，让AI更具进攻性）
     board[r][c] = opponent;
-    score += this.evaluatePositionV2(board, r, c, opponent) * 0.8;
+    score += this.evaluatePosition(board, r, c, opponent) * 0.8;
     board[r][c] = 0;
 
     return score;
@@ -2513,6 +2547,265 @@ class AIManager {
     }
 
     return score;
+  }
+
+  // ========== 智能提示系统 ==========
+
+  // 通用智能提示入口
+  getSmartHint(gameType, board, currentPlayer) {
+    try {
+      switch (gameType) {
+        case 'gobang':
+          return this.getGobangSmartHint(board, currentPlayer);
+        case 'chinese-chess':
+          return this.getChessSmartHint(board, 'hard', currentPlayer);
+        case 'go':
+          return this.getGoSmartHint(board, currentPlayer);
+        default:
+          return null;
+      }
+    } catch (error) {
+      console.error('getSmartHint 出错:', error.message);
+      return null;
+    }
+  }
+
+  // 五子棋智能提示 - 按战局优先级分析
+  getGobangSmartHint(board, currentPlayer) {
+    const opponent = currentPlayer === 1 ? 2 : 1;
+    const aiBoard = board.map(row => [...row]);
+
+    // 第一步直接给中心位置
+    if (this.isFirstMove(aiBoard)) {
+      const centerR = Math.floor(aiBoard.length / 2);
+      const centerC = Math.floor(aiBoard[0].length / 2);
+      return {
+        move: { r: centerR, c: centerC },
+        reason: '💡 开局第一步，抢占中心位置控制战局',
+        type: 'opening'
+      };
+    }
+
+    // ===== 最高优先级：立即获胜 =====
+    const winningMove = this.findWinningMove(aiBoard, currentPlayer);
+    if (winningMove) {
+      return {
+        move: winningMove,
+        reason: '🎯 这里可以直接获胜！点击此位置完成五连',
+        type: 'win'
+      };
+    }
+
+    // ===== 次高优先级：对手即将获胜，必须防守 =====
+    const mustDefendMove = this.findWinningMove(aiBoard, opponent);
+    if (mustDefendMove) {
+      return {
+        move: mustDefendMove,
+        reason: '🛡️ 紧急防守！对手在此处即将五连，必须阻止',
+        type: 'block-win'
+      };
+    }
+
+    // ===== 高优先级：防守对手的四连 =====
+    const fourInRowDefense = this.findFourInRowDefense(aiBoard, opponent);
+    if (fourInRowDefense) {
+      return {
+        move: fourInRowDefense,
+        reason: '🛡️ 防守对手的四连威胁，防止对方形成必胜局面',
+        type: 'block-four'
+      };
+    }
+
+    const opponentFourInRow = this.findFourInRowMove(aiBoard, opponent);
+    if (opponentFourInRow) {
+      return {
+        move: opponentFourInRow,
+        reason: '🛡️ 防守：对手可以在此形成四连，需要提前阻止',
+        type: 'block-four'
+      };
+    }
+
+    // ===== 高优先级：自己形成活四（必胜） =====
+    const myLiveFour = this.findLiveFourMove(aiBoard, currentPlayer);
+    if (myLiveFour) {
+      return {
+        move: myLiveFour,
+        reason: '⚡ 在此处落子可形成活四，对手无法防守，必胜！',
+        type: 'live-four'
+      };
+    }
+
+    // ===== 高优先级：自己形成冲四 =====
+    const myRushFour = this.findRushFourMove(aiBoard, currentPlayer);
+    if (myRushFour) {
+      return {
+        move: myRushFour,
+        reason: '🔥 在此处落子可形成冲四，对方必须防守，你将获得先手',
+        type: 'rush-four'
+      };
+    }
+
+    // ===== 中优先级：防守对手的活四/冲四 =====
+    const opponentLiveFour = this.findLiveFourMove(aiBoard, opponent);
+    if (opponentLiveFour) {
+      return {
+        move: opponentLiveFour,
+        reason: '🛡️ 防守对手的活四机会，否则对手将获得必胜局面',
+        type: 'block-live-four'
+      };
+    }
+
+    const opponentRushFour = this.findRushFourMove(aiBoard, opponent);
+    if (opponentRushFour) {
+      return {
+        move: opponentRushFour,
+        reason: '🛡️ 防守对手即将形成的冲四威胁',
+        type: 'block-rush-four'
+      };
+    }
+
+    // ===== 中优先级：形成双活三（必胜局面） =====
+    const doubleLiveThree = this.findDoubleLiveThreeMove(aiBoard, currentPlayer);
+    if (doubleLiveThree) {
+      return {
+        move: doubleLiveThree,
+        reason: '⚡ 双活三！在此处落子可同时形成两个活三，必胜局面',
+        type: 'double-live-three'
+      };
+    }
+
+    const opponentDoubleLiveThree = this.findDoubleLiveThreeMove(aiBoard, opponent);
+    if (opponentDoubleLiveThree) {
+      return {
+        move: opponentDoubleLiveThree,
+        reason: '🛡️ 防守：对手可以在此形成双活三，必须提前阻止',
+        type: 'block-double-live-three'
+      };
+    }
+
+    // ===== 中低优先级：形成活三 =====
+    const liveThreeMove = this.findLiveThreeMove(aiBoard, currentPlayer);
+    if (liveThreeMove) {
+      return {
+        move: liveThreeMove,
+        reason: '🔥 在此处落子可形成活三，为后续进攻打下基础',
+        type: 'live-three'
+      };
+    }
+
+    const opponentLiveThree = this.findLiveThreeMove(aiBoard, opponent);
+    if (opponentLiveThree) {
+      return {
+        move: opponentLiveThree,
+        reason: '🛡️ 防守对手的活三机会，防止其形成更强攻势',
+        type: 'block-live-three'
+      };
+    }
+
+    // ===== 低优先级：使用困难模式Minimax分析最佳位置 =====
+    try {
+      const hardMove = this.getGobangHardMove(aiBoard, currentPlayer);
+      if (hardMove) {
+        return {
+          move: hardMove,
+          reason: '💡 综合分析：此处进攻和防守价值最高，适合稳步推进',
+          type: 'strategic'
+        };
+      }
+    } catch (e) {
+      // 回退到中等难度
+    }
+
+    // ===== 兜底：使用中等难度 =====
+    const mediumMove = this.getGobangMediumMove(aiBoard, currentPlayer);
+    if (mediumMove) {
+      return {
+        move: mediumMove,
+        reason: '💡 建议位置：此处有利于构建攻势',
+        type: 'general'
+      };
+    }
+
+    // ===== 最后兜底：简单模式 =====
+    const easyMove = this.getGobangEasyMove(aiBoard, currentPlayer);
+    if (easyMove) {
+      return {
+        move: easyMove,
+        reason: '💡 推荐位置',
+        type: 'general'
+      };
+    }
+
+    return null;
+  }
+
+  // 中国象棋智能提示
+  getChessSmartHint(board, difficulty, currentPlayer) {
+    try {
+      // 使用困难模式AI获取最佳走法
+      const move = this.getChessAIMove(board, 'hard', currentPlayer);
+      if (move) {
+        return {
+          move: move,
+          reason: '💡 建议：这是当前局面下价值最高的走法',
+          type: 'strategic'
+        };
+      }
+
+      // 兜底：中等难度
+      const mediumMove = this.getChessAIMove(board, 'medium', currentPlayer);
+      if (mediumMove) {
+        return {
+          move: mediumMove,
+          reason: '💡 推荐走法',
+          type: 'general'
+        };
+      }
+    } catch (e) {
+      console.error('getChessSmartHint 出错:', e.message);
+    }
+
+    return null;
+  }
+
+  // 围棋智能提示
+  getGoSmartHint(board, currentPlayer) {
+    try {
+      // 先看是否有第一步特殊处理
+      if (this.isFirstMove(board)) {
+        const centerR = Math.floor(board.length / 2);
+        const centerC = Math.floor(board[0].length / 2);
+        return {
+          move: { r: centerR, c: centerC },
+          reason: '💡 开局第一步，抢占天元控制全局',
+          type: 'opening'
+        };
+      }
+
+      // 使用中等以上难度分析
+      const mediumMove = this.getGoMediumMove(board, currentPlayer);
+      if (mediumMove) {
+        return {
+          move: mediumMove,
+          reason: '💡 建议：此处攻守价值较高',
+          type: 'strategic'
+        };
+      }
+
+      // 兜底：简单模式
+      const easyMove = this.getGoEasyMove(board);
+      if (easyMove) {
+        return {
+          move: easyMove,
+          reason: '💡 推荐位置',
+          type: 'general'
+        };
+      }
+    } catch (e) {
+      console.error('getGoSmartHint 出错:', e.message);
+    }
+
+    return null;
   }
 }
 

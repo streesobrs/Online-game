@@ -233,19 +233,33 @@ class ShopManager {
         await accountManager.addCosmetic(userId, item.category, item.id);
         break;
       case 'pack':
-        for (const [contentId, count] of Object.entries(item.content)) {
-          const contentItem = this.findItem(contentId);
-          if (contentItem) {
-            for (let i = 0; i < count; i++) {
-              await this.deliverItem(userId, contentItem, accountManager);
-            }
-          }
-        }
+        await accountManager.addItem(userId, item.id, 1);
         break;
       case 'vip':
         await accountManager.addVip(userId, item.days, item.expBonus);
         break;
     }
+  }
+
+  // 开启礼包
+  async openPack(userId, packId, accountManager) {
+    const pack = this.findItem(packId);
+    if (!pack || pack.category !== 'pack') {
+      return { success: false, message: '礼包不存在' };
+    }
+
+    const rewards = [];
+    for (const [contentId, count] of Object.entries(pack.content || {})) {
+      const contentItem = this.findItem(contentId);
+      if (contentItem) {
+        for (let i = 0; i < count; i++) {
+          await this.deliverItem(userId, contentItem, accountManager);
+        }
+        rewards.push({ id: contentId, name: contentItem.name, icon: contentItem.icon, count });
+      }
+    }
+
+    return { success: true, rewards, message: `开启${pack.name}成功！` };
   }
 
   // 用户灰度哈希

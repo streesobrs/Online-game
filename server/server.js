@@ -217,7 +217,7 @@ app.post('/api/shop/use-item', async (req, res) => {
     if (!userId || !itemId) {
       return res.status(400).json({ success: false, message: '参数错误' });
     }
-    const result = await accountManager.useItem(userId, itemId, 1);
+    const result = await accountManager.useItem(userId, itemId, 1, shopManager);
     res.json(result);
   } catch (err) {
     logger.error('使用道具失败', { error: err.message });
@@ -1185,11 +1185,103 @@ app.get('/api/profile/:accountId', async (req, res) => {
   }
 });
 
+// ========== 邮件系统 API ==========
+
+// 获取用户邮件列表
+app.get('/api/mails/:accountId', async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const result = await accountManager.getMails(accountId);
+    res.json(result);
+  } catch (err) {
+    logger.error('获取邮件列表失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取邮件列表失败' });
+  }
+});
+
+// 领取单封邮件
+app.post('/api/mails/:accountId/claim/:mailId', async (req, res) => {
+  try {
+    const { accountId, mailId } = req.params;
+    const result = await accountManager.claimMail(accountId, mailId);
+    res.json(result);
+  } catch (err) {
+    logger.error('领取邮件失败', { error: err.message });
+    res.status(500).json({ success: false, message: '领取邮件失败' });
+  }
+});
+
+// 一键领取所有邮件
+app.post('/api/mails/:accountId/claim-all', async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const result = await accountManager.claimAllMails(accountId);
+    res.json(result);
+  } catch (err) {
+    logger.error('批量领取邮件失败', { error: err.message });
+    res.status(500).json({ success: false, message: '批量领取邮件失败' });
+  }
+});
+
+// 标记所有邮件为已读
+app.post('/api/mails/:accountId/read-all', async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const result = await accountManager.readAllMails(accountId);
+    res.json(result);
+  } catch (err) {
+    logger.error('标记已读失败', { error: err.message });
+    res.status(500).json({ success: false, message: '操作失败' });
+  }
+});
+
+// 标记单封邮件为已读
+app.post('/api/mails/:accountId/read/:mailId', async (req, res) => {
+  try {
+    const { accountId, mailId } = req.params;
+    const result = await accountManager.readMail(accountId, mailId);
+    res.json(result);
+  } catch (err) {
+    logger.error('标记邮件已读失败', { error: err.message });
+    res.status(500).json({ success: false, message: '操作失败' });
+  }
+});
+
+// 删除单封邮件
+app.delete('/api/mails/:accountId/:mailId', async (req, res) => {
+  try {
+    const { accountId, mailId } = req.params;
+    const result = await accountManager.deleteMail(accountId, mailId);
+    res.json(result);
+  } catch (err) {
+    logger.error('删除邮件失败', { error: err.message });
+    res.status(500).json({ success: false, message: '删除邮件失败' });
+  }
+});
+
+// 清理所有已领取的邮件
+app.post('/api/mails/:accountId/cleanup', async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const result = await accountManager.deleteClaimedMails(accountId);
+    res.json(result);
+  } catch (err) {
+    logger.error('清理邮件失败', { error: err.message });
+    res.status(500).json({ success: false, message: '清理邮件失败' });
+  }
+});
+
 // 初始化管理器
 const versionManager = new VersionManager();
 const accountManager = new AccountManager();
 // 后台加载节假日数据
 AccountManager.initHolidays().catch(err => logger.warn('节假日初始化失败', { error: err.message }));
+// 启动时迁移邮件和背包数据到独立存储
+AccountManager.migrateAll().then(result => {
+  if (result.migratedAccounts > 0) {
+    logger.info('邮件和背包数据迁移完成', { migratedAccounts: result.migratedAccounts, mailCount: result.mailCount, inventoryItemCount: result.inventoryItemCount });
+  }
+}).catch(err => logger.warn('邮件和背包数据迁移失败', { error: err.message }));
 const userManager = new UserManager(accountManager);
 const achievementManager = new AchievementManager(accountManager, userManager);
 // 启动时同步勋章数据
@@ -1197,7 +1289,7 @@ achievementManager.syncAllBadges().catch(err => logger.warn('勋章数据同步�
 const aiManager = new AIManager();
 const gameManager = new GameManager(userManager, accountManager, achievementManager, aiManager);
 const chatManager = new ChatManager(userManager, gameManager, accountManager);
-const adminManager = new AdminManager(userManager, gameManager, chatManager, accountManager);
+const adminManager = new AdminManager(userManager, gameManager, chatManager, accountManager, io);
 const feedbackManager = FeedbackManager;
 const shopManager = new ShopManager();
 // 注入accountManager到FeedbackManager用于实时查询昵称
@@ -2854,6 +2946,57 @@ adminNamespace.on('connection', (socket) => {
     adminManager.resetUserAchievements(socket, id);
   });
 
+  // ========== 邮件系统 & 物品发放 ==========
+
+  // 给用户发送邮件（带物品/星钻/经验）
+  socket.on('send_mail_to_user', (data) => {
+    adminManager.sendMailToUser(socket, data);
+  });
+
+  // 批量发送邮件给多个用户
+  socket.on('send_mail_batch', (data) => {
+    adminManager.sendMailToMultiple(socket, data);
+  });
+
+  // 发送全站邮件
+  socket.on('send_mail_all', (data) => {
+    adminManager.sendMailToAllUsers(socket, data);
+  });
+
+  // 直接发放星钻（立即到账）
+  socket.on('grant_starcoins', (data) => {
+    const { id, amount, reason } = data;
+    adminManager.grantStarCoinsToUser(socket, id, Number(amount), reason || '管理员发放');
+  });
+
+  // 直接发放经验
+  socket.on('grant_exp', (data) => {
+    const { id, amount, reason } = data;
+    adminManager.grantExpToUser(socket, id, Number(amount), reason || '管理员发放');
+  });
+
+  // 直接发放物品
+  socket.on('grant_items', (data) => {
+    const { id, items } = data;
+    adminManager.grantItemsToUser(socket, id, items);
+  });
+
+  // 获取用户邮件列表（管理员查看）
+  socket.on('get_user_mails', (data) => {
+    const { id } = data;
+    adminManager.getUserMails(socket, id);
+  });
+
+  // 获取物品列表
+  socket.on('get_items_list', () => {
+    adminManager.getItemsList(socket);
+  });
+
+  // 获取用户选择列表
+  socket.on('get_users_select_list', (data) => {
+    adminManager.getUsersForSelect(socket, data.keyword);
+  });
+
   // 断开连接
   socket.on('disconnect', () => {
     adminManager.handleAdminDisconnect(socket);
@@ -2961,8 +3104,7 @@ process.on('SIGINT', async () => {
 // 未捕获异常处理
 process.on('uncaughtException', (err) => {
   logger.error('未捕获的异常', { error: err.message, stack: err.stack });
-  // 不立即退出，给日志写入时间
-  setTimeout(() => process.exit(1), 1000);
+  // 不退出进程，让服务端继续运行。只记录详细错误日志便于排查。
 });
 
 process.on('unhandledRejection', (reason, promise) => {

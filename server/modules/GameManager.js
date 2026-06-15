@@ -1741,63 +1741,78 @@ class GameManager {
       return;
     }
 
-    // 获取 AI 移动
-    const aiMove = this.aiManager.getAIMove(
-      aiGame.gameType,
-      aiGame.board,
-      aiGame.difficulty,
-      aiGame.currentPlayer
-    );
+    try {
+      // 获取 AI 移动
+      const aiMove = this.aiManager.getAIMove(
+        aiGame.gameType,
+        aiGame.board,
+        aiGame.difficulty,
+        aiGame.currentPlayer
+      );
 
-    if (!aiMove) {
-      logger.warn('AI 移动失败：无法生成有效移动', { accountId, gameType: aiGame.gameType });
-      return;
-    }
-
-    logger.info('🤖 AI 执行移动', { accountId, gameType: aiGame.gameType, move: aiMove });
-
-    // 执行 AI 移动
-    this.executeMove(aiGame.gameType, aiGame.board, aiMove, aiGame.currentPlayer);
-
-    // 记录移动
-    const move = {
-      player: 'ai',
-      color: aiGame.currentPlayer,
-      position: aiMove,
-      timestamp: Date.now()
-    };
-    aiGame.moves.push(move);
-    aiGame.lastMoveTime = Date.now();
-
-    // 更新用户活动时间
-    const user = this.userManager.getUserByAccountId(accountId);
-    if (user) {
-      user.lastActivity = Date.now();
-    }
-
-    // 检查游戏是否结束
-    const gameOver = this.checkGameOver(aiGame.gameType, aiGame.board, aiGame.currentPlayer);
-    if (gameOver) {
-      this.endAIGame(accountId, 'loss', io);
-      return;
-    }
-
-    // 切换回玩家回合
-    aiGame.currentPlayer = 1;
-
-    // 发送AI移动结果
-    const userSocket = this.userManager.getSocketByAccountId(accountId);
-    if (userSocket) {
-      const result = {
-        position: aiMove,
-        color: 2,
-        currentPlayer: 1
-      };
-      // 象棋需要发送完整棋盘数据
-      if (aiGame.gameType === 'chinese-chess') {
-        result.board = aiGame.board;
+      if (!aiMove) {
+        logger.warn('AI 移动失败：无法生成有效移动', { accountId, gameType: aiGame.gameType });
+        return;
       }
-      userSocket.emit('ai_move_result', result);
+
+      logger.info('🤖 AI 执行移动', { accountId, gameType: aiGame.gameType, move: aiMove });
+
+      // 执行 AI 移动
+      this.executeMove(aiGame.gameType, aiGame.board, aiMove, aiGame.currentPlayer);
+
+      // 记录移动
+      const move = {
+        player: 'ai',
+        color: aiGame.currentPlayer,
+        position: aiMove,
+        timestamp: Date.now()
+      };
+      aiGame.moves.push(move);
+      aiGame.lastMoveTime = Date.now();
+
+      // 更新用户活动时间
+      const user = this.userManager.getUserByAccountId(accountId);
+      if (user) {
+        user.lastActivity = Date.now();
+      }
+
+      // 检查游戏是否结束
+      const gameOver = this.checkGameOver(aiGame.gameType, aiGame.board, aiGame.currentPlayer);
+      if (gameOver) {
+        this.endAIGame(accountId, 'loss', io);
+        return;
+      }
+
+      // 切换回玩家回合
+      aiGame.currentPlayer = 1;
+
+      // 发送AI移动结果
+      const userSocket = this.userManager.getSocketByAccountId(accountId);
+      if (userSocket) {
+        const result = {
+          position: aiMove,
+          color: 2,
+          currentPlayer: 1
+        };
+        // 象棋需要发送完整棋盘数据
+        if (aiGame.gameType === 'chinese-chess') {
+          result.board = aiGame.board;
+        }
+        userSocket.emit('ai_move_result', result);
+      }
+    } catch (error) {
+      logger.error('AI 自动移动出错', { accountId, gameType: aiGame.gameType, error: error.message, stack: error.stack });
+      // 出错后将回合还给玩家，让游戏可以继续
+      aiGame.currentPlayer = 1;
+      const userSocket = this.userManager.getSocketByAccountId(accountId);
+      if (userSocket) {
+        userSocket.emit('ai_move_result', {
+          position: null,
+          color: 2,
+          currentPlayer: 1,
+          error: 'AI 思考中遇到问题，请继续你的回合'
+        });
+      }
     }
   }
 
@@ -2725,67 +2740,30 @@ class GameManager {
       return;
     }
 
-    // 使用AI计算最佳移动
-    let hintMove = null;
+    // 使用AI计算最佳移动（智能提示）
+    let hintData = null;
 
     // 将棋盘转为适用AIManager的格式
     const aiBoard = board.map(row => Array.isArray(row) ? [...row] : row);
 
     try {
-      // 计算提示 - 使用简单/中等难度快速计算
-      if (gameType === 'gobang') {
-        // 尝试用中等难度获取最优解
-        const medium = this.aiManager.getGobangMediumMove(aiBoard, currentPlayer);
-        if (medium) {
-          hintMove = { r: medium.r, c: medium.c };
-        } else {
-          // 回退到简单
-          const easy = this.aiManager.getGobangEasyMove(aiBoard, currentPlayer);
-          if (easy) {
-            hintMove = { r: easy.r, c: easy.c };
-          }
-        }
-      } else if (gameType === 'go') {
-        const goMove = this.aiManager.getGoMediumMove(aiBoard, currentPlayer);
-        if (goMove) {
-          hintMove = { r: goMove.r, c: goMove.c };
-        } else {
-          const easy = this.aiManager.getGoEasyMove(aiBoard);
-          if (easy) {
-            hintMove = { r: easy.r, c: easy.c };
-          }
-        }
-      } else if (gameType === 'chinese-chess') {
-        const chessMove = this.aiManager.getChessAIMove(aiBoard, 'medium', currentPlayer);
-        if (chessMove) {
-          hintMove = {
-            fromR: chessMove.fromR,
-            fromC: chessMove.fromC,
-            toR: chessMove.toR,
-            toC: chessMove.toC
-          };
-        } else {
-          const easy = this.aiManager.getChessAIMove(aiBoard, 'easy', currentPlayer);
-          if (easy) {
-            hintMove = {
-              fromR: easy.fromR,
-              fromC: easy.fromC,
-              toR: easy.toR,
-              toC: easy.toC
-            };
-          }
-        }
-      }
+      // 使用智能提示系统 - 按战局优先级分析并返回说明
+      hintData = this.aiManager.getSmartHint(gameType, aiBoard, currentPlayer);
 
-      if (hintMove) {
+      if (hintData && hintData.move) {
         const socket = this.userManager.getSocketByAccountId(user.accountId);
         if (socket) {
-          socket.emit('hint_result', { move: hintMove, gameType: gameType });
+          // 发送提示结果，包含：位置、类型、说明
+          socket.emit('hint_result', {
+            move: hintData.move,
+            gameType: gameType,
+            reason: hintData.reason,
+            hintType: hintData.type
+          });
 
           // 扣除提示次数
           if (this.accountManager && user.accountId) {
             try {
-              // 尝试扣除提示次数（通过库存）
               const account = await this.accountManager.getAccount(user.accountId);
               if (account && account.inventory && account.inventory.hintCount > 0) {
                 account.inventory.hintCount -= 1;

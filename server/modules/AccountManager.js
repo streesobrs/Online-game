@@ -2464,14 +2464,238 @@ class AccountManager {
     }
   }
 
+  // ========== 邮件独立存储 ==========
+
+  /**
+   * 获取用户邮件（独立存储，不再放在账号数据里）
+   */
+  async _getMailStore(userId) {
+    try {
+      let store = await dataStore.readOne('mails', userId);
+
+      // 检查账号里是否还有残留的 mails 字段，有则合并迁移并清理
+      const account = await this._getAccount(userId);
+      const hasOldMails = account && account.mails && Array.isArray(account.mails) && account.mails.length > 0;
+
+      if (!store && hasOldMails) {
+        store = { userId, mails: account.mails };
+        await dataStore.writeOne('mails', userId, store);
+        delete account.mails;
+        await this._saveAccount(userId, account);
+        logger.info('邮件数据已迁移到独立存储', { userId, mailCount: store.mails.length });
+      } else if (store && hasOldMails) {
+        // 独立文件已存在，把账号里的旧邮件合并进去（按 id 去重）
+        const existingIds = new Set(store.mails.map(m => m.id));
+        for (const oldMail of account.mails) {
+          if (!existingIds.has(oldMail.id)) store.mails.push(oldMail);
+        }
+        await dataStore.writeOne('mails', userId, store);
+        delete account.mails;
+        await this._saveAccount(userId, account);
+        logger.info('邮件数据已迁移到独立存储', { userId, mailCount: store.mails.length });
+      } else if (account && account.mails !== undefined && !hasOldMails) {
+        // 空数组，直接清理
+        delete account.mails;
+        await this._saveAccount(userId, account);
+      }
+
+      return store || { userId, mails: [] };
+    } catch (err) {
+      logger.error('获取邮件存储失败', { userId, error: err.message });
+      return { userId, mails: [] };
+    }
+  }
+
+  /**
+   * 保存用户邮件到独立存储
+   */
+  async _saveMailStore(userId, store) {
+    try {
+      await dataStore.writeOne('mails', userId, store);
+      return true;
+    } catch (err) {
+      logger.error('保存邮件存储失败', { userId, error: err.message });
+      return false;
+    }
+  }
+
+  // ========== 背包独立存储 ==========
+
+  /**
+   * 获取用户背包（独立存储，不再放在账号数据里）
+   */
+  async _getInventoryStore(userId) {
+    try {
+      let store = await dataStore.readOne('inventories', userId);
+
+      const account = await this._getAccount(userId);
+      const oldInv = account?.inventory;
+      const hasOldData = oldInv && (
+        (oldInv.items && Object.keys(oldInv.items).length > 0) ||
+        oldInv?.undoCount > 0 ||
+        oldInv?.hintCount > 0
+      );
+
+      if (!store && hasOldData) {
+        store = {
+          userId,
+          items: oldInv.items || {},
+          undoCount: oldInv.undoCount || 0,
+          hintCount: oldInv.hintCount || 0
+        };
+        await dataStore.writeOne('inventories', userId, store);
+        delete account.inventory;
+        await this._saveAccount(userId, account);
+        const itemCount = Object.keys(store.items || {}).length;
+        logger.info('背包数据已迁移到独立存储', { userId, itemCount });
+      } else if (store && hasOldData) {
+        // 独立文件已存在，把账号里的旧物品合并进去
+        if (oldInv.items) {
+          for (const [itemId, count] of Object.entries(oldInv.items)) {
+            store.items[itemId] = (store.items[itemId] || 0) + count;
+          }
+        }
+        store.undoCount = Math.max(store.undoCount || 0, oldInv.undoCount || 0);
+        store.hintCount = Math.max(store.hintCount || 0, oldInv.hintCount || 0);
+        await dataStore.writeOne('inventories', userId, store);
+        delete account.inventory;
+        await this._saveAccount(userId, account);
+        const itemCount = Object.keys(store.items || {}).length;
+        logger.info('背包数据已迁移到独立存储', { userId, itemCount });
+      } else if (account && account.inventory !== undefined && !hasOldData) {
+        delete account.inventory;
+        await this._saveAccount(userId, account);
+      }
+
+      return store || { userId, items: {}, undoCount: 0, hintCount: 0 };
+    } catch (err) {
+      logger.error('获取背包存储失败', { userId, error: err.message });
+      return { userId, items: {}, undoCount: 0, hintCount: 0 };
+    }
+  }
+
+  /**
+   * 保存用户背包到独立存储
+   */
+  async _saveInventoryStore(userId, store) {
+    try {
+      await dataStore.writeOne('inventories', userId, store);
+      return true;
+    } catch (err) {
+      logger.error('保存背包存储失败', { userId, error: err.message });
+      return false;
+    }
+  }
+
+  /**
+   * 全量迁移邮件和背包数据到独立存储（服务器启动时调用一次）
+   */
+  static async migrateAll() {
+    try {
+      const accounts = await dataStore.read('accounts');
+      if (!accounts || accounts.length === 0) {
+        logger.info('无账号数据，跳过迁移');
+        return { success: true, migratedAccounts: 0, mailCount: 0, inventoryItemCount: 0 };
+      }
+
+      let migratedAccounts = 0;
+      let totalMailCount = 0;
+      let totalInventoryItemCount = 0;
+
+      for (const account of accounts) {
+        const userId = account?.account?.id || account?.id;
+        if (!userId) continue;
+
+        let needsSave = false;
+
+        // 只要账号里还有 mails 字段，就合并到独立文件并清理
+        if (account.mails && Array.isArray(account.mails) && account.mails.length > 0) {
+          let existingMailStore = null;
+          try { existingMailStore = await dataStore.readOne('mails', userId); } catch (e) { /* 忽略 */ }
+
+          const existingIds = new Set(
+            existingMailStore && existingMailStore.mails
+              ? existingMailStore.mails.map(m => m.id)
+              : []
+          );
+          const merged = existingMailStore && existingMailStore.mails
+            ? [...existingMailStore.mails]
+            : [];
+
+          for (const oldMail of account.mails) {
+            if (!existingIds.has(oldMail.id)) merged.push(oldMail);
+          }
+
+          await dataStore.writeOne('mails', userId, { userId, mails: merged });
+          delete account.mails;
+          needsSave = true;
+          totalMailCount += merged.length;
+          logger.info('迁移邮件数据', { userId, mailCount: merged.length });
+        } else if (account.mails !== undefined) {
+          delete account.mails;
+          needsSave = true;
+        }
+
+        // 只要账号里还有 inventory 字段，就合并到独立文件并清理
+        if (account.inventory) {
+          const oldInv = account.inventory;
+          const hasData = (oldInv.items && Object.keys(oldInv.items).length > 0) ||
+            oldInv?.undoCount > 0 || oldInv?.hintCount > 0;
+
+          if (hasData) {
+            let existingInvStore = null;
+            try { existingInvStore = await dataStore.readOne('inventories', userId); } catch (e) { /* 忽略 */ }
+
+            const mergedItems = { ...(existingInvStore?.items || {}) };
+            if (oldInv.items) {
+              for (const [itemId, count] of Object.entries(oldInv.items)) {
+                mergedItems[itemId] = (mergedItems[itemId] || 0) + count;
+              }
+            }
+
+            await dataStore.writeOne('inventories', userId, {
+              userId,
+              items: mergedItems,
+              undoCount: Math.max(existingInvStore?.undoCount || 0, oldInv.undoCount || 0),
+              hintCount: Math.max(existingInvStore?.hintCount || 0, oldInv.hintCount || 0)
+            });
+            delete account.inventory;
+            needsSave = true;
+            const itemCount = Object.keys(mergedItems).length;
+            totalInventoryItemCount += itemCount;
+            logger.info('迁移背包数据', { userId, itemCount });
+          } else {
+            delete account.inventory;
+            needsSave = true;
+          }
+        }
+
+        if (needsSave) {
+          await dataStore.writeOne('accounts', userId, account);
+          migratedAccounts++;
+        }
+      }
+
+      logger.info('全量迁移完成', { migratedAccounts, totalMailCount, totalInventoryItemCount });
+      return { success: true, migratedAccounts, mailCount: totalMailCount, inventoryItemCount: totalInventoryItemCount };
+    } catch (err) {
+      logger.error('全量迁移失败', { error: err.message, stack: err.stack });
+      return { success: false, message: err.message };
+    }
+  }
+
   // ========== 背包系统 ==========
 
   /**
    * 获取用户背包
    */
   async getInventory(userId) {
-    const account = await this._getAccount(userId);
-    const inventory = account?.inventory || { items: {} };
+    const invStore = await this._getInventoryStore(userId);
+    const inventory = {
+      items: invStore.items || {},
+      undoCount: invStore.undoCount || 0,
+      hintCount: invStore.hintCount || 0
+    };
     return { success: true, inventory };
   }
 
@@ -2479,68 +2703,78 @@ class AccountManager {
    * 添加道具
    */
   async addItem(userId, itemId, count = 1) {
-    const account = await this._getAccount(userId);
-    if (!account) {
-      return { success: false, message: '账号不存在' };
-    }
-    if (!account.inventory) {
-      account.inventory = { items: {} };
-    }
-    if (!account.inventory.items) {
-      account.inventory.items = {};
-    }
-    account.inventory.items[itemId] = (account.inventory.items[itemId] || 0) + count;
-    await this._saveAccount(userId, account);
+    const invStore = await this._getInventoryStore(userId);
+    if (!invStore.items) invStore.items = {};
+    invStore.items[itemId] = (invStore.items[itemId] || 0) + count;
+    await this._saveInventoryStore(userId, invStore);
     return { success: true };
   }
 
   /**
    * 使用道具
    */
-  async useItem(userId, itemId, count = 1) {
-    const account = await this._getAccount(userId);
-    if (!account) {
-      return { success: false, message: '账号不存在' };
-    }
-    if (!account.inventory?.items?.[itemId] || account.inventory.items[itemId] < count) {
+  async useItem(userId, itemId, count = 1, shopManager = null) {
+    const invStore = await this._getInventoryStore(userId);
+    if (!invStore.items?.[itemId] || invStore.items[itemId] < count) {
       return { success: false, message: '道具不足' };
+    }
+
+    // 如果是礼包类型，交由 shopManager 处理
+    if (shopManager) {
+      const itemInfo = shopManager.findItem(itemId);
+      if (itemInfo && itemInfo.category === 'pack') {
+        const openResult = await shopManager.openPack(userId, itemId, this);
+        if (openResult.success) {
+          // 扣除礼包数量
+          invStore.items[itemId] -= count;
+          if (invStore.items[itemId] <= 0) {
+            delete invStore.items[itemId];
+          }
+          await this._saveInventoryStore(userId, invStore);
+          return { ...openResult };
+        }
+        return openResult;
+      }
     }
 
     let result = { success: true };
     let expToAdd = 0;
+    const account = await this._getAccount(userId);
 
     switch (itemId) {
       case 'item_double_exp':
-        // 双倍经验卡：添加1小时的双倍经验buff
+        if (!account) return { success: false, message: '账号不存在' };
         if (!account.activeBuffs) account.activeBuffs = {};
         const now = Date.now();
         const existingExpire = account.activeBuffs.doubleExp || now;
-        account.activeBuffs.doubleExp = Math.max(existingExpire, now) + 60 * 60 * 1000; // 1小时
+        account.activeBuffs.doubleExp = Math.max(existingExpire, now) + 60 * 60 * 1000;
         result.message = '双倍经验卡已激活！1小时内经验翻倍';
+        await this._saveAccount(userId, account);
         break;
       case 'item_luck_boost':
-        // 幸运符：添加1小时的幸运buff
+        if (!account) return { success: false, message: '账号不存在' };
         if (!account.activeBuffs) account.activeBuffs = {};
         const luckNow = Date.now();
         const existingLuckExpire = account.activeBuffs.luckBoost || luckNow;
-        account.activeBuffs.luckBoost = Math.max(existingLuckExpire, luckNow) + 60 * 60 * 1000; // 1小时
+        account.activeBuffs.luckBoost = Math.max(existingLuckExpire, luckNow) + 60 * 60 * 1000;
         result.message = '幸运符已激活！1小时内星钻奖励翻倍';
+        await this._saveAccount(userId, account);
         break;
       case 'item_triple_exp':
-        // 三倍经验卡：添加1小时的三倍经验buff
+        if (!account) return { success: false, message: '账号不存在' };
         if (!account.activeBuffs) account.activeBuffs = {};
         const tripleNow = Date.now();
         const existingTripleExpire = account.activeBuffs.tripleExp || tripleNow;
-        account.activeBuffs.tripleExp = Math.max(existingTripleExpire, tripleNow) + 60 * 60 * 1000; // 1小时
+        account.activeBuffs.tripleExp = Math.max(existingTripleExpire, tripleNow) + 60 * 60 * 1000;
         result.message = '三倍经验卡已激活！1小时内经验三倍';
+        await this._saveAccount(userId, account);
         break;
       case 'item_exp_potion':
-        // 经验药水：立即获得500经验
         expToAdd = 500 * count;
         result.message = `使用成功！获得${expToAdd}经验值`;
         break;
       case 'item_level_up':
-        // 等级直升券：加每一级所需经验，让等级表自动计算
+        if (!account) return { success: false, message: '账号不存在' };
         const currentLevel = account.account?.profile?.level || 1;
         const targetLevel = currentLevel + count;
         let totalExpNeeded = 0;
@@ -2551,17 +2785,13 @@ class AccountManager {
         result.message = `使用成功！等级从${currentLevel}提升到${targetLevel}`;
         break;
       case 'item_undo':
-        // 悔棋卡：添加悔棋次数
-        if (!account.inventory) account.inventory = {};
-        if (!account.inventory.undoCount) account.inventory.undoCount = 0;
-        account.inventory.undoCount += 3 * count;
+        if (!invStore.undoCount) invStore.undoCount = 0;
+        invStore.undoCount += 3 * count;
         result.message = `使用成功！获得${3 * count}次悔棋次数`;
         break;
       case 'item_hint':
-        // 提示卡：添加提示次数
-        if (!account.inventory) account.inventory = {};
-        if (!account.inventory.hintCount) account.inventory.hintCount = 0;
-        account.inventory.hintCount += 5 * count;
+        if (!invStore.hintCount) invStore.hintCount = 0;
+        invStore.hintCount += 5 * count;
         result.message = `使用成功！获得${5 * count}次提示次数`;
         break;
       default:
@@ -2570,6 +2800,7 @@ class AccountManager {
 
     // 处理经验添加、星钻奖励、经验记录
     if (expToAdd > 0) {
+      if (!account) return { success: false, message: '账号不存在' };
       if (!account.account) account.account = {};
       if (!account.account.profile) account.account.profile = {};
 
@@ -2577,26 +2808,22 @@ class AccountManager {
       const oldExp = account.account.profile.exp || 0;
       const newTotalExp = oldExp + expToAdd;
 
-      // 通过总经验重新计算等级
-      const { level: calculatedLevel, exp: currentLevelExp } = this.calculateLevelAndExp(newTotalExp);
+      const { level: calculatedLevel } = this.calculateLevelAndExp(newTotalExp);
       account.account.profile.exp = newTotalExp;
       account.account.profile.level = calculatedLevel;
       const newLevel = calculatedLevel;
 
-      // 星钻奖励
       let currencyReward = Math.max(1, Math.floor(expToAdd / 10));
       if (currencyReward > 0) {
         await this.addCurrency(userId, currencyReward, `获得${expToAdd}经验值奖励`, 'exp_reward');
       }
 
-      // 升级奖励
       if (newLevel > oldLevel) {
         const levelUpCurrency = (newLevel - oldLevel) * 50;
         await this.addCurrency(userId, levelUpCurrency, `从${oldLevel}级升到${newLevel}级奖励`, 'level_up');
       }
       await this.checkLevelRewards(userId);
 
-      // 记录经验变动
       try {
         const expRecords = await this.getExpRecords(userId);
         expRecords.transactions.push({
@@ -2618,15 +2845,17 @@ class AccountManager {
       } catch (recErr) {
         logger.warn('记录经验变动失败', { userId, error: recErr.message });
       }
+
+      await this._saveAccount(userId, account);
     }
 
     // 扣除道具
-    account.inventory.items[itemId] -= count;
-    if (account.inventory.items[itemId] <= 0) {
-      delete account.inventory.items[itemId];
+    invStore.items[itemId] -= count;
+    if (invStore.items[itemId] <= 0) {
+      delete invStore.items[itemId];
     }
 
-    await this._saveAccount(userId, account);
+    await this._saveInventoryStore(userId, invStore);
     return result;
   }
 
@@ -2757,6 +2986,681 @@ class AccountManager {
 
     await this._saveAccount(userId, account);
     return { success: true };
+  }
+
+  // ===== 邮件系统 =====
+
+  /**
+   * 发送邮件给用户
+   */
+  async sendMail(userId, mailData) {
+    try {
+      const account = await this._getAccount(userId);
+      if (!account) {
+        return { success: false, message: '账号不存在' };
+      }
+
+      // 从配置文件读取物品/礼包/外观信息，填充 name/icon
+      const itemsPath = path.join(__dirname, '..', 'config', 'shop', 'items.json');
+      const packsPath = path.join(__dirname, '..', 'config', 'shop', 'packs.json');
+      const cosmeticsPath = path.join(__dirname, '..', 'config', 'shop', 'cosmetics.json');
+      const vipPath = path.join(__dirname, '..', 'config', 'shop', 'vip.json');
+
+      let itemsConfig = {};
+      let packsConfig = {};
+      let cosmeticsConfig = {};
+      let vipConfig = {};
+
+      try {
+        if (fs.existsSync(itemsPath)) itemsConfig = JSON.parse(fs.readFileSync(itemsPath, 'utf8'));
+        if (fs.existsSync(packsPath)) packsConfig = JSON.parse(fs.readFileSync(packsPath, 'utf8'));
+        if (fs.existsSync(cosmeticsPath)) cosmeticsConfig = JSON.parse(fs.readFileSync(cosmeticsPath, 'utf8'));
+        if (fs.existsSync(vipPath)) vipConfig = JSON.parse(fs.readFileSync(vipPath, 'utf8'));
+      } catch (e) { /* 忽略配置读取错误 */ }
+
+      // 处理物品列表：填充 name/icon
+      const processedItems = [];
+      if (Array.isArray(mailData.items) && mailData.items.length > 0) {
+        for (const item of mailData.items) {
+          const itemConfig = itemsConfig[item.id] || packsConfig[item.id];
+          processedItems.push({
+            id: item.id,
+            count: item.count || 1,
+            name: itemConfig?.name || item.name || item.id,
+            icon: itemConfig?.icon || '📦',
+            category: itemConfig?.category || 'item'
+          });
+        }
+      }
+
+      // 处理外观列表：填充 name/icon
+      const processedCosmetics = [];
+      if (Array.isArray(mailData.cosmetics) && mailData.cosmetics.length > 0) {
+        const catMap = { frame: 'frames', skin: 'skins', background: 'backgrounds', title: 'titles' };
+        for (const cosmetic of mailData.cosmetics) {
+          const catKey = catMap[cosmetic.category] || cosmetic.category;
+          const cosmeticConfig = cosmeticsConfig[catKey]?.[cosmetic.id] || {};
+          processedCosmetics.push({
+            id: cosmetic.id,
+            category: cosmetic.category,
+            name: cosmeticConfig.name || cosmetic.id,
+            icon: cosmeticConfig.icon || '🎨'
+          });
+        }
+      }
+
+      // 处理会员信息
+      let processedVip = mailData.vip || null;
+      if (processedVip) {
+        let vipName = `${processedVip.days}天会员`;
+        for (const pkg of Object.values(vipConfig)) {
+          if (pkg.days === processedVip.days) {
+            vipName = pkg.name || vipName;
+            break;
+          }
+        }
+        processedVip = { ...processedVip, name: vipName, icon: '💎' };
+      }
+
+      const mail = {
+        id: Date.now().toString(36) + Math.random().toString(36).substr(2, 6),
+        title: mailData.title || '系统邮件',
+        content: mailData.content || '',
+        items: processedItems,
+        cosmetics: processedCosmetics,
+        vip: processedVip,
+        starCoins: mailData.starCoins || 0,
+        exp: mailData.exp || 0,
+        from: mailData.from || '系统',
+        claimed: false,
+        read: false,
+        createdAt: Date.now()
+      };
+
+      const mailStore = await this._getMailStore(userId);
+      if (!mailStore.mails) mailStore.mails = [];
+      mailStore.mails.unshift(mail);
+
+      // 限制邮件数量，最多保留100封
+      if (mailStore.mails.length > 100) {
+        mailStore.mails = mailStore.mails.slice(0, 100);
+      }
+
+      await this._saveMailStore(userId, mailStore);
+      logger.info('发送邮件', { userId, mailId: mail.id, title: mail.title });
+      return { success: true, mail };
+    } catch (err) {
+      logger.error('发送邮件失败', { userId, error: err.message, stack: err.stack });
+      return { success: false, message: '发送邮件失败' };
+    }
+  }
+
+  /**
+   * 批量发送邮件给多个用户
+   */
+  async sendMailToUsers(userIds, mailData) {
+    const results = [];
+    for (const userId of userIds) {
+      const result = await this.sendMail(userId, mailData);
+      results.push({ userId, ...result });
+    }
+    return { success: true, results, sentCount: results.filter(r => r.success).length };
+  }
+
+  /**
+   * 给所有用户发送邮件
+   */
+  async sendMailToAll(mailData) {
+    try {
+      const accounts = await this.getAllAccounts();
+      const userIds = accounts.map(a => a.account?.id).filter(Boolean);
+      return await this.sendMailToUsers(userIds, mailData);
+    } catch (err) {
+      logger.error('群发邮件失败', { error: err.message });
+      return { success: false, message: '群发邮件失败' };
+    }
+  }
+
+  /**
+   * 获取用户邮件列表
+   */
+  async getMails(userId) {
+    try {
+      const mailStore = await this._getMailStore(userId);
+      const mails = mailStore.mails || [];
+      const unreadCount = mails.filter(m => !m.read).length;
+      const unclaimedCount = mails.filter(m => !m.claimed && ((m.items && m.items.length > 0) || (m.cosmetics && m.cosmetics.length > 0) || m.vip || m.starCoins > 0 || m.exp > 0)).length;
+      return { success: true, mails, unreadCount, unclaimedCount };
+    } catch (err) {
+      logger.error('获取邮件失败', { userId, error: err.message });
+      return { success: false, message: '获取邮件失败' };
+    }
+  }
+
+  /**
+   * 领取单封邮件奖励
+   */
+  async claimMail(userId, mailId) {
+    try {
+      const account = await this._getAccount(userId);
+      if (!account) {
+        return { success: false, message: '账号不存在' };
+      }
+      const mailStore = await this._getMailStore(userId);
+      if (!mailStore.mails || mailStore.mails.length === 0) {
+        return { success: false, message: '没有邮件' };
+      }
+
+      const mailIndex = mailStore.mails.findIndex(m => m.id === mailId);
+      if (mailIndex < 0) {
+        return { success: false, message: '邮件不存在' };
+      }
+
+      const mail = mailStore.mails[mailIndex];
+      if (mail.claimed) {
+        return { success: false, message: '该邮件已领取' };
+      }
+
+      const rewards = { items: [], cosmetics: [], vip: null, starCoins: 0, exp: 0 };
+
+      // 发放物品和礼包（使用独立背包存储）
+      if (mail.items && mail.items.length > 0) {
+        const invStore = await this._getInventoryStore(userId);
+        if (!invStore.items) invStore.items = {};
+        for (const item of mail.items) {
+          invStore.items[item.id] = (invStore.items[item.id] || 0) + item.count;
+          rewards.items.push(item);
+        }
+        await this._saveInventoryStore(userId, invStore);
+      }
+
+      // 发放外观
+      if (mail.cosmetics && mail.cosmetics.length > 0) {
+        if (!account.cosmetics) {
+          account.cosmetics = {
+            owned: { frames: [], skins: [], backgrounds: [], titles: [] },
+            equipped: { frame: null, skin: null, background: null, title: null }
+          };
+        }
+        const categoryMap = { frame: 'frames', skin: 'skins', background: 'backgrounds', title: 'titles' };
+        for (const cosmetic of mail.cosmetics) {
+          const ownedKey = categoryMap[cosmetic.category];
+          if (ownedKey && !account.cosmetics.owned[ownedKey].includes(cosmetic.id)) {
+            account.cosmetics.owned[ownedKey].push(cosmetic.id);
+            rewards.cosmetics.push(cosmetic);
+          }
+        }
+      }
+
+      // 发放会员
+      if (mail.vip && mail.vip.days > 0) {
+        if (!account.vip) {
+          account.vip = { type: null, expireAt: 0, expBonus: 0, lastDailyGift: 0, lastWeeklyGift: 0, lastMonthlyGift: 0 };
+        }
+        const now = Date.now();
+        if (account.vip.expireAt > now) {
+          account.vip.expireAt += mail.vip.days * 24 * 60 * 60 * 1000;
+        } else {
+          account.vip.expireAt = now + mail.vip.days * 24 * 60 * 60 * 1000;
+        }
+        account.vip.type = `vip_${mail.vip.days === 7 ? 'week' : mail.vip.days === 30 ? 'month' : 'year'}`;
+        account.vip.expBonus = Math.max(account.vip.expBonus || 0, mail.vip.expBonus || 0);
+        rewards.vip = mail.vip;
+      }
+
+      // 发放星钻
+      if (mail.starCoins && mail.starCoins > 0) {
+        if (!account.currency) account.currency = { starCoins: 0 };
+        account.currency.starCoins = (account.currency.starCoins || 0) + mail.starCoins;
+        rewards.starCoins = mail.starCoins;
+
+        // 添加星钻交易记录（独立文件）
+        try {
+          const transactionRecords = await this.getTransactionRecords(userId);
+          transactionRecords.transactions.push({
+            id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+            type: 'earn',
+            amount: mail.starCoins,
+            balance: account.currency.starCoins,
+            source: 'mail_reward',
+            reason: mail.title + ' - 邮件奖励',
+            timestamp: Date.now()
+          });
+          const recentLimit = 100;
+          if (transactionRecords.transactions.length > recentLimit) {
+            transactionRecords.transactions = transactionRecords.transactions.slice(-recentLimit);
+          }
+          await dataStore.writeOne('currencyTransactions', userId, transactionRecords);
+        } catch (recErr) {
+          logger.warn('记录邮件星钻奖励失败', { userId, error: recErr.message });
+        }
+      }
+
+      // 发放经验
+      if (mail.exp && mail.exp > 0) {
+        if (!account.account) account.account = {};
+        if (!account.account.profile) account.account.profile = { exp: 0 };
+        const oldExp = account.account.profile.exp || 0;
+        const oldLevel = account.account.profile.level || 1;
+        const newExp = oldExp + mail.exp;
+        const { level: newLevel } = this.calculateLevelAndExp(newExp);
+        account.account.profile.exp = newExp;
+        account.account.profile.level = newLevel;
+        rewards.exp = mail.exp;
+
+        // 添加经验交易记录（独立文件）
+        try {
+          const expRecords = await this.getExpRecords(userId);
+          expRecords.transactions.push({
+            id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+            baseExp: mail.exp,
+            bonusExp: 0,
+            finalExp: mail.exp,
+            levelMult: 1,
+            eventLabel: '邮件奖励',
+            oldLevel,
+            newLevel,
+            totalExp: newExp,
+            reason: mail.title,
+            timestamp: Date.now()
+          });
+          if (expRecords.transactions.length > 500) {
+            expRecords.transactions = expRecords.transactions.slice(-500);
+          }
+          await dataStore.writeOne('expTransactions', userId, expRecords);
+        } catch (recErr) {
+          logger.warn('记录邮件经验奖励失败', { userId, error: recErr.message });
+        }
+      }
+
+      // 标记邮件为已领取（使用独立邮件存储）
+      mailStore.mails[mailIndex].claimed = true;
+      mailStore.mails[mailIndex].read = true;
+      mailStore.mails[mailIndex].claimedAt = Date.now();
+      if (account.account) account.account.updatedAt = Date.now();
+
+      await this._saveMailStore(userId, mailStore);
+      await this._saveAccount(userId, account);
+      logger.info('领取邮件奖励', { userId, mailId, rewards });
+      return { success: true, rewards, message: '领取成功' };
+    } catch (err) {
+      logger.error('领取邮件失败', { userId, mailId, error: err.message });
+      return { success: false, message: '领取失败' };
+    }
+  }
+
+  /**
+   * 一键领取所有未领取邮件
+   */
+  async claimAllMails(userId) {
+    try {
+      const account = await this._getAccount(userId);
+      if (!account) {
+        return { success: false, message: '账号不存在' };
+      }
+      const mailStore = await this._getMailStore(userId);
+      if (!mailStore.mails || mailStore.mails.length === 0) {
+        return { success: true, claimedCount: 0, rewards: { items: [], cosmetics: [], vip: null, starCoins: 0, exp: 0 } };
+      }
+
+      const totalRewards = { items: [], cosmetics: [], vip: null, starCoins: 0, exp: 0 };
+      const itemMap = new Map();
+      const cosmeticSet = new Set();
+      let vipDaysToAdd = 0;
+      let vipMaxExpBonus = 0;
+      let claimedCount = 0;
+      let starCoinsToAdd = 0;
+      let expToAdd = 0;
+
+      for (let i = 0; i < mailStore.mails.length; i++) {
+        const mail = mailStore.mails[i];
+        if (mail.claimed) continue;
+
+        const hasReward = (mail.items && mail.items.length > 0) || (mail.cosmetics && mail.cosmetics.length > 0) || mail.vip || mail.starCoins > 0 || mail.exp > 0;
+        if (!hasReward) {
+          mailStore.mails[i].read = true;
+          continue;
+        }
+
+        if (mail.items && mail.items.length > 0) {
+          for (const item of mail.items) {
+            const current = itemMap.get(item.id) || 0;
+            itemMap.set(item.id, current + item.count);
+          }
+        }
+
+        if (mail.cosmetics && mail.cosmetics.length > 0) {
+          for (const cosmetic of mail.cosmetics) {
+            const key = `${cosmetic.category}:${cosmetic.id}`;
+            if (!cosmeticSet.has(key)) {
+              cosmeticSet.add(key);
+            }
+          }
+        }
+
+        if (mail.vip && mail.vip.days > 0) {
+          vipDaysToAdd += mail.vip.days;
+          vipMaxExpBonus = Math.max(vipMaxExpBonus, mail.vip.expBonus || 0);
+        }
+
+        if (mail.starCoins && mail.starCoins > 0) {
+          starCoinsToAdd += mail.starCoins;
+        }
+
+        if (mail.exp && mail.exp > 0) {
+          expToAdd += mail.exp;
+        }
+
+        mailStore.mails[i].claimed = true;
+        mailStore.mails[i].read = true;
+        mailStore.mails[i].claimedAt = Date.now();
+        claimedCount++;
+      }
+
+      // 应用物品奖励（使用独立背包存储）
+      if (itemMap.size > 0) {
+        const invStore = await this._getInventoryStore(userId);
+        if (!invStore.items) invStore.items = {};
+        for (const [itemId, count] of itemMap.entries()) {
+          invStore.items[itemId] = (invStore.items[itemId] || 0) + count;
+          totalRewards.items.push({ id: itemId, count });
+        }
+        await this._saveInventoryStore(userId, invStore);
+      }
+
+      // 应用外观奖励
+      if (cosmeticSet.size > 0) {
+        if (!account.cosmetics) {
+          account.cosmetics = {
+            owned: { frames: [], skins: [], backgrounds: [], titles: [] },
+            equipped: { frame: null, skin: null, background: null, title: null }
+          };
+        }
+        const categoryMap = { frame: 'frames', skin: 'skins', background: 'backgrounds', title: 'titles' };
+        for (const key of cosmeticSet) {
+          const [category, id] = key.split(':');
+          const ownedKey = categoryMap[category];
+          if (ownedKey && !account.cosmetics.owned[ownedKey].includes(id)) {
+            account.cosmetics.owned[ownedKey].push(id);
+            totalRewards.cosmetics.push({ category, id });
+          }
+        }
+      }
+
+      // 应用会员奖励
+      if (vipDaysToAdd > 0) {
+        if (!account.vip) {
+          account.vip = { type: null, expireAt: 0, expBonus: 0, lastDailyGift: 0, lastWeeklyGift: 0, lastMonthlyGift: 0 };
+        }
+        const now = Date.now();
+        if (account.vip.expireAt > now) {
+          account.vip.expireAt += vipDaysToAdd * 24 * 60 * 60 * 1000;
+        } else {
+          account.vip.expireAt = now + vipDaysToAdd * 24 * 60 * 60 * 1000;
+        }
+        account.vip.type = `vip_${vipDaysToAdd === 7 ? 'week' : vipDaysToAdd === 30 ? 'month' : 'year'}`;
+        account.vip.expBonus = Math.max(account.vip.expBonus || 0, vipMaxExpBonus);
+        totalRewards.vip = { days: vipDaysToAdd, expBonus: vipMaxExpBonus };
+      }
+
+      // 应用星钻奖励
+      if (starCoinsToAdd > 0) {
+        if (!account.currency) account.currency = { starCoins: 0 };
+        account.currency.starCoins = (account.currency.starCoins || 0) + starCoinsToAdd;
+        totalRewards.starCoins = starCoinsToAdd;
+
+        try {
+          const transactionRecords = await this.getTransactionRecords(userId);
+          transactionRecords.transactions.push({
+            id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+            type: 'earn',
+            amount: starCoinsToAdd,
+            balance: account.currency.starCoins,
+            source: 'mail_reward_batch',
+            reason: '邮件奖励（批量）',
+            timestamp: Date.now()
+          });
+          const recentLimit = 100;
+          if (transactionRecords.transactions.length > recentLimit) {
+            transactionRecords.transactions = transactionRecords.transactions.slice(-recentLimit);
+          }
+          await dataStore.writeOne('currencyTransactions', userId, transactionRecords);
+        } catch (recErr) {
+          logger.warn('记录批量邮件星钻奖励失败', { userId, error: recErr.message });
+        }
+      }
+
+      // 应用经验奖励
+      if (expToAdd > 0) {
+        if (!account.account) account.account = {};
+        if (!account.account.profile) account.account.profile = { exp: 0 };
+        const oldExp = account.account.profile.exp || 0;
+        const oldLevel = account.account.profile.level || 1;
+        const newExp = oldExp + expToAdd;
+        const { level: newLevel } = this.calculateLevelAndExp(newExp);
+        account.account.profile.exp = newExp;
+        account.account.profile.level = newLevel;
+        totalRewards.exp = expToAdd;
+
+        try {
+          const expRecords = await this.getExpRecords(userId);
+          expRecords.transactions.push({
+            id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+            baseExp: expToAdd,
+            bonusExp: 0,
+            finalExp: expToAdd,
+            levelMult: 1,
+            eventLabel: '邮件奖励',
+            oldLevel,
+            newLevel,
+            totalExp: newExp,
+            reason: '批量领取邮件奖励',
+            timestamp: Date.now()
+          });
+          if (expRecords.transactions.length > 500) {
+            expRecords.transactions = expRecords.transactions.slice(-500);
+          }
+          await dataStore.writeOne('expTransactions', userId, expRecords);
+        } catch (recErr) {
+          logger.warn('记录批量邮件经验奖励失败', { userId, error: recErr.message });
+        }
+      }
+
+      await this._saveMailStore(userId, mailStore);
+      await this._saveAccount(userId, account);
+      logger.info('批量领取邮件', { userId, claimedCount, totalRewards });
+      return { success: true, claimedCount, rewards: totalRewards };
+    } catch (err) {
+      logger.error('批量领取邮件失败', { userId, error: err.message });
+      return { success: false, message: '批量领取失败' };
+    }
+  }
+
+  /**
+   * 标记邮件为已读
+   */
+  async readMail(userId, mailId) {
+    try {
+      const mailStore = await this._getMailStore(userId);
+      if (!mailStore.mails || mailStore.mails.length === 0) {
+        return { success: false, message: '没有邮件' };
+      }
+
+      const mail = mailStore.mails.find(m => m.id === mailId);
+      if (!mail) {
+        return { success: false, message: '邮件不存在' };
+      }
+
+      mail.read = true;
+      await this._saveMailStore(userId, mailStore);
+      return { success: true };
+    } catch (err) {
+      logger.error('标记邮件已读失败', { userId, mailId, error: err.message });
+      return { success: false, message: '操作失败' };
+    }
+  }
+
+  /**
+   * 标记所有邮件为已读
+   */
+  async readAllMails(userId) {
+    try {
+      const mailStore = await this._getMailStore(userId);
+      if (!mailStore.mails || mailStore.mails.length === 0) {
+        return { success: true, readCount: 0 };
+      }
+
+      let count = 0;
+      for (const mail of mailStore.mails) {
+        if (!mail.read) {
+          mail.read = true;
+          count++;
+        }
+      }
+
+      await this._saveMailStore(userId, mailStore);
+      return { success: true, readCount: count };
+    } catch (err) {
+      logger.error('批量标记已读失败', { userId, error: err.message });
+      return { success: false, message: '操作失败' };
+    }
+  }
+
+  /**
+   * 删除单封邮件
+   */
+  async deleteMail(userId, mailId) {
+    try {
+      const mailStore = await this._getMailStore(userId);
+      if (!mailStore.mails || mailStore.mails.length === 0) {
+        return { success: true, deleted: 0 };
+      }
+
+      const beforeLen = mailStore.mails.length;
+      mailStore.mails = mailStore.mails.filter(m => m.id !== mailId);
+      const deleted = beforeLen - mailStore.mails.length;
+
+      await this._saveMailStore(userId, mailStore);
+      return { success: true, deleted };
+    } catch (err) {
+      logger.error('删除邮件失败', { userId, mailId, error: err.message });
+      return { success: false, message: '删除失败' };
+    }
+  }
+
+  /**
+   * 删除所有已领取的邮件
+   */
+  async deleteClaimedMails(userId) {
+    try {
+      const mailStore = await this._getMailStore(userId);
+      if (!mailStore.mails || mailStore.mails.length === 0) {
+        return { success: true, deleted: 0 };
+      }
+
+      const beforeLen = mailStore.mails.length;
+      mailStore.mails = mailStore.mails.filter(m => !m.claimed);
+      const deleted = beforeLen - mailStore.mails.length;
+
+      await this._saveMailStore(userId, mailStore);
+      return { success: true, deleted };
+    } catch (err) {
+      logger.error('清理已领取邮件失败', { userId, error: err.message });
+      return { success: false, message: '清理失败' };
+    }
+  }
+
+  /**
+   * 给用户直接发放星钻（不走邮件系统）
+   */
+  async grantStarCoins(userId, amount, reason = '管理员发放') {
+    if (!Number.isInteger(amount) || amount <= 0) {
+      return { success: false, message: '星钻数量必须是正整数' };
+    }
+    const result = await this.addCurrency(userId, amount, reason, 'admin_grant');
+    if (result.success) {
+      // 发送邮件记录
+      await this.sendMail(userId, {
+        title: '星钻发放通知',
+        content: `${reason}\n\n已成功发放 ${amount} 星钻到您的账户。`,
+        starCoins: 0,
+        exp: 0,
+        from: '系统'
+      });
+    }
+    return result;
+  }
+
+  /**
+   * 给用户直接发放经验（不走邮件系统）
+   */
+  async grantExp(userId, amount, reason = '管理员发放') {
+    if (!Number.isInteger(amount) || amount <= 0) {
+      return { success: false, message: '经验值数量必须是正整数' };
+    }
+    const result = await this.modifyUserExp(userId, 'add', amount);
+    if (result.success) {
+      // 发送邮件记录
+      await this.sendMail(userId, {
+        title: '经验值发放通知',
+        content: `${reason}\n\n已成功发放 ${amount} 点经验值到您的账户。`,
+        starCoins: 0,
+        exp: 0,
+        from: '系统'
+      });
+    }
+    return result;
+  }
+
+  /**
+   * 给用户直接发放物品（不走邮件系统）
+   */
+  async grantItems(userId, items) {
+    try {
+      if (!Array.isArray(items) || items.length === 0) {
+        return { success: false, message: '物品列表不能为空' };
+      }
+      const account = await this._getAccount(userId);
+      if (!account) {
+        return { success: false, message: '账号不存在' };
+      }
+      const invStore = await this._getInventoryStore(userId);
+      if (!invStore.items) invStore.items = {};
+
+      const itemsPath = path.join(__dirname, '..', 'config', 'shop', 'items.json');
+      const packsPath = path.join(__dirname, '..', 'config', 'shop', 'packs.json');
+      let itemsConfig = {};
+      let packsConfig = {};
+      try {
+        if (fs.existsSync(itemsPath)) itemsConfig = JSON.parse(fs.readFileSync(itemsPath, 'utf8'));
+        if (fs.existsSync(packsPath)) packsConfig = JSON.parse(fs.readFileSync(packsPath, 'utf8'));
+      } catch (e) { /* 忽略 */ }
+
+      for (const item of items) {
+        if (!item.id || !item.count) continue;
+        invStore.items[item.id] = (invStore.items[item.id] || 0) + item.count;
+      }
+
+      await this._saveInventoryStore(userId, invStore);
+      logger.info('管理员发放物品', { userId, items });
+
+      const itemDescriptions = items.map(i => {
+        const conf = itemsConfig[i.id] || packsConfig[i.id] || {};
+        return `${conf.icon || '📦'} ${conf.name || i.id} ×${i.count}`;
+      }).join('\n');
+      await this.sendMail(userId, {
+        title: '物品发放通知',
+        content: `管理员发放物品到您的账户。\n\n发放的物品：\n${itemDescriptions}`,
+        starCoins: 0,
+        exp: 0,
+        from: '系统'
+      });
+
+      return { success: true, granted: items };
+    } catch (err) {
+      logger.error('发放物品失败', { userId, error: err.message, stack: err.stack });
+      return { success: false, message: '发放失败' };
+    }
   }
 }
 

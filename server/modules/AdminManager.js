@@ -3,15 +3,18 @@ const crypto = require('crypto');
 const config = require('../config');
 const logger = require('../utils/logger');
 const dataStore = require('../utils/dataStore');
+const fs = require('fs');
+const path = require('path');
 
 class AdminManager {
-  constructor(userManager, gameManager, chatManager, accountManager = null) {
+  constructor(userManager, gameManager, chatManager, accountManager = null, io = null) {
     this.userManager = userManager;
     this.gameManager = gameManager;
     this.chatManager = chatManager;
     this.accountManager = accountManager;
-    this.adminSockets = new Map(); // socketId -> admin信息
-    this.activeTokens = new Map(); // token -> {createdAt, lastUsed, socketIds}
+    this.io = io;
+    this.adminSockets = new Map();
+    this.activeTokens = new Map();
     this.systemStats = {
       serverStartTime: Date.now(),
       totalRequests: 0,
@@ -1019,15 +1022,16 @@ class AdminManager {
 
     socket.emit('admin_account_detail', {
       account: {
-        id: account.id,
-        type: account.type,
-        username: account.username,
-        nickname: account.nickname,
-        createdAt: account.createdAt,
-        lastSeen: account.lastSeen,
-        lastLogin: account.lastLogin,
-        stats: account.stats,
-        profile: account.profile
+        id: account.account?.id || account.id,
+        type: account.account?.type,
+        username: account.account?.username,
+        nickname: account.account?.nickname,
+        createdAt: account.account?.createdAt,
+        lastSeen: account.account?.lastSeen,
+        lastLogin: account.account?.lastLogin,
+        stats: account.stats || account.account?.stats,
+        profile: account.account?.profile || account.profile,
+        achievements: account.achievements || account.account?.achievements
       },
       user: user ? {
         userId: user.accountId,
@@ -1127,6 +1131,358 @@ class AdminManager {
   // 获取在线管理员数量
   getOnlineAdminCount() {
     return this.adminSockets.size;
+  }
+
+  // 给指定用户发送邮件（带物品/星钻/经验奖励）
+  async sendMailToUser(socket, data) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'send_mail',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+
+    const { userId, title, content, items = [], cosmetics = [], vip = null, starCoins = 0, exp = 0, from = '管理员' } = data;
+    if (!userId) {
+      socket.emit('admin_action_result', {
+        action: 'send_mail',
+        success: false,
+        message: '用户ID不能为空'
+      });
+      return;
+    }
+
+    const mailData = { title, content, items, cosmetics, vip, starCoins, exp, from };
+    const result = await this.accountManager.sendMail(userId, mailData);
+    logger.info('管理员发送邮件', { adminSocket: socket.id, userId, title });
+    socket.emit('admin_action_result', {
+      action: 'send_mail',
+      ...result
+    });
+
+    if (result.success && this.io && this.userManager) {
+      const userSocket = this.userManager.getSocketByAccountId(userId);
+      if (userSocket) {
+        const updatedAccount = await this.accountManager.getAccount(userId);
+        userSocket.emit('mail_received', { mail: result.mail });
+        userSocket.emit('account_updated', { account: updatedAccount });
+      }
+    }
+  }
+
+  // 给多个用户发送邮件
+  async sendMailToMultiple(socket, data) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'send_mail_batch',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+
+    const { userIds, title, content, items = [], starCoins = 0, exp = 0, from = '管理员' } = data;
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      socket.emit('admin_action_result', {
+        action: 'send_mail_batch',
+        success: false,
+        message: '用户列表不能为空'
+      });
+      return;
+    }
+
+    const mailData = { title, content, items, starCoins, exp, from };
+    const result = await this.accountManager.sendMailToUsers(userIds, mailData);
+    logger.info('管理员批量发送邮件', { adminSocket: socket.id, userCount: userIds.length, title });
+    socket.emit('admin_action_result', {
+      action: 'send_mail_batch',
+      ...result
+    });
+
+    if (result.success && this.io && this.userManager && Array.isArray(userIds)) {
+      for (const uid of userIds) {
+        const userSocket = this.userManager.getSocketByAccountId(uid);
+        if (userSocket) {
+          const updatedAccount = await this.accountManager.getAccount(uid);
+          userSocket.emit('mail_received', { title, content, from });
+          userSocket.emit('account_updated', { account: updatedAccount });
+        }
+      }
+    }
+  }
+
+  // 给所有用户发送邮件（全站邮件）
+  async sendMailToAllUsers(socket, data) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'send_mail_all',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+
+    const { title, content, items = [], cosmetics = [], vip = null, starCoins = 0, exp = 0, from = '管理员' } = data;
+    const mailData = { title, content, items, cosmetics, vip, starCoins, exp, from };
+    const result = await this.accountManager.sendMailToAll(mailData);
+    logger.info('管理员发送全站邮件', { adminSocket: socket.id, title, sentCount: result.sentCount });
+    socket.emit('admin_action_result', {
+      action: 'send_mail_all',
+      ...result
+    });
+
+    if (this.io && this.userManager) {
+      const onlineUsers = this.userManager.getAllUsers();
+      for (const userSession of onlineUsers) {
+        if (userSession && userSession.socket) {
+          const updatedAccount = await this.accountManager.getAccount(userSession.accountId);
+          userSession.socket.emit('mail_received', { title, content, from });
+          userSession.socket.emit('account_updated', { account: updatedAccount });
+        }
+      }
+    }
+  }
+
+  // 直接给用户发放星钻（立即到账，不通过邮件）
+  async grantStarCoinsToUser(socket, id, amount, reason) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'grant_starcoins',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+
+    const result = await this.accountManager.grantStarCoins(id, amount, reason);
+    logger.info('管理员发放星钻', { adminSocket: socket.id, id, amount, reason });
+    socket.emit('admin_action_result', {
+      action: 'grant_starcoins',
+      ...result
+    });
+
+    if (result.success && this.io && this.userManager) {
+      const userSocket = this.userManager.getSocketByAccountId(id);
+      if (userSocket) {
+        const updatedAccount = await this.accountManager.getAccount(id);
+        userSocket.emit('account_updated', { account: updatedAccount });
+      }
+    }
+  }
+
+  // 直接给用户发放经验
+  async grantExpToUser(socket, id, amount, reason) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'grant_exp',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+
+    const result = await this.accountManager.grantExp(id, amount, reason);
+    logger.info('管理员发放经验', { adminSocket: socket.id, id, amount, reason });
+    socket.emit('admin_action_result', {
+      action: 'grant_exp',
+      ...result
+    });
+
+    if (result.success && this.io && this.userManager) {
+      const userSocket = this.userManager.getSocketByAccountId(id);
+      if (userSocket) {
+        const updatedAccount = await this.accountManager.getAccount(id);
+        userSocket.emit('account_updated', { account: updatedAccount });
+      }
+    }
+  }
+
+  // 直接给用户发放物品
+  async grantItemsToUser(socket, id, items) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'grant_items',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+
+    const result = await this.accountManager.grantItems(id, items);
+    logger.info('管理员发放物品', { adminSocket: socket.id, id, items });
+    socket.emit('admin_action_result', {
+      action: 'grant_items',
+      ...result
+    });
+
+    if (result.success && this.io && this.userManager) {
+      const userSocket = this.userManager.getSocketByAccountId(id);
+      if (userSocket) {
+        const updatedAccount = await this.accountManager.getAccount(id);
+        userSocket.emit('account_updated', { account: updatedAccount });
+      }
+    }
+  }
+
+  // 获取用户邮件列表（管理员查看）
+  async getUserMails(socket, id) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'get_user_mails',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+
+    const result = await this.accountManager.getMails(id);
+    socket.emit('admin_user_mails', {
+      userId: id,
+      ...result
+    });
+  }
+
+  // 获取物品列表
+  async getItemsList(socket) {
+    logger.info('收到物品列表请求', { socketId: socket.id });
+    try {
+      const itemsPath = path.join(__dirname, '..', 'config', 'shop', 'items.json');
+      const packsPath = path.join(__dirname, '..', 'config', 'shop', 'packs.json');
+      const cosmeticsPath = path.join(__dirname, '..', 'config', 'shop', 'cosmetics.json');
+      const vipPath = path.join(__dirname, '..', 'config', 'shop', 'vip.json');
+
+      const items = [];
+      const packs = [];
+      const cosmetics = [];
+      const vipOptions = [];
+
+      if (fs.existsSync(itemsPath)) {
+        const itemsData = JSON.parse(fs.readFileSync(itemsPath, 'utf-8'));
+        for (const item of Object.values(itemsData)) {
+          items.push({
+            id: item.id,
+            name: item.name,
+            icon: item.icon || '📦',
+            description: item.description || '',
+            category: item.category || 'item',
+            rarity: item.rarity || 'common',
+            price: item.price || 0,
+            enabled: item.enabled !== false
+          });
+        }
+      }
+      logger.info('读取物品列表', { itemsCount: items.length, itemsPath });
+
+      if (fs.existsSync(packsPath)) {
+        const packsData = JSON.parse(fs.readFileSync(packsPath, 'utf-8'));
+        for (const pack of Object.values(packsData)) {
+          packs.push({
+            id: pack.id,
+            name: pack.name,
+            icon: pack.icon || '🎁',
+            description: pack.description || '',
+            category: 'pack',
+            rarity: pack.rarity || 'common',
+            price: pack.price || 0,
+            content: pack.content || {},
+            enabled: pack.enabled !== false
+          });
+        }
+      }
+      logger.info('读取礼包列表', { packsCount: packs.length, packsPath });
+
+      if (fs.existsSync(cosmeticsPath)) {
+        const cosmeticsData = JSON.parse(fs.readFileSync(cosmeticsPath, 'utf-8'));
+        const categories = ['frames', 'skins', 'backgrounds', 'titles'];
+        for (const category of categories) {
+          if (cosmeticsData[category]) {
+            const catMap = { frames: 'frame', skins: 'skin', backgrounds: 'background', titles: 'title' };
+            for (const cosmetic of Object.values(cosmeticsData[category])) {
+              cosmetics.push({
+                id: cosmetic.id,
+                name: cosmetic.name,
+                icon: cosmetic.icon || '🎨',
+                description: cosmetic.description || '',
+                category: catMap[category],
+                rarity: cosmetic.rarity || 'common',
+                price: cosmetic.price || 0,
+                enabled: cosmetic.enabled !== false
+              });
+            }
+          }
+        }
+      }
+      logger.info('读取外观列表', { cosmeticsCount: cosmetics.length, cosmeticsPath });
+
+      if (fs.existsSync(vipPath)) {
+        const vipData = JSON.parse(fs.readFileSync(vipPath, 'utf-8'));
+        for (const pkg of Object.values(vipData)) {
+          if (pkg.category === 'vip') {
+            vipOptions.push({
+              id: pkg.id,
+              name: pkg.name,
+              icon: pkg.icon || '💎',
+              description: pkg.description || '',
+              days: pkg.days,
+              expBonus: pkg.expBonus || 2.0,
+              price: pkg.price || 0,
+              enabled: pkg.enabled !== false
+            });
+          }
+        }
+      }
+      logger.info('读取会员列表', { vipCount: vipOptions.length, vipPath });
+
+      logger.info('发送物品列表', { items: items.length, packs: packs.length, cosmetics: cosmetics.length, vip: vipOptions.length });
+      socket.emit('admin_items_list', { items, packs, cosmetics, vip: vipOptions, success: true });
+    } catch (err) {
+      logger.error('获取物品列表失败', { error: err.message, stack: err.stack });
+      socket.emit('admin_items_list', { items: [], packs: [], cosmetics: [], vip: [], success: false, message: '读取失败' });
+    }
+  }
+
+  // 获取用户列表（用于搜索和选择）
+  async getUsersForSelect(socket, keyword) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'get_users_for_select',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+
+    try {
+      const accounts = await this.accountManager.getAllAccounts(100, 0);
+      const kw = keyword?.toLowerCase() || '';
+      const filtered = accounts
+        .filter(a => {
+          const acc = a.account || a;
+          if (!kw) return true;
+          return (
+            acc.username?.toLowerCase().includes(kw) ||
+            acc.nickname?.toLowerCase().includes(kw) ||
+            acc.id?.toLowerCase().includes(kw)
+          );
+        })
+        .slice(0, 50)
+        .map(a => {
+          const acc = a.account || a;
+          return {
+            id: acc.id,
+            username: acc.username || '',
+            nickname: acc.nickname || '',
+            level: acc.profile?.level || 1,
+            status: a.status || acc.status || 'offline'
+          };
+        });
+      socket.emit('admin_users_select_list', { users: filtered, success: true });
+    } catch (err) {
+      logger.error('获取用户列表失败', { error: err.message });
+      socket.emit('admin_users_select_list', { users: [], success: false, message: '读取失败' });
+    }
   }
 }
 

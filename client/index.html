@@ -1376,6 +1376,134 @@
       }
     }
 
+    /* ===== 智能提示视觉标记样式 ===== */
+
+    /* 标记格子高亮背景 - 清晰的提示位置标记 */
+    .hint-highlight {
+      background-color: rgba(255, 215, 0, 0.3) !important;
+      border: 2px solid rgba(255, 200, 0, 0.9) !important;
+      animation: hintGlow 1.5s ease-in-out infinite !important;
+      z-index: 10 !important;
+      position: relative !important;
+      border-radius: 4px;
+    }
+
+    /* 高亮发光动画 - 更明显的脉冲效果 */
+    @keyframes hintGlow {
+
+      0%,
+      100% {
+        box-shadow: 0 0 12px 4px rgba(255, 215, 0, 0.7), inset 0 0 8px rgba(255, 215, 0, 0.4);
+      }
+
+      50% {
+        box-shadow: 0 0 20px 8px rgba(255, 215, 0, 0.9), inset 0 0 12px rgba(255, 215, 0, 0.6);
+      }
+    }
+
+    /* 💡标记本身 - 一个清晰可见的圆形标记 */
+    .hint-marker {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 34px;
+      height: 34px;
+      min-width: 34px;
+      min-height: 34px;
+      background: radial-gradient(circle, rgba(255, 255, 240, 1) 0%, rgba(255, 220, 50, 1) 55%, rgba(255, 165, 0, 1) 100%);
+      border: 3px solid #e67e22;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      line-height: 1;
+      z-index: 9999;
+      pointer-events: none;
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.8), 0 4px 16px rgba(243, 156, 18, 0.9), 0 0 24px rgba(255, 215, 0, 0.7);
+      animation: hintMarkerPulse 1.1s ease-in-out infinite;
+    }
+
+    /* 象棋嵌套标记 - 直接放在 chess-intersection 内部，
+       利用父元素自身的正确坐标系统来定位，确保精准对齐交叉点 */
+    .hint-marker.hint-chess-inline {
+      /* chess-intersection 宽40高40，top/left 50% 将标记左上角放到中心，
+         然后 transform translate(-50%, -50%) 将标记中心对齐到该点 */
+      animation: hintMarkerPulse 1.1s ease-in-out infinite;
+    }
+
+    /* 小尺寸标记（用于标记棋子起点） */
+    .hint-marker-small {
+      width: 26px;
+      height: 26px;
+      min-width: 26px;
+      min-height: 26px;
+      font-size: 13px;
+    }
+
+    /* 标记浮动动画 */
+    @keyframes hintMarkerPulse {
+
+      0%,
+      100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.8), 0 4px 16px rgba(243, 156, 18, 0.9), 0 0 24px rgba(255, 215, 0, 0.7);
+      }
+
+      50% {
+        transform: translate(-50%, -50%) scale(1.25);
+        opacity: 1;
+        box-shadow: 0 0 0 4px rgba(255, 255, 255, 1), 0 6px 20px rgba(243, 156, 18, 1), 0 0 40px rgba(255, 215, 0, 0.95);
+      }
+    }
+
+    /* 象棋提示 - 起点位置样式 */
+    .hint-source {
+      background-color: rgba(46, 204, 113, 0.35) !important;
+      border: 2px dashed #27ae60 !important;
+      border-radius: 6px;
+      z-index: 10 !important;
+      animation: hintSourcePulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes hintSourcePulse {
+
+      0%,
+      100% {
+        box-shadow: 0 0 8px 2px rgba(46, 204, 113, 0.6);
+      }
+
+      50% {
+        box-shadow: 0 0 16px 4px rgba(46, 204, 113, 0.9);
+      }
+    }
+
+    /* 象棋提示 - 目标位置样式 */
+    .hint-target {
+      background-color: rgba(255, 215, 0, 0.3) !important;
+      border: 2px solid #f39c12 !important;
+      animation: hintGlow 1.5s ease-in-out infinite;
+      z-index: 10 !important;
+      border-radius: 4px;
+    }
+
+    /* 提示文字下方的说明提示条 */
+    .hint-description {
+      display: block;
+      font-size: 15px;
+      color: #e67e22;
+      background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%);
+      border: 1px solid #f1c40f;
+      border-radius: 8px;
+      padding: 10px 15px;
+      margin-top: 10px 0;
+      text-align: center;
+      font-weight: 500;
+      box-shadow: 0 2px 8px rgba(241, 196, 15, 0.2);
+    }
+
     /* 版本信息样式 */
     .version-info {
       color: #94a3b8;
@@ -2811,7 +2939,435 @@
       color: #2b6cb0;
     }
 
-    /* 禁用触摸设备上的默认行为，防止双击放大 */
+    /* === 成就页面样式 === */
+    .achievements-container {
+      width: 100%;
+      max-width: 100%;
+      min-width: 500px;
+      background: #ffffff;
+      padding: 20px;
+      border-radius: 16px;
+      box-shadow: 0 2px 16px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.02);
+      margin: 0 0 20px;
+      box-sizing: border-box;
+    }
+
+    .ach-header {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .ach-header h2 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #1a202c;
+      margin: 0 0 6px 0;
+      letter-spacing: -0.5px;
+    }
+
+    .ach-header p {
+      color: #718096;
+      font-size: 12px;
+      margin: 0;
+    }
+
+    /* 进度总览卡片 */
+    .ach-overview {
+      background: linear-gradient(135deg, #fff8f0 0%, #fffbf5 50%, #fef7ec 100%);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 16px;
+      border: 1px solid #f6e0b0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .ach-overview::before {
+      content: '';
+      position: absolute;
+      top: -30px;
+      right: -30px;
+      width: 120px;
+      height: 120px;
+      background: radial-gradient(circle, rgba(251, 191, 36, 0.12) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+
+    .ach-overview-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .ach-overview-top .title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #92400e;
+      letter-spacing: 0.3px;
+    }
+
+    .ach-overview-top .count {
+      font-size: 28px;
+      font-weight: 700;
+      color: #92400e;
+      letter-spacing: -0.5px;
+    }
+
+    .ach-overview-bar {
+      width: 100%;
+      height: 6px;
+      background: rgba(217, 119, 6, 0.12);
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+      z-index: 1;
+    }
+
+    .ach-overview-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);
+      border-radius: 4px;
+      transition: width 0.6s ease;
+      box-shadow: 0 0 6px rgba(217, 119, 6, 0.3);
+    }
+
+    .ach-overview-pct {
+      text-align: center;
+      font-size: 11px;
+      color: #78350f;
+      font-weight: 500;
+      margin-top: 6px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* 分类标签导航 - 彩色标签 */
+    .ach-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .ach-tab {
+      padding: 7px 14px;
+      border-radius: 18px;
+      border: 1px solid #e5e7eb;
+      background: #f9fafb;
+      color: #4b5563;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .ach-tab:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    .ach-tab.active {
+      color: white;
+      border-color: transparent;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    /* 不同分类的主题色 */
+    .ach-tab.cat-game.active {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    }
+
+    .ach-tab.cat-level.active {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+    .ach-tab.cat-streak.active {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    }
+
+    .ach-tab.cat-ai.active {
+      background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    }
+
+    .ach-tab.cat-creative.active {
+      background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
+    }
+
+    .ach-tab.cat-gobang.active {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    }
+
+    .ach-tab.cat-chinese-chess.active {
+      background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    }
+
+    .ach-tab.cat-go.active {
+      background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+    }
+
+    .ach-tab.cat-snake.active {
+      background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    }
+
+    .ach-tab .tab-count {
+      font-size: 10px;
+      opacity: 0.7;
+      background: rgba(0, 0, 0, 0.08);
+      padding: 1px 6px;
+      border-radius: 10px;
+    }
+
+    .ach-tab.active .tab-count {
+      background: rgba(255, 255, 255, 0.25);
+      opacity: 1;
+    }
+
+    /* 成就内容滚动区 */
+    .ach-scroll {
+      overflow-y: auto;
+      padding-right: 8px;
+    }
+
+    .ach-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .ach-scroll::-webkit-scrollbar-track {
+      background: #f9fafb;
+      border-radius: 3px;
+    }
+
+    .ach-scroll::-webkit-scrollbar-thumb {
+      background: #d1d5db;
+      border-radius: 3px;
+    }
+
+    .ach-scroll::-webkit-scrollbar-thumb:hover {
+      background: #9ca3af;
+    }
+
+    /* 分类区块 */
+    .ach-category {
+      margin-bottom: 4px;
+    }
+
+    .ach-category-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      margin-bottom: 10px;
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    .ach-category-header .cat-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1f2937;
+    }
+
+    .ach-category-header .cat-progress {
+      font-size: 11px;
+      color: #6b7280;
+      background: #f9fafb;
+      padding: 3px 10px;
+      border-radius: 10px;
+      font-weight: 500;
+      border: 1px solid #f3f4f6;
+    }
+
+    /* 成就卡片网格 - 更紧凑 */
+    .ach-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 10px;
+    }
+
+    /* 成就卡片 - 更现代紧凑 */
+    .ach-card {
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      background: #ffffff;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .ach-card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 3px 14px rgba(0, 0, 0, 0.08);
+      border-color: #d1d5db;
+    }
+
+    .ach-card.unlocked {
+      background: linear-gradient(135deg, #fefce8 0%, #fef9c3 100%);
+      border-color: #fbbf24;
+      box-shadow: 0 2px 8px rgba(251, 191, 36, 0.12);
+    }
+
+    .ach-card.unlocked:hover {
+      box-shadow: 0 4px 18px rgba(251, 191, 36, 0.2);
+    }
+
+    /* 右上角的状态徽章 */
+    .ach-card.unlocked::before {
+      content: '✓';
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 20px;
+      height: 20px;
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      border-radius: 50%;
+      color: white;
+      font-size: 12px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 6px rgba(217, 119, 6, 0.3);
+    }
+
+    .ach-card.locked::before {
+      content: '🔒';
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 11px;
+      opacity: 0.5;
+    }
+
+    .ach-card-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      padding-right: 26px;
+    }
+
+    .ach-icon-box {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .ach-card.unlocked .ach-icon-box {
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      box-shadow: 0 2px 5px rgba(251, 191, 36, 0.2);
+    }
+
+    .ach-card.locked .ach-icon-box {
+      background: #f3f4f6;
+    }
+
+    .ach-card-name {
+      font-weight: 700;
+      color: #1f2937;
+      font-size: 12px;
+      flex: 1;
+      line-height: 1.3;
+    }
+
+    .ach-card.locked .ach-card-name {
+      color: #6b7280;
+    }
+
+    .ach-card-desc {
+      font-size: 11px;
+      color: #6b7280;
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
+
+    .ach-card-progress {
+      margin-bottom: 8px;
+    }
+
+    .ach-card-progress .prog-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      margin-bottom: 3px;
+      color: #6b7280;
+      font-weight: 500;
+    }
+
+    .ach-card-progress .prog-bar {
+      height: 4px;
+      background: #f3f4f6;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .ach-card-progress .prog-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.5s ease;
+    }
+
+    .ach-card.unlocked .ach-card-progress .prog-bar-fill {
+      background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);
+    }
+
+    .ach-card.locked .ach-card-progress .prog-bar-fill {
+      background: linear-gradient(90deg, #9ca3af 0%, #6b7280 100%);
+    }
+
+    .ach-card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 6px;
+      border-top: 1px solid #f3f4f6;
+    }
+
+    .ach-card.unlocked .ach-card-footer {
+      border-top-color: #fde68a;
+    }
+
+    .ach-status-tag {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 8px;
+    }
+
+    .ach-status-tag.unlocked {
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      color: #92400e;
+    }
+
+    .ach-status-tag.locked {
+      background: #f3f4f6;
+      color: #6b7280;
+    }
+
+    .ach-exp-tag {
+      font-size: 10px;
+      color: #92400e;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      padding: 3px 8px;
+      border-radius: 8px;
+    }
+
+    .ach-card.locked .ach-exp-tag {
+      background: #f9fafb;
+      color: #9ca3af;
+    }
+
     .touch-disabled {
       touch-action: manipulation !important;
       -webkit-user-select: none !important;
@@ -3022,16 +3578,12 @@
     <!-- 中间内容区域 -->
     <div class="center-content-container">
       <!-- 成就页面 -->
-      <div class="achievements-container" id="achievements-container"
-        style="display: none; width: 100%; max-width: 100%; min-width: 500px; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07); margin: 0 0 15px; box-sizing: border-box;">
-        <div class="lobby-title" style="font-size: 24px; margin-bottom: 15px;">🏆 成就系统</div>
-        <div class="lobby-status" style="font-size: 16px; margin-bottom: 25px;">
-          解锁成就，获得丰厚奖励！
+      <div class="achievements-container" id="achievements-container" style="display: none;">
+        <div class="ach-header">
+          <h2>🏆 成就系统</h2>
+          <p>解锁成就，获得丰厚奖励！</p>
         </div>
-        <div class="achievements-list" id="achievements-list"
-          style="padding: 20px; background: #f8f9fa; border-radius: 8px; max-height: 500px; overflow-y: auto;">
-          加载中...
-        </div>
+        <div id="achContent">加载中...</div>
       </div>
 
       <!-- 排行榜页面 -->
@@ -4045,90 +4597,122 @@
       }
     }
 
-    // 处理提示结果
+    // 处理提示结果 - 带说明和清晰视觉标记
     function handleHintResult(data) {
       if (!data.move) {
         updateStatus('❌ 无法计算提示位置');
         return;
       }
 
-      const { move, gameType } = data;
+      const { move, gameType, reason, hintType } = data;
 
-      // 在棋盘上高亮提示位置
+      // 先清除之前的提示标记
+      clearAllHintMarkers();
+
+      // 在棋盘上显示提示位置（带清晰💡标记）
       if (gameType === 'gobang') {
-        highlightCell(move.r, move.c, '#00ff00');
+        showHintMarkerOnBoard('gobang', move);
       } else if (gameType === 'go') {
-        highlightCell(move.r, move.c, '#00ff00');
+        showHintMarkerOnBoard('go', move);
       } else if (gameType === 'chinese-chess') {
-        highlightChessMove(move);
+        showChessHintMarker(move);
       }
 
-      updateStatus(`💡 提示：${formatHintPosition(move, gameType)}`);
-      showToast(`💡 建议位置：${formatHintPosition(move, gameType)}`, 'info', 5000);
+      // 显示说明文字 - 不仅是坐标，还有为什么选这个位置
+      const displayText = reason || '💡 建议位置';
+      updateStatus(displayText);
+      showToast(displayText, 'info', 6000);
+
+      // 提示标记会一直显示，直到用户落子（落子逻辑中会调用 clearAllHintMarkers 清除）
     }
 
-    // 格式化提示位置显示
-    function formatHintPosition(move, gameType) {
-      if (gameType === 'chinese-chess') {
-        return `从(${move.fromR},${move.fromC})移动到(${move.toR},${move.toC})`;
-      }
-      return `(${move.r}, ${move.c})`;
+    // 清除所有提示标记
+    function clearAllHintMarkers() {
+      document.querySelectorAll('.hint-marker').forEach(marker => {
+        marker.remove();
+      });
+      document.querySelectorAll('.hint-highlight').forEach(el => {
+        el.classList.remove('hint-highlight');
+      });
+      document.querySelectorAll('.hint-source, .hint-target').forEach(el => {
+        el.classList.remove('hint-source', 'hint-target');
+      });
     }
 
-    // 高亮棋盘单元格
-    function highlightCell(r, c, color) {
-      // 五子棋
-      const gobangCells = document.querySelectorAll('#gobang-board .cell');
-      if (gobangCells.length > 0) {
-        gobangCells.forEach(cell => {
-          const row = parseInt(cell.dataset.r);
-          const col = parseInt(cell.dataset.c);
-          if (row === r && col === c) {
-            cell.style.boxShadow = `0 0 8px 3px ${color}`;
-            cell.style.animation = 'hintPulse 1s ease-in-out infinite';
-            setTimeout(() => {
-              cell.style.boxShadow = '';
-              cell.style.animation = '';
-            }, 4000);
-          }
-        });
-        return;
-      }
+    // 在棋盘上显示提示标记（五子棋/围棋通用）
+    function showHintMarkerOnBoard(gameType, move) {
+      const boardId = gameType === 'gobang' ? 'gobang-board' : 'go-board';
+      const board = document.getElementById(boardId);
+      if (!board) return;
 
-      // 围棋
-      const goCells = document.querySelectorAll('#go-board .cell');
-      if (goCells.length > 0) {
-        goCells.forEach(cell => {
-          const row = parseInt(cell.dataset.r);
-          const col = parseInt(cell.dataset.c);
-          if (row === r && col === c) {
-            cell.style.boxShadow = `0 0 8px 3px ${color}`;
-            cell.style.animation = 'hintPulse 1s ease-in-out infinite';
-            setTimeout(() => {
-              cell.style.boxShadow = '';
-              cell.style.animation = '';
-            }, 4000);
-          }
-        });
-      }
-    }
-
-    // 高亮象棋移动
-    function highlightChessMove(move) {
-      // 高亮来源与目标位置
-      const cells = document.querySelectorAll('#chess-board .chess-intersection');
+      const cellClass = gameType === 'gobang' ? 'gobang-cell' : 'go-cell';
+      const cells = board.querySelectorAll(`.${cellClass}`);
       cells.forEach(cell => {
         const row = parseInt(cell.dataset.r);
         const col = parseInt(cell.dataset.c);
-        if ((row === move.fromR && col === move.fromC) || (row === move.toR && col === move.toC)) {
-          cell.style.boxShadow = `0 0 8px 3px #00ff00`;
-          cell.style.animation = 'hintPulse 1s ease-in-out infinite';
-          setTimeout(() => {
-            cell.style.boxShadow = '';
-            cell.style.animation = '';
-          }, 4000);
+        if (row === move.r && col === move.c) {
+          // 给格子本身添加高亮背景
+          cell.classList.add('hint-highlight');
+
+          // 在格子上添加💡圆形标记
+          const marker = document.createElement('div');
+          marker.className = 'hint-marker';
+          marker.innerHTML = '💡';
+          cell.appendChild(marker);
         }
       });
+    }
+
+    // 象棋提示标记（显示从哪里移动到哪里）
+    // 将标记直接插入到 chess-intersection 元素内部，利用其正确的坐标系统
+    function showChessHintMarker(move) {
+      const board = document.getElementById('chess-board');
+      if (!board) return;
+
+      const cells = board.querySelectorAll('.chess-intersection');
+      cells.forEach(cell => {
+        const row = parseInt(cell.dataset.r);
+        const col = parseInt(cell.dataset.c);
+
+        // 找到起点 intersection，放入📤标记并高亮
+        if (row === move.fromR && col === move.fromC) {
+          cell.classList.add('hint-source');
+          const fromMarker = document.createElement('div');
+          fromMarker.className = 'hint-marker hint-marker-small hint-chess-inline';
+          fromMarker.innerHTML = '📤';
+          fromMarker.style.pointerEvents = 'auto';
+          fromMarker.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectChessPiece(move.fromR, move.fromC);
+          });
+          cell.appendChild(fromMarker);
+        }
+
+        // 找到终点 intersection，放入💡标记并高亮
+        if (row === move.toR && col === move.toC) {
+          cell.classList.add('hint-target');
+          const toMarker = document.createElement('div');
+          toMarker.className = 'hint-marker hint-chess-inline';
+          toMarker.innerHTML = '💡';
+          toMarker.style.pointerEvents = 'auto';
+          toMarker.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (gameState.selectedPiece) {
+              moveChessPiece(move.fromR, move.fromC, move.toR, move.toC);
+            } else {
+              selectChessPiece(move.fromR, move.fromC);
+            }
+          });
+          cell.appendChild(toMarker);
+        }
+      });
+
+      // 自动选中起点棋子，让用户直接看到合法走法
+      setTimeout(() => {
+        if (typeof selectChessPiece === 'function') {
+          selectChessPiece(move.fromR, move.fromC);
+        }
+      }, 100);
     }
 
     // 重做功能
@@ -4988,22 +5572,31 @@
       socket.on('achievements_list', (data) => {
         if (!data.categories) return;
 
-        const achievementsList = document.getElementById('achievements-list');
+        const achContent = document.getElementById('achContent');
         const unlockedIds = Array.isArray(data.userAchievements) ? data.userAchievements : [];
         const totalAchievements = data.totalAchievements || 0;
         const unlockedCount = unlockedIds.length;
         const progressPercent = totalAchievements > 0 ? Math.round((unlockedCount / totalAchievements) * 100) : 0;
 
-        // 游戏类型配置
+        // 游戏类型配置 - 带图标
         const gameTypeConfig = {
-          gobang: { name: '🔴 五子棋成就' },
-          'chinese-chess': { name: '🟥 象棋成就' },
-          go: { name: '⚫ 围棋成就' },
-          snake: { name: '🐍 贪吃蛇成就' }
+          gobang: { name: '五子棋成就', icon: '⚫', displayName: '五子棋' },
+          'chinese-chess': { name: '象棋成就', icon: '♟️', displayName: '象棋' },
+          go: { name: '围棋成就', icon: '⚫', displayName: '围棋' },
+          snake: { name: '贪吃蛇成就', icon: '🐍', displayName: '贪吃蛇' }
         };
         const gameOrder = ['gobang', 'chinese-chess', 'go', 'snake'];
 
-        // 重组成就分类：将 game_type 按游戏类型拆分
+        // 基础分类配置
+        const baseCategoryConfig = {
+          game: { name: '胜利成就', icon: '🏆', displayName: '胜利成就' },
+          level: { name: '等级成就', icon: '📈', displayName: '等级成就' },
+          streak: { name: '连胜成就', icon: '🔥', displayName: '连胜成就' },
+          ai: { name: 'AI对战成就', icon: '🤖', displayName: 'AI对战' },
+          creative: { name: '特殊成就', icon: '✨', displayName: '特殊成就' }
+        };
+
+        // 重组成就分类
         const reorganizedCategories = [];
         const gameTypeGroups = {};
 
@@ -5017,85 +5610,142 @@
               }
             });
           } else {
-            reorganizedCategories.push({ name: category.name, achievements: category.achievements });
+            const baseCfg = baseCategoryConfig[type] || { name: category.name, icon: '🎯', displayName: category.name };
+            reorganizedCategories.push({
+              type: type,
+              name: baseCfg.name,
+              icon: baseCfg.icon,
+              displayName: baseCfg.displayName,
+              achievements: category.achievements
+            });
           }
         });
 
-        // 按固定顺序添加游戏分类
+        // 添加棋种成就分类
         gameOrder.forEach(gt => {
           if (gameTypeGroups[gt] && gameTypeGroups[gt].length > 0) {
-            const cfg = gameTypeConfig[gt] || { name: '🎮 其他成就' };
-            reorganizedCategories.push({ name: cfg.name, achievements: gameTypeGroups[gt] });
+            const cfg = gameTypeConfig[gt];
+            reorganizedCategories.push({
+              type: gt,
+              name: cfg.name,
+              icon: cfg.icon,
+              displayName: cfg.displayName,
+              achievements: gameTypeGroups[gt]
+            });
           }
         });
 
-        let html = `
-          <div style="margin-bottom: 20px; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; color: white;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <span style="font-size: 18px; font-weight: bold;">成就进度</span>
-              <span style="font-size: 24px; font-weight: bold;">${unlockedCount}/${totalAchievements}</span>
+        // 构建分类标签映射
+        const catTabs = reorganizedCategories.map((cat, idx) => ({
+          id: 'cat-' + idx,
+          type: cat.type,
+          name: cat.icon + ' ' + cat.displayName,
+          fullName: cat.name,
+          unlocked: cat.achievements.filter(a => unlockedIds.includes(a.id)).length,
+          total: cat.achievements.length,
+          achievements: cat.achievements
+        }));
+
+        // 存储数据供标签切换使用
+        window._achData = { catTabs, unlockedIds, unlockedCount, totalAchievements, progressPercent };
+
+        // 渲染标签和内容
+        function renderTab(tabId) {
+          if (!window._achData) return;
+          const { catTabs, unlockedIds, unlockedCount, totalAchievements, progressPercent } = window._achData;
+
+          const activeTab = catTabs.find(t => t.id === tabId) || catTabs[0];
+
+          // 标签栏HTML - 添加分类class
+          let tabsHtml = catTabs.map(t => `
+            <div class="ach-tab cat-${t.type} ${t.id === activeTab.id ? 'active' : ''}"
+                 onclick="renderAchievementsTab('${t.id}')">
+              ${t.name}
+              <span class="tab-count">${t.unlocked}/${t.total}</span>
             </div>
-            <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.3); border-radius: 4px; overflow: hidden;">
-              <div style="width: ${progressPercent}%; height: 100%; background: #4ade80; border-radius: 4px; transition: width 0.5s ease;"></div>
-            </div>
-            <div style="text-align: center; margin-top: 8px; font-size: 14px; opacity: 0.9;">已完成 ${progressPercent}%</div>
-          </div>
-        `;
+          `).join('');
 
-        // 渲染重组的分类
-        reorganizedCategories.forEach(category => {
-          if (!category.achievements || category.achievements.length === 0) return;
-
-          const categoryUnlocked = category.achievements.filter(a => unlockedIds.includes(a.id)).length;
-
-          html += `
-            <div style="margin-bottom: 25px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0;">
-                <span style="font-size: 16px; font-weight: bold; color: #2d3748;">${category.name}</span>
-                <span style="font-size: 13px; color: #718096; background: #f7fafc; padding: 4px 10px; border-radius: 12px;">${categoryUnlocked}/${category.achievements.length}</span>
-              </div>
-              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;">
-          `;
-
-          category.achievements.forEach(achievement => {
+          // 渲染成就卡片
+          let cardsHtml = activeTab.achievements.map(achievement => {
             const isUnlocked = unlockedIds.includes(achievement.id);
-            const cardBg = isUnlocked ? 'linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%)' : '#f7fafc';
-            const borderColor = isUnlocked ? '#48bb78' : '#e2e8f0';
-            const statusText = isUnlocked ? '✓ 已解锁' : '○ 未解锁';
-            const statusColor = isUnlocked ? '#38a169' : '#a0aec0';
-            const icon = isUnlocked ? '🏆' : '🔒';
-            const opacity = isUnlocked ? '1' : '0.7';
+            const statusText = isUnlocked ? '已解锁' : '未解锁';
+            const cardClass = isUnlocked ? 'ach-card unlocked' : 'ach-card locked';
 
-            html += `
-              <div style="padding: 15px; background: ${cardBg}; border-radius: 10px; border: 2px solid ${borderColor}; opacity: ${opacity}; transition: all 0.3s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                <div style="display: flex; align-items: center; margin-bottom: 8px;">
-                  <span style="font-size: 24px; margin-right: 10px;">${icon}</span>
-                  <span style="font-weight: bold; color: #2d3748; font-size: 15px;">${achievement.name}</span>
-                </div>
-                <div style="font-size: 13px; color: #4a5568; margin-bottom: 10px; line-height: 1.4;">${achievement.description}</div>
-                ${achievement.progress ? `
-                  <div style="margin-bottom: 10px;">
-                    <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px;">
-                      <span>进度</span>
-                      <span>${isUnlocked ? achievement.progress.target : achievement.progress.current}/${achievement.progress.target}</span>
-                    </div>
-                    <div style="height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
-                      <div style="width: ${isUnlocked ? 100 : achievement.progress.percent}%; height: 100%; background: ${isUnlocked ? '#48bb78' : '#ed8936'}; transition: width 0.5s ease;"></div>
-                    </div>
+            // 计算进度
+            let progressHtml = '';
+            if (achievement.progress && !isUnlocked) {
+              progressHtml = `
+                <div class="ach-card-progress">
+                  <div class="prog-label">
+                    <span>进度</span>
+                    <span>${achievement.progress.current}/${achievement.progress.target}</span>
                   </div>
-                ` : ''}
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <span style="font-size: 11px; color: ${statusColor}; font-weight: 600; padding: 3px 8px; background: ${isUnlocked ? '#c6f6d5' : '#e2e8f0'}; border-radius: 10px;">${statusText}</span>
-                  ${achievement.reward ? `<span style="font-size: 11px; color: #ed8936;">+${achievement.reward.exp} EXP</span>` : ''}
+                  <div class="prog-bar">
+                    <div class="prog-bar-fill" style="width: ${achievement.progress.percent}%;"></div>
+                  </div>
+                </div>
+              `;
+            } else if (isUnlocked && achievement.progress) {
+              progressHtml = `
+                <div class="ach-card-progress">
+                  <div class="prog-label">
+                    <span>进度</span>
+                    <span>${achievement.progress.target}/${achievement.progress.target}</span>
+                  </div>
+                  <div class="prog-bar">
+                    <div class="prog-bar-fill" style="width: 100%;"></div>
+                  </div>
+                </div>
+              `;
+            }
+
+            return `
+              <div class="${cardClass}">
+                <div class="ach-card-top">
+                  <div class="ach-icon-box">${isUnlocked ? '🏆' : '🔒'}</div>
+                  <div class="ach-card-name">${achievement.name}</div>
+                </div>
+                <div class="ach-card-desc">${achievement.description}</div>
+                ${progressHtml}
+                <div class="ach-card-footer">
+                  <span class="ach-status-tag ${isUnlocked ? 'unlocked' : 'locked'}">${isUnlocked ? '✓ ' : '○ '}${statusText}</span>
+                  ${achievement.reward ? `<span class="ach-exp-tag">+${achievement.reward.exp} EXP</span>` : ''}
                 </div>
               </div>
             `;
-          });
+          }).join('');
 
-          html += '</div></div>';
-        });
+          achContent.innerHTML = `
+            <div class="ach-overview">
+              <div class="ach-overview-top">
+                <span class="title">成就进度</span>
+                <span class="count">${unlockedCount}/${totalAchievements}</span>
+              </div>
+              <div class="ach-overview-bar">
+                <div class="ach-overview-bar-fill" style="width: ${progressPercent}%;"></div>
+              </div>
+              <div class="ach-overview-pct">已完成 ${progressPercent}%</div>
+            </div>
 
-        achievementsList.innerHTML = html;
+            <div class="ach-tabs">${tabsHtml}</div>
+
+            <div class="ach-scroll">
+              <div class="ach-category">
+                <div class="ach-category-header">
+                  <span class="cat-name">${activeTab.fullName}</span>
+                  <span class="cat-progress">${activeTab.unlocked}/${activeTab.total} 已解锁</span>
+                </div>
+                <div class="ach-grid">${cardsHtml}</div>
+              </div>
+            </div>
+          `;
+        }
+
+        // 挂载到全局
+        window.renderAchievementsTab = renderTab;
+
+        // 渲染第一个标签
+        renderTab('cat-0');
       });
 
       // ========== AI对战事件处理 ==========
@@ -6131,6 +6781,13 @@
         return;
       }
 
+      // 恢复中间内容区域的原始高度（从成就页面返回时）
+      const centerContainer = document.querySelector('.center-content-container');
+      if (centerContainer) {
+        centerContainer.style.minHeight = '';
+        centerContainer.style.alignItems = '';
+      }
+
       currentGame = game;
       updateGameDisplay();
 
@@ -6443,6 +7100,9 @@
     // ========== 围棋逻辑 ==========
     function handleGoClick(r, c) {
       if (currentGame !== 'go' || gameState.gameOver || gameState.turn !== gameState.me || gameState.board[r][c] !== 0 || (!matchedOpponentId && !gameState.difficulty)) return;
+
+      // 落子时清除提示标记
+      clearAllHintMarkers();
 
       // 检查是否打劫
       if (isKo(r, c, gameState.me)) {
@@ -6935,6 +7595,20 @@
               }
             }
           });
+
+          // 白脸将：检查对方将帅对面时，可以"吃"对方将帅
+          const enemyKingType = isRed ? '将' : '帅';
+          for (let i = 1; i < 10; i++) {
+            const nr = r + (isRed ? -i : i);
+            if (nr < 0 || nr >= 10) break;
+            const piece = getChessPieceAt(nr, c);
+            if (piece) {
+              if (piece.dataset.name === enemyKingType && piece.dataset.color !== color) {
+                moves.push({ r: nr, c: c });
+              }
+              break;
+            }
+          }
           break;
 
         case '仕':
@@ -6981,25 +7655,25 @@
           break;
 
         case '马':
-          // 马走日
           const horseDirs = [
-            [-2, -1], [-2, 1], [-1, -2], [-1, 2],
-            [1, -2], [1, 2], [2, -1], [2, 1]
+            [-2, -1, -1, 0], [-2, 1, -1, 0],
+            [2, -1, 1, 0], [2, 1, 1, 0],
+            [-1, -2, 0, -1], [-1, 2, 0, 1],
+            [1, -2, 0, -1], [1, 2, 0, 1]
           ];
 
-          horseDirs.forEach(([dr, dc]) => {
+          horseDirs.forEach(([dr, dc, legR, legC]) => {
             const nr = r + dr;
             const nc = c + dc;
-            const midR = r + Math.sign(dr);
-            const midC = c + Math.sign(dc);
+            const legPosR = r + legR;
+            const legPosC = c + legC;
 
-            // 马腿不能有棋子
-            if (!getChessPieceAt(midR, midC)) {
-              if (nr >= 0 && nr < 10 && nc >= 0 && nc < 9) {
-                const piece = getChessPieceAt(nr, nc);
-                if (!piece || piece.dataset.color !== color) {
-                  moves.push({ r: nr, c: nc });
-                }
+            if (nr < 0 || nr >= 10 || nc < 0 || nc >= 9) return;
+
+            if (!getChessPieceAt(legPosR, legPosC)) {
+              const piece = getChessPieceAt(nr, nc);
+              if (!piece || piece.dataset.color !== color) {
+                moves.push({ r: nr, c: nc });
               }
             }
           });
@@ -7101,6 +7775,9 @@
         clearChessSelection();
         return;
       }
+
+      // 移动棋子时清除提示标记
+      clearAllHintMarkers();
 
       // 1. 处理吃子，同时更新 DOM 和 chessPieces 数据
       const capturedPiece = getChessPieceAt(toR, toC);
@@ -9521,6 +10198,13 @@
         playAgainBtn.style.display = 'none';
       }
 
+      // 恢复中间内容区域的原始高度（从成就页面返回时）
+      const centerContainer = document.querySelector('.center-content-container');
+      if (centerContainer) {
+        centerContainer.style.minHeight = '';
+        centerContainer.style.alignItems = '';
+      }
+
       // 检查是否从AI对战返回
       const isFromAI = gameState.difficulty !== null;
 
@@ -9621,6 +10305,13 @@
         board.style.display = 'none';
       });
 
+      // 让中间内容区域根据内容自适应高度（消除大片空白）
+      const centerContainer = document.querySelector('.center-content-container');
+      if (centerContainer) {
+        centerContainer.style.minHeight = 'auto';
+        centerContainer.style.alignItems = 'flex-start';
+      }
+
       // 显示成就页面
       const achievementsContainer = document.getElementById('achievements-container');
       achievementsContainer.style.opacity = '0';
@@ -9640,6 +10331,13 @@
     function showAIGame() {
       // 更新导航按钮状态
       updateNavActiveState('ai');
+
+      // 恢复中间内容区域的原始高度（从成就页面返回时）
+      const centerContainer = document.querySelector('.center-content-container');
+      if (centerContainer) {
+        centerContainer.style.minHeight = '';
+        centerContainer.style.alignItems = '';
+      }
 
       // 隐藏其他页面
       lobbyContainer.style.display = 'none';
@@ -9674,6 +10372,13 @@
     function showLeaderboard() {
       // 更新导航按钮状态
       updateNavActiveState('leaderboard');
+
+      // 恢复中间内容区域的原始高度（从成就页面返回时）
+      const centerContainer = document.querySelector('.center-content-container');
+      if (centerContainer) {
+        centerContainer.style.minHeight = '';
+        centerContainer.style.alignItems = '';
+      }
 
       // 隐藏其他页面
       lobbyContainer.style.display = 'none';
@@ -10918,6 +11623,9 @@
     function handleGobangClick(r, c) {
       if (gameState.gameOver || gameState.turn !== gameState.me) return;
       if (gameState.board[r][c] !== 0) return;
+
+      // 落子时清除提示标记
+      clearAllHintMarkers();
 
       gameState.board[r][c] = gameState.me;
       gameState.moveCount++;

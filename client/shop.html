@@ -884,8 +884,8 @@
               </div>
 
               <div class="item-detail-actions">
-                ${fromInventory && item.usable ? `
-                  <button class="action-btn primary" onclick="useItem('${itemId}'); closeItemDetail();">使用</button>
+                ${fromInventory && (item.usable || itemType === 'pack') ? `
+                  <button class="action-btn primary" onclick="useItem('${itemId}'); closeItemDetail();">${itemType === 'pack' ? '开启' : '使用'}</button>
                 ` : ''}
                 ${!fromInventory && item.price ? `
                   <div style="display:flex; align-items:center; gap:8px; flex:1;">
@@ -1014,7 +1014,12 @@
         });
         const data = await res.json();
         if (data.success) {
-          showMessage(data.message || '使用成功！', 'success');
+          if (data.rewards && data.rewards.length > 0) {
+            const rewardStr = data.rewards.map(r => `${r.icon || '📦'} ${r.name} ×${r.count}`).join('、');
+            showMessage(`获得：${rewardStr}！`, 'success');
+          } else {
+            showMessage(data.message || '使用成功！', 'success');
+          }
           await loadData();
         } else {
           showMessage(data.message || '使用失败', 'error');
@@ -1249,16 +1254,20 @@
 
       let html = '';
 
-      // 从商店数据中获取背包物品的详细信息，并过滤
       let items = {};
+      let packs = {};
       for (const [id, count] of Object.entries(inventory.items || {})) {
         const itemInfo = shopData?.items?.[id];
+        const packInfo = shopData?.packs?.[id];
         if (itemInfo) {
           items[id] = { ...itemInfo, _count: count };
+        } else if (packInfo) {
+          packs[id] = { ...packInfo, _count: count };
+        } else {
+          items[id] = { id, icon: '📦', name: id, description: '', rarity: 'common', _count: count };
         }
       }
 
-      // 应用搜索/筛选
       items = filterItems(items);
 
       if (Object.keys(items).length > 0) {
@@ -1277,6 +1286,27 @@
               <div class="rarity-badge ${item.rarity || 'common'}">${RARITY_CONFIG[item.rarity]?.name || '普通'}</div>
               <div style="font-size:24px;font-weight:bold;color:#007bff;">×${count}</div>
               <button class="buy-btn" onclick="event.stopPropagation(); useItem('${id}')">使用</button>
+            </div>
+          `;
+        }
+        html += '</div>';
+      }
+
+      if (Object.keys(packs).length > 0) {
+        html += '<div class="category-title">礼包</div>';
+        html += '<div class="items-grid">';
+        for (const [id, pack] of Object.entries(packs)) {
+          const count = pack._count;
+          const rarityClass = pack.rarity ? `rarity-${pack.rarity}` : '';
+          const glowClass = pack.rarity === 'legendary' || pack.rarity === 'epic' ? `glow-${pack.rarity}` : '';
+          html += `
+            <div class="item-card ${rarityClass} ${glowClass}" onclick="showItemDetail('${id}', true)">
+              <div class="item-icon">${pack.icon}</div>
+              <div class="item-name">${pack.name}</div>
+              <div class="item-desc">${pack.description}</div>
+              <div class="rarity-badge ${pack.rarity || 'common'}">${RARITY_CONFIG[pack.rarity]?.name || '普通'}</div>
+              <div style="font-size:24px;font-weight:bold;color:#007bff;">×${count}</div>
+              <button class="buy-btn" onclick="event.stopPropagation(); useItem('${id}')">开启</button>
             </div>
           `;
         }

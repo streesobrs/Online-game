@@ -374,6 +374,39 @@
       transition: all 0.2s;
     }
 
+    .btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-sm {
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+
+    .btn-xs {
+      padding: 3px 10px;
+      border-radius: 5px;
+      font-size: 11px;
+      border: 1px solid #334155;
+      background: #1e293b;
+      color: #94a3b8;
+    }
+
+    .btn-xs:hover {
+      background: #334155;
+      color: #e2e8f0;
+    }
+
     .btn-primary {
       background: linear-gradient(90deg, #3b82f6, #8b5cf6);
       color: #fff;
@@ -394,19 +427,35 @@
       color: #fff;
     }
 
-    .btn-warning {
-      background: #f59e0b;
-      color: #fff;
-    }
-
-    .btn-success {
-      background: #10b981;
-      color: #fff;
-    }
-
     .btn-secondary {
       background: #334155;
       color: #e2e8f0;
+    }
+
+    .mail-tab-btn {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #94a3b8;
+      padding: 6px 12px;
+      font-size: 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .mail-tab-btn:hover {
+      background: #334155;
+      color: #e2e8f0;
+    }
+
+    .mail-tab-btn.active {
+      background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+      color: #fff;
+      border-color: transparent;
+    }
+
+    .mail-tab-panel {
+      padding: 10px 0;
     }
 
     .action-btn:hover {
@@ -976,6 +1025,10 @@
           <span class="nav-icon">💡</span>
           <span class="nav-text">反馈管理</span>
         </div>
+        <div class="nav-item" onclick="switchView('mail')">
+          <span class="nav-icon">📬</span>
+          <span class="nav-text">邮件系统</span>
+        </div>
       </nav>
       <div class="sidebar-footer">
         <div class="status-bar">
@@ -1372,6 +1425,172 @@
             </div>
           </div>
         </section>
+
+        <!-- 邮件系统 -->
+        <section id="view-mail" class="content-section">
+          <!-- 发送邮件给用户 -->
+          <div class="data-card">
+            <div class="card-header">
+              <span class="card-title">📬 发送邮件给用户</span>
+            </div>
+            <div style="padding:16px;">
+              <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px;">
+                <div>
+                  <label class="form-label">用户搜索（点击下方用户或手动输入）</label>
+                  <div style="position:relative;">
+                    <input type="text" id="mail-user-id" class="form-input" placeholder="输入用户名/昵称/ID搜索..."
+                      oninput="searchUsers(this)">
+                    <div id="mail-user-list"
+                      style="position:absolute;top:100%;left:0;right:0;background:#1e293b;border:1px solid #334155;border-radius:8px;margin-top:4px;max-height:200px;overflow-y:auto;z-index:100;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.3);">
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label class="form-label">邮件标题</label>
+                  <input type="text" id="mail-title" class="form-input" placeholder="如：系统补偿、活动奖励等">
+                </div>
+                <div>
+                  <label class="form-label">邮件内容</label>
+                  <textarea id="mail-content" class="form-input" rows="3" placeholder="邮件详细内容..."></textarea>
+                </div>
+              </div>
+
+              <div
+                style="background:#0f172a;padding:12px;border-radius:8px;border:1px solid #334155;margin-bottom:12px;">
+                <div style="font-size:13px;color:#94a3b8;margin-bottom:8px;">📦 奖励内容（可留空）</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                  <div>
+                    <label class="form-label" style="font-size:12px;">💎 星钻</label>
+                    <input type="number" id="mail-starcoins" class="form-input" value="0" min="0" placeholder="星钻数量">
+                  </div>
+                  <div>
+                    <label class="form-label" style="font-size:12px;">⭐ 经验值</label>
+                    <input type="number" id="mail-exp" class="form-input" value="0" min="0" placeholder="经验值数量">
+                  </div>
+                </div>
+
+                <div style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap;">
+                  <button class="btn mail-tab-btn" data-tab="items" onclick="switchMailTab('items')">📦 物品</button>
+                  <button class="btn mail-tab-btn" data-tab="packs" onclick="switchMailTab('packs')">🎁 礼包</button>
+                  <button class="btn mail-tab-btn" data-tab="cosmetics" onclick="switchMailTab('cosmetics')">🎨
+                    外观</button>
+                  <button class="btn mail-tab-btn" data-tab="vip" onclick="switchMailTab('vip')">💎 会员</button>
+                  <button class="btn mail-tab-btn" data-tab="manual" onclick="switchMailTab('manual')">✏️
+                    手动输入</button>
+                </div>
+
+                <div id="mail-tab-items" class="mail-tab-panel">
+                  <div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">已选物品：</div>
+                  <div id="mail-items-grid"
+                    style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:6px;margin-bottom:10px;border:1px dashed #334155;border-radius:8px;padding:10px;min-height:50px;">
+                    <div style="grid-column:1/-1;text-align:center;color:#64748b;font-size:12px;">点击下方物品列表添加物品...
+                    </div>
+                  </div>
+                  <div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">可选物品（点击添加）：</div>
+                  <div id="mail-items-available"
+                    style="display:flex;flex-wrap:wrap;gap:6px;max-height:120px;overflow-y:auto;">
+                    <span style="font-size:12px;color:#64748b;">加载中...</span>
+                  </div>
+                </div>
+
+                <div id="mail-tab-packs" class="mail-tab-panel" style="display:none;">
+                  <div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">已选礼包：</div>
+                  <div id="mail-packs-grid"
+                    style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:6px;margin-bottom:10px;border:1px dashed #334155;border-radius:8px;padding:10px;min-height:50px;">
+                    <div style="grid-column:1/-1;text-align:center;color:#64748b;font-size:12px;">点击下方礼包列表添加礼包...
+                    </div>
+                  </div>
+                  <div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">可选礼包（点击添加）：</div>
+                  <div id="mail-packs-available"
+                    style="display:flex;flex-wrap:wrap;gap:6px;max-height:120px;overflow-y:auto;">
+                    <span style="font-size:12px;color:#64748b;">加载中...</span>
+                  </div>
+                </div>
+
+                <div id="mail-tab-cosmetics" class="mail-tab-panel" style="display:none;">
+                  <div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">已选外观（点击取消）：</div>
+                  <div id="mail-cosmetics-selected"
+                    style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;border:1px dashed #334155;border-radius:8px;padding:10px;min-height:50px;">
+                    <div style="color:#64748b;font-size:12px;">点击下方外观列表添加...</div>
+                  </div>
+                  <div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">可选外观（点击添加）：</div>
+                  <div id="mail-cosmetics-available"
+                    style="display:flex;flex-wrap:wrap;gap:6px;max-height:120px;overflow-y:auto;">
+                    <span style="font-size:12px;color:#64748b;">加载中...</span>
+                  </div>
+                </div>
+
+                <div id="mail-tab-vip" class="mail-tab-panel" style="display:none;">
+                  <div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">选择会员（单选）：</div>
+                  <div id="mail-vip-list"
+                    style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;margin-bottom:10px;border:1px dashed #334155;border-radius:8px;padding:10px;min-height:50px;">
+                    <span style="font-size:12px;color:#64748b;">加载中...</span>
+                  </div>
+                </div>
+
+                <div id="mail-tab-manual" class="mail-tab-panel" style="display:none;">
+                  <div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">手动输入物品ID（逗号分隔，支持 itemId*数量 格式，如
+                    item_exp_book*3, pack_newbie*2）：</div>
+                  <input type="text" id="mail-manual-items" class="form-input"
+                    placeholder="例如：item_exp_book*3, item_double_exp, pack_newbie*2" style="margin-bottom:8px;">
+                  <div style="font-size:12px;color:#f59e0b;">⚠️ 手动输入时请确保ID正确，否则物品将无法正常发放</div>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:10px;">
+                <button class="btn btn-primary" onclick="sendMailToUser()">📨 发送给指定用户</button>
+                <button class="btn btn-warning" onclick="sendMailToAllUsers()">📢 发送给所有用户</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 直接发放奖励（立即到账，不通过邮件） -->
+          <div class="data-card">
+            <div class="card-header">
+              <span class="card-title">⚡ 直接发放奖励（立即到账）</span>
+            </div>
+            <div style="padding:16px;">
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
+                <div>
+                  <label class="form-label">用户ID（点击搜索）</label>
+                  <div style="position:relative;">
+                    <input type="text" id="grant-user-id" class="form-input" placeholder="点击搜索用户"
+                      onfocus="searchUsers(this)" oninput="searchUsers(this)">
+                    <div id="grant-user-list"
+                      style="position:absolute;top:100%;left:0;right:0;background:#1e293b;border:1px solid #334155;border-radius:8px;margin-top:4px;max-height:200px;overflow-y:auto;z-index:100;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.3);">
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label class="form-label">💎 星钻数量</label>
+                  <input type="number" id="grant-starcoins" class="form-input" value="0" min="0" placeholder="发放星钻">
+                </div>
+                <div>
+                  <label class="form-label">⭐ 经验值</label>
+                  <input type="number" id="grant-exp" class="form-input" value="0" min="0" placeholder="发放经验值">
+                </div>
+              </div>
+              <div style="margin-bottom:12px;">
+                <label class="form-label">📦 选择物品（点击添加）</label>
+                <div id="grant-items-grid"
+                  style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;min-height:30px;border:1px dashed #334155;border-radius:8px;padding:10px;">
+                </div>
+                <div id="grant-items-available"
+                  style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;max-height:100px;overflow-y:auto;">
+                </div>
+              </div>
+              <div style="margin-bottom:12px;">
+                <label class="form-label">发放原因（记录用）</label>
+                <input type="text" id="grant-reason" class="form-input" placeholder="如: 系统补偿、活动奖励等">
+              </div>
+              <div style="display:flex;gap:10px;">
+                <button class="btn btn-success" onclick="grantStarCoins()">💎 发放星钻</button>
+                <button class="btn btn-info" onclick="grantExp()">⭐ 发放经验值</button>
+                <button class="btn btn-warning" onclick="grantItems()">📦 发放物品</button>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </main>
   </div>
@@ -1398,9 +1617,9 @@
 
     // 页面加载时尝试自动登录
     window.addEventListener('DOMContentLoaded', () => {
+      loadServerVersion();
       const savedToken = localStorage.getItem('adminToken');
       if (savedToken) {
-        // 使用已保存的 token 直接连接
         socket = io('/admin', {
           query: { token: savedToken },
           reconnection: true,
@@ -1408,14 +1627,22 @@
           reconnectionDelay: reconnectDelay
         });
 
-        socket.on('connect', () => {
+        const onConnect = () => {
+          console.log('[DEBUG] 自动登录 socket 已连接');
           reconnectAttempts = 0;
           document.getElementById('login-page').classList.add('hidden');
           document.getElementById('admin-app').classList.remove('hidden');
           showToast('自动登录成功', 'success');
           loadDashboardData();
           loadServerVersion();
-        });
+          console.log('[DEBUG] 500ms 后调用 loadItemList');
+          setTimeout(loadItemList, 500);
+        };
+
+        socket.on('connect', onConnect);
+        if (socket.connected) {
+          onConnect();
+        }
 
         socket.on('auth_error', (data) => {
           showToast(data.message || '认证失败，请重新登录', 'error');
@@ -1423,6 +1650,90 @@
           localStorage.removeItem('adminToken');
           document.getElementById('login-page').classList.remove('hidden');
           document.getElementById('admin-app').classList.add('hidden');
+        });
+
+        socket.on('disconnect', (reason) => {
+          if (reason === 'io server disconnect') {
+            localStorage.removeItem('adminToken');
+            document.getElementById('login-page').classList.remove('hidden');
+            document.getElementById('admin-app').classList.add('hidden');
+            showToast('连接已断开，请重新登录', 'error');
+          }
+        });
+
+        socket.on('reconnect', (attemptNumber) => {
+          showToast(`重新连接成功 (尝试 ${attemptNumber})`, 'success');
+          loadDashboardData();
+        });
+
+        socket.on('admin_update', (data) => {
+          adminData.stats = data.stats || {};
+          adminData.users = data.users || [];
+          adminData.games = data.games || [];
+          if (data.accounts) adminData.accounts = data.accounts;
+          renderStats();
+          if (currentView === 'users') renderOnlineUsers();
+          if (currentView === 'games') renderGames();
+          if (currentView === 'accounts') renderAccounts();
+          if (currentView === 'dashboard') {
+            renderLeaderboard();
+            renderRecentLogins();
+            renderRecentGames();
+            renderOnlineUsersDetail();
+            renderGameStats();
+            renderSystemInfo(data.stats?.system);
+          }
+        });
+
+        socket.on('admin_action_result', (data) => {
+          if (data.success) showToast(data.message || '操作成功', 'success');
+          else showToast(data.message || '操作失败', 'error');
+        });
+
+        socket.on('admin_accounts_updated', () => loadAccounts());
+        socket.on('admin_leaderboard', (data) => {
+          adminData.leaderboard = data.leaderboard || [];
+          if (currentView === 'dashboard') renderLeaderboard();
+        });
+        socket.on('admin_game_history', (data) => showGameHistoryModal(data.history || []));
+        socket.on('admin_config', (data) => showConfigModal(data.config || {}));
+        socket.on('admin_user_detail', (data) => showUserDetailModal(data));
+        socket.on('admin_chat_history', (data) => {
+          adminData.chatMessages = data.history || [];
+          if (currentView === 'chat') renderChatMessages();
+        });
+        socket.on('admin_logs', (data) => showLogsModal(data.logs || []));
+        socket.on('admin_accounts_list', (data) => {
+          adminData.accounts = data.accounts || [];
+          if (currentView === 'accounts') renderAccounts();
+        });
+        socket.on('level_exp_config', (data) => {
+          adminData.levelExpConfig = data.levelExp || {};
+        });
+        socket.on('admin_system_stats', (data) => {
+          if (data) {
+            adminData.stats = { ...adminData.stats, ...data };
+            renderStats();
+          }
+        });
+        socket.on('admin_items_list', (data) => {
+          console.log('[DEBUG] 收到 admin_items_list (自动登录):', data);
+          if (data.success) {
+            mailItemList = data.items || [];
+            mailPackList = data.packs || [];
+            mailCosmeticList = data.cosmetics || [];
+            mailVipList = data.vip || [];
+            renderMailItems(mailItemList);
+            renderMailPacks(mailPackList);
+            renderMailCosmetics(mailCosmeticList);
+            renderMailVip(mailVipList);
+            renderGrantItems(mailItemList);
+          }
+        });
+        socket.on('admin_users_select_list', (data) => {
+          if (data.success && pendingUserListId) {
+            renderUserList(data.users, pendingUserListId);
+          }
         });
       }
     });
@@ -1448,7 +1759,8 @@
         chat: '聊天管理',
         accounts: '账号管理',
         system: '系统设置',
-        feedbacks: '反馈管理'
+        feedbacks: '反馈管理',
+        mail: '邮件系统'
       };
       document.getElementById('page-title').textContent = titles[view];
 
@@ -1497,14 +1809,16 @@
 
       // 监听登录结果
       socket.once('admin_login_result', (data) => {
+        console.log('[DEBUG] 收到 admin_login_result:', data);
         if (data.success) {
-          // 登录成功，存储 token
           localStorage.setItem('adminToken', data.token);
           document.getElementById('login-page').classList.add('hidden');
           document.getElementById('admin-app').classList.remove('hidden');
           showToast('登录成功', 'success');
           loadDashboardData();
           loadServerVersion();
+          console.log('[DEBUG] 500ms 后调用 loadItemList');
+          setTimeout(loadItemList, 500);
         } else {
           // 登录失败
           showToast(data.message || '认证失败', 'error');
@@ -1515,9 +1829,22 @@
       });
 
       // 连接成功后发送账号登录请求
-      socket.on('connect', () => {
+      const onConnectForLogin = () => {
         socket.emit('admin_account_login', { username, password });
-      });
+      };
+      socket.on('connect', onConnectForLogin);
+      if (socket.connected) {
+        onConnectForLogin();
+      }
+
+      // 连接成功后加载物品列表
+      const onConnectForItems = () => {
+        setTimeout(loadItemList, 500);
+      };
+      socket.on('connect', onConnectForItems);
+      if (socket.connected) {
+        onConnectForItems();
+      }
 
       // 监听认证错误
       socket.on('auth_error', (data) => {
@@ -1639,6 +1966,29 @@
           renderStats();
         }
       });
+
+      // 物品列表
+      socket.on('admin_items_list', (data) => {
+        console.log('[DEBUG] 收到 admin_items_list (账号登录):', data);
+        if (data.success) {
+          mailItemList = data.items || [];
+          mailPackList = data.packs || [];
+          mailCosmeticList = data.cosmetics || [];
+          mailVipList = data.vip || [];
+          renderMailItems(mailItemList);
+          renderMailPacks(mailPackList);
+          renderMailCosmetics(mailCosmeticList);
+          renderMailVip(mailVipList);
+          renderGrantItems(mailItemList);
+        }
+      });
+
+      // 用户选择列表
+      socket.on('admin_users_select_list', (data) => {
+        if (data.success && pendingUserListId) {
+          renderUserList(data.users, pendingUserListId);
+        }
+      });
     }
 
     function logout() {
@@ -1650,16 +2000,29 @@
 
     // 加载服务器版本号
     function loadServerVersion() {
+      console.log('[DEBUG] loadServerVersion 被调用');
       fetch('/version')
         .then(response => response.json())
         .then(data => {
-          const versionElements = document.querySelectorAll('[id="server-version"]');
-          versionElements.forEach(element => {
-            element.textContent = `v${data.version} (build ${data.build})`;
-          });
+          console.log('[DEBUG] 版本号数据:', data);
+          const elements = document.getElementById('server-version');
+          console.log('[DEBUG] 找到的版本号元素:', elements);
+          // 手动查找所有 id="server-version" 的元素（处理重复 id 的情况）
+          const allElements = document.getElementsByTagName('span');
+          for (let i = 0; i < allElements.length; i++) {
+            if (allElements[i].id === 'server-version') {
+              allElements[i].textContent = `v${data.version} (build ${data.build})`;
+            }
+          }
         })
         .catch(error => {
           console.error('获取版本号失败:', error);
+          const allElements = document.getElementsByTagName('span');
+          for (let i = 0; i < allElements.length; i++) {
+            if (allElements[i].id === 'server-version') {
+              allElements[i].textContent = '获取版本号失败';
+            }
+          }
         });
     }
 
@@ -1736,7 +2099,7 @@
               <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(f.content || '').replace(/"/g, '&quot;')}">${f.content?.slice(0, 60) || '-'}</td>
               <td><span style="color:${statusColors[f.status] || '#6c757d'};font-weight:bold;">${statusMap[f.status] || f.status}</span></td>
               <td>👍 ${f.votes?.length || 0}</td>
-              <td><button class="action-btn" onclick="updateFeedbackStatus('${f.id}','${nextStatus}')" style="padding:3px 10px;font-size:12px;border:1px solid #ddd;border-radius:4px;background:white;cursor:pointer;">${nextLabel}</button></td>
+              <td><button class="btn btn-xs" onclick="updateFeedbackStatus('${f.id}','${nextStatus}')">${nextLabel}</button></td>
             </tr>`;
           }
           list.innerHTML = html;
@@ -2424,6 +2787,120 @@
     }
 
     // ==================== 功能操作 ====================
+    // ==================== 邮件系统功能 ====================
+    function parseItemsInput(itemsStr) {
+      if (!itemsStr || !itemsStr.trim()) return [];
+      const items = [];
+      const parts = itemsStr.split(',');
+      for (const part of parts) {
+        const trimmed = part.trim();
+        if (!trimmed) continue;
+        const [id, count] = trimmed.split(':');
+        if (id && count) {
+          const numCount = parseInt(count);
+          if (!isNaN(numCount) && numCount > 0) {
+            items.push({ id: id.trim(), count: numCount });
+          }
+        }
+      }
+      return items;
+    }
+
+    function sendMailToUser() {
+      if (!socket) return showToast('未连接到服务器', 'error');
+      const userId = document.getElementById('mail-user-id').value.trim();
+      const title = document.getElementById('mail-title').value.trim();
+      const content = document.getElementById('mail-content').value.trim();
+      const starCoins = parseInt(document.getElementById('mail-starcoins').value) || 0;
+      const exp = parseInt(document.getElementById('mail-exp').value) || 0;
+      const items = getSelectedMailItems();
+      const cosmetics = getSelectedMailCosmetics();
+      const vip = getSelectedMailVip();
+
+      if (!userId) return showToast('请输入用户ID', 'error');
+      if (!title) return showToast('请输入邮件标题', 'error');
+
+      const mailData = {
+        userId,
+        title,
+        content,
+        items,
+        cosmetics,
+        vip,
+        starCoins,
+        exp,
+        from: '管理员'
+      };
+      socket.emit('send_mail_to_user', mailData);
+      showToast('邮件发送请求已提交', 'success');
+    }
+
+    function sendMailToAllUsers() {
+      if (!socket) return showToast('未连接到服务器', 'error');
+      const title = document.getElementById('mail-title').value.trim();
+      const content = document.getElementById('mail-content').value.trim();
+      const starCoins = parseInt(document.getElementById('mail-starcoins').value) || 0;
+      const exp = parseInt(document.getElementById('mail-exp').value) || 0;
+      const items = getSelectedMailItems();
+      const cosmetics = getSelectedMailCosmetics();
+      const vip = getSelectedMailVip();
+
+      if (!title) return showToast('请输入邮件标题', 'error');
+      if (!confirm('确定要给所有用户发送这封邮件吗？此操作可能需要较长时间。')) return;
+
+      const mailData = {
+        title,
+        content,
+        items,
+        cosmetics,
+        vip,
+        starCoins,
+        exp,
+        from: '管理员'
+      };
+      socket.emit('send_mail_all', mailData);
+      showToast('全站邮件发送请求已提交', 'success');
+    }
+
+    function grantStarCoins() {
+      if (!socket) return showToast('未连接到服务器', 'error');
+      const userId = document.getElementById('grant-user-id').value.trim();
+      const amount = parseInt(document.getElementById('grant-starcoins').value) || 0;
+      const reason = document.getElementById('grant-reason').value.trim() || '管理员发放';
+
+      if (!userId) return showToast('请输入用户ID', 'error');
+      if (amount <= 0) return showToast('请输入有效的星钻数量', 'error');
+      if (!confirm(`确定要给用户 ${userId} 发放 ${amount} 星钻吗？`)) return;
+
+      socket.emit('grant_starcoins', { id: userId, amount, reason });
+    }
+
+    function grantExp() {
+      if (!socket) return showToast('未连接到服务器', 'error');
+      const userId = document.getElementById('grant-user-id').value.trim();
+      const amount = parseInt(document.getElementById('grant-exp').value) || 0;
+      const reason = document.getElementById('grant-reason').value.trim() || '管理员发放';
+
+      if (!userId) return showToast('请输入用户ID', 'error');
+      if (amount <= 0) return showToast('请输入有效的经验值数量', 'error');
+      if (!confirm(`确定要给用户 ${userId} 发放 ${amount} 经验值吗？`)) return;
+
+      socket.emit('grant_exp', { id: userId, amount, reason });
+    }
+
+    function grantItems() {
+      if (!socket) return showToast('未连接到服务器', 'error');
+      const userId = document.getElementById('grant-user-id').value.trim();
+      const items = getSelectedGrantItems();
+      const reason = document.getElementById('grant-reason').value.trim() || '管理员发放';
+
+      if (!userId) return showToast('请输入用户ID', 'error');
+      if (items.length === 0) return showToast('请选择物品', 'error');
+      if (!confirm(`确定要给用户 ${userId} 发放 ${items.length} 种物品吗？`)) return;
+
+      socket.emit('grant_items', { id: userId, items, reason });
+    }
+
     function showBroadcastModal() {
       showModal('广播消息', `
     <div class="form-group">
@@ -2702,19 +3179,19 @@
           <div class="form-group">
             <label class="form-label">快捷操作</label>
             <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-              <button onclick="modifyExp('${accountId}', 'add', 100)" class="btn-primary" style="padding: 8px 12px;">+100</button>
-              <button onclick="modifyExp('${accountId}', 'add', 500)" class="btn-primary" style="padding: 8px 12px;">+500</button>
-              <button onclick="modifyExp('${accountId}', 'subtract', 100)" class="btn-secondary" style="padding: 8px 12px;">-100</button>
-              <button onclick="modifyExp('${accountId}', 'reset', 0)" class="btn-danger" style="padding: 8px 12px;">重置</button>
+              <button onclick="modifyExp('${accountId}', 'add', 100)" class="btn btn-sm btn-primary">+100</button>
+              <button onclick="modifyExp('${accountId}', 'add', 500)" class="btn btn-sm btn-primary">+500</button>
+              <button onclick="modifyExp('${accountId}', 'subtract', 100)" class="btn btn-sm btn-secondary">-100</button>
+              <button onclick="modifyExp('${accountId}', 'reset', 0)" class="btn btn-sm btn-danger">重置</button>
             </div>
           </div>
           <div class="form-group">
             <label class="form-label">自定义经验值</label>
             <div style="display: flex; gap: 10px;">
               <input type="number" id="custom-exp-amount" class="form-input" value="100" style="flex: 1;">
-              <button onclick="modifyExp('${accountId}', 'add', parseInt(document.getElementById('custom-exp-amount').value))" class="btn-primary" style="padding: 8px 12px;">添加</button>
-              <button onclick="modifyExp('${accountId}', 'subtract', parseInt(document.getElementById('custom-exp-amount').value))" class="btn-secondary" style="padding: 8px 12px;">减少</button>
-              <button onclick="modifyExp('${accountId}', 'set', parseInt(document.getElementById('custom-exp-amount').value))" class="btn-warning" style="padding: 8px 12px;">设置</button>
+              <button onclick="modifyExp('${accountId}', 'add', parseInt(document.getElementById('custom-exp-amount').value))" class="btn btn-sm btn-primary">添加</button>
+              <button onclick="modifyExp('${accountId}', 'subtract', parseInt(document.getElementById('custom-exp-amount').value))" class="btn btn-sm btn-secondary">减少</button>
+              <button onclick="modifyExp('${accountId}', 'set', parseInt(document.getElementById('custom-exp-amount').value))" class="btn btn-sm btn-warning">设置</button>
             </div>
           </div>
         `, [{ text: '关闭', class: 'btn-secondary', action: closeModal }]);
@@ -2738,9 +3215,9 @@
                 已解锁成就: ${achievements.length} 个
               </div>
               <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <button onclick="showAddAchievementModal('${accountId}')" class="btn-primary" style="padding: 8px 12px; font-size: 12px;">添加成就</button>
-                <button onclick="showRemoveAchievementModal('${accountId}')" class="btn-secondary" style="padding: 8px 12px; font-size: 12px;">移除成就</button>
-                <button onclick="resetAchievements('${accountId}')" class="btn-danger" style="padding: 8px 12px; font-size: 12px;">重置所有成就</button>
+                <button onclick="showAddAchievementModal('${accountId}')" class="btn btn-sm btn-primary">添加成就</button>
+                <button onclick="showRemoveAchievementModal('${accountId}')" class="btn btn-sm btn-secondary">移除成就</button>
+                <button onclick="resetAchievements('${accountId}')" class="btn btn-sm btn-danger">重置所有成就</button>
               </div>
             </div>
           </div>
@@ -2962,7 +3439,7 @@
       );
       const tbody = document.getElementById('online-users-body');
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">🔍</div>无匹配用户</div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">🔍</div>无匹配用户</div></td></tr>';
         return;
       }
       tbody.innerHTML = filtered.map(user => {
@@ -3063,19 +3540,19 @@
             <label class="form-label">经验值</label>
             <div style="display: flex; gap: 10px;">
               <input type="text" class="form-input" value="${account.profile?.exp || 0}" readonly style="flex: 1;">
-              <button onclick="modifyExp('${account.id}', 'add', 100)" class="btn-primary" style="padding: 8px 12px;">+100</button>
-              <button onclick="modifyExp('${account.id}', 'add', 500)" class="btn-primary" style="padding: 8px 12px;">+500</button>
-              <button onclick="modifyExp('${account.id}', 'subtract', 100)" class="btn-secondary" style="padding: 8px 12px;">-100</button>
-              <button onclick="modifyExp('${account.id}', 'reset', 0)" class="btn-danger" style="padding: 8px 12px;">重置</button>
+              <button onclick="modifyExp('${account.id}', 'add', 100)" class="btn btn-sm btn-primary">+100</button>
+              <button onclick="modifyExp('${account.id}', 'add', 500)" class="btn btn-sm btn-primary">+500</button>
+              <button onclick="modifyExp('${account.id}', 'subtract', 100)" class="btn btn-sm btn-secondary">-100</button>
+              <button onclick="modifyExp('${account.id}', 'reset', 0)" class="btn btn-sm btn-danger">重置</button>
             </div>
           </div>
           <div class="form-group">
             <label class="form-label">自定义经验值</label>
             <div style="display: flex; gap: 10px;">
               <input type="number" id="custom-exp-amount" class="form-input" value="100" style="flex: 1;">
-              <button onclick="modifyExp('${account.id}', 'add', parseInt(document.getElementById('custom-exp-amount').value))" class="btn-primary" style="padding: 8px 12px;">添加</button>
-              <button onclick="modifyExp('${account.id}', 'subtract', parseInt(document.getElementById('custom-exp-amount').value))" class="btn-secondary" style="padding: 8px 12px;">减少</button>
-              <button onclick="modifyExp('${account.id}', 'set', parseInt(document.getElementById('custom-exp-amount').value))" class="btn-warning" style="padding: 8px 12px;">设置</button>
+              <button onclick="modifyExp('${account.id}', 'add', parseInt(document.getElementById('custom-exp-amount').value))" class="btn btn-sm btn-primary">添加</button>
+              <button onclick="modifyExp('${account.id}', 'subtract', parseInt(document.getElementById('custom-exp-amount').value))" class="btn btn-sm btn-secondary">减少</button>
+              <button onclick="modifyExp('${account.id}', 'set', parseInt(document.getElementById('custom-exp-amount').value))" class="btn btn-sm btn-warning">设置</button>
             </div>
           </div>
           <div class="form-group">
@@ -3113,9 +3590,9 @@
                 已解锁成就: ${account.achievements.length} 个
               </div>
               <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <button onclick="showAddAchievementModal('${account.id}')" class="btn-primary" style="padding: 8px 12px; font-size: 12px;">添加成就</button>
-                <button onclick="showRemoveAchievementModal('${account.id}')" class="btn-secondary" style="padding: 8px 12px; font-size: 12px;">移除成就</button>
-                <button onclick="resetAchievements('${account.id}')" class="btn-danger" style="padding: 8px 12px; font-size: 12px;">重置所有成就</button>
+                <button onclick="showAddAchievementModal('${account.id}')" class="btn btn-sm btn-primary">添加成就</button>
+                <button onclick="showRemoveAchievementModal('${account.id}')" class="btn btn-sm btn-secondary">移除成就</button>
+                <button onclick="resetAchievements('${account.id}')" class="btn btn-sm btn-danger">重置所有成就</button>
               </div>
             </div>
           </div>
@@ -3337,13 +3814,14 @@
 
       if (keyword) {
         filtered = filtered.filter(a =>
-          (a.username && a.username.includes(keyword)) ||
-          (a.id && a.id.includes(keyword))
+          (a.account?.username && a.account.username.includes(keyword)) ||
+          (a.account?.nickname && a.account.nickname.includes(keyword)) ||
+          (a.account?.id && a.account.id.includes(keyword))
         );
       }
 
       if (type !== 'all') {
-        filtered = filtered.filter(a => a.type === type);
+        filtered = filtered.filter(a => a.account?.type === type);
       }
 
       const tbody = document.getElementById('accounts-body');
@@ -3353,20 +3831,20 @@
       }
 
       tbody.innerHTML = filtered.map(acc => {
-        const typeClass = acc.type === 'registered' ? 'badge-online' : 'badge-warning';
+        const typeClass = acc.account?.type === 'registered' ? 'badge-online' : 'badge-warning';
         return `
         <tr>
-          <td>${acc.id}</td>
-          <td>${acc.username || '-'}</td>
-          <td>${acc.nickname || '-'}</td>
-          <td><span class="badge ${typeClass}">${acc.type === 'registered' ? '注册用户' : '游客'}</span></td>
+          <td>${acc.account?.id || '-'}</td>
+          <td>${acc.account?.username || '-'}</td>
+          <td>${acc.account?.nickname || '-'}</td>
+          <td><span class="badge ${typeClass}">${acc.account?.type === 'registered' ? '注册用户' : '游客'}</span></td>
           <td>${acc.stats?.totalGames || 0}</td>
-          <td>${formatTime(acc.createdAt)}</td>
+          <td>${formatTime(acc.account?.createdAt)}</td>
           <td>
             <div class="table-actions">
-              <button class="table-btn table-btn-info" onclick="viewAccountDetail('${acc.id}')">详情</button>
-              <button class="table-btn table-btn-warning" onclick="resetPassword('${acc.id}')">重置密码</button>
-              <button class="table-btn table-btn-danger" onclick="deleteAccount('${acc.id}')">删除</button>
+              <button class="table-btn table-btn-info" onclick="viewAccountDetail('${acc.account?.id || acc.id}')">详情</button>
+              <button class="table-btn table-btn-warning" onclick="resetPassword('${acc.account?.id || acc.id}')">重置密码</button>
+              <button class="table-btn table-btn-danger" onclick="deleteAccount('${acc.account?.id || acc.id}')">删除</button>
             </div>
           </td>
         </tr>
@@ -3384,14 +3862,14 @@
 
       if (keyword) {
         filtered = filtered.filter(a =>
-          (a.username && a.username.includes(keyword)) ||
-          (a.id && a.id.includes(keyword)) ||
-          (a.nickname && a.nickname.includes(keyword))
+          (a.account?.username && a.account.username.includes(keyword)) ||
+          (a.account?.nickname && a.account.nickname.includes(keyword)) ||
+          (a.account?.id && a.account.id.includes(keyword))
         );
       }
 
       if (type !== 'all') {
-        filtered = filtered.filter(a => a.type === type);
+        filtered = filtered.filter(a => a.account?.type === type);
       }
 
       const tbody = document.getElementById('user-data-body');
@@ -3401,24 +3879,24 @@
       }
 
       tbody.innerHTML = filtered.map(acc => {
-        const typeClass = acc.type === 'registered' ? 'badge-online' : 'badge-warning';
-        const level = acc.profile?.level || 1;
-        const exp = acc.profile?.exp || 0;
+        const typeClass = acc.account?.type === 'registered' ? 'badge-online' : 'badge-warning';
+        const level = acc.account?.profile?.level || 1;
+        const exp = acc.account?.profile?.exp || 0;
         const achievementCount = acc.achievements?.length || 0;
         return `
         <tr>
-          <td>${acc.id}</td>
-          <td>${acc.username || '-'}</td>
-          <td>${acc.nickname || '-'}</td>
-          <td><span class="badge ${typeClass}">${acc.type === 'registered' ? '注册用户' : '游客'}</span></td>
+          <td>${acc.account?.id || '-'}</td>
+          <td>${acc.account?.username || '-'}</td>
+          <td>${acc.account?.nickname || '-'}</td>
+          <td><span class="badge ${typeClass}">${acc.account?.type === 'registered' ? '注册用户' : '游客'}</span></td>
           <td>Lv.${level}</td>
           <td>${exp}</td>
           <td>${achievementCount}</td>
           <td>
             <div class="table-actions">
-              <button class="table-btn table-btn-info" onclick="viewAccountDetail('${acc.id}')">详情</button>
-              <button class="table-btn table-btn-primary" onclick="showExpManagement('${acc.id}')">经验</button>
-              <button class="table-btn table-btn-success" onclick="showAchievementManagement('${acc.id}')">成就</button>
+              <button class="table-btn table-btn-info" onclick="viewAccountDetail('${acc.account?.id || acc.id}')">详情</button>
+              <button class="table-btn table-btn-primary" onclick="showExpManagement('${acc.account?.id || acc.id}')">经验</button>
+              <button class="table-btn table-btn-success" onclick="showAchievementManagement('${acc.account?.id || acc.id}')">成就</button>
             </div>
           </td>
         </tr>
@@ -3488,6 +3966,415 @@
         minute: '2-digit'
       });
     }
+
+    // ========== 物品列表和用户搜索功能 ==========
+    let mailItemList = [];
+    let mailPackList = [];
+    let mailCosmeticList = [];
+    let mailVipList = [];
+    let mailSelectedItems = new Map();
+    let mailSelectedPacks = new Map();
+    let mailSelectedCosmetics = new Set();
+    let mailSelectedVip = null;
+    let grantSelectedItems = new Map();
+    let mailActiveTab = 'items';
+
+    function loadItemList() {
+      console.log('[DEBUG] loadItemList 被调用, socket:', socket, 'connected:', socket?.connected);
+      if (socket) {
+        socket.emit('get_items_list');
+        console.log('[DEBUG] 已发送 get_items_list 事件');
+      }
+    }
+
+    function renderMailItems(items) {
+      console.log('[DEBUG] renderMailItems, items:', items?.length);
+      const availableContainer = document.getElementById('mail-items-available');
+      const gridContainer = document.getElementById('mail-items-grid');
+      if (!availableContainer || !gridContainer) {
+        console.log('[DEBUG] renderMailItems 元素缺失:', { availableContainer: !!availableContainer, gridContainer: !!gridContainer });
+        return;
+      }
+
+      availableContainer.innerHTML = '';
+      for (const item of items) {
+        if (!item.enabled) continue;
+        const btn = document.createElement('button');
+        btn.className = 'item-tag';
+        btn.style.cssText = 'background:#1e293b;border:1px solid #334155;border-radius:6px;padding:4px 10px;font-size:12px;color:#e2e8f0;cursor:pointer;white-space:nowrap;';
+        btn.innerHTML = `${item.icon} ${item.name}`;
+        btn.onclick = () => toggleMailItem(item);
+        availableContainer.appendChild(btn);
+      }
+
+      updateMailItemsGrid();
+    }
+
+    function updateMailItemsGrid() {
+      const gridContainer = document.getElementById('mail-items-grid');
+      if (!gridContainer) return;
+
+      if (mailSelectedItems.size === 0) {
+        gridContainer.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#64748b;font-size:12px;">点击下方物品列表添加物品...</div>';
+        return;
+      }
+
+      gridContainer.innerHTML = '';
+      for (const [itemId, data] of mailSelectedItems) {
+        const box = document.createElement('div');
+        box.style.cssText = 'background:#1e293b;border:1px solid #475569;border-radius:6px;padding:8px;display:flex;align-items:center;gap:6px;';
+        box.innerHTML = `
+          <span style="font-size:14px;">${data.icon}</span>
+          <span style="font-size:12px;flex:1;">${data.name}</span>
+          <input type="number" value="${data.count}" min="1" style="width:60px;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:4px 8px;border-radius:4px;font-size:12px;" onchange="updateMailItemCount('${itemId}', this.value)">
+          <button style="background:#dc2626;border:none;color:white;padding:2px 8px;border-radius:4px;font-size:12px;cursor:pointer;" onclick="removeMailItem('${itemId}')">×</button>
+        `;
+        gridContainer.appendChild(box);
+      }
+    }
+
+    function toggleMailItem(item) {
+      if (mailSelectedItems.has(item.id)) {
+        mailSelectedItems.delete(item.id);
+      } else {
+        mailSelectedItems.set(item.id, { ...item, count: 1 });
+      }
+      updateMailItemsGrid();
+    }
+
+    function updateMailItemCount(itemId, count) {
+      const num = parseInt(count) || 1;
+      if (mailSelectedItems.has(itemId)) {
+        mailSelectedItems.get(itemId).count = num;
+      }
+    }
+
+    function removeMailItem(itemId) {
+      mailSelectedItems.delete(itemId);
+      updateMailItemsGrid();
+    }
+
+    function getSelectedMailItems() {
+      const items = Array.from(mailSelectedItems.values()).map(i => ({ id: i.id, count: i.count }));
+      const packs = Array.from(mailSelectedPacks.values()).map(p => ({ id: p.id, count: p.count }));
+      const combined = [...items, ...packs];
+
+      const manualInput = document.getElementById('mail-manual-items');
+      if (manualInput && manualInput.value.trim()) {
+        const manualEntries = manualInput.value.split(',').map(s => s.trim()).filter(Boolean);
+        for (const entry of manualEntries) {
+          const parts = entry.split('*').map(s => s.trim());
+          const id = parts[0];
+          const count = parseInt(parts[1]) || 1;
+          const existing = combined.find(i => i.id === id);
+          if (existing) {
+            existing.count += count;
+          } else {
+            combined.push({ id, count });
+          }
+        }
+      }
+      return combined;
+    }
+
+    function getSelectedMailCosmetics() {
+      const result = [];
+      for (const key of mailSelectedCosmetics) {
+        const [category, id] = key.split(':');
+        result.push({ category, id });
+      }
+      return result;
+    }
+
+    function getSelectedMailVip() {
+      if (!mailSelectedVip) return null;
+      return { days: mailSelectedVip.days, expBonus: mailSelectedVip.expBonus || 2 };
+    }
+
+    function switchMailTab(tab) {
+      mailActiveTab = tab;
+      document.querySelectorAll('.mail-tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+      });
+      document.querySelectorAll('.mail-tab-panel').forEach(panel => {
+        panel.style.display = 'none';
+      });
+      const activePanel = document.getElementById(`mail-tab-${tab}`);
+      if (activePanel) activePanel.style.display = 'block';
+    }
+
+    function renderMailPacks(packs) {
+      const availableContainer = document.getElementById('mail-packs-available');
+      if (!availableContainer) return;
+
+      availableContainer.innerHTML = '';
+      if (!packs || packs.length === 0) {
+        availableContainer.innerHTML = '<span style="font-size:12px;color:#64748b;">暂无礼包</span>';
+        return;
+      }
+      for (const pack of packs) {
+        if (!pack.enabled) continue;
+        const btn = document.createElement('button');
+        btn.style.cssText = 'background:#1e293b;border:1px solid #334155;border-radius:6px;padding:4px 10px;font-size:12px;color:#e2e8f0;cursor:pointer;white-space:nowrap;';
+        btn.innerHTML = `${pack.icon} ${pack.name}`;
+        btn.onclick = () => toggleMailPack(pack);
+        availableContainer.appendChild(btn);
+      }
+      updateMailPacksGrid();
+    }
+
+    function updateMailPacksGrid() {
+      const gridContainer = document.getElementById('mail-packs-grid');
+      if (!gridContainer) return;
+
+      if (mailSelectedPacks.size === 0) {
+        gridContainer.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#64748b;font-size:12px;">点击下方礼包列表添加礼包...</div>';
+        return;
+      }
+
+      gridContainer.innerHTML = '';
+      for (const [packId, data] of mailSelectedPacks) {
+        const box = document.createElement('div');
+        box.style.cssText = 'background:#1e293b;border:1px solid #475569;border-radius:6px;padding:8px;display:flex;align-items:center;gap:6px;';
+        box.innerHTML = `
+          <span style="font-size:14px;">${data.icon}</span>
+          <span style="font-size:12px;flex:1;">${data.name}</span>
+          <input type="number" value="${data.count}" min="1" style="width:60px;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:4px 8px;border-radius:4px;font-size:12px;" onchange="updateMailPackCount('${packId}', this.value)">
+          <button style="background:#dc2626;border:none;color:white;padding:2px 8px;border-radius:4px;font-size:12px;cursor:pointer;" onclick="removeMailPack('${packId}')">×</button>
+        `;
+        gridContainer.appendChild(box);
+      }
+    }
+
+    function toggleMailPack(pack) {
+      if (mailSelectedPacks.has(pack.id)) {
+        mailSelectedPacks.delete(pack.id);
+      } else {
+        mailSelectedPacks.set(pack.id, { ...pack, count: 1 });
+      }
+      updateMailPacksGrid();
+    }
+
+    function updateMailPackCount(packId, count) {
+      const num = parseInt(count) || 1;
+      if (mailSelectedPacks.has(packId)) {
+        mailSelectedPacks.get(packId).count = num;
+      }
+    }
+
+    function removeMailPack(packId) {
+      mailSelectedPacks.delete(packId);
+      updateMailPacksGrid();
+    }
+
+    function renderMailCosmetics(cosmetics) {
+      const selectedContainer = document.getElementById('mail-cosmetics-selected');
+      const availableContainer = document.getElementById('mail-cosmetics-available');
+      if (!selectedContainer || !availableContainer) return;
+
+      availableContainer.innerHTML = '';
+      if (!cosmetics || cosmetics.length === 0) {
+        availableContainer.innerHTML = '<span style="font-size:12px;color:#64748b;">暂无外观</span>';
+      } else {
+        for (const cosmetic of cosmetics) {
+          if (!cosmetic.enabled) continue;
+          const btn = document.createElement('button');
+          btn.style.cssText = 'background:#1e293b;border:1px solid #334155;border-radius:6px;padding:4px 10px;font-size:12px;color:#e2e8f0;cursor:pointer;white-space:nowrap;';
+          btn.innerHTML = `${cosmetic.icon} ${cosmetic.name}`;
+          btn.onclick = () => toggleMailCosmetic(cosmetic);
+          availableContainer.appendChild(btn);
+        }
+      }
+      updateMailCosmeticsSelected();
+    }
+
+    function toggleMailCosmetic(cosmetic) {
+      const key = `${cosmetic.category}:${cosmetic.id}`;
+      if (mailSelectedCosmetics.has(key)) {
+        mailSelectedCosmetics.delete(key);
+      } else {
+        mailSelectedCosmetics.add(key);
+      }
+      updateMailCosmeticsSelected();
+    }
+
+    function updateMailCosmeticsSelected() {
+      const container = document.getElementById('mail-cosmetics-selected');
+      if (!container) return;
+
+      if (mailSelectedCosmetics.size === 0) {
+        container.innerHTML = '<div style="color:#64748b;font-size:12px;text-align:center;width:100%;">点击下方外观列表添加...</div>';
+        return;
+      }
+
+      container.innerHTML = '';
+      for (const key of mailSelectedCosmetics) {
+        const [category, id] = key.split(':');
+        const itemInfo = mailCosmeticList.find(c => c.id === id);
+        const name = itemInfo ? itemInfo.name : id;
+        const icon = itemInfo ? itemInfo.icon : '🎨';
+        const btn = document.createElement('button');
+        btn.style.cssText = 'background:#334155;border:1px solid #475569;border-radius:6px;padding:6px 10px;font-size:12px;color:#e2e8f0;cursor:pointer;white-space:nowrap;';
+        btn.innerHTML = `${icon} ${name} ×`;
+        btn.onclick = () => {
+          mailSelectedCosmetics.delete(key);
+          updateMailCosmeticsSelected();
+        };
+        container.appendChild(btn);
+      }
+    }
+
+    function renderMailVip(vipOptions) {
+      const container = document.getElementById('mail-vip-list');
+      if (!container) return;
+
+      container.innerHTML = '';
+      if (!vipOptions || vipOptions.length === 0) {
+        container.innerHTML = '<span style="font-size:12px;color:#64748b;">暂无会员选项</span>';
+        return;
+      }
+      for (const vip of vipOptions) {
+        if (!vip.enabled) continue;
+        const btn = document.createElement('button');
+        const isSelected = mailSelectedVip && mailSelectedVip.id === vip.id;
+        btn.style.cssText = `background:${isSelected ? 'linear-gradient(90deg, #3b82f6, #8b5cf6)' : '#1e293b'};border:1px solid ${isSelected ? 'transparent' : '#334155'};border-radius:6px;padding:6px 12px;font-size:12px;color:#fff;cursor:pointer;white-space:nowrap;`;
+        btn.innerHTML = `${vip.icon} ${vip.name} (${vip.days}天)`;
+        btn.onclick = () => toggleMailVip(vip);
+        container.appendChild(btn);
+      }
+    }
+
+    function toggleMailVip(vip) {
+      if (mailSelectedVip && mailSelectedVip.id === vip.id) {
+        mailSelectedVip = null;
+      } else {
+        mailSelectedVip = vip;
+      }
+      renderMailVip(mailVipList);
+    }
+
+    function renderGrantItems(items) {
+      const gridContainer = document.getElementById('grant-items-grid');
+      const availableContainer = document.getElementById('grant-items-available');
+      if (!availableContainer || !gridContainer) return;
+
+      availableContainer.innerHTML = '';
+      for (const item of items) {
+        if (!item.enabled) continue;
+        const btn = document.createElement('button');
+        btn.style.cssText = 'background:#1e293b;border:1px solid #334155;border-radius:6px;padding:4px 10px;font-size:12px;color:#e2e8f0;cursor:pointer;white-space:nowrap;';
+        btn.innerHTML = `${item.icon} ${item.name}`;
+        btn.onclick = () => toggleGrantItem(item);
+        availableContainer.appendChild(btn);
+      }
+
+      updateGrantItemsGrid();
+    }
+
+    function updateGrantItemsGrid() {
+      const gridContainer = document.getElementById('grant-items-grid');
+      if (!gridContainer) return;
+
+      if (grantSelectedItems.size === 0) {
+        gridContainer.innerHTML = '<div style="color:#64748b;font-size:12px;text-align:center;width:100%;">点击下方物品添加...</div>';
+        return;
+      }
+
+      gridContainer.innerHTML = '';
+      for (const [itemId, data] of grantSelectedItems) {
+        const box = document.createElement('div');
+        box.style.cssText = 'background:#1e293b;border:1px solid #475569;border-radius:6px;padding:6px;display:flex;align-items:center;gap:6px;';
+        box.innerHTML = `
+          <span>${data.icon}</span>
+          <span style="font-size:12px;flex:1;">${data.name}</span>
+          <input type="number" value="${data.count}" min="1" style="width:55px;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:3px 6px;border-radius:4px;font-size:12px;" onchange="updateGrantItemCount('${itemId}', this.value)">
+          <button style="background:#dc2626;border:none;color:white;padding:1px 6px;border-radius:4px;font-size:12px;cursor:pointer;" onclick="removeGrantItem('${itemId}')">×</button>
+        `;
+        gridContainer.appendChild(box);
+      }
+    }
+
+    function toggleGrantItem(item) {
+      if (grantSelectedItems.has(item.id)) {
+        grantSelectedItems.delete(item.id);
+      } else {
+        grantSelectedItems.set(item.id, { ...item, count: 1 });
+      }
+      updateGrantItemsGrid();
+    }
+
+    function updateGrantItemCount(itemId, count) {
+      const num = parseInt(count) || 1;
+      if (grantSelectedItems.has(itemId)) {
+        grantSelectedItems.get(itemId).count = num;
+      }
+    }
+
+    function removeGrantItem(itemId) {
+      grantSelectedItems.delete(itemId);
+      updateGrantItemsGrid();
+    }
+
+    function getSelectedGrantItems() {
+      return Array.from(grantSelectedItems.values()).map(i => ({ id: i.id, count: i.count }));
+    }
+
+    function searchUsers(inputEl) {
+      const keyword = inputEl.value.trim();
+      const inputId = inputEl.id;
+      const listId = inputId === 'mail-user-id' ? 'mail-user-list' : 'grant-user-list';
+      const listEl = document.getElementById(listId);
+      if (!listEl) return;
+
+      if (keyword.length < 1) {
+        listEl.style.display = 'none';
+        return;
+      }
+
+      if (!socket) return;
+      socket.emit('get_users_select_list', { keyword });
+      pendingUserListId = listId;
+    }
+
+    let pendingUserListId = null;
+
+    function renderUserList(users, listId) {
+      const listEl = document.getElementById(listId);
+      if (!listEl) return;
+
+      if (!users || users.length === 0) {
+        listEl.innerHTML = '<div style="padding:12px;text-align:center;color:#64748b;font-size:12px;">没有找到用户</div>';
+        listEl.style.display = 'block';
+        return;
+      }
+
+      listEl.innerHTML = '';
+      for (const user of users) {
+        const item = document.createElement('div');
+        item.style.cssText = 'padding:10px 12px;cursor:pointer;border-bottom:1px solid #334155;display:flex;align-items:center;gap:8px;font-size:13px;color:#e2e8f0;';
+        item.innerHTML = `
+          <span style="font-weight:bold;color:#fbbf24;">${user.nickname || user.username}</span>
+          <span style="color:#64748b;font-size:11px;">(${user.id})</span>
+          <span style="margin-left:auto;font-size:10px;color:${user.status === 'online' ? '#22c55e' : '#64748b'};">${user.status || 'offline'}</span>
+        `;
+        item.onmouseenter = () => item.style.background = '#1e3a5f';
+        item.onmouseleave = () => item.style.background = 'transparent';
+        item.onclick = () => {
+          const inputId = listId === 'mail-user-list' ? 'mail-user-id' : 'grant-user-id';
+          document.getElementById(inputId).value = user.id;
+          listEl.style.display = 'none';
+        };
+        listEl.appendChild(item);
+      }
+      listEl.style.display = 'block';
+    }
+
+    document.addEventListener('click', (e) => {
+      const mailList = document.getElementById('mail-user-list');
+      const grantList = document.getElementById('grant-user-list');
+      if (mailList && e.target.id !== 'mail-user-id') mailList.style.display = 'none';
+      if (grantList && e.target.id !== 'grant-user-id') grantList.style.display = 'none';
+    });
 
     // 添加动画样式
     const style = document.createElement('style');

@@ -13,7 +13,9 @@ class DataStore {
       'accounts': 'accounts',
       'games': 'games', // 游戏记录按ID拆分存储
       'currencyTransactions': 'currency_transactions', // 星钻交易记录按用户ID拆分存储
-      'expTransactions': 'exp_transactions' // 经验变动记录按用户ID拆分存储
+      'expTransactions': 'exp_transactions', // 经验变动记录按用户ID拆分存储
+      'mails': 'mails', // 邮件记录按用户ID拆分存储
+      'inventories': 'inventories' // 背包资源按用户ID拆分存储
     };
 
     // 普通集合的目录映射
