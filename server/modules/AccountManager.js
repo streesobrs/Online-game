@@ -431,91 +431,6 @@ class AccountManager {
     }
   }
 
-  // 更新游戏统计
-  async updateGameStats(accountId, result, gameType = null, isAI = false, aiDifficulty = null, duration = null) {
-    try {
-      const account = await dataStore.findOne('accounts', { 'account.id': accountId });
-      if (!account) {
-        return {
-          success: false,
-          message: '账号不存在'
-        };
-      }
-
-      // 更新通用统计
-      account.stats.totalGames = (account.stats.totalGames || 0) + 1;
-
-      if (result === 'win') {
-        account.stats.totalWins = (account.stats.totalWins || 0) + 1;
-      } else if (result === 'loss') {
-        account.stats.totalLosses = (account.stats.totalLosses || 0) + 1;
-      } else if (result === 'draw') {
-        account.stats.totalDraws = (account.stats.totalDraws || 0) + 1;
-      }
-
-      // 更新真人对战和AI对战统计
-      if (isAI) {
-        account.stats.aiWins = (account.stats.aiWins || 0) + (result === 'win' ? 1 : 0);
-        account.stats.aiLosses = (account.stats.aiLosses || 0) + (result === 'loss' ? 1 : 0);
-        account.stats.aiDraws = (account.stats.aiDraws || 0) + (result === 'draw' ? 1 : 0);
-      } else {
-        account.stats.humanWins = (account.stats.humanWins || 0) + (result === 'win' ? 1 : 0);
-        account.stats.humanLosses = (account.stats.humanLosses || 0) + (result === 'loss' ? 1 : 0);
-        account.stats.humanDraws = (account.stats.humanDraws || 0) + (result === 'draw' ? 1 : 0);
-      }
-
-      // 更新游戏类型统计
-      if (gameType && account.games[gameType]) {
-        account.games[gameType].totalGames = (account.games[gameType].totalGames || 0) + 1;
-
-        if (result === 'win') {
-          account.games[gameType].wins = (account.games[gameType].wins || 0) + 1;
-          account.games[gameType].streak = (account.games[gameType].streak || 0) + 1;
-          account.games[gameType].maxStreak = Math.max(
-            account.games[gameType].maxStreak || 0,
-            account.games[gameType].streak
-          );
-        } else if (result === 'loss') {
-          account.games[gameType].losses = (account.games[gameType].losses || 0) + 1;
-          account.games[gameType].streak = 0;
-        } else if (result === 'draw') {
-          account.games[gameType].draws = (account.games[gameType].draws || 0) + 1;
-        }
-
-        // AI游戏统计
-        if (isAI && gameType !== 'snake') {
-          account.games[gameType].aiWins = (account.games[gameType].aiWins || 0) + (result === 'win' ? 1 : 0);
-          account.games[gameType].aiLosses = (account.games[gameType].aiLosses || 0) + (result === 'loss' ? 1 : 0);
-          account.games[gameType].aiDraws = (account.games[gameType].aiDraws || 0) + (result === 'draw' ? 1 : 0);
-          account.games[gameType].aiDifficulty = aiDifficulty;
-          account.games[gameType].aiResult = result;
-        }
-
-        account.games[gameType].lastPlayedAt = Date.now();
-      }
-
-      // 更新活动统计
-      const now = Date.now();
-      account.account.activity.dailyGames = (account.account.activity.dailyGames || 0) + 1;
-      account.account.activity.lastDailyReset = now;
-      account.stats.lastGamePlayedAt = now;
-
-      // 保存更新
-      await dataStore.update('accounts', { 'account.id': accountId }, account);
-
-      return {
-        success: true,
-        message: '统计更新成功'
-      };
-    } catch (err) {
-      logger.error('更新游戏统计失败', { accountId, error: err.message });
-      return {
-        success: false,
-        message: '更新统计失败'
-      };
-    }
-  }
-
   // 获取排行榜
   async getLeaderboard(limit = 10, gameType = 'all') {
     try {
@@ -742,10 +657,6 @@ class AccountManager {
           leaderboard: true
         }
       },
-      social: {
-        friends: 0,
-        invites: 0
-      },
       achievements: []
     };
 
@@ -925,7 +836,6 @@ class AccountManager {
           },
           activity: {
             ...guestAccount.account.activity,
-            loginCount: 1, // 初始化登录次数为1
             lastLogin: now,
             lastSeen: now
           }
@@ -1065,10 +975,6 @@ class AccountManager {
             spectate: true,
             leaderboard: true
           }
-        },
-        social: {
-          friends: 0,
-          invites: 0
         },
         achievements: []
       };
@@ -1391,6 +1297,21 @@ class AccountManager {
         stats.humanWins = (stats.humanWins || 0) + (result === 'win' ? 1 : 0);
         stats.humanLosses = (stats.humanLosses || 0) + (result === 'loss' ? 1 : 0);
         stats.humanDraws = (stats.humanDraws || 0) + (result === 'draw' ? 1 : 0);
+      }
+
+      // 更新逆转连胜：胜利时+1，失败时归零
+      if (result === 'win') {
+        stats.comebackStreak = (stats.comebackStreak || 0) + 1;
+      } else if (result === 'loss') {
+        stats.comebackStreak = 0;
+      }
+
+      // 更新低等级胜利计数：等级 <= 5 时的胜利
+      if (result === 'win') {
+        const playerLevel = account.account?.profile?.level || 1;
+        if (playerLevel <= 5) {
+          stats.lowLevelWins = (stats.lowLevelWins || 0) + 1;
+        }
       }
 
       // 更新活动数据

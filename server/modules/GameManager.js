@@ -1448,7 +1448,10 @@ class GameManager {
         moves: game.moves || [],
         startTime: game.startTime,
         endTime: game.endTime,
-        duration: game.duration
+        duration: game.duration,
+        score: game.score,
+        maxLength: game.maxLength,
+        foodEaten: game.foodEaten
       };
     } catch (err) {
       logger.error('获取游戏回放失败', { gameId, error: err.message });

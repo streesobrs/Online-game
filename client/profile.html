@@ -1224,7 +1224,7 @@
 <body>
 
   <!-- 导航栏 -->
-  <div class="game-nav">
+  <div class="game-nav" id="profileNav">
     <button class="nav-btn" onclick="window.location.href='/'">🏠 游戏大厅</button>
     <button class="nav-btn active">👤 个人资料</button>
     <button class="nav-btn" onclick="window.location.href='/games-history.html'">📊 游戏记录</button>
@@ -1536,6 +1536,21 @@
     function renderProfile(data) {
       const p = data.profile || {}, acct = data.account || {}, stats = data.stats || {}, games = data.games || {};
       currentAccountData = acct;
+
+      // 管理员入口
+      const nav = document.getElementById('profileNav');
+      if (nav) {
+        const existingAdminBtn = document.getElementById('profileAdminBtn');
+        if (existingAdminBtn) existingAdminBtn.remove();
+        if (acct.isAdmin) {
+          const adminBtn = document.createElement('button');
+          adminBtn.id = 'profileAdminBtn';
+          adminBtn.className = 'nav-btn';
+          adminBtn.textContent = '🛠️ 管理后台';
+          adminBtn.onclick = () => { window.location.href = '/admin'; };
+          nav.appendChild(adminBtn);
+        }
+      }
 
       // 基础信息
       document.getElementById('displayName').textContent = acct.nickname || acct.username || '玩家';

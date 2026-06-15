@@ -39,7 +39,8 @@
     var gameTypeNames = {
       'gobang': '五子棋',
       'go': '围棋',
-      'chinese-chess': '中国象棋'
+      'chinese-chess': '中国象棋',
+      'snake': '贪吃蛇'
     };
 
     var modal = document.createElement('div');
@@ -66,7 +67,22 @@
         '<div style="font-size:11px;color:#718096;">' + (replay.gameType === 'chinese-chess' ? '黑方' : '白方') + '</div>',
         '</div>',
         '</div>'
-      ].join('') : '',
+      ].join('') : (replay.gameType === 'snake' ? [
+        '<div style="display:flex;gap:20px;margin-bottom:10px;">',
+        '<div style="flex:1;background:#f7fafc;padding:8px;border-radius:8px;text-align:center;">',
+        '<div style="font-weight:bold;color:#2d3748;font-size:14px;">🏆 最终分数</div>',
+        '<div style="font-size:18px;color:#e74c3c;font-weight:bold;">' + (replay.score || 0) + '</div>',
+        '</div>',
+        '<div style="flex:1;background:#f7fafc;padding:8px;border-radius:8px;text-align:center;">',
+        '<div style="font-weight:bold;color:#2d3748;font-size:14px;">🐍 最大长度</div>',
+        '<div style="font-size:18px;color:#27ae60;font-weight:bold;">' + (replay.maxLength || 1) + '</div>',
+        '</div>',
+        '<div style="flex:1;background:#f7fafc;padding:8px;border-radius:8px;text-align:center;">',
+        '<div style="font-weight:bold;color:#2d3748;font-size:14px;">🍎 吃食物</div>',
+        '<div style="font-size:18px;color:#f39c12;font-weight:bold;">' + (replay.foodEaten || 0) + '</div>',
+        '</div>',
+        '</div>'
+      ].join('') : ''),
       '<div id="replay-board-container" style="display:flex;justify-content:center;margin-bottom:10px;overflow:auto;flex-shrink:1;">',
       generateBoardHTML(replay.gameType),
       '</div>',
@@ -436,11 +452,21 @@
     var moves = state.replay.moves;
     if (targetIndex === 0) return;
 
-    var snake = [], food = null;
+    var snake = [], foods = [];
     if (moves.length > 0 && moves[0][0] === 'init') {
       var initMove = moves[0];
       snake = initMove[3].map(function (s) { return { x: s[0], y: s[1] }; });
-      food = initMove[4] ? { x: initMove[4][0], y: initMove[4][1] } : null;
+      // init格式: ['init', timestamp, direction, snake, foodCount, f1x, f1y, ..., score]
+      var initFoodCount = initMove[4];
+      if (typeof initFoodCount === 'number' && initFoodCount > 0) {
+        for (var fi = 0; fi < initFoodCount; fi++) {
+          var fx = initMove[5 + fi * 2];
+          var fy = initMove[6 + fi * 2];
+          if (typeof fx === 'number' && typeof fy === 'number') {
+            foods.push({ x: fx, y: fy });
+          }
+        }
+      }
     }
 
     for (var i2 = 1; i2 < targetIndex && i2 < moves.length; i2++) {
@@ -452,8 +478,19 @@
           snake.unshift(head);
           if (!ate) snake.pop();
         }
-        if (ate && mv.length >= 6) {
-          food = { x: mv[4], y: mv[5] };
+        if (ate && mv.length > 5) {
+          // 格式: [..., foodCount, f1x, f1y, f2x, f2y, ...]
+          var foodCount = mv[4];
+          foods = [];
+          if (typeof foodCount === 'number' && foodCount > 0) {
+            for (var fj = 0; fj < foodCount; fj++) {
+              var fxx = mv[5 + fj * 2];
+              var fyy = mv[6 + fj * 2];
+              if (typeof fxx === 'number' && typeof fyy === 'number') {
+                foods.push({ x: fxx, y: fyy });
+              }
+            }
+          }
         }
       }
     }
@@ -461,22 +498,25 @@
     if (snake.length === 0 && moves.length > 0 && moves[0][0] === 'init') {
       var initMove2 = moves[0];
       snake = initMove2[3].map(function (s) { return { x: s[0], y: s[1] }; });
-      food = initMove2[4] ? { x: initMove2[4][0], y: initMove2[4][1] } : null;
     }
 
-    if (food) {
-      ctx.fillStyle = '#ff5722';
-      ctx.beginPath();
-      ctx.arc(food.x * cellSize + cellSize / 2, food.y * cellSize + cellSize / 2, cellSize / 2 - 2, 0, Math.PI * 2);
-      ctx.fill();
+    // 渲染所有食物
+    if (foods && foods.length > 0) {
+      ctx.fillStyle = '#ff6b6b';
+      for (var fi2 = 0; fi2 < foods.length; fi2++) {
+        ctx.beginPath();
+        ctx.arc(foods[fi2].x * cellSize + cellSize / 2, foods[fi2].y * cellSize + cellSize / 2, cellSize / 2 - 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
+    // 渲染蛇（蛇头为亮青色，身体为深蓝色）
     if (snake && snake.length > 0) {
-      ctx.fillStyle = '#4caf50';
+      ctx.fillStyle = '#45b7d1';
       for (var s = 1; s < snake.length; s++) {
         ctx.fillRect(snake[s].x * cellSize + 1, snake[s].y * cellSize + 1, cellSize - 2, cellSize - 2);
       }
-      ctx.fillStyle = '#81c784';
+      ctx.fillStyle = '#4ecdc4';
       ctx.fillRect(snake[0].x * cellSize + 1, snake[0].y * cellSize + 1, cellSize - 2, cellSize - 2);
     }
   }

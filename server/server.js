@@ -1147,7 +1147,8 @@ app.get('/api/profile/:accountId', async (req, res) => {
           type: account.account?.type,
           createdAt: account.account?.createdAt,
           loginCount: account.account?.loginCount || 0,
-          hasPassword: account.hasPassword || false
+          hasPassword: account.hasPassword || false,
+          isAdmin: account.account?.isAdmin === true
         },
         profile: account.account?.profile || { level: 1, exp: 0 },
         currency: currency.balance || 0,
@@ -2789,6 +2790,50 @@ adminNamespace.on('connection', (socket) => {
       socket.emit('admin_login_result', {
         success: false,
         message: result.message
+      });
+    }
+  });
+
+  // 通过普通用户的 userToken 自动登录（从游戏大厅/个人资料页跳转的管理员）
+  socket.on('admin_user_token_login', async (data) => {
+    const { userToken } = data;
+
+    logger.info('收到通过用户Token自动登录请求', {
+      socketId: socket.id,
+      hasToken: !!userToken
+    });
+
+    if (!userToken) {
+      socket.emit('admin_login_result', {
+        success: false,
+        message: '缺少用户Token'
+      });
+      return;
+    }
+
+    // 验证用户Token并获取账号信息
+    const accountResult = await adminManager.verifyUserTokenAndGetAdminAccount(userToken);
+
+    if (accountResult.success) {
+      // 登录成功，发送结果和 token
+      socket.emit('admin_login_result', {
+        success: true,
+        token: accountResult.token,
+        account: accountResult.account,
+        isAutoLogin: true
+      });
+
+      // 使用新 token 建立管理员连接
+      adminManager.handleAdminConnection(socket, accountResult.token, io);
+      logger.info('通过用户Token自动登录成功', {
+        socketId: socket.id,
+        username: accountResult.account?.account?.username || accountResult.account?.username
+      });
+    } else {
+      // 登录失败
+      socket.emit('admin_login_result', {
+        success: false,
+        message: accountResult.message
       });
     }
   });

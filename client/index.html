@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 
 <head>
@@ -4208,6 +4208,14 @@
         return;
       }
 
+      // 正在玩贪吃蛇时，跳过与方向控制冲突的字母键（WASD），让贪吃蛇自己处理
+      if (currentGame === 'snake') {
+        const lower = e.key.toLowerCase();
+        if (['w', 'a', 's', 'd'].includes(lower)) {
+          return;
+        }
+      }
+
       const key = e.key === ' ' ? ' ' : e.key.toLowerCase();
       const shortcut = shortcuts[key] || shortcuts[e.key];
 
@@ -4858,11 +4866,11 @@
 • 食物颜色交替显示，便于区分
 
 🎒 道具说明：
-• 复活卡（❤️）：使用后下次碰撞可原地复活一次，保留当前分数
+• 复活卡（❤️）：撞墙时弹出选择框确认是否使用，保留当前分数，获得5秒无敌保护
 • 加速卡（⚡）：10秒内移动速度翻倍，快速冲刺获取高分
 • 双倍卡（✖️2）：15秒内吃掉食物获得双倍分数
 • 缩短卡（🔽）：身体立即缩短3节，降低碰撞风险
-使用方法：在游戏中双击道具栏中的道具即可使用（商店购买后自动同步）`
+使用方法：加速/双倍/缩短卡需双击道具栏使用，复活卡撞墙时自动弹出选择框确认（商店购买后自动同步）`
     };
 
     // 双人模式配置
@@ -4968,11 +4976,11 @@
 
     // ========== 初始化 ==========
     async function init() {
-      // 加载保存的账号信息并检查登录状态
-      const isLoggedIn = await loadSavedAccount();
+      // 检查是否有保存的token，不主动发送请求（由client_connect统一处理自动登录）
+      const hasToken = !!localStorage.getItem('userToken');
 
-      if (!isLoggedIn) {
-        // 如果没有登录，显示自动登录模态窗口
+      if (!hasToken) {
+        // 如果没有token，显示自动登录模态窗口
         setTimeout(() => {
           showAutoLoginModal();
         }, 1000);
@@ -5179,7 +5187,6 @@
           return;
         }
 
-        // 等待socket连接
         const isConnected = await waitForSocketConnection();
         if (!isConnected) {
           console.warn('Socket未连接，无法获取账号信息');
@@ -5187,13 +5194,12 @@
           return;
         }
 
-        socket.emit('get_account_by_token', { token });
-
-        // 设置一次性监听器来接收响应
+        let resolved = false;
         const handleAccountInfo = (data) => {
+          if (resolved) return;
+          resolved = true;
           socket.off('account_info', handleAccountInfo);
           if (data.success && data.data) {
-            // 保存服务端返回的新token（自动续期）
             if (data.data.token) {
               localStorage.setItem('userToken', data.data.token);
             }
@@ -5204,12 +5210,16 @@
         };
 
         socket.on('account_info', handleAccountInfo);
+        socket.emit('get_account_by_token', { token });
 
-        // 设置超时
         setTimeout(() => {
-          socket.off('account_info', handleAccountInfo);
-          resolve(null);
-        }, 5000);
+          if (!resolved) {
+            resolved = true;
+            socket.off('account_info', handleAccountInfo);
+            console.warn('获取账号信息超时');
+            resolve(null);
+          }
+        }, 10000);
       });
     }
 
@@ -5282,10 +5292,11 @@
         });
 
         // 如果已经有账号信息，发送用户登录事件
-        // 处理不同的数据结构
-        const accountData = currentAccount.account.account || currentAccount.account;
-        if (currentAccount && accountData?.nickname) {
-          socket.emit('user_login', { nickname: accountData.nickname });
+        if (currentAccount) {
+          const accountData = currentAccount.account?.account || currentAccount.account;
+          if (accountData?.nickname) {
+            socket.emit('user_login', { nickname: accountData.nickname });
+          }
         }
 
         // 获取排行榜
@@ -5338,6 +5349,16 @@
         // 保存用户ID到localStorage
         saveUserId(accountId);
         initUserStatus();
+
+        // 如果有保存的token但没有恢复登录（currentAccount为null），说明token失效
+        const hasToken = !!localStorage.getItem('userToken');
+        if (hasToken && !currentAccount && (!data.accountId || data.accountType === 'anonymous')) {
+          // token失效，清除并显示登录窗口
+          localStorage.removeItem('userToken');
+          setTimeout(() => {
+            showAutoLoginModal();
+          }, 500);
+        }
       });
 
       socket.on('online_users', (users) => {
@@ -5931,11 +5952,17 @@
             accountId = resultData.account.account.id;
             nickname = resultData.account.account.nickname;
             username = resultData.account.account.username;
+            // 保存经验值和等级用于成就更新
+            lastExp = resultData.account.account.profile?.exp || 0;
+            lastLevel = resultData.account.account.profile?.level || 1;
           } else {
             // 游客登录的数据结构
             accountId = resultData.account.id;
             nickname = resultData.account.nickname;
             username = resultData.account.username;
+            // 保存经验值和等级用于成就更新
+            lastExp = resultData.account.profile?.exp || 0;
+            lastLevel = resultData.account.profile?.level || 1;
           }
 
           localStorage.setItem('currentAccountId', accountId);
@@ -5951,13 +5978,25 @@
             socket.emit('user_login', { nickname: nickname });
           }
 
-          showToast('登录成功！欢迎 ' + (nickname || username), 'success');
+          // 只有主动登录才显示欢迎提示，自动登录不显示
+          if (message && message.indexOf('自动登录') === -1) {
+            showToast('登录成功！欢迎 ' + (nickname || username), 'success');
+          }
 
           // 根据权限加载功能模块
           loadPermissions(resultData.permissions);
         } else {
           // 登录失败
-          showToast(message || '登录失败，请检查用户名和密码', 'error');
+          if (message) {
+            showToast(message, 'error');
+          } else {
+            // token失效时清除token
+            localStorage.removeItem('userToken');
+            // 显示登录窗口
+            setTimeout(() => {
+              showAutoLoginModal();
+            }, 1000);
+          }
         }
       });
 
@@ -8217,7 +8256,7 @@
       // 道具系统
       activeItems: [],       // 当前生效的道具列表
       itemEffects: {},       // 道具效果状态 { type: { remaining, multiplier, etc } }
-      resurrectionUsed: false, // 本局是否已使用复活卡
+      invincibleEndTime: 0,  // 无敌效果结束时间戳（0 表示未激活）
       scoreMultiplier: 1,    // 得分倍率
       speedBoostEndTime: 0,  // 加速结束时间
       doubleScoreEndTime: 0, // 双倍得分结束时间
@@ -8306,7 +8345,7 @@
       snakeGameState.lastScore = 0; // 初始分数
       snakeGameState.lastTime = Date.now(); // 用于控制游戏速度
       // 重置道具状态
-      snakeGameState.resurrectionUsed = false;
+      snakeGameState.invincibleEndTime = 0;
       snakeGameState.scoreMultiplier = 1;
       snakeGameState.speedBoostEndTime = 0;
       snakeGameState.doubleScoreEndTime = 0;
@@ -8322,14 +8361,18 @@
       if (virtualControls) virtualControls.classList.add('touch-disabled');
 
       // 记录初始状态（使用紧凑数组表示）
-      snakeGameState.moveHistory.push([
-        'init', // 类型
-        Date.now(), // 时间戳
-        snakeGameState.direction, // 方向
-        snakeGameState.snake.map(segment => [segment.x, segment.y]), // 蛇的初始位置
-        snakeGameState.foods.length > 0 ? [snakeGameState.foods[0].x, snakeGameState.foods[0].y] : null, // 初始食物位置
-        snakeGameState.score // 分数
-      ]);
+      // 格式: ['init', timestamp, direction, snake[[x,y]...], foodCount, f1x, f1y, f2x, f2y, ..., score]
+      const initRecord = [
+        'init',
+        Date.now(),
+        snakeGameState.direction,
+        snakeGameState.snake.map(segment => [segment.x, segment.y]),
+      ];
+      // 添加所有初始食物
+      initRecord.push(snakeGameState.foods.length);
+      snakeGameState.foods.forEach(f => initRecord.push(f.x, f.y));
+      initRecord.push(snakeGameState.score);
+      snakeGameState.moveHistory.push(initRecord);
 
       // 更新UI
       updateSnakeScore();
@@ -8361,26 +8404,56 @@
             case 'right': head.x++; break;
           }
 
-          // 碰撞检测
-          if (checkSnakeCollision(head)) {
-            // 尝试使用复活卡
-            if (tryUseResurrection()) {
-              // 复活：取消本次移动，蛇保持原位
-              showToast('❤️ 使用复活卡，蛇已复活！', 'success', 2000);
-              // 重置蛇的位置到安全位置（倒退一步）
-              snakeGameState.snake = snakeGameState.snake.slice(0, Math.max(1, snakeGameState.snake.length - 1));
-              if (snakeGameState.snake.length === 0) {
-                snakeGameState.snake = [{ x: 10, y: 10 }];
-              }
-              snakeGameState.snakePositions.clear();
-              snakeGameState.snake.forEach(seg => snakeGameState.snakePositions.add(`${seg.x},${seg.y}`));
-              snakeGameState.lastTime = currentTime;
-              renderSnakeGame();
-              snakeGameState.gameLoop = requestAnimationFrame(gameLoop);
-              return;
+          // 碰撞检测（无敌时间内跳过）
+          const isInvincible = snakeGameState.invincibleEndTime > 0 && Date.now() < snakeGameState.invincibleEndTime;
+          if (!isInvincible && checkSnakeCollision(head)) {
+            // 撞墙后暂停游戏，弹出选择框
+            const hasRevive = snakeInventory['item_snake_revive'] && snakeInventory['item_snake_revive'] > 0;
+            snakeGameState.isPaused = true;
+
+            if (hasRevive) {
+              const remain = snakeInventory['item_snake_revive'];
+              showReviveDialog(remain, () => {
+                // 用户选择使用复活卡
+                snakeInventory['item_snake_revive']--;
+                saveSnakeItems();
+                updateSnakeItemBar();
+                consumeServerItem('item_snake_revive');
+                snakeGameState.invincibleEndTime = Date.now() + 5000; // 5秒无敌
+
+                // 重置蛇的位置到安全位置（倒退一步）
+                snakeGameState.snake = snakeGameState.snake.slice(0, Math.max(1, snakeGameState.snake.length - 1));
+                if (snakeGameState.snake.length === 0) {
+                  snakeGameState.snake = [{ x: 10, y: 10 }];
+                }
+                snakeGameState.snakePositions.clear();
+                snakeGameState.snake.forEach(seg => snakeGameState.snakePositions.add(`${seg.x},${seg.y}`));
+
+                const newRemain = snakeInventory['item_snake_revive'] || 0;
+                showToast(`❤️ 复活成功！剩余${newRemain}张，5秒无敌保护已激活`, 'success', 3000);
+
+                snakeGameState.isPaused = false;
+                snakeGameState.lastTime = Date.now();
+                renderSnakeGame();
+              }, () => {
+                // 用户选择不使用，游戏结束
+                endSnakeGame();
+              });
+            } else {
+              // 没有复活卡，直接结束
+              showToast('💥 撞到了！', 'error', 1500);
+              setTimeout(() => endSnakeGame(), 300);
             }
-            endSnakeGame();
+            // 渲染并确保循环继续（后续由 isPaused 检查来处理暂停）
+            renderSnakeGame();
+            snakeGameState.gameLoop = requestAnimationFrame(gameLoop);
             return;
+          }
+
+          // 无敌时间结束提示
+          if (snakeGameState.invincibleEndTime > 0 && Date.now() >= snakeGameState.invincibleEndTime) {
+            snakeGameState.invincibleEndTime = 0;
+            showToast('🛡️ 无敌保护已结束', 'info', 1500);
           }
 
           // 移动蛇
@@ -9063,14 +9136,24 @@
         ctx.fill();
       });
 
-      // 绘制蛇 - 使用路径批量绘制
-      const snakeHeadColor = snakeGameConfig.colors.snakeHead;
-      const snakeBodyColor = snakeGameConfig.colors.snakeBody;
+      // 绘制蛇 - 使用路径批量绘制（无敌时带闪烁发光效果）
+      const isInvincible = snakeGameState.invincibleEndTime > 0 && Date.now() < snakeGameState.invincibleEndTime;
+      // 无敌时闪烁：根据时间奇偶交替显示
+      const invincibleBlinkOn = !isInvincible || Math.floor(Date.now() / 150) % 2 === 0;
+      const snakeHeadColor = isInvincible ? '#ffd700' : snakeGameConfig.colors.snakeHead;
+      const snakeBodyColor = isInvincible ? '#ffeb3b' : snakeGameConfig.colors.snakeBody;
       const rectSize = cellSize - 2;
       const offset = 1;
 
+      // 无敌时绘制发光背景
+      if (isInvincible && invincibleBlinkOn) {
+        ctx.save();
+        ctx.shadowColor = '#ffd700';
+        ctx.shadowBlur = 15;
+      }
+
       // 批量绘制蛇身
-      if (snakeGameState.snake.length > 1) {
+      if (snakeGameState.snake.length > 1 && invincibleBlinkOn) {
         ctx.fillStyle = snakeBodyColor;
         ctx.beginPath();
         for (let i = 1; i < snakeGameState.snake.length; i++) {
@@ -9081,10 +9164,14 @@
       }
 
       // 绘制蛇头
-      if (snakeGameState.snake.length > 0) {
+      if (snakeGameState.snake.length > 0 && invincibleBlinkOn) {
         const head = snakeGameState.snake[0];
         ctx.fillStyle = snakeHeadColor;
         ctx.fillRect(head.x * cellSize + offset, head.y * cellSize + offset, rectSize, rectSize);
+      }
+
+      if (isInvincible && invincibleBlinkOn) {
+        ctx.restore();
       }
     }
 
@@ -9290,7 +9377,7 @@
 
     // 道具配置
     const SNAKE_ITEM_TYPES = {
-      'item_snake_revive': { id: 'item_snake_revive', name: '复活卡', icon: '❤️', desc: '撞墙或撞身后可原地复活一次', type: 'revive', price: 100 },
+      'item_snake_revive': { id: 'item_snake_revive', name: '复活卡', icon: '❤️', desc: '撞墙时弹出选择框确认是否使用，获得5秒无敌保护', type: 'revive', price: 100 },
       'item_snake_speed': { id: 'item_snake_speed', name: '加速卡', icon: '⚡', desc: '10秒内移动速度翻倍', type: 'speed', price: 80 },
       'item_snake_double': { id: 'item_snake_double', name: '双倍卡', icon: '✖️2', desc: '15秒内得分翻倍', type: 'double', price: 120 },
       'item_snake_shrink': { id: 'item_snake_shrink', name: '缩短卡', icon: '🔽', desc: '身体缩短3节', type: 'shrink', price: 60 }
@@ -9413,14 +9500,10 @@
       // 执行道具效果
       switch (config.type) {
         case 'revive':
-          // 复活卡 - 设置标记，碰撞时自动使用
-          if (snakeGameState.resurrectionUsed) {
-            showToast('本局已使用过复活卡', 'warning');
-            return;
-          }
-          snakeGameState.resurrectionUsed = true;
-          showToast('❤️ 复活卡已就绪，下次碰撞时自动生效', 'success', 2000);
-          break;
+          // 复活卡 - 碰撞时自动消耗一张并复活，无需手动装备
+          // 这里的双击只是提醒玩家有多少张复活卡可用
+          showToast(`❤️ 你还有 ${snakeInventory['item_snake_revive']} 张复活卡，撞墙时会弹出选择框确认是否使用`, 'info', 2500);
+          return; // 不消耗卡，只是状态显示
 
         case 'speed':
           // 加速卡 - 速度翻倍持续10秒
@@ -9483,28 +9566,44 @@
       }
     }
 
-    // 尝试使用复活卡（碰撞时调用）
-    function tryUseResurrection() {
-      if (snakeGameState.resurrectionUsed) {
-        // 检查背包中是否有复活卡
-        if (snakeInventory['item_snake_revive'] && snakeInventory['item_snake_revive'] > 0) {
-          snakeInventory['item_snake_revive']--;
-          saveSnakeItems();
-          updateSnakeItemBar();
-          snakeGameState.resurrectionUsed = true;
-          return true;
-        }
-        return false;
-      }
-      return false;
-    }
-
     // 清除道具效果（游戏结束时调用）
     function clearSnakeItemEffects() {
-      snakeGameState.resurrectionUsed = false;
+      snakeGameState.invincibleEndTime = 0;
       snakeGameState.scoreMultiplier = 1;
       snakeGameState.speedBoostEndTime = 0;
       snakeGameState.doubleScoreEndTime = 0;
+    }
+
+    // 复活确认对话框
+    function showReviveDialog(remain, onUse, onCancel) {
+      const modal = document.createElement('div');
+      modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:99999;';
+
+      const box = document.createElement('div');
+      box.style.cssText = 'background:linear-gradient(135deg,#fff 0%,#fff5f0 100%);padding:28px 32px;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,0.3);max-width:400px;text-align:center;border:2px solid #ffd700;';
+
+      box.innerHTML = `
+        <div style="font-size:48px;margin-bottom:12px;">💥</div>
+        <h3 style="margin:0 0 12px;color:#dc2626;font-size:20px;">撞到了！</h3>
+        <p style="color:#52525b;margin:0 0 20px;font-size:14px;line-height:1.6;">
+          你还有 <strong style="color:#f59e0b;font-size:18px;">${remain}</strong> 张复活卡<br>
+          使用一张并获得5秒无敌保护？
+        </p>
+        <div style="display:flex;gap:12px;justify-content:center;">
+          <button id="revive-use-btn" style="padding:10px 24px;background:linear-gradient(135deg,#f59e0b 0%,#dc2626 100%);color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">❤️ 使用复活卡</button>
+          <button id="revive-cancel-btn" style="padding:10px 24px;background:#e4e4e7;color:#374151;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">放弃结束</button>
+        </div>
+      `;
+
+      modal.appendChild(box);
+      document.body.appendChild(modal);
+
+      const useBtn = box.querySelector('#revive-use-btn');
+      const cancelBtn = box.querySelector('#revive-cancel-btn');
+
+      const close = () => modal.remove();
+      useBtn.onclick = () => { close(); if (typeof onUse === 'function') onUse(); };
+      cancelBtn.onclick = () => { close(); if (typeof onCancel === 'function') onCancel(); };
     }
 
     // 结束游戏
@@ -9513,6 +9612,7 @@
         cancelAnimationFrame(snakeGameState.gameLoop);
         snakeGameState.gameLoop = null;
       }
+
 
       // 移除键盘事件监听器，防止泄漏
       document.removeEventListener('keydown', handleSnakeKeydown);
@@ -11837,6 +11937,7 @@
       if (currentAccount) {
         // 处理不同的数据结构
         let accountType, nickname, username, level, exp, starCoins;
+        let isAdmin = false;
         let undoCount = 0, hintCount = 0;
         if (currentAccount.account.account) {
           // 账号登录的数据结构
@@ -11846,6 +11947,7 @@
           level = currentAccount.account.account.profile?.level || 1;
           exp = currentAccount.account.account.profile?.exp || 0;
           starCoins = currentAccount.account.currency?.starCoins || 0;
+          isAdmin = currentAccount.account.account.isAdmin === true;
           undoCount = currentAccount.account.inventory?.undoCount || 0;
           hintCount = currentAccount.account.inventory?.hintCount || 0;
           // 加上道具卡可兑换的次数（每张悔棋卡=3次，每张提示卡=5次）
@@ -11860,6 +11962,7 @@
           level = currentAccount.account.profile?.level || 1;
           exp = currentAccount.account.profile?.exp || 0;
           starCoins = currentAccount.currency?.starCoins || 0;
+          isAdmin = currentAccount.account.isAdmin === true;
           undoCount = currentAccount.account.inventory?.undoCount || 0;
           hintCount = currentAccount.account.inventory?.hintCount || 0;
           // 加上道具卡可兑换的次数
@@ -11876,6 +11979,7 @@
         // 游客用户也显示资料按钮（可查看个人信息和转正）
         const profileButton = '<button class="account-btn btn-info" onclick="window.location.href=\'/profile.html\'">👤 资料</button>';
         const historyButton = '<button class="account-btn" onclick="showGameHistoryModal()" style="background: #9b59b6;">📜 历史</button>';
+        const adminButton = isAdmin ? '<button class="account-btn" onclick="window.location.href=\'/admin\'" style="background: #e74c3c;">🛠️ 管理</button>' : '';
 
         accountBar.innerHTML = `
           <div class="account-info">
@@ -11896,6 +12000,7 @@
             <div class="account-buttons">
               ${profileButton}
               ${historyButton}
+              ${adminButton}
               <button class="account-btn" onclick="${logoutFunction}">${logoutText}</button>
             </div>
           </div>

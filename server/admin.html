@@ -1618,10 +1618,13 @@
     // 页面加载时尝试自动登录
     window.addEventListener('DOMContentLoaded', () => {
       loadServerVersion();
-      const savedToken = localStorage.getItem('adminToken');
-      if (savedToken) {
+      const savedAdminToken = localStorage.getItem('adminToken');
+      const savedUserToken = localStorage.getItem('userToken');
+
+      // 优先使用 adminToken
+      if (savedAdminToken) {
         socket = io('/admin', {
-          query: { token: savedToken },
+          query: { token: savedAdminToken },
           reconnection: true,
           reconnectionAttempts: maxReconnectAttempts,
           reconnectionDelay: reconnectDelay
@@ -1735,6 +1738,142 @@
             renderUserList(data.users, pendingUserListId);
           }
         });
+      } else if (savedUserToken) {
+        // 没有 adminToken，但有 userToken，尝试通过用户 token 自动登录
+        console.log('[DEBUG] 检测到 userToken，尝试自动登录管理后台');
+
+        socket = io('/admin', {
+          reconnection: true,
+          reconnectionAttempts: maxReconnectAttempts,
+          reconnectionDelay: reconnectDelay
+        });
+
+        // 监听登录结果
+        socket.once('admin_login_result', (data) => {
+          console.log('[DEBUG] 收到 admin_login_result (用户token自动登录):', data);
+          if (data.success) {
+            localStorage.setItem('adminToken', data.token);
+            document.getElementById('login-page').classList.add('hidden');
+            document.getElementById('admin-app').classList.remove('hidden');
+            showToast('自动登录成功', 'success');
+            loadDashboardData();
+            loadServerVersion();
+            setTimeout(loadItemList, 500);
+          } else {
+            // 登录失败，显示登录页面
+            console.log('[DEBUG] 用户token自动登录失败:', data.message);
+            showToast(data.message || '无法自动登录，请手动登录', 'warning');
+            socket.disconnect();
+            document.getElementById('login-page').classList.remove('hidden');
+            document.getElementById('admin-app').classList.add('hidden');
+          }
+        });
+
+        // 连接成功后发送用户 token 登录请求
+        const onConnectForUserToken = () => {
+          console.log('[DEBUG] socket已连接，发送 admin_user_token_login 请求');
+          socket.emit('admin_user_token_login', { userToken: savedUserToken });
+        };
+        socket.on('connect', onConnectForUserToken);
+        if (socket.connected) {
+          onConnectForUserToken();
+        }
+
+        // 添加完整的事件监听器
+        socket.on('auth_error', (data) => {
+          showToast(data.message || '认证失败', 'error');
+          socket.disconnect();
+          localStorage.removeItem('adminToken');
+          document.getElementById('login-page').classList.remove('hidden');
+          document.getElementById('admin-app').classList.add('hidden');
+        });
+
+        socket.on('disconnect', (reason) => {
+          if (reason === 'io server disconnect') {
+            localStorage.removeItem('adminToken');
+            document.getElementById('login-page').classList.remove('hidden');
+            document.getElementById('admin-app').classList.add('hidden');
+            showToast('连接已断开，请重新登录', 'error');
+          }
+        });
+
+        socket.on('reconnect', (attemptNumber) => {
+          showToast(`重新连接成功 (尝试 ${attemptNumber})`, 'success');
+          loadDashboardData();
+        });
+
+        socket.on('admin_update', (data) => {
+          adminData.stats = data.stats || {};
+          adminData.users = data.users || [];
+          adminData.games = data.games || [];
+          if (data.accounts) adminData.accounts = data.accounts;
+          renderStats();
+          if (currentView === 'users') renderOnlineUsers();
+          if (currentView === 'games') renderGames();
+          if (currentView === 'accounts') renderAccounts();
+          if (currentView === 'dashboard') {
+            renderLeaderboard();
+            renderRecentLogins();
+            renderRecentGames();
+            renderOnlineUsersDetail();
+            renderGameStats();
+            renderSystemInfo(data.stats?.system);
+          }
+        });
+
+        socket.on('admin_action_result', (data) => {
+          if (data.success) showToast(data.message || '操作成功', 'success');
+          else showToast(data.message || '操作失败', 'error');
+        });
+
+        socket.on('admin_accounts_updated', () => loadAccounts());
+        socket.on('admin_leaderboard', (data) => {
+          adminData.leaderboard = data.leaderboard || [];
+          if (currentView === 'dashboard') renderLeaderboard();
+        });
+        socket.on('admin_game_history', (data) => showGameHistoryModal(data.history || []));
+        socket.on('admin_config', (data) => showConfigModal(data.config || {}));
+        socket.on('admin_user_detail', (data) => showUserDetailModal(data));
+        socket.on('admin_chat_history', (data) => {
+          adminData.chatMessages = data.history || [];
+          if (currentView === 'chat') renderChatMessages();
+        });
+        socket.on('admin_logs', (data) => showLogsModal(data.logs || []));
+        socket.on('admin_accounts_list', (data) => {
+          adminData.accounts = data.accounts || [];
+          if (currentView === 'accounts') renderAccounts();
+        });
+        socket.on('level_exp_config', (data) => {
+          adminData.levelExpConfig = data.levelExp || {};
+        });
+        socket.on('admin_system_stats', (data) => {
+          if (data) {
+            adminData.stats = { ...adminData.stats, ...data };
+            renderStats();
+          }
+        });
+        socket.on('admin_items_list', (data) => {
+          console.log('[DEBUG] 收到 admin_items_list (用户token登录):', data);
+          if (data.success) {
+            mailItemList = data.items || [];
+            mailPackList = data.packs || [];
+            mailCosmeticList = data.cosmetics || [];
+            mailVipList = data.vip || [];
+            renderMailItems(mailItemList);
+            renderMailPacks(mailPackList);
+            renderMailCosmetics(mailCosmeticList);
+            renderMailVip(mailVipList);
+            renderGrantItems(mailItemList);
+          }
+        });
+        socket.on('admin_users_select_list', (data) => {
+          if (data.success && pendingUserListId) {
+            renderUserList(data.users, pendingUserListId);
+          }
+        });
+      } else {
+        // 没有任何 token，显示登录页面
+        console.log('[DEBUG] 没有检测到token，显示登录页面');
       }
     });
 

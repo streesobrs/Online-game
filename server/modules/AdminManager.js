@@ -71,6 +71,68 @@ class AdminManager {
     return true;
   }
 
+  // 通过用户Token验证并获取管理员账号（从游戏大厅/个人资料页自动登录）
+  async verifyUserTokenAndGetAdminAccount(userToken) {
+    logger.info('通过用户Token验证管理员身份', { hasToken: !!userToken });
+
+    if (!this.accountManager) {
+      return {
+        success: false,
+        message: '账号管理模块未初始化'
+      };
+    }
+
+    // 验证用户Token并获取账号信息
+    const accountResult = await this.accountManager.verifyTokenAndGetAccount(userToken);
+
+    if (!accountResult.success) {
+      return {
+        success: false,
+        message: accountResult.message || '用户Token无效或已过期'
+      };
+    }
+
+    const account = accountResult.data.account;
+    const accountId = account.account?.id;
+
+    if (!accountId) {
+      return {
+        success: false,
+        message: '账号信息不完整'
+      };
+    }
+
+    // 检查账号是否有管理员标记
+    const rawAccount = await dataStore.findOne('accounts', { 'account.id': accountId });
+    const isAdmin = rawAccount?.account?.isAdmin;
+
+    // 兼容旧配置：检查用户名是否在管理员列表中
+    const username = account.account?.username;
+    const allowedUsernames = config.admin.allowedUsernames || ['admin'];
+    const isInList = username ? allowedUsernames.includes(username.toLowerCase()) : false;
+
+    if (!isAdmin && !isInList) {
+      return {
+        success: false,
+        message: '该账号不是管理员账号'
+      };
+    }
+
+    // 生成动态Token
+    const token = this.generateDynamicToken();
+
+    logger.info('通过用户Token自动登录成功', {
+      accountId,
+      username
+    });
+
+    return {
+      success: true,
+      token: token,
+      account: account
+    };
+  }
+
   // 验证账号登录（用于后台管理）
   async verifyAccountLogin(username, password) {
     logger.info('验证管理员账号登录', { username });
