@@ -311,7 +311,7 @@ class AccountManager {
         'account.lastSeen': now,
         'account.activity.returnPlayer': returnPlayer,
         'account.activity.longReturnPlayer': longReturnPlayer,
-        'account.activity.loginCount': loginCount,
+        'account.loginCount': loginCount,
         'account.updatedAt': now
       });
 
@@ -1130,7 +1130,7 @@ class AccountManager {
         'account.lastSeen': now,
         'account.activity.returnPlayer': returnPlayer,
         'account.activity.longReturnPlayer': longReturnPlayer,
-        'account.activity.loginCount': loginCount,
+        'account.loginCount': loginCount,
         'account.updatedAt': now
       });
 

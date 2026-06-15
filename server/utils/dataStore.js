@@ -173,7 +173,7 @@ class DataStore {
         await fs.mkdir(path.join(this.dataDir, subDir), { recursive: true });
       }
 
-      logger.info('普通集合数据已保存', { collection, path: filePath });
+      logger.debug('普通集合数据已保存', { collection, path: filePath });
       await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
       this.cache.set(collection, data);
       return true;
