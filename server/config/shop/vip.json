@@ -2,7 +2,7 @@
   "vip_week": {
     "id": "vip_week",
     "name": "VIP周卡",
-    "description": "7天VIP会员，所有游戏获得的经验值翻倍，快速升级",
+    "description": "7天VIP会员，经验×2，全场商品9折，尊享会员标识",
     "icon": "⭐",
     "price": 300,
     "category": "vip",
@@ -18,12 +18,13 @@
     "enabled": true,
     "rollout": 100,
     "days": 7,
-    "expBonus": 2
+    "expBonus": 2,
+    "dailyPrice": 43
   },
   "vip_month": {
     "id": "vip_month",
     "name": "VIP月卡",
-    "description": "30天VIP会员，所有游戏获得的经验值翻倍，超值优惠",
+    "description": "30天VIP会员，经验×2，全场商品9折，日均仅 27💎，比周卡省 37%",
     "icon": "🌟",
     "price": 800,
     "category": "vip",
@@ -35,11 +36,39 @@
       "VIP",
       "会员",
       "经验",
-      "优惠"
+      "推荐"
     ],
     "enabled": true,
     "rollout": 100,
     "days": 30,
-    "expBonus": 2
+    "expBonus": 2,
+    "dailyPrice": 27,
+    "recommend": true,
+    "savePercent": 37
+  },
+  "vip_year": {
+    "id": "vip_year",
+    "name": "VIP年卡",
+    "description": "365天VIP会员，经验×3，全场商品8.5折，日均仅 22💎，尊享年度会员徽章",
+    "icon": "💎",
+    "price": 8000,
+    "category": "vip",
+    "type": "membership",
+    "rarity": "legendary",
+    "usable": true,
+    "tradable": false,
+    "tags": [
+      "VIP",
+      "会员",
+      "年度",
+      "超值"
+    ],
+    "enabled": true,
+    "rollout": 100,
+    "days": 365,
+    "expBonus": 3,
+    "dailyPrice": 22,
+    "savePercent": 49,
+    "bigDiscount": true
   }
 }

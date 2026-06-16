@@ -1345,6 +1345,122 @@ const newVersion = versionManager.incrementBuild();
 logger.info(`服务器版本更新: ${newVersion}`);
 const themeManager = new ThemeManager();
 
+// ========== FFmpeg 自动检测（用于 GIF 头像压缩） ==========
+(function initFfmpeg() {
+  try {
+    if (config.ffmpeg && config.ffmpeg.path && fs.existsSync(config.ffmpeg.path)) {
+      process.env.FFMPEG_PATH = config.ffmpeg.path;
+      logger.info('使用配置的 FFmpeg 路径', { path: config.ffmpeg.path });
+      return;
+    }
+
+    if (process.env.FFMPEG_PATH && fs.existsSync(process.env.FFMPEG_PATH)) {
+      logger.info('使用环境变量指定的 FFmpeg 路径', { path: process.env.FFMPEG_PATH });
+      return;
+    }
+
+    const { execFileSync, execSync } = require('child_process');
+    const isWin = process.platform === 'win32';
+
+    // 先测试当前进程的 PATH 里有没有（最理想情况）
+    try {
+      execFileSync('ffmpeg', ['-version'], { stdio: 'ignore', timeout: 2000 });
+      logger.info('FFmpeg 已在 PATH 中可用');
+      return;
+    } catch (e) { /* 继续 */ }
+
+    function injectFfmpeg(foundPath) {
+      if (!foundPath || !fs.existsSync(foundPath)) return false;
+      process.env.FFMPEG_PATH = foundPath;
+      const ffmpegDir = path.dirname(foundPath);
+      if (process.env.PATH) {
+        if (!process.env.PATH.includes(ffmpegDir)) {
+          process.env.PATH = ffmpegDir + path.delimiter + process.env.PATH;
+        }
+      } else {
+        process.env.PATH = ffmpegDir;
+      }
+      return true;
+    }
+
+    if (isWin) {
+      // 关键: 从注册表读取系统最新的 PATH（绕过进程启动时缓存的 PATH）
+      let freshPathDirs = [];
+      try {
+        // 读取系统级 PATH (HKLM)
+        const sysOut = execSync('reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path', { encoding: 'utf8', timeout: 3000 });
+        const sysMatch = sysOut.match(/Path\s+(?:REG_SZ|REG_EXPAND_SZ|REG_MULTI_SZ)\s+([\s\S]+?)(?:\r?\n\r?\n|$)/i);
+        if (sysMatch) {
+          freshPathDirs.push(...sysMatch[1].trim().split(';').filter(Boolean));
+        }
+      } catch (e) { /* 读取 HKLM 失败，继续 */ }
+      try {
+        // 读取用户级 PATH (HKCU)
+        const userOut = execSync('reg query "HKCU\\Environment" /v Path', { encoding: 'utf8', timeout: 3000 });
+        const userMatch = userOut.match(/Path\s+(?:REG_SZ|REG_EXPAND_SZ|REG_MULTI_SZ)\s+([\s\S]+?)(?:\r?\n\r?\n|$)/i);
+        if (userMatch) {
+          freshPathDirs.push(...userMatch[1].trim().split(';').filter(Boolean));
+        }
+      } catch (e) { /* 读取 HKCU 失败，继续 */ }
+
+      // 展开环境变量（如 %SystemRoot%），然后在每个目录中查找 ffmpeg.exe
+      for (let dir of freshPathDirs) {
+        dir = dir.replace(/%([^%]+)%/g, (match, name) => process.env[name] || match);
+        const candidate = path.join(dir, 'ffmpeg.exe');
+        try {
+          if (fs.existsSync(candidate)) {
+            if (injectFfmpeg(candidate)) {
+              logger.info('从系统注册表 PATH 中找到 FFmpeg 并已注入', { path: candidate });
+              return;
+            }
+          }
+        } catch (e) { /* 路径可能无效，跳过 */ }
+      }
+
+      // 常见安装位置兜底（扫描常见盘符 C:\ D:\ E:\ 等）
+      const userProfile = process.env.USERPROFILE || process.env.HOMEPATH || '';
+      const commonDirs = [
+        path.join(userProfile, 'scoop', 'shims'),
+        path.join('C:\\ProgramData', 'scoop', 'shims'),
+        'C:\\ProgramData\\chocolatey\\bin',
+        'C:\\ffmpeg\\bin',
+        'D:\\ffmpeg\\bin',
+        'E:\\ffmpeg\\bin',
+        'C:\\Program Files\\ffmpeg\\bin',
+        'C:\\Program Files (x86)\\ffmpeg\\bin',
+        'D:\\Program Files\\ffmpeg\\bin',
+      ];
+      const winCandidates = commonDirs.map(dir => path.join(dir, 'ffmpeg.exe'));
+      for (const candidate of winCandidates) {
+        if (fs.existsSync(candidate)) {
+          if (injectFfmpeg(candidate)) {
+            logger.info('在系统目录找到 FFmpeg 并已注入', { path: candidate });
+            return;
+          }
+        }
+      }
+    }
+
+    // Linux/macOS
+    const nixCandidates = ['/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg', '/opt/bin/ffmpeg'];
+    for (const candidate of nixCandidates) {
+      if (fs.existsSync(candidate)) {
+        if (injectFfmpeg(candidate)) {
+          logger.info('自动检测到 FFmpeg', { path: candidate });
+          return;
+        }
+      }
+    }
+
+    logger.warn('未找到 FFmpeg，GIF 头像将不被压缩。可通过以下方式解决：');
+    logger.warn('  1. 在 config.js 中设置 config.ffmpeg.path = "你的ffmpeg完整路径"（最稳妥）');
+    logger.warn('  2. 设置环境变量 FFMPEG_PATH 后启动服务器');
+    logger.warn('  3. 安装 ffmpeg 到系统 PATH 后重启服务器（如 scoop install ffmpeg）');
+  } catch (err) {
+    logger.warn('FFmpeg 自动检测出错，跳过 GIF 压缩', { error: err.message });
+  }
+})();
+
 const serverStartTime = Date.now();
 
 // ========== Socket.IO 连接处理 ==========

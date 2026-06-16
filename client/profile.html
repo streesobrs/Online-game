@@ -2228,6 +2228,7 @@
     }
 
     // 压缩图片到指定大小（默认 2MB）
+    // ⚠️ GIF 动图不经过 Canvas（会丢失动画），直接用原始文件
     async function compressImage(file, maxSizeKB = 2000) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -2235,7 +2236,17 @@
           const img = new Image();
           img.onload = function () {
             try {
-              // 1. 先缩小尺寸到最大 1024px（头像不需要太大）
+              // 1. 根据原始文件类型决定输出格式
+              const originalType = file.type;
+              let outputMime = 'image/jpeg';
+              if (originalType === 'image/png') {
+                outputMime = 'image/png';
+              } else if (originalType === 'image/webp') {
+                outputMime = 'image/webp';
+              }
+              // JPEG 以外的类型，都按原格式输出（GIF 在调用方已过滤）
+
+              // 2. 先缩小尺寸到最大 1024px（头像不需要太大）
               const maxDim = 1024;
               let width = img.width;
               let height = img.height;
@@ -2249,16 +2260,22 @@
                 }
               }
 
-              // 2. 用 Canvas 重绘，逐步降低质量直到小于 2MB
+              // 3. 用 Canvas 重绘
               const canvas = document.createElement('canvas');
               canvas.width = width;
               canvas.height = height;
               const ctx = canvas.getContext('2d');
+
+              // PNG/WebP 需要保留透明通道，不填背景色
+              if (outputMime === 'image/jpeg') {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, width, height);
+              }
               ctx.drawImage(img, 0, 0, width, height);
 
-              // 从高质量开始逐步压缩
+              // 4. 根据输出格式选择压缩策略
               const qualities = [0.92, 0.85, 0.75, 0.65, 0.55, 0.45, 0.35, 0.25];
-              let finalDataUrl = canvas.toDataURL('image/jpeg', qualities[0]);
+              let finalDataUrl = canvas.toDataURL(outputMime, qualities[0]);
               let curSizeKB = Math.round(finalDataUrl.length * 3 / 4 / 1024);
 
               if (curSizeKB <= maxSizeKB) {
@@ -2266,10 +2283,19 @@
                 return;
               }
 
-              for (let i = 1; i < qualities.length; i++) {
-                finalDataUrl = canvas.toDataURL('image/jpeg', qualities[i]);
-                curSizeKB = Math.round(finalDataUrl.length * 3 / 4 / 1024);
-                if (curSizeKB <= maxSizeKB) break;
+              // PNG/WebP 压缩效率差，尝试降低质量；如果仍然太大，告知用户
+              if (outputMime !== 'image/jpeg') {
+                for (let i = 1; i < qualities.length; i++) {
+                  finalDataUrl = canvas.toDataURL(outputMime, qualities[i]);
+                  curSizeKB = Math.round(finalDataUrl.length * 3 / 4 / 1024);
+                  if (curSizeKB <= maxSizeKB) break;
+                }
+              } else {
+                for (let i = 1; i < qualities.length; i++) {
+                  finalDataUrl = canvas.toDataURL(outputMime, qualities[i]);
+                  curSizeKB = Math.round(finalDataUrl.length * 3 / 4 / 1024);
+                  if (curSizeKB <= maxSizeKB) break;
+                }
               }
 
               resolve({ dataUrl: finalDataUrl, sizeKB: curSizeKB, originalSizeKB: Math.round(file.size / 1024) });
@@ -2293,18 +2319,60 @@
       let base64Data;
       let compressedInfo = null;
 
+      // 检测文件类型：优先用 file.type，兜底用文件名扩展名
+      // ⚠️ 手机浏览器可能把 GIF 的 file.type 检测为空或 image/jpeg
+      function detectImageType(fileObj) {
+        const type = (fileObj.type || '').toLowerCase();
+        const name = (fileObj.name || '').toLowerCase();
+        if (type === 'image/gif' || name.endsWith('.gif')) return 'gif';
+        if (type === 'image/png' || name.endsWith('.png')) return 'png';
+        if (type === 'image/jpeg' || type === 'image/jpg' || name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'jpeg';
+        if (type === 'image/webp' || name.endsWith('.webp')) return 'webp';
+        // 默认用 type 中的信息
+        if (type.startsWith('image/')) return type.replace('image/', '');
+        return 'png';
+      }
+
+      const detectedType = detectImageType(file);
+      const isGif = detectedType === 'gif';
+
       try {
-        if (file.size > 2 * 1024 * 1024) {
+        if (isGif) {
+          // GIF 动图：不能走 Canvas（会丢失动画），直接读取原始文件上传
+          // 服务端会用 ffmpeg 自动压缩（最大 512px、15fps）
+          const maxGifSizeKB = 10000;
+          if (file.size > maxGifSizeKB * 1024) {
+            showToast(`GIF 动图太大（${Math.round(file.size / 1024)}KB），请使用小于 10MB 的 GIF`, 'warning');
+            return;
+          }
+          showToast('检测到 GIF 动图，正在上传（服务端将自动压缩）...', 'info');
+          base64Data = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = e => resolve(e.target.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          // 确保 base64 头部为 image/gif（手机浏览器有时会串改）
+          if (!base64Data.startsWith('data:image/gif;')) {
+            const gifMagic = new Uint8Array(await file.slice(0, 6).arrayBuffer());
+            const isRealGif = gifMagic[0] === 0x47 && gifMagic[1] === 0x49 && gifMagic[2] === 0x46;
+            if (isRealGif) {
+              const body = base64Data.split(',')[1] || '';
+              base64Data = 'data:image/gif;base64,' + body;
+            }
+          }
+        } else if (file.size > 2 * 1024 * 1024) {
+          // 超过 2MB 的 PNG/JPG：按原格式压缩
           showToast('图片较大，正在压缩...', 'info');
           compressedInfo = await compressImage(file, 2000);
           base64Data = compressedInfo.dataUrl;
           if (compressedInfo.sizeKB > 2000) {
-            showToast('图片过大，压缩后仍超过2MB', 'warning');
+            showToast('图片过大，压缩后仍超过 2MB', 'warning');
             return;
           }
           showToast(`已压缩 ${compressedInfo.originalSizeKB}KB → ${compressedInfo.sizeKB}KB`, 'success');
         } else {
-          // 小文件仍用原始方式读取（保留 PNG/GIF 透明度）
+          // 小文件：保留原始格式（PNG 透明度）
           base64Data = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = e => resolve(e.target.result);

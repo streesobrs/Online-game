@@ -130,5 +130,17 @@ module.exports = {
   rateLimit: {
     windowMs: 60000, // 1分钟
     maxRequests: 100 // 最大请求数
+  },
+
+  // FFmpeg 配置（用于 GIF 头像压缩）
+  ffmpeg: {
+    // ffmpeg 可执行文件路径（留空则自动检测）
+    path: process.env.FFMPEG_PATH || null,
+    // GIF 压缩参数：最大尺寸、帧率、调色板颜色
+    maxSize: 512,
+    fps: 15,
+    maxColors: 128,
+    // 单个 GIF 最大处理时长（毫秒）
+    timeout: 30000
   }
 };

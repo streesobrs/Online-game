@@ -1,6 +1,8 @@
 // AccountManager.js - 账号管理模块
 const crypto = require('crypto');
+const { execFile, execFileSync } = require('child_process');
 const logger = require('../utils/logger');
+const config = require('../config');
 const dataStore = require('../utils/dataStore');
 const fs = require('fs');
 const path = require('path');
@@ -3002,6 +3004,45 @@ class AccountManager {
       const buffer = Buffer.from(base64, 'base64');
       fs.writeFileSync(avatarPath, buffer);
 
+      const originalSizeKB = Math.round(buffer.length / 1024);
+
+      // 如果是 GIF，尝试用 ffmpeg 压缩（根据文件大小动态调整策略）
+      if (ext === 'gif') {
+        try {
+          // 文件过小（<3MB）直接跳过，避免越压越大
+          const SIZE_THRESHOLD_SKIP_KB = 3 * 1024;
+          if (originalSizeKB < SIZE_THRESHOLD_SKIP_KB) {
+            logger.info('GIF 头像较小，跳过压缩', { userId, size: originalSizeKB + 'KB' });
+          } else {
+            const compressedPath = await this._compressGifWithFfmpeg(avatarPath, originalSizeKB);
+            if (compressedPath) {
+              const compressedSizeKB = Math.round(fs.statSync(compressedPath).size / 1024);
+              const reductionRatio = 1 - compressedSizeKB / originalSizeKB;
+              // 只有压缩后至少减小 25% 才替换，否则可能反而变大
+              if (reductionRatio >= 0.25) {
+                logger.info('GIF 头像已压缩', {
+                  userId,
+                  original: originalSizeKB + 'KB',
+                  compressed: compressedSizeKB + 'KB',
+                  saved: Math.round(reductionRatio * 100) + '%'
+                });
+                fs.copyFileSync(compressedPath, avatarPath);
+              } else {
+                logger.info('GIF 压缩效果不明显（减小不足25%），保留原始文件', {
+                  userId,
+                  original: originalSizeKB + 'KB',
+                  compressed: compressedSizeKB + 'KB',
+                  reduction: Math.round(reductionRatio * 100) + '%'
+                });
+              }
+              try { fs.unlinkSync(compressedPath); } catch (e) { }
+            }
+          }
+        } catch (gifErr) {
+          logger.warn('GIF 压缩失败，保留原始文件', { userId, error: gifErr.message });
+        }
+      }
+
       account.cosmetics.equipped.avatarCustom = userId + '/' + avatarFile;
       account.cosmetics.equipped.avatar = null;
       await this._saveAccount(userId, account);
@@ -3017,6 +3058,166 @@ class AccountManager {
       logger.error('保存自定义头像失败', { userId, error: err.message });
       return { success: false, message: '头像保存失败' };
     }
+  }
+
+  /**
+   * 用 ffmpeg 压缩 GIF 动图
+   * 根据文件大小动态调整压缩强度，避免越压越大
+   * @param {string} inputPath - 原始 GIF 路径
+   * @param {number} originalSizeKB - 原始文件大小（KB）
+   * @returns {string|null} 压缩后的文件路径，或 null（ffmpeg 不可用）
+   */
+  async _compressGifWithFfmpeg(inputPath, originalSizeKB) {
+    const tmpDir = path.dirname(inputPath);
+    const outputPath = path.join(tmpDir, 'tmp_compressed_' + Date.now() + '.gif');
+
+    const ffmpegPath = this._findFfmpeg();
+    if (!ffmpegPath) {
+      logger.warn('未找到 ffmpeg，跳过 GIF 压缩。如需启用，请安装 ffmpeg 并确保它在 PATH 中');
+      return null;
+    }
+
+    // 根据文件大小动态调整压缩强度
+    let maxSize = 512;      // 最大尺寸
+    let fps = 12;           // 帧率
+    let maxColors = 128;    // 调色板颜色数
+
+    if (originalSizeKB >= 20 * 1024) {
+      // 20MB+：强压缩
+      maxSize = 256;
+      fps = 8;
+      maxColors = 64;
+    } else if (originalSizeKB >= 10 * 1024) {
+      // 10-20MB：中等偏强压缩
+      maxSize = 384;
+      fps = 10;
+      maxColors = 96;
+    } else if (originalSizeKB >= 5 * 1024) {
+      // 5-10MB：中等压缩
+      maxSize = 448;
+      fps = 12;
+      maxColors = 128;
+    } else {
+      // 3-5MB：轻度压缩（主要降帧）
+      maxSize = 512;
+      fps = 15;
+      maxColors = 192;
+    }
+
+    const ffmpegConfig = (typeof config !== 'undefined' && config.ffmpeg) || {};
+    const timeoutMs = ffmpegConfig.timeout || 30000;
+
+    return new Promise((resolve, reject) => {
+      const args = [
+        '-i', inputPath,
+        '-vf', `fps=${fps},scale=${maxSize}:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=${maxColors}:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:diff_mode=rectangle`,
+        '-y',
+        outputPath
+      ];
+
+      execFile(ffmpegPath, args, { timeout: timeoutMs }, (err, stdout, stderr) => {
+        if (err) {
+          try { fs.unlinkSync(outputPath); } catch (e) { }
+          reject(err);
+          return;
+        }
+        if (!fs.existsSync(outputPath) || fs.statSync(outputPath).size === 0) {
+          try { fs.unlinkSync(outputPath); } catch (e) { }
+          reject(new Error('ffmpeg 输出为空'));
+          return;
+        }
+        resolve(outputPath);
+      });
+    });
+  }
+
+  /**
+   * 查找 ffmpeg 可执行文件
+   * 优先级：config.ffmpeg.path > process.env.FFMPEG_PATH > 系统 PATH > 注册表读取 > 常见安装位置
+   */
+  _findFfmpeg() {
+    if (this._ffmpegPathCache !== undefined) return this._ffmpegPathCache;
+
+    const isWin = process.platform === 'win32';
+
+    // 1. 配置文件显式指定
+    try {
+      if (typeof config !== 'undefined' && config.ffmpeg && config.ffmpeg.path && fs.existsSync(config.ffmpeg.path)) {
+        this._ffmpegPathCache = config.ffmpeg.path;
+        return this._ffmpegPathCache;
+      }
+    } catch (e) { /* config 可能未加载 */ }
+
+    // 2. 环境变量（server.js 启动时已自动注入）
+    if (process.env.FFMPEG_PATH && fs.existsSync(process.env.FFMPEG_PATH)) {
+      this._ffmpegPathCache = process.env.FFMPEG_PATH;
+      return this._ffmpegPathCache;
+    }
+
+    // 3. 当前进程 PATH 中是否已有
+    try {
+      execFileSync('ffmpeg', ['-version'], { stdio: 'ignore', timeout: 2000 });
+      this._ffmpegPathCache = 'ffmpeg';
+      return 'ffmpeg';
+    } catch (e) { /* PATH 中找不到 */ }
+
+    // 4. Windows: 从注册表读取系统最新 PATH（绕过进程缓存）
+    if (isWin) {
+      const { execSync } = require('child_process');
+      let freshPathDirs = [];
+      try {
+        const sysOut = execSync('reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path', { encoding: 'utf8', timeout: 3000 });
+        const sysMatch = sysOut.match(/Path\s+(?:REG_SZ|REG_EXPAND_SZ|REG_MULTI_SZ)\s+([\s\S]+?)(?:\r?\n\r?\n|$)/i);
+        if (sysMatch) freshPathDirs.push(...sysMatch[1].trim().split(';').filter(Boolean));
+      } catch (e) { /* 继续 */ }
+      try {
+        const userOut = execSync('reg query "HKCU\\Environment" /v Path', { encoding: 'utf8', timeout: 3000 });
+        const userMatch = userOut.match(/Path\s+(?:REG_SZ|REG_EXPAND_SZ|REG_MULTI_SZ)\s+([\s\S]+?)(?:\r?\n\r?\n|$)/i);
+        if (userMatch) freshPathDirs.push(...userMatch[1].trim().split(';').filter(Boolean));
+      } catch (e) { /* 继续 */ }
+
+      for (let dir of freshPathDirs) {
+        dir = dir.replace(/%([^%]+)%/g, (m, name) => process.env[name] || m);
+        const candidate = path.join(dir, 'ffmpeg.exe');
+        if (fs.existsSync(candidate)) {
+          this._ffmpegPathCache = candidate;
+          return candidate;
+        }
+      }
+
+      // 5. 常见安装位置兜底（扫描 C:\ D:\ E:\ 等）
+      const userProfile = process.env.USERPROFILE || process.env.HOMEPATH || '';
+      const commonDirs = [
+        path.join(userProfile, 'scoop', 'shims'),
+        path.join('C:\\ProgramData', 'scoop', 'shims'),
+        'C:\\ProgramData\\chocolatey\\bin',
+        'C:\\ffmpeg\\bin',
+        'D:\\ffmpeg\\bin',
+        'E:\\ffmpeg\\bin',
+        'C:\\Program Files\\ffmpeg\\bin',
+        'C:\\Program Files (x86)\\ffmpeg\\bin',
+        'D:\\Program Files\\ffmpeg\\bin',
+      ];
+      for (const dir of commonDirs) {
+        const candidate = path.join(dir, 'ffmpeg.exe');
+        if (fs.existsSync(candidate)) {
+          this._ffmpegPathCache = candidate;
+          return candidate;
+        }
+      }
+    }
+
+    // 6. Linux/macOS 常见位置
+    const nixCandidates = ['/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg', '/opt/bin/ffmpeg'];
+    for (const candidate of nixCandidates) {
+      if (fs.existsSync(candidate)) {
+        this._ffmpegPathCache = candidate;
+        return candidate;
+      }
+    }
+
+    this._ffmpegPathCache = null;
+    return null;
   }
 
   /**
@@ -3091,13 +3292,25 @@ class AccountManager {
 
     const now = Date.now();
     const isActive = vip.expireAt > now;
+    // 按会员类型返回折扣百分比（10 表示 9 折，15 表示 8.5 折）
+    let discountPercent = 0;
+    if (isActive) {
+      if (vip.type === 'vip_year') {
+        discountPercent = 15;
+      } else {
+        discountPercent = 10;
+      }
+    }
 
     return {
       success: true,
       vip: {
         ...vip,
         isActive,
-        remainingDays: isActive ? Math.ceil((vip.expireAt - now) / (1000 * 60 * 60 * 24)) : 0
+        discountPercent,
+        remainingDays: isActive ? Math.ceil((vip.expireAt - now) / (1000 * 60 * 60 * 24)) : 0,
+        remainingHours: isActive ? Math.ceil((vip.expireAt - now) / (1000 * 60 * 60)) : 0,
+        expireAtFormatted: isActive ? new Date(vip.expireAt).toLocaleString('zh-CN', { hour12: false }) : ''
       }
     };
   }

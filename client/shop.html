@@ -222,52 +222,274 @@
     }
 
     /* ===== 会员区 ===== */
-    .vip-section {
-      background: white;
-      padding: 30px;
+    .vip-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* ===== 会员状态卡片 ===== */
+    .vip-status-card {
+      background: linear-gradient(135deg, #fff7e6 0%, #fff0d1 100%);
+      border: 1px solid #ffd700;
+      border-radius: 16px;
+      padding: 28px 32px;
+      box-shadow: 0 4px 20px rgba(255, 215, 0, 0.12);
+    }
+
+    .vip-status-card.inactive {
+      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      border: 1px dashed #adb5bd;
+      box-shadow: none;
+    }
+
+    .vip-status-main {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .vip-status-icon {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ffd700, #ff8c42);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+    }
+
+    .vip-status-card.inactive .vip-status-icon {
+      background: linear-gradient(135deg, #6c757d, #495057);
+    }
+
+    .vip-status-info {
+      flex: 1;
+      text-align: left;
+    }
+
+    .vip-status-label {
+      font-size: 13px;
+      color: #b8860b;
+      font-weight: bold;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .vip-status-card.inactive .vip-status-label {
+      color: #6c757d;
+    }
+
+    .vip-status-title {
+      font-size: 24px;
+      font-weight: bold;
+      color: #1a1a1a;
+      margin-bottom: 6px;
+    }
+
+    .vip-status-title span {
+      color: #d4a000;
+    }
+
+    .vip-status-sub {
+      font-size: 13px;
+      color: #868e96;
+    }
+
+    .vip-status-benefits {
+      display: flex;
+      gap: 16px;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .benefit-chip {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.7);
       border-radius: 12px;
-      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .benefit-icon {
+      font-size: 20px;
+      margin-bottom: 2px;
+    }
+
+    .benefit-value {
+      font-size: 18px;
+      font-weight: bold;
+      color: #1a1a1a;
+    }
+
+    .benefit-label {
+      font-size: 12px;
+      color: #868e96;
+    }
+
+    .vip-status-benefits-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 8px;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .benefit-mini {
+      background: rgba(255, 255, 255, 0.8);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #495057;
+    }
+
+    .vip-status-footer {
+      margin-top: 20px;
+      font-size: 13px;
+      color: #868e96;
       text-align: center;
     }
 
-    .vip-card {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 36px;
-      border-radius: 16px;
-      max-width: 500px;
-      margin: 0 auto 24px;
+    /* ===== 套餐卡片行 ===== */
+    .vip-cards-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
     }
 
-    .vip-title {
-      font-size: 26px;
+    .vip-card {
+      background: white;
+      border: 2px solid;
+      border-radius: 16px;
+      padding: 28px 24px;
+      position: relative;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .vip-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    }
+
+    .vip-card-badge {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 18px;
+      border-radius: 20px;
+      color: white;
+      font-size: 12px;
       font-weight: bold;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .vip-card-icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 16px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .vip-card-title {
+      font-size: 22px;
+      font-weight: bold;
+      color: #1a1a1a;
+      margin-bottom: 4px;
+    }
+
+    .vip-card-subtitle {
+      font-size: 13px;
+      color: #868e96;
       margin-bottom: 16px;
     }
 
-    .vip-days {
-      font-size: 48px;
-      font-weight: bold;
+    .vip-card-divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.08), transparent);
       margin: 12px 0;
     }
 
-    .vip-options {
+    .vip-card-benefits {
       display: flex;
-      gap: 16px;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+      min-height: 90px;
+    }
+
+    .vip-benefit-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #495057;
+      text-align: left;
+      padding: 0 10px;
+    }
+
+    .vip-check {
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    .vip-card-price {
+      display: flex;
+      align-items: center;
       justify-content: center;
-      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
     }
 
-    .vip-option {
-      background: rgba(255, 255, 255, 0.15);
-      padding: 20px 28px;
-      border-radius: 12px;
-      cursor: pointer;
+    .price-icon {
+      font-size: 20px;
     }
 
-    .vip-option:hover {
-      background: rgba(255, 255, 255, 0.25);
-      transform: translateY(-4px);
+    .price-num {
+      font-size: 28px;
+      font-weight: bold;
+      color: #1a1a1a;
+    }
+
+    .vip-card-daily {
+      font-size: 12px;
+      color: #adb5bd;
+      margin-top: 6px;
+    }
+
+    @media (max-width: 600px) {
+      .vip-status-card {
+        padding: 20px;
+      }
+
+      .vip-status-main {
+        flex-direction: column;
+        text-align: center;
+      }
+
+      .vip-status-info {
+        text-align: center;
+      }
+
+      .vip-status-benefits {
+        flex-direction: column;
+      }
     }
 
     /* ===== 分类标题 ===== */
@@ -812,6 +1034,12 @@
       const rarity = RARITY_CONFIG[item.rarity] || RARITY_CONFIG.common;
       const count = fromInventory ? inventory?.items?.[itemId] : 0;
 
+      // VIP 折扣计算 - 从服务端 vipInfo.discountPercent 获取
+      const isVipActive = vipInfo?.expireAt > Date.now();
+      const vipDiscount = (isVipActive && vipInfo?.discountPercent) ? vipInfo.discountPercent : 0;
+      const itemDiscountPrice = item.price ? Math.floor(item.price * (100 - vipDiscount) / 100) : 0;
+      const showItemDiscount = isVipActive && vipDiscount > 0 && item.price;
+
       // 生成礼包内容HTML
       let contentHtml = '';
       if (itemType === 'pack' && item.content) {
@@ -871,7 +1099,13 @@
                   <div class="info-grid">
                     <div class="info-item">
                       <span class="info-label">价格</span>
-                      <span class="info-value">💎 ${item.price}</span>
+                      <span class="info-value">
+                        ${showItemDiscount ? `
+                          <span style="text-decoration:line-through; color:#adb5bd; font-size:14px;">💎 ${item.price}</span>
+                          <span style="color:#ffd700; font-weight:bold; margin-left:6px;">💎 ${itemDiscountPrice}</span>
+                          <span style="font-size:12px; color:#ffd700; margin-left:4px;">(${vipDiscount}% OFF)</span>
+                        ` : `💎 ${item.price}`}
+                      </span>
                     </div>
                     <div class="info-item">
                       <span class="info-label">分类</span>
@@ -898,11 +1132,13 @@
                 ${!fromInventory && item.price ? `
                   <div style="display:flex; align-items:center; gap:8px; flex:1;">
                     <div style="display:flex; align-items:center; gap:2px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:6px; overflow:hidden;">
-                      <button style="width:32px;height:32px;border:none;background:transparent;cursor:pointer;font-weight:bold;color:#495057;font-size:18px;display:flex;align-items:center;justify-content:center;" onclick="document.getElementById('modal-qty-${itemId}').textContent = Math.max(1, parseInt(document.getElementById('modal-qty-${itemId}').textContent)-1)">−</button>
+                      <button style="width:32px;height:32px;border:none;background:transparent;cursor:pointer;font-weight:bold;color:#495057;font-size:18px;display:flex;align-items:center;justify-content:center;" onclick="document.getElementById('modal-qty-${itemId}').textContent = Math.max(1, parseInt(document.getElementById('modal-qty-${itemId}').textContent)-1">−</button>
                       <span style="width:36px;text-align:center;font-weight:700;font-size:16px;color:#2d3748;" id="modal-qty-${itemId}">1</span>
                       <button style="width:32px;height:32px;border:none;background:transparent;cursor:pointer;font-weight:bold;color:#495057;font-size:18px;display:flex;align-items:center;justify-content:center;" onclick="document.getElementById('modal-qty-${itemId}').textContent = Math.min(999, parseInt(document.getElementById('modal-qty-${itemId}').textContent)+1)">+</button>
                     </div>
-                    <button class="action-btn buy" style="flex:1;" onclick="buyItem('${itemId}', parseInt(document.getElementById('modal-qty-${itemId}').textContent)||1); closeItemDetail();">💎 ${item.price} 购买</button>
+                    <button class="action-btn buy" style="flex:1;" onclick="buyItem('${itemId}', parseInt(document.getElementById('modal-qty-${itemId}').textContent)||1); closeItemDetail();">
+                      ${showItemDiscount ? `💎 ${itemDiscountPrice} <span style="font-size:12px; text-decoration:line-through; opacity:0.6;">原价 ${item.price}</span>` : `💎 ${item.price}`} 购买
+                    </button>
                   </div>
                 ` : ''}
                 <button class="action-btn secondary" onclick="closeItemDetail()">关闭</button>
@@ -997,7 +1233,19 @@
         });
         const data = await res.json();
         if (data.success) {
-          showMessage(data.message || '购买成功！', 'success');
+          // 判断是否为 VIP 商品，提供更醒目的提示
+          const isVipItem = typeof itemId === 'string' && itemId.startsWith('vip_');
+          if (isVipItem) {
+            const vipMap = { 'vip_week': '周卡', 'vip_month': '月卡', 'vip_year': '年卡' };
+            const vipName = vipMap[itemId] || '会员';
+            const wasActive = vipInfo?.expireAt > Date.now();
+            const tip = wasActive
+              ? `✨ 续费 ${vipName}成功！会员时长已延长，继续享受尊贵体验~`
+              : `🎉 恭喜开通 ${vipName}！全场商品折扣、经验加成、专属标识已生效！`;
+            showMessage(tip, 'success');
+          } else {
+            showMessage(data.message || '购买成功！', 'success');
+          }
           await loadData();
         } else {
           showMessage(data.message || '购买失败', 'error');
@@ -1060,17 +1308,18 @@
         return '<div class="inventory-empty">暂无商品</div>';
       }
 
-      // VIP折扣信息
+      // VIP折扣信息 - 从服务端 vipInfo.discountPercent 获取（10=9折, 15=8.5折）
       const isVipActive = vipInfo?.expireAt > Date.now();
-      const vipDiscount = isVipActive ? 10 : 0; // 从服务器获取的折扣比例，目前固定10%
+      const vipDiscount = (isVipActive && vipInfo?.discountPercent) ? vipInfo.discountPercent : 0;
 
       let html = '';
 
       // VIP折扣横幅
-      if (isVipActive) {
+      if (isVipActive && vipDiscount > 0) {
+        const discountText = (100 - vipDiscount) + '折';
         html += `<div style="background: linear-gradient(135deg, #667eea33, #764ba233); border: 1px solid #667eea; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
           <span style="font-size: 20px;">👑</span>
-          <span style="font-weight: 600; color: #5a67d8;">VIP会员享${vipDiscount}%折扣（全场商品9折优惠）</span>
+          <span style="font-weight: 600; color: #5a67d8;">VIP会员享 ${discountText} 优惠（已为您节省 💎）</span>
         </div>`;
       }
 
@@ -1184,9 +1433,9 @@
         const rarityClass = pack.rarity ? `rarity-${pack.rarity}` : '';
         const glowClass = pack.rarity === 'legendary' || pack.rarity === 'epic' ? `glow-${pack.rarity}` : '';
 
-        // VIP折扣
+        // VIP折扣 - 从服务端 vipInfo.discountPercent 获取
         const isVipActive = vipInfo?.expireAt > Date.now();
-        const vipDiscount = isVipActive ? 10 : 0;
+        const vipDiscount = (isVipActive && vipInfo?.discountPercent) ? vipInfo.discountPercent : 0;
         const discountedPrice = Math.floor(pack.price * (100 - vipDiscount) / 100);
         const showDiscount = isVipActive && vipDiscount > 0;
 
@@ -1238,31 +1487,119 @@
       let vips = shopData.vip || {};
       vips = filterItems(vips);
 
-      const daysMap = { 'vip_week': 7, 'vip_month': 30, 'vip_year': 365 };
-      const nameMap = { 'vip_week': '周卡', 'vip_month': '月卡', 'vip_year': '年卡' };
+      let html = '<div class="vip-wrapper">';
 
-      let html = '<div class="vip-section">';
-
-      html += '<div style="text-align:center; margin-bottom:16px; color:#6c757d; font-size:13px;">会员状态请到个人资料页面查看</div>';
-
-      html += '<div class="vip-options">';
-      for (const [id, vip] of Object.entries(vips)) {
-        const rarityClass = vip.rarity ? `rarity-${vip.rarity}` : '';
-        const glowClass = vip.rarity === 'legendary' || vip.rarity === 'epic' ? `glow-${vip.rarity}` : '';
+      // ===== 顶部：当前会员状态卡片 =====
+      if (vipInfo && vipInfo.isActive) {
+        const remainingDays = Math.floor(vipInfo.remainingDays || 0);
+        const remainingHours = Math.floor(vipInfo.remainingHours || 0);
+        const displayTime = remainingDays >= 1 ? `${remainingDays} 天` : `${remainingHours} 小时`;
+        const typeName = vipInfo.type === 'vip_year' ? '年度会员' : vipInfo.type === 'vip_month' ? '月度会员' : '周度会员';
+        const discountText = vipInfo.discountPercent ? `${(100 - vipInfo.discountPercent).toFixed(0)}折` : '9折';
+        const expireText = vipInfo.expireAtFormatted || new Date(vipInfo.expireAt).toLocaleString('zh-CN', { hour12: false });
 
         html += `
-          <div class="vip-option ${rarityClass} ${glowClass}" onclick="showItemDetail('${id}', false)" style="cursor:pointer; border-radius:12px; padding:20px; transition:transform 0.2s;">
-            <div style="font-size:24px;font-weight:bold; color: ${RARITY_CONFIG[vip.rarity]?.color || '#007bff'}">${nameMap[id]}</div>
-            <div style="margin-top:8px;">${daysMap[id]}天</div>
-            <div style="font-size:13px;margin-top:8px;opacity:0.8;line-height:1.4;">${vip.description}</div>
-            <div><span class="rarity-badge ${vip.rarity || 'common'}">${RARITY_CONFIG[vip.rarity]?.name || '普通'}</span></div>
-            ${vip.tags && vip.tags.length > 0 ? `
-              <div class="item-tags">
-                ${vip.tags.slice(0, 2).map(tag => `<span class="item-tag">${tag}</span>`).join('')}
+          <div class="vip-status-card">
+            <div class="vip-status-main">
+              <div class="vip-status-icon">👑</div>
+              <div class="vip-status-info">
+                <div class="vip-status-label">${typeName} · 已激活</div>
+                <div class="vip-status-title">距离到期还有 <span>${displayTime}</span></div>
+                <div class="vip-status-sub">到期时间：${expireText}</div>
               </div>
-            ` : ''}
-            <div style="font-size:14px;margin-top:8px;opacity:0.8;">经验 +${vip.expBonus * 100}%</div>
-            <div style="font-size:22px;font-weight:bold;margin-top:12px;">💎 ${vip.price}</div>
+            </div>
+            <div class="vip-status-benefits">
+              <div class="benefit-chip">
+                <span class="benefit-icon">⚡</span>
+                <span class="benefit-value">×${(vipInfo.expBonus || 2).toFixed(0)}</span>
+                <span class="benefit-label">经验加成</span>
+              </div>
+              <div class="benefit-chip">
+                <span class="benefit-icon">💎</span>
+                <span class="benefit-value">${discountText}</span>
+                <span class="benefit-label">购物折扣</span>
+              </div>
+              <div class="benefit-chip">
+                <span class="benefit-icon">👑</span>
+                <span class="benefit-value">专属</span>
+                <span class="benefit-label">会员标识</span>
+              </div>
+            </div>
+            <div class="vip-status-footer">续费可直接延长到期时间，等级不会丢失 ✨</div>
+          </div>
+        `;
+      } else {
+        html += `
+          <div class="vip-status-card inactive">
+            <div class="vip-status-main">
+              <div class="vip-status-icon">✨</div>
+              <div class="vip-status-info">
+                <div class="vip-status-label">暂未开通会员</div>
+                <div class="vip-status-title">开通会员，享受专属特权</div>
+                <div class="vip-status-sub">选择下方套餐，立即开启 VIP 之旅</div>
+              </div>
+            </div>
+            <div class="vip-status-benefits-grid">
+              <div class="benefit-mini">⚡ 全场商品${vipInfo?.discountPercent ? (100 - vipInfo.discountPercent) + '折' : '9折'}</div>
+              <div class="benefit-mini">💎 对战经验 ×2</div>
+              <div class="benefit-mini">👑 专属会员标识</div>
+              <div class="benefit-mini">🎁 每日登录礼包</div>
+              <div class="benefit-mini">�️ 专属金色头像框</div>
+              <div class="benefit-mini">🌟 抢先体验新功能</div>
+            </div>
+          </div>
+        `;
+      }
+
+      // ===== 套餐选项卡片（从 vip.json 动态读取） =====
+      const rarityGradientMap = {
+        'rare': 'linear-gradient(135deg, #4da3ff 0%, #007bff 100%)',
+        'epic': 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
+        'legendary': 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
+        'common': 'linear-gradient(135deg, #6c757d 0%, #495057 100%)',
+        'uncommon': 'linear-gradient(135deg, #28a745 0%, #20c997 100%)'
+      };
+
+      const nameShortMap = { 'vip_week': '周卡', 'vip_month': '月卡', 'vip_year': '年卡' };
+      const discountMap = { 'vip_week': '9折', 'vip_month': '9折', 'vip_year': '8.5折' };
+
+      html += '<div class="vip-cards-row">';
+      for (const [id, vip] of Object.entries(vips)) {
+        const rarityColor = RARITY_CONFIG[vip.rarity]?.color || '#007bff';
+        const gradient = rarityGradientMap[vip.rarity] || rarityGradientMap['common'];
+        const shortName = nameShortMap[id] || vip.name.replace('VIP', '').trim();
+        const dailyPrice = vip.dailyPrice || Math.round(vip.price / (vip.days || 1));
+
+        let badge = null;
+        if (vip.bigDiscount) badge = '🏆 最超值';
+        else if (vip.recommend) badge = '🔥 推荐';
+
+        const benefitList = [
+          `经验 ×${vip.expBonus || 2}`,
+          `全场 ${discountMap[id] || '9折'}`,
+          '专属会员标识'
+        ];
+        if (vip.savePercent && vip.savePercent > 0) {
+          benefitList.push(`省 ${vip.savePercent}%`);
+        }
+
+        html += `
+          <div class="vip-card" onclick="showItemDetail('${id}', false)" style="border-color: ${rarityColor}40;">
+            ${badge ? `<div class="vip-card-badge" style="background: ${gradient};">${badge}</div>` : ''}
+            <div class="vip-card-icon" style="background: ${gradient};">
+              <span>${vip.icon || '⭐'}</span>
+            </div>
+            <div class="vip-card-title">${shortName}</div>
+            <div class="vip-card-subtitle">${vip.days}天会员</div>
+            <div class="vip-card-divider"></div>
+            <div class="vip-card-benefits">
+              ${benefitList.map(b => `<div class="vip-benefit-row"><span class="vip-check" style="color: ${rarityColor};">✓</span><span>${b}</span></div>`).join('')}
+            </div>
+            <div class="vip-card-price">
+              <span class="price-icon">💎</span>
+              <span class="price-num">${vip.price}</span>
+            </div>
+            <div class="vip-card-daily">日均约 ${dailyPrice}💎</div>
           </div>
         `;
       }
