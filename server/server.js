@@ -46,8 +46,8 @@ const io = socketIo(server, {
 
 // 中间件
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Token认证中间件
 function authenticateToken(req, res, next) {
@@ -72,6 +72,9 @@ app.use(express.static(path.join(__dirname, '..')));
 
 // 静态资源服务 - 勋章图标等
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
+
+// 自定义头像静态服务
+app.use('/data/cosmetics/avatars', express.static(path.join(__dirname, '..', 'data', 'cosmetics', 'avatars')));
 
 // API路由
 app.get('/admin', (req, res) => {
@@ -177,6 +180,47 @@ app.post('/api/shop/cosmetics/equip', async (req, res) => {
   } catch (err) {
     logger.error('装备失败', { error: err.message });
     res.status(500).json({ success: false, message: '装备失败' });
+  }
+});
+
+// 获取所有外观配置
+app.get('/api/shop/cosmetics/config', async (req, res) => {
+  try {
+    const result = accountManager.getAllCosmeticsConfig();
+    res.json(result);
+  } catch (err) {
+    logger.error('获取外观配置失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取失败' });
+  }
+});
+
+// 上传自定义头像
+app.post('/api/avatar/upload', async (req, res) => {
+  try {
+    const { userId, avatar, replaceIndex, name } = req.body;
+    if (!userId || !avatar) {
+      return res.status(400).json({ success: false, message: '参数错误' });
+    }
+    const result = await accountManager.saveCustomAvatar(userId, avatar, replaceIndex, name);
+    res.json(result);
+  } catch (err) {
+    logger.error('上传头像失败', { error: err.message });
+    res.status(500).json({ success: false, message: '上传失败' });
+  }
+});
+
+// 删除自定义头像
+app.post('/api/avatar/delete', async (req, res) => {
+  try {
+    const { userId, avatarFile } = req.body;
+    if (!userId || !avatarFile) {
+      return res.status(400).json({ success: false, message: '参数错误' });
+    }
+    const result = await accountManager.deleteCustomAvatar(userId, avatarFile);
+    res.json(result);
+  } catch (err) {
+    logger.error('删除头像失败', { error: err.message });
+    res.status(500).json({ success: false, message: '删除失败' });
   }
 });
 

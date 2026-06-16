@@ -230,5 +230,70 @@
     ],
     "enabled": true,
     "rollout": 100
+  },
+  "item_slot_1": {
+    "id": "item_slot_1",
+    "name": "头像槽位·1",
+    "description": "永久增加1个自定义头像槽位，解锁更多个性化空间",
+    "icon": "📸",
+    "price": 300,
+    "category": "slot",
+    "type": "permanent",
+    "rarity": "rare",
+    "maxStack": 99,
+    "slots": 1,
+    "usable": true,
+    "tradable": false,
+    "tags": [
+      "头像",
+      "槽位",
+      "永久"
+    ],
+    "enabled": true,
+    "rollout": 100
+  },
+  "item_slot_3": {
+    "id": "item_slot_3",
+    "name": "头像槽位·3",
+    "description": "永久增加3个自定义头像槽位，超值组合，节省20%",
+    "icon": "📷",
+    "price": 720,
+    "category": "slot",
+    "type": "permanent",
+    "rarity": "epic",
+    "maxStack": 99,
+    "slots": 3,
+    "usable": true,
+    "tradable": false,
+    "tags": [
+      "头像",
+      "槽位",
+      "永久",
+      "优惠"
+    ],
+    "enabled": true,
+    "rollout": 100
+  },
+  "item_slot_5": {
+    "id": "item_slot_5",
+    "name": "头像槽位·5",
+    "description": "永久增加5个自定义头像槽位，最超值选择，节省33%",
+    "icon": "🎨",
+    "price": 1000,
+    "category": "slot",
+    "type": "permanent",
+    "rarity": "legendary",
+    "maxStack": 99,
+    "slots": 5,
+    "usable": true,
+    "tradable": false,
+    "tags": [
+      "头像",
+      "槽位",
+      "永久",
+      "超值"
+    ],
+    "enabled": true,
+    "rollout": 100
   }
 }

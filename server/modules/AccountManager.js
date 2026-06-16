@@ -2656,6 +2656,18 @@ class AccountManager {
         }
         return openResult;
       }
+
+      // 如果是头像槽位类型物品，直接增加槽位
+      if (itemInfo && itemInfo.category === 'slot') {
+        const slotAdd = (itemInfo.slots || 1) * count;
+        await this.addAvatarSlots(userId, slotAdd);
+        invStore.items[itemId] -= count;
+        if (invStore.items[itemId] <= 0) {
+          delete invStore.items[itemId];
+        }
+        await this._saveInventoryStore(userId, invStore);
+        return { success: true, message: `成功增加${slotAdd}个自定义头像槽位！` };
+      }
     }
 
     let result = { success: true };
@@ -2788,9 +2800,13 @@ class AccountManager {
   async getCosmetics(userId) {
     const account = await this._getAccount(userId);
     const cosmetics = account?.cosmetics || {
-      owned: { frames: [], skins: [], backgrounds: [], titles: [] },
-      equipped: { frame: null, skin: null, background: null, title: null }
+      slots: 0,
+      owned: { frames: [], avatars: [], customAvatars: [], skins: [], backgrounds: [], titles: [] },
+      equipped: { frame: null, avatar: null, avatarCustom: null, skin: null, background: null, title: null }
     };
+    if (cosmetics.slots === undefined || cosmetics.slots === null) cosmetics.slots = 0;
+    if (!cosmetics.owned.avatars) cosmetics.owned.avatars = [];
+    if (!cosmetics.owned.customAvatars) cosmetics.owned.customAvatars = [];
     return { success: true, cosmetics };
   }
 
@@ -2804,13 +2820,16 @@ class AccountManager {
     }
     if (!account.cosmetics) {
       account.cosmetics = {
-        owned: { frames: [], skins: [], backgrounds: [], titles: [] },
-        equipped: { frame: null, skin: null, background: null, title: null }
+        owned: { frames: [], avatars: [], customAvatars: [], skins: [], backgrounds: [], titles: [] },
+        equipped: { frame: null, avatar: null, avatarCustom: null, skin: null, background: null, title: null }
       };
     }
+    if (!account.cosmetics.owned.avatars) account.cosmetics.owned.avatars = [];
+    if (!account.cosmetics.owned.customAvatars) account.cosmetics.owned.customAvatars = [];
 
     const categoryMap = {
       frame: 'frames',
+      avatar: 'avatars',
       skin: 'skins',
       background: 'backgrounds',
       title: 'titles'
@@ -2838,28 +2857,227 @@ class AccountManager {
       return { success: false, message: '账号不存在' };
     }
     if (!account.cosmetics) {
-      return { success: false, message: '请先购买' };
+      account.cosmetics = {
+        owned: { frames: [], avatars: [], customAvatars: [], skins: [], backgrounds: [], titles: [] },
+        equipped: { frame: null, avatar: null, avatarCustom: null, skin: null, background: null, title: null }
+      };
+    }
+    if (!account.cosmetics.owned.avatars) account.cosmetics.owned.avatars = [];
+    if (!account.cosmetics.owned.customAvatars) account.cosmetics.owned.customAvatars = [];
+
+    if (category === 'avatar') {
+      if (cosmeticId === 'custom') {
+        if (!account.cosmetics.equipped.avatarCustom) {
+          return { success: false, message: '请先上传自定义头像' };
+        }
+        account.cosmetics.equipped.avatar = null;
+      } else {
+        if (!account.cosmetics.owned.avatars.includes(cosmeticId) && cosmeticId !== 'avatar_default') {
+          return { success: false, message: '未拥有该外观' };
+        }
+        account.cosmetics.equipped.avatarCustom = null;
+        account.cosmetics.equipped.avatar = cosmeticId;
+      }
+    } else if (category === 'avatarCustom') {
+      const hasCustom = account.cosmetics.owned.customAvatars.some(a => a.file === cosmeticId);
+      if (!hasCustom) {
+        return { success: false, message: '该自定义头像不存在' };
+      }
+      account.cosmetics.equipped.avatar = null;
+      account.cosmetics.equipped.avatarCustom = userId + '/' + cosmeticId;
+    } else {
+      const categoryMap = {
+        frame: 'frames',
+        avatar: 'avatars',
+        skin: 'skins',
+        background: 'backgrounds',
+        title: 'titles'
+      };
+      const ownedKey = categoryMap[category];
+      if (!ownedKey) {
+        return { success: false, message: '类型错误' };
+      }
+      if (cosmeticId && ownedKey && !account.cosmetics.owned[ownedKey].includes(cosmeticId) && cosmeticId !== 'frame_default') {
+        return { success: false, message: '未拥有该外观' };
+      }
+      account.cosmetics.equipped[category] = cosmeticId || null;
     }
 
-    const categoryMap = {
-      frame: 'frames',
-      skin: 'skins',
-      background: 'backgrounds',
-      title: 'titles'
-    };
-    const ownedKey = categoryMap[category];
-
-    if (!ownedKey) {
-      return { success: false, message: '类型错误' };
-    }
-
-    if (cosmeticId && !account.cosmetics.owned[ownedKey].includes(cosmeticId)) {
-      return { success: false, message: '未拥有该外观' };
-    }
-
-    account.cosmetics.equipped[category] = cosmeticId || null;
     await this._saveAccount(userId, account);
     return { success: true };
+  }
+
+  /**
+   * 保存自定义头像（base64数据）
+   * @param {string} userId - 用户ID
+   * @param {string} base64Data - base64图片数据
+   * @param {number|string} replaceIndex - 可选，要替换的头像索引或文件名。null=新增
+   * @param {string} name - 可选，头像名称
+   */
+  async saveCustomAvatar(userId, base64Data, replaceIndex = null, name = null) {
+    try {
+      const account = await this._getAccount(userId);
+      if (!account) {
+        return { success: false, message: '账号不存在' };
+      }
+
+      if (!account.cosmetics) {
+        account.cosmetics = {
+          slots: 0,
+          owned: { frames: [], avatars: [], customAvatars: [], skins: [], backgrounds: [], titles: [] },
+          equipped: { frame: null, avatar: null, avatarCustom: null, skin: null, background: null, title: null }
+        };
+      }
+      if (!account.cosmetics.owned.customAvatars) account.cosmetics.owned.customAvatars = [];
+
+      const now = Date.now();
+      const isVipActive = account.vip?.expireAt > now || account.rank === 'svip' || account.rank === 'admin';
+      const defaultSlots = 3;
+      const purchasedSlots = account.cosmetics.slots || 0;
+      const vipBonusSlots = isVipActive ? 10 : 0;
+      const maxAvatars = defaultSlots + purchasedSlots + vipBonusSlots;
+
+      const avatarDir = path.join(__dirname, '..', '..', 'data', 'cosmetics', 'avatars', userId);
+      if (!fs.existsSync(avatarDir)) {
+        fs.mkdirSync(avatarDir, { recursive: true });
+      }
+
+      const mimeMatch = base64Data.match(/^data:image\/(\w+);base64,/);
+      const extMap = { png: 'png', gif: 'gif', jpeg: 'jpg', jpg: 'jpg', webp: 'webp', bmp: 'bmp' };
+      const ext = mimeMatch && extMap[mimeMatch[1]] ? extMap[mimeMatch[1]] : 'png';
+
+      let avatarFile;
+      let avatarId;
+      let isReplace = false;
+
+      if (replaceIndex !== null && replaceIndex !== undefined && replaceIndex !== '') {
+        let targetIdx = -1;
+        if (typeof replaceIndex === 'number') {
+          targetIdx = replaceIndex;
+        } else {
+          targetIdx = account.cosmetics.owned.customAvatars.findIndex(a => a.file === replaceIndex);
+        }
+        if (targetIdx >= 0 && targetIdx < account.cosmetics.owned.customAvatars.length) {
+          const oldAvatar = account.cosmetics.owned.customAvatars[targetIdx];
+          const oldPath = path.join(avatarDir, oldAvatar.file);
+          if (fs.existsSync(oldPath)) {
+            try { fs.unlinkSync(oldPath); } catch (e) { }
+          }
+          avatarId = Date.now().toString();
+          avatarFile = avatarId + '.' + ext;
+          account.cosmetics.owned.customAvatars[targetIdx] = {
+            file: avatarFile,
+            name: name || ('自定义头像 ' + (targetIdx + 1)),
+            uploadedAt: Date.now()
+          };
+          isReplace = true;
+
+          if (account.cosmetics.equipped.avatarCustom &&
+            account.cosmetics.equipped.avatarCustom.endsWith('/' + oldAvatar.file)) {
+            account.cosmetics.equipped.avatarCustom = userId + '/' + avatarFile;
+          }
+        }
+      }
+
+      if (!isReplace) {
+        if (account.cosmetics.owned.customAvatars.length >= maxAvatars) {
+          return {
+            success: false,
+            message: `已达到${maxAvatars}个自定义头像上限`,
+            needReplace: true,
+            currentAvatars: account.cosmetics.owned.customAvatars
+          };
+        }
+        avatarId = Date.now().toString();
+        avatarFile = avatarId + '.' + ext;
+        account.cosmetics.owned.customAvatars.push({
+          file: avatarFile,
+          name: name || ('自定义头像 ' + (account.cosmetics.owned.customAvatars.length + 1)),
+          uploadedAt: Date.now()
+        });
+      }
+
+      const avatarPath = path.join(avatarDir, avatarFile);
+      const base64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
+      const buffer = Buffer.from(base64, 'base64');
+      fs.writeFileSync(avatarPath, buffer);
+
+      account.cosmetics.equipped.avatarCustom = userId + '/' + avatarFile;
+      account.cosmetics.equipped.avatar = null;
+      await this._saveAccount(userId, account);
+
+      return {
+        success: true,
+        avatarFile: avatarFile,
+        message: '头像上传成功',
+        avatars: account.cosmetics.owned.customAvatars,
+        equipped: account.cosmetics.equipped.avatarCustom
+      };
+    } catch (err) {
+      logger.error('保存自定义头像失败', { userId, error: err.message });
+      return { success: false, message: '头像保存失败' };
+    }
+  }
+
+  /**
+   * 删除自定义头像
+   */
+  async deleteCustomAvatar(userId, avatarFile) {
+    try {
+      const account = await this._getAccount(userId);
+      if (!account) {
+        return { success: false, message: '账号不存在' };
+      }
+      if (!account.cosmetics || !account.cosmetics.owned.customAvatars) {
+        return { success: false, message: '没有自定义头像' };
+      }
+
+      const idx = account.cosmetics.owned.customAvatars.findIndex(a => a.file === avatarFile);
+      if (idx < 0) {
+        return { success: false, message: '头像不存在' };
+      }
+
+      const avatarDir = path.join(__dirname, '..', '..', 'data', 'cosmetics', 'avatars', userId);
+      const filePath = path.join(avatarDir, avatarFile);
+      if (fs.existsSync(filePath)) {
+        try { fs.unlinkSync(filePath); } catch (e) { }
+      }
+
+      account.cosmetics.owned.customAvatars.splice(idx, 1);
+
+      if (account.cosmetics.equipped.avatarCustom &&
+        account.cosmetics.equipped.avatarCustom.endsWith('/' + avatarFile)) {
+        if (account.cosmetics.owned.customAvatars.length > 0) {
+          account.cosmetics.equipped.avatarCustom = userId + '/' + account.cosmetics.owned.customAvatars[0].file;
+        } else {
+          account.cosmetics.equipped.avatarCustom = null;
+        }
+      }
+
+      await this._saveAccount(userId, account);
+      return { success: true, message: '删除成功', avatars: account.cosmetics.owned.customAvatars };
+    } catch (err) {
+      logger.error('删除自定义头像失败', { userId, error: err.message });
+      return { success: false, message: '删除失败' };
+    }
+  }
+
+  /**
+   * 获取所有可用的外观配置（供客户端展示）
+   */
+  getAllCosmeticsConfig() {
+    try {
+      const cosmeticsPath = path.join(__dirname, '..', 'config', 'shop', 'cosmetics.json');
+      if (!fs.existsSync(cosmeticsPath)) {
+        return { success: false, message: '配置不存在' };
+      }
+
+      const data = JSON.parse(fs.readFileSync(cosmeticsPath, 'utf-8'));
+      return { success: true, cosmetics: data };
+    } catch (err) {
+      logger.error('获取外观配置失败', { error: err.message });
+      return { success: false, message: '读取失败' };
+    }
   }
 
   // ========== 会员系统 ==========
@@ -2882,6 +3100,26 @@ class AccountManager {
         remainingDays: isActive ? Math.ceil((vip.expireAt - now) / (1000 * 60 * 60 * 24)) : 0
       }
     };
+  }
+
+  /**
+   * 添加自定义头像槽位
+   */
+  async addAvatarSlots(userId, count) {
+    const account = await this._getAccount(userId);
+    if (!account) {
+      return { success: false, message: '账号不存在' };
+    }
+    if (!account.cosmetics) {
+      account.cosmetics = {
+        slots: 0,
+        owned: { frames: [], avatars: [], customAvatars: [], skins: [], backgrounds: [], titles: [] },
+        equipped: { frame: null, avatar: null, avatarCustom: null, skin: null, background: null, title: null }
+      };
+    }
+    account.cosmetics.slots = (account.cosmetics.slots || 0) + count;
+    await this._saveAccount(userId, account);
+    return { success: true, message: `成功增加${count}个自定义头像槽位` };
   }
 
   /**
@@ -2957,7 +3195,7 @@ class AccountManager {
       // 处理外观列表：填充 name/icon
       const processedCosmetics = [];
       if (Array.isArray(mailData.cosmetics) && mailData.cosmetics.length > 0) {
-        const catMap = { frame: 'frames', skin: 'skins', background: 'backgrounds', title: 'titles' };
+        const catMap = { frame: 'frames', avatar: 'avatars', skin: 'skins', background: 'backgrounds', title: 'titles' };
         for (const cosmetic of mailData.cosmetics) {
           const catKey = catMap[cosmetic.category] || cosmetic.category;
           const cosmeticConfig = cosmeticsConfig[catKey]?.[cosmetic.id] || {};
@@ -3082,7 +3320,7 @@ class AccountManager {
         return { success: false, message: '该邮件已领取' };
       }
 
-      const rewards = { items: [], cosmetics: [], vip: null, starCoins: 0, exp: 0 };
+      const rewards = { items: [], cosmetics: [], vip: null, starCoins: 0, exp: 0, slots: 0 };
 
       // 发放物品和礼包（使用独立背包存储）
       if (mail.items && mail.items.length > 0) {
@@ -3099,11 +3337,13 @@ class AccountManager {
       if (mail.cosmetics && mail.cosmetics.length > 0) {
         if (!account.cosmetics) {
           account.cosmetics = {
-            owned: { frames: [], skins: [], backgrounds: [], titles: [] },
-            equipped: { frame: null, skin: null, background: null, title: null }
+            slots: 0,
+            owned: { frames: [], avatars: [], customAvatars: [], skins: [], backgrounds: [], titles: [] },
+            equipped: { frame: null, avatar: null, avatarCustom: null, skin: null, background: null, title: null }
           };
         }
-        const categoryMap = { frame: 'frames', skin: 'skins', background: 'backgrounds', title: 'titles' };
+        if (!account.cosmetics.owned.avatars) account.cosmetics.owned.avatars = [];
+        const categoryMap = { frame: 'frames', avatar: 'avatars', skin: 'skins', background: 'backgrounds', title: 'titles' };
         for (const cosmetic of mail.cosmetics) {
           const ownedKey = categoryMap[cosmetic.category];
           if (ownedKey && !account.cosmetics.owned[ownedKey].includes(cosmetic.id)) {
@@ -3111,6 +3351,19 @@ class AccountManager {
             rewards.cosmetics.push(cosmetic);
           }
         }
+      }
+
+      // 发放头像槽位
+      if (mail.slots && mail.slots > 0) {
+        if (!account.cosmetics) {
+          account.cosmetics = {
+            slots: 0,
+            owned: { frames: [], avatars: [], customAvatars: [], skins: [], backgrounds: [], titles: [] },
+            equipped: { frame: null, avatar: null, avatarCustom: null, skin: null, background: null, title: null }
+          };
+        }
+        account.cosmetics.slots = (account.cosmetics.slots || 0) + mail.slots;
+        rewards.slots = mail.slots;
       }
 
       // 发放会员

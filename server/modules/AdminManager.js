@@ -1457,10 +1457,10 @@ class AdminManager {
 
       if (fs.existsSync(cosmeticsPath)) {
         const cosmeticsData = JSON.parse(fs.readFileSync(cosmeticsPath, 'utf-8'));
-        const categories = ['frames', 'skins', 'backgrounds', 'titles'];
+        const categories = ['frames', 'avatars', 'skins', 'backgrounds', 'titles'];
         for (const category of categories) {
           if (cosmeticsData[category]) {
-            const catMap = { frames: 'frame', skins: 'skin', backgrounds: 'background', titles: 'title' };
+            const catMap = { frames: 'frame', avatars: 'avatar', skins: 'skin', backgrounds: 'background', titles: 'title' };
             for (const cosmetic of Object.values(cosmeticsData[category])) {
               cosmetics.push({
                 id: cosmetic.id,

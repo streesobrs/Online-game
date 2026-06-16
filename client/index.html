@@ -3962,6 +3962,10 @@
     let lastLevel = 1;
     let pendingRegisterInfo = null; // 保存注册信息用于自动登录
 
+    // 外观相关变量
+    let cosmeticsConfig = null;
+    let userCosmetics = null;
+
     // Socket.io 连接
     const socket = io({
       transports: ['websocket', 'polling'],
@@ -4989,6 +4993,9 @@
       // 从服务器获取主题
       await fetchThemesFromServer();
 
+      // 加载外观配置
+      await loadCosmeticsConfig();
+
       // 初始化缓存
       moveLogEl.dataset.lastIndex = "-1";
       // 更新客户端版本显示
@@ -5238,6 +5245,13 @@
           const userAccountData = currentAccount.account.account || currentAccount.account;
           lastExp = userAccountData?.profile?.exp || 0;
           lastLevel = userAccountData?.profile?.level || 1;
+
+          // 加载用户外观数据
+          const userId = userAccountData?.id;
+          if (userId) {
+            await loadUserCosmetics(userId);
+          }
+
           updateAccountBar();
           return true;
         }
@@ -5967,6 +5981,13 @@
 
           localStorage.setItem('currentAccountId', accountId);
           localStorage.setItem('nickname', nickname || username || '玩家');
+
+          // 加载外观配置和用户外观数据
+          loadCosmeticsConfig().then(() => {
+            return loadUserCosmetics(accountId);
+          }).then(() => {
+            updateAccountBar();
+          });
 
           // 更新界面
           updateAccountBar();
@@ -11932,6 +11953,76 @@
 
     // ========== 账号系统函数 ==========
 
+    // 加载外观配置
+    async function loadCosmeticsConfig() {
+      try {
+        const response = await fetch('/api/shop/cosmetics/config');
+        const result = await response.json();
+        if (result.success) {
+          cosmeticsConfig = result.cosmetics;
+        }
+      } catch (err) {
+        console.warn('加载外观配置失败', err);
+      }
+    }
+
+    // 加载用户外观数据
+    async function loadUserCosmetics(userId) {
+      if (!userId) return;
+      try {
+        const response = await fetch(`/api/shop/cosmetics?userId=${userId}`);
+        const result = await response.json();
+        if (result.success) {
+          userCosmetics = result.cosmetics;
+        }
+      } catch (err) {
+        console.warn('加载用户外观失败', err);
+      }
+    }
+
+    // 获取头像显示内容
+    function getAvatarDisplay() {
+      const equipped = userCosmetics?.equipped || {};
+      const avatars = cosmeticsConfig?.avatars || {};
+
+      // 优先显示自定义头像
+      if (equipped.avatarCustom) {
+        return `<img src="/data/cosmetics/avatars/${equipped.avatarCustom}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.style.display='none'">`;
+      }
+
+      // 然后显示预设头像
+      if (equipped.avatar && avatars[equipped.avatar]) {
+        return avatars[equipped.avatar].emoji || avatars[equipped.avatar].icon || '👤';
+      }
+
+      // 默认头像
+      return '👤';
+    }
+
+    // 获取头像框样式
+    function getAvatarFrameStyle() {
+      const equipped = userCosmetics?.equipped || {};
+      const frames = cosmeticsConfig?.frames || {};
+      const frame = equipped.frame && frames[equipped.frame] ? frames[equipped.frame] : null;
+
+      if (!frame) {
+        return 'background: rgba(226, 232, 240, 0.3); border: 2px solid rgba(160, 174, 192, 0.6);';
+      }
+
+      let background = '';
+      if (frame.color) {
+        if (frame.color.startsWith('linear-gradient') || frame.color.startsWith('radial-gradient')) {
+          background = `background: ${frame.color};`;
+        } else {
+          background = `background: ${frame.color};`;
+        }
+      } else {
+        background = 'background: rgba(160, 174, 192, 0.3);';
+      }
+
+      return `${background} border: 3px solid rgba(255, 255, 255, 0.8); box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);`;
+    }
+
     function updateAccountBar() {
       const accountBar = document.getElementById('account-bar');
       if (currentAccount) {
@@ -11981,10 +12072,13 @@
         const historyButton = '<button class="account-btn" onclick="showGameHistoryModal()" style="background: #9b59b6;">📜 历史</button>';
         const adminButton = isAdmin ? '<button class="account-btn" onclick="window.location.href=\'/admin\'" style="background: #e74c3c;">🛠️ 管理</button>' : '';
 
+        const avatarContent = getAvatarDisplay();
+        const avatarFrameStyle = getAvatarFrameStyle();
+
         accountBar.innerHTML = `
           <div class="account-info">
             <div class="account-user-section">
-              <span class="account-avatar">👤</span>
+              <span class="account-avatar" style="${avatarFrameStyle}">${avatarContent}</span>
               <div class="account-user-details">
                 <span class="account-nickname">${nickname || username}</span>
                 <div class="account-stats">

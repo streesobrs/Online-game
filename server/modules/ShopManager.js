@@ -155,6 +155,7 @@ class ShopManager {
     const allItems = [
       ...Object.values(this.items || {}),
       ...Object.values(this.cosmetics.frames || {}),
+      ...Object.values(this.cosmetics.avatars || {}),
       ...Object.values(this.cosmetics.skins || {}),
       ...Object.values(this.cosmetics.backgrounds || {}),
       ...Object.values(this.cosmetics.titles || {}),
@@ -227,6 +228,7 @@ class ShopManager {
         await accountManager.addItem(userId, item.id, 1);
         break;
       case 'frame':
+      case 'avatar':
       case 'skin':
       case 'background':
       case 'title':
@@ -237,6 +239,9 @@ class ShopManager {
         break;
       case 'vip':
         await accountManager.addVip(userId, item.days, item.expBonus);
+        break;
+      case 'slot':
+        await accountManager.addAvatarSlots(userId, item.slots || 1);
         break;
     }
   }
