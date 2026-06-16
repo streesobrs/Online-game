@@ -3355,7 +3355,8 @@ class AccountManager {
     if (vip.expireAt <= now) return; // 非激活会员不发
     if (!vip.type) return;
 
-    const today = new Date(now).toISOString().slice(0, 10); // YYYY-MM-DD
+    const todayDate = new Date(now);
+    const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
     if (vip.lastDailyGiftDate === today) return; // 今天已发过
 
     // 读取每日奖励配置
@@ -3405,7 +3406,8 @@ class AccountManager {
     try {
       const accounts = await dataStore.read('accounts');
       const now = Date.now();
-      const today = new Date(now).toISOString().slice(0, 10);
+      const todayDate = new Date(now);
+      const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
 
       // 读取VIP配置
       const vipConfigPath = path.join(__dirname, '..', 'config', 'shop', 'vip.json');
