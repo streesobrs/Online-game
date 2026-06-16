@@ -705,7 +705,7 @@
   <div id="message"></div>
 
   <script>
-    let userId = localStorage.getItem('gameUserId') || 'guest_' + Date.now();
+    let userId = localStorage.getItem('currentAccountId') || localStorage.getItem('gameUserId') || null;
     let shopData = null;
     let inventory = null;
     let cosmetics = null;
@@ -715,6 +715,14 @@
     let rarityFilter = '';
 
     const API_BASE = '/api';
+
+    // 监听其他页面登录状态变化（例如在大厅登录后切换到商店）
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'currentAccountId' && e.newValue && e.newValue !== userId) {
+        userId = e.newValue;
+        loadData();
+      }
+    });
 
     // 稀有度配置
     const RARITY_CONFIG = {
@@ -914,6 +922,19 @@
     }
 
     async function loadData() {
+      // 优先从 currentAccountId 读取（登录成功后由大厅写入）
+      const savedAccountId = localStorage.getItem('currentAccountId');
+      if (savedAccountId) {
+        userId = savedAccountId;
+      }
+
+      if (!userId) {
+        showMessage('请先在游戏大厅登录后再使用商店！', 'error');
+        document.getElementById('content').innerHTML =
+          '<div class="inventory-empty">请先登录，再使用商店。<br><br><button class="buy-btn" style="max-width:200px;" onclick="window.location.href=\'/\'">返回大厅登录</button></div>';
+        return;
+      }
+
       try {
         const res = await fetch(`${API_BASE}/shop/data?userId=${userId}`);
         const data = await res.json();

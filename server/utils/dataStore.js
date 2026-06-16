@@ -8,6 +8,7 @@ class DataStore {
   constructor() {
     this.dataDir = config.paths.data;
     this.cache = new Map();
+    this.writeLocks = new Map();
     // 按ID拆分的集合配置
     this.splitByIdCollections = {
       'accounts': 'accounts',
@@ -244,13 +245,55 @@ class DataStore {
     }
   }
 
+  // 获取 per-ID 写锁，防止同一账号并发写入产生竞态条件
+  async acquireLock(lockKey) {
+    while (this.writeLocks.has(lockKey)) {
+      await this.writeLocks.get(lockKey);
+    }
+    let release;
+    const promise = new Promise((resolve) => {
+      release = () => {
+        this.writeLocks.delete(lockKey);
+        resolve();
+      };
+    });
+    this.writeLocks.set(lockKey, promise);
+    return release;
+  }
+
+  // 原子化的 rename，带重试：避免 Windows 文件句柄未释放导致 ENOENT/EACCES
+  async atomicRename(tmpPath, targetPath, retries = 5) {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        await fs.rename(tmpPath, targetPath);
+        return;
+      } catch (err) {
+        if (attempt === retries) throw err;
+        const delay = 50 * attempt;
+        logger.warn('rename 失败，准备重试', {
+          tmpPath,
+          targetPath,
+          attempt,
+          error: err.message,
+          delay
+        });
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+  }
+
   // 写入单个记录（用于按ID拆分的集合）
   async writeOne(collection, id, item) {
+    const lockKey = `${collection}:${id}`;
+    let release = null;
     try {
       if (!this.isSplitById(collection)) {
         // 非拆分集合，使用普通更新
         return await this.update(collection, id, item);
       }
+
+      // 同一 collection+id 串行写入，避免并发 rename 产生 ENOENT
+      release = await this.acquireLock(lockKey);
 
       // 保护 accounts 集合的 security 字段不被意外删除
       let writeItem = item;
@@ -281,7 +324,7 @@ class DataStore {
       // 先写临时文件，再重命名，避免写入过程中崩溃导致文件损坏
       const tmpPath = filePath + '.tmp';
       await fs.writeFile(tmpPath, JSON.stringify(writeItem, null, 2), 'utf8');
-      await fs.rename(tmpPath, filePath);
+      await this.atomicRename(tmpPath, filePath);
 
       logger.info('数据已保存到文件', { collection, id, path: filePath });
 
@@ -295,6 +338,8 @@ class DataStore {
     } catch (err) {
       logger.error('写入单条记录失败', { collection, id, error: err.message });
       return false;
+    } finally {
+      if (release) release();
     }
   }
 
