@@ -2,7 +2,7 @@
   "vip_week": {
     "id": "vip_week",
     "name": "VIP周卡",
-    "description": "7天VIP会员，经验×2，全场商品9折，尊享会员标识",
+    "description": "7天VIP会员，体验会员专属权益",
     "icon": "⭐",
     "price": 300,
     "category": "vip",
@@ -13,19 +13,33 @@
     "tags": [
       "VIP",
       "会员",
-      "经验"
+      "体验"
     ],
     "enabled": true,
     "rollout": 100,
     "days": 7,
     "expBonus": 2,
-    "dailyPrice": 43
+    "discountPercent": 10,
+    "dailyPrice": 43,
+    "benefits": [
+      "⚡ 对战经验 ×2",
+      "💎 全场商品 9折",
+      "💙 专属会员标识",
+      "📬 每日邮件礼包"
+    ],
+    "dailyReward": {
+      "title": "⭐ 周卡每日礼包",
+      "content": "感谢您的支持！每日礼包已为您准备好，请注意查收。\n\n会员到期后将停止发放每日礼包哦~",
+      "starCoins": 20,
+      "exp": 100,
+      "items": []
+    }
   },
   "vip_month": {
     "id": "vip_month",
     "name": "VIP月卡",
-    "description": "30天VIP会员，经验×2，全场商品9折，日均仅 27💎，比周卡省 37%",
-    "icon": "🌟",
+    "description": "30天VIP会员，性价比之选，日均仅 27💎",
+    "icon": "🌙",
     "price": 800,
     "category": "vip",
     "type": "membership",
@@ -35,22 +49,91 @@
     "tags": [
       "VIP",
       "会员",
-      "经验",
       "推荐"
     ],
     "enabled": true,
     "rollout": 100,
     "days": 30,
     "expBonus": 2,
+    "discountPercent": 10,
     "dailyPrice": 27,
     "recommend": true,
-    "savePercent": 37
+    "savePercent": 37,
+    "benefits": [
+      "⚡ 对战经验 ×2",
+      "💎 全场商品 9折",
+      "💜 紫色会员标识",
+      "📬 每日高级邮件礼包",
+      "🎨 专属头像框 🔒敬请期待"
+    ],
+    "dailyReward": {
+      "title": "🌙 月卡每日礼包",
+      "content": "感谢您的支持！高级每日礼包已为您准备好，请注意查收。\n\n会员到期后将停止发放每日礼包哦~",
+      "starCoins": 40,
+      "exp": 200,
+      "items": [
+        {
+          "id": "item_exp_potion",
+          "count": 1
+        }
+      ]
+    }
+  },
+  "vip_season": {
+    "id": "vip_season",
+    "name": "VIP季卡",
+    "description": "90天VIP会员，经验加成提升，全场8.5折，日均仅 22💎",
+    "icon": "🌸",
+    "price": 2000,
+    "category": "vip",
+    "type": "membership",
+    "rarity": "epic",
+    "usable": true,
+    "tradable": false,
+    "tags": [
+      "VIP",
+      "会员",
+      "季度",
+      "高性价比"
+    ],
+    "enabled": true,
+    "rollout": 100,
+    "days": 90,
+    "expBonus": 2.5,
+    "discountPercent": 15,
+    "dailyPrice": 22,
+    "savePercent": 49,
+    "benefits": [
+      "⚡ 对战经验 ×2.5",
+      "💎 全场商品 8.5折",
+      "💗 粉色会员标识",
+      "📬 每日尊享邮件礼包",
+      "🎨 专属头像框 🔒敬请期待",
+      "👑 专属称号 🔒敬请期待",
+      "🛒 限定商店解锁 🔒敬请期待"
+    ],
+    "dailyReward": {
+      "title": "🌸 季卡每日礼包",
+      "content": "感谢您的支持！尊享每日礼包已为您准备好，请注意查收。\n\n会员到期后将停止发放每日礼包哦~",
+      "starCoins": 80,
+      "exp": 400,
+      "items": [
+        {
+          "id": "item_exp_potion",
+          "count": 2
+        },
+        {
+          "id": "item_double_exp",
+          "count": 1
+        }
+      ]
+    }
   },
   "vip_year": {
     "id": "vip_year",
     "name": "VIP年卡",
-    "description": "365天VIP会员，经验×3，全场商品8.5折，日均仅 22💎，尊享年度会员徽章",
-    "icon": "💎",
+    "description": "365天VIP会员，尊享年度会员徽章，最高经验与折扣，日均仅 22💎",
+    "icon": "👑",
     "price": 8000,
     "category": "vip",
     "type": "membership",
@@ -61,14 +144,41 @@
       "VIP",
       "会员",
       "年度",
-      "超值"
+      "尊享"
     ],
     "enabled": true,
     "rollout": 100,
     "days": 365,
     "expBonus": 3,
+    "discountPercent": 15,
     "dailyPrice": 22,
     "savePercent": 49,
-    "bigDiscount": true
+    "bigDiscount": true,
+    "benefits": [
+      "⚡ 对战经验 ×3",
+      "💎 全场商品 8.5折",
+      "🏆 金色会员标识",
+      "📬 每日传说邮件礼包",
+      "🎨 专属金色头像框 🔒敬请期待",
+      "👑 专属传说称号 🔒敬请期待",
+      "🛒 限定商店解锁",
+      "🌟 排行榜金色高亮 🔒敬请期待"
+    ],
+    "dailyReward": {
+      "title": "👑 年卡每日礼包",
+      "content": "感谢您的尊享支持！传说级每日礼包已为您准备好，请注意查收。\n\n会员到期后将停止发放每日礼包哦~",
+      "starCoins": 150,
+      "exp": 1000,
+      "items": [
+        {
+          "id": "item_exp_potion",
+          "count": 3
+        },
+        {
+          "id": "item_triple_exp",
+          "count": 1
+        }
+      ]
+    }
   }
 }

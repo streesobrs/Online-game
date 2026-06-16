@@ -2809,6 +2809,13 @@ class AccountManager {
     if (cosmetics.slots === undefined || cosmetics.slots === null) cosmetics.slots = 0;
     if (!cosmetics.owned.avatars) cosmetics.owned.avatars = [];
     if (!cosmetics.owned.customAvatars) cosmetics.owned.customAvatars = [];
+    // 确保用户有默认头像和默认头像框
+    if (!cosmetics.owned.avatars.includes('avatar_default')) cosmetics.owned.avatars.push('avatar_default');
+    if (!cosmetics.owned.frames.includes('frame_default')) cosmetics.owned.frames.push('frame_default');
+    // 如果没有装备任何头像，装备默认头像
+    if (!cosmetics.equipped.avatar && !cosmetics.equipped.avatarCustom) cosmetics.equipped.avatar = 'avatar_default';
+    // 如果没有装备任何头像框，装备默认头像框
+    if (!cosmetics.equipped.frame) cosmetics.equipped.frame = 'frame_default';
     return { success: true, cosmetics };
   }
 
@@ -3288,17 +3295,36 @@ class AccountManager {
    */
   async getVip(userId) {
     const account = await this._getAccount(userId);
-    const vip = account?.vip || { type: null, expireAt: 0, expBonus: 0, lastDailyGift: 0, lastWeeklyGift: 0, lastMonthlyGift: 0 };
+    const vip = account?.vip || { type: null, expireAt: 0, expBonus: 0, lastDailyGift: 0, lastWeeklyGift: 0, lastMonthlyGift: 0, lastDailyGiftDate: '' };
 
     const now = Date.now();
     const isActive = vip.expireAt > now;
-    // 按会员类型返回折扣百分比（10 表示 9 折，15 表示 8.5 折）
+
     let discountPercent = 0;
-    if (isActive) {
-      if (vip.type === 'vip_year') {
-        discountPercent = 15;
-      } else {
-        discountPercent = 10;
+    let expBonus = vip.expBonus || 0;
+    if (isActive && vip.type) {
+      const vipConfigPath = path.join(__dirname, '..', 'config', 'shop', 'vip.json');
+      try {
+        if (fs.existsSync(vipConfigPath)) {
+          const vipConfig = JSON.parse(fs.readFileSync(vipConfigPath, 'utf8'));
+          const cfg = vipConfig[vip.type];
+          if (cfg) {
+            discountPercent = cfg.discountPercent || 0;
+            expBonus = Math.max(expBonus, cfg.expBonus || 0);
+          }
+        }
+      } catch (e) { /* 读取失败时用默认值 */ }
+
+      if (discountPercent === 0) {
+        if (vip.type === 'vip_year' || vip.type === 'vip_season') discountPercent = 15;
+        else discountPercent = 10;
+      }
+
+      // 检查并发送每日邮件礼包
+      try {
+        await this.checkAndSendDailyReward(userId);
+      } catch (e) {
+        logger.warn('每日礼包发送失败', { userId, error: e.message });
       }
     }
 
@@ -3306,6 +3332,7 @@ class AccountManager {
       success: true,
       vip: {
         ...vip,
+        expBonus,
         isActive,
         discountPercent,
         remainingDays: isActive ? Math.ceil((vip.expireAt - now) / (1000 * 60 * 60 * 24)) : 0,
@@ -3313,6 +3340,148 @@ class AccountManager {
         expireAtFormatted: isActive ? new Date(vip.expireAt).toLocaleString('zh-CN', { hour12: false }) : ''
       }
     };
+  }
+
+  /**
+   * 检查并发送会员每日邮件礼包（根据VIP等级发放不同奖励）
+   * 每天最多发一次，通过日期字符串去重
+   */
+  async checkAndSendDailyReward(userId) {
+    const account = await this._getAccount(userId);
+    if (!account || !account.vip) return;
+
+    const vip = account.vip;
+    const now = Date.now();
+    if (vip.expireAt <= now) return; // 非激活会员不发
+    if (!vip.type) return;
+
+    const today = new Date(now).toISOString().slice(0, 10); // YYYY-MM-DD
+    if (vip.lastDailyGiftDate === today) return; // 今天已发过
+
+    // 读取每日奖励配置
+    const vipConfigPath = path.join(__dirname, '..', 'config', 'shop', 'vip.json');
+    let vipConfig;
+    try {
+      if (!fs.existsSync(vipConfigPath)) return;
+      vipConfig = JSON.parse(fs.readFileSync(vipConfigPath, 'utf8'));
+    } catch (e) { return; }
+
+    const cfg = vipConfig[vip.type];
+    if (!cfg || !cfg.dailyReward) return;
+
+    const reward = cfg.dailyReward;
+
+    // 发送邮件
+    const mailData = {
+      title: reward.title || '会员每日礼包',
+      content: reward.content || '每日礼包已送达',
+      starCoins: reward.starCoins || 0,
+      exp: reward.exp || 0,
+      from: '会员中心'
+    };
+    if (Array.isArray(reward.items) && reward.items.length > 0) {
+      mailData.items = reward.items;
+    }
+
+    // 发送邮件前二次检查最新状态，防止与 batchCheckAndSendDailyRewards 并发导致重复发
+    const freshAccount = await this._getAccount(userId);
+    if (!freshAccount || !freshAccount.vip) return;
+    if (freshAccount.vip.lastDailyGiftDate === today) return; // 已被定时任务发过了
+
+    const sendResult = await this.sendMail(userId, mailData);
+    if (!sendResult.success) return;
+
+    // 记录发送日期，确保每天只发一次
+    freshAccount.vip.lastDailyGiftDate = today;
+    await this._saveAccount(userId, freshAccount);
+    logger.info('会员每日礼包已发放', { userId, vipType: freshAccount.vip.type, date: today });
+  }
+
+  /**
+   * 批量检查并发送所有VIP每日邮件礼包（服务器定时调用，不依赖用户登录）
+   * 遍历所有账号，找出VIP在有效期内且今天还没发过礼包的用户，自动发邮件
+   */
+  async batchCheckAndSendDailyRewards() {
+    try {
+      const accounts = await dataStore.read('accounts');
+      const now = Date.now();
+      const today = new Date(now).toISOString().slice(0, 10);
+
+      // 读取VIP配置
+      const vipConfigPath = path.join(__dirname, '..', 'config', 'shop', 'vip.json');
+      let vipConfig;
+      try {
+        if (!fs.existsSync(vipConfigPath)) {
+          return { success: true, sent: 0, total: 0, reason: 'vip config not found' };
+        }
+        vipConfig = JSON.parse(fs.readFileSync(vipConfigPath, 'utf8'));
+      } catch (e) {
+        return { success: false, sent: 0, total: 0, reason: 'vip config read error' };
+      }
+
+      let sentCount = 0;
+      let totalVipActive = 0;
+
+      for (const account of accounts) {
+        try {
+          const vip = account.vip;
+          if (!vip || !vip.type) continue;
+          if (vip.expireAt <= now) continue;
+          totalVipActive++;
+
+          const userId = account.account?.id;
+          if (!userId) continue;
+
+          // 发送邮件前重新读取最新账号数据，防止与 checkAndSendDailyReward 并发导致重复发
+          const freshAccount = await this._getAccount(userId);
+          if (!freshAccount || !freshAccount.vip) continue;
+          if (freshAccount.vip.expireAt <= now) continue;
+          if (freshAccount.vip.lastDailyGiftDate === today) continue; // 已发过，跳过
+
+          const cfg = vipConfig[freshAccount.vip.type];
+          if (!cfg || !cfg.dailyReward) continue;
+
+          const reward = cfg.dailyReward;
+          const mailData = {
+            title: reward.title || '会员每日礼包',
+            content: reward.content || '每日礼包已送达',
+            starCoins: reward.starCoins || 0,
+            exp: reward.exp || 0,
+            from: '会员中心'
+          };
+          if (Array.isArray(reward.items) && reward.items.length > 0) {
+            mailData.items = reward.items;
+          }
+
+          const sendResult = await this.sendMail(userId, mailData);
+          if (sendResult.success) {
+            freshAccount.vip.lastDailyGiftDate = today;
+            await this._saveAccount(userId, freshAccount);
+            sentCount++;
+            logger.info('定时任务-会员每日礼包已发放', { userId, vipType: freshAccount.vip.type, date: today });
+          }
+        } catch (err) {
+          logger.warn('定时任务-单个账号VIP礼包发送失败', { accountId: account.account?.id, error: err.message });
+        }
+      }
+
+      logger.info('定时任务-VIP每日礼包批量检查完成', { activeVip: totalVipActive, sent: sentCount });
+      return { success: true, sent: sentCount, total: totalVipActive };
+    } catch (err) {
+      logger.error('定时任务-VIP每日礼包批量检查失败', { error: err.message });
+      return { success: false, sent: 0, total: 0, reason: err.message };
+    }
+  }
+
+  /**
+   * 统一触发器入口：服务器定时调用，检查所有需要发送的邮件
+   * 目前包括：VIP每日礼包
+   * 后续可扩展：等级奖励邮件、成就邮件、指定时间邮件等
+   */
+  async checkAndSendAllTriggers() {
+    const results = {};
+    results.vipDaily = await this.batchCheckAndSendDailyRewards();
+    return results;
   }
 
   /**
@@ -3353,7 +3522,21 @@ class AccountManager {
     } else {
       account.vip.expireAt = now + days * 24 * 60 * 60 * 1000;
     }
-    account.vip.type = `vip_${days === 7 ? 'week' : days === 30 ? 'month' : 'year'}`;
+
+    let newType;
+    if (days === 7) newType = 'vip_week';
+    else if (days === 30) newType = 'vip_month';
+    else if (days === 90) newType = 'vip_season';
+    else newType = 'vip_year';
+
+    const priority = { vip_week: 1, vip_month: 2, vip_season: 3, vip_year: 4 };
+    const currentPriority = priority[account.vip.type] || 0;
+    const newPriority = priority[newType] || 0;
+
+    if (newPriority >= currentPriority) {
+      account.vip.type = newType;
+    }
+
     account.vip.expBonus = Math.max(account.vip.expBonus || 0, expBonus);
 
     await this._saveAccount(userId, account);

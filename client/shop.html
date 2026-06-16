@@ -138,6 +138,47 @@
       color: white;
     }
 
+    .shop-sub-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      padding: 6px;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .shop-sub-tabs.cosmetic-tabs {
+      background: #f8f9fa;
+      box-shadow: none;
+    }
+
+    .shop-sub-tab {
+      padding: 8px 14px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 14px;
+      background: transparent;
+      color: #6c757d;
+      transition: all 0.2s ease;
+    }
+
+    .shop-sub-tab:hover {
+      background: #e9ecef;
+      color: #495057;
+    }
+
+    .shop-sub-tab.active {
+      background: #007bff;
+      color: white;
+    }
+
+    .cosmetic-tabs .shop-sub-tab.active {
+      background: #6f42c1;
+    }
+
     /* ===== 商品网格 ===== */
     .items-grid {
       display: grid;
@@ -151,6 +192,9 @@
       border-radius: 12px;
       box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
       text-align: center;
+      display: flex;
+      flex-direction: column;
+      min-height: 340px;
     }
 
     .item-card:hover {
@@ -188,6 +232,18 @@
       margin-bottom: 12px;
     }
 
+    .item-count {
+      font-size: 13px;
+      color: #28a745;
+      font-weight: 600;
+      margin-bottom: 10px;
+      min-height: 18px;
+    }
+
+    .card-footer {
+      margin-top: auto;
+    }
+
     .buy-btn {
       width: 100%;
       padding: 12px;
@@ -215,6 +271,22 @@
     .buy-btn:disabled {
       background: #adb5bd;
       cursor: not-allowed;
+    }
+
+    .quick-buy-btn {
+      margin-top: 12px;
+      background: linear-gradient(135deg, #007bff, #0056b3);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .quick-buy-btn:hover {
+      background: linear-gradient(135deg, #0056b3, #003d82);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0, 123, 255, 0.3);
+    }
+
+    .vip-buy-btn {
+      margin-top: 14px;
     }
 
     .item-card.disabled {
@@ -369,12 +441,15 @@
       background: white;
       border: 2px solid;
       border-radius: 16px;
-      padding: 28px 24px;
+      padding: 28px 20px 24px;
       position: relative;
       cursor: pointer;
       transition: all 0.25s ease;
       text-align: center;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      display: flex;
+      flex-direction: column;
+      min-height: 380px;
     }
 
     .vip-card:hover {
@@ -396,15 +471,17 @@
     }
 
     .vip-card-icon {
-      width: 64px;
-      height: 64px;
+      width: 60px;
+      height: 60px;
       margin: 0 auto 16px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 28px;
+      font-size: 30px;
+      line-height: 1;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      flex-shrink: 0;
     }
 
     .vip-card-title {
@@ -431,7 +508,8 @@
       flex-direction: column;
       gap: 8px;
       margin-bottom: 16px;
-      min-height: 90px;
+      min-height: 110px;
+      flex: 1;
     }
 
     .vip-benefit-row {
@@ -441,7 +519,9 @@
       font-size: 13px;
       color: #495057;
       text-align: left;
-      padding: 0 10px;
+      justify-content: center;
+      line-height: 1.4;
+      min-height: 20px;
     }
 
     .vip-check {
@@ -454,7 +534,7 @@
       align-items: center;
       justify-content: center;
       gap: 6px;
-      margin-top: 8px;
+      margin-top: auto;
     }
 
     .price-icon {
@@ -471,6 +551,109 @@
       font-size: 12px;
       color: #adb5bd;
       margin-top: 6px;
+    }
+
+    /* ===== 会员特权横向对比表 ===== */
+    .vip-compare-wrap {
+      margin-top: 32px;
+      padding: 24px 20px;
+      background: #ffffff;
+      border-radius: 12px;
+      border: 1px solid #e9ecef;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .vip-compare-title {
+      font-size: 18px;
+      font-weight: bold;
+      color: #2d3748;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .vip-compare-table {
+      display: flex;
+      flex-direction: column;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #dee2e6;
+    }
+
+    .vip-compare-row {
+      display: grid;
+      grid-template-columns: 180px repeat(5, 1fr);
+      background: #ffffff;
+    }
+
+    .vip-compare-row:nth-child(even) {
+      background: #f8f9fa;
+    }
+
+    .vip-compare-row.header {
+      background: #f1f3f5;
+      color: #2d3748;
+      font-weight: bold;
+      border-bottom: 2px solid #ced4da;
+    }
+
+    .vip-compare-row.header .vip-compare-cell {
+      color: #495057;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .vip-compare-cell {
+      padding: 14px 10px;
+      font-size: 13px;
+      text-align: center;
+      color: #495057;
+      border-right: 1px solid #e9ecef;
+      border-bottom: 1px solid #e9ecef;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1.4;
+    }
+
+    .vip-compare-row:last-child .vip-compare-cell {
+      border-bottom: none;
+    }
+
+    .vip-compare-cell:last-child {
+      border-right: none;
+    }
+
+    .vip-compare-cell.cell-label {
+      text-align: left;
+      font-weight: 600;
+      justify-content: flex-start;
+      padding-left: 16px;
+      background: #f8f9fa;
+      color: #495057;
+    }
+
+    .vip-compare-row:nth-child(even) .vip-compare-cell.cell-label {
+      background: #e9ecef;
+    }
+
+    @media (max-width: 900px) {
+      .vip-compare-wrap {
+        padding: 12px;
+        overflow-x: auto;
+      }
+
+      .vip-compare-table {
+        min-width: 800px;
+      }
+
+      .vip-compare-row {
+        grid-template-columns: 140px repeat(5, 1fr);
+      }
+
+      .vip-compare-cell {
+        font-size: 12px;
+        padding: 10px 6px;
+      }
     }
 
     @media (max-width: 600px) {
@@ -519,9 +702,65 @@
     }
 
     .equipped-tag {
-      color: #52c41a;
+      color: white;
+      background: linear-gradient(135deg, #52c41a, #389e0d);
+      padding: 4px 14px;
+      border-radius: 12px;
       font-weight: bold;
       margin-bottom: 8px;
+      font-size: 12px;
+      display: inline-block;
+      box-shadow: 0 2px 8px rgba(82, 196, 26, 0.3);
+    }
+
+    .equipped-card {
+      border: 2px solid #52c41a !important;
+      box-shadow: 0 4px 16px rgba(82, 196, 26, 0.25) !important;
+    }
+
+    /* ===== 头像框环形边框 ===== */
+    .cosmetic-item-icon {
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .frame-ring {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      position: relative;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      transition: transform 0.3s ease;
+      padding: 6px;
+    }
+
+    .frame-ring::before {
+      content: '';
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      right: 6px;
+      bottom: 6px;
+      border-radius: 50%;
+      background: white;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .frame-ring::after {
+      content: '👤';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 22px;
+    }
+
+    .item-card:hover .frame-ring {
+      transform: scale(1.1) rotate(5deg);
     }
 
     /* ===== 消息提示 ===== */
@@ -840,27 +1079,61 @@
 
     .action-btn {
       flex: 1;
-      padding: 12px;
+      padding: 14px 16px;
       border: none;
-      border-radius: 8px;
+      border-radius: 10px;
       font-size: 15px;
       font-weight: bold;
       cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .action-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
 
     .action-btn.primary {
-      background: #007bff;
+      background: linear-gradient(135deg, #007bff, #0056b3);
       color: white;
+      flex: 3;
     }
 
     .action-btn.buy {
-      background: #fda085;
+      background: linear-gradient(135deg, #007bff, #0056b3);
       color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex: 3;
     }
 
     .action-btn.secondary {
-      background: #6c757d;
-      color: white;
+      background: #e9ecef;
+      color: #495057;
+      flex: 1;
+    }
+
+    .buy-price {
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    .buy-sep {
+      opacity: 0.5;
+    }
+
+    .buy-label {
+      font-size: 15px;
+    }
+
+    .buy-original {
+      font-size: 12px;
+      opacity: 0.65;
+      text-decoration: line-through;
+      margin-left: 6px;
     }
 
     .item-count-badge {
@@ -897,18 +1170,44 @@
       </div>
     </div>
 
-    <!-- 商店标签 -->
+    <!-- 商店主标签 -->
     <div class="shop-tabs">
-      <button class="shop-tab active" data-tab="items">道具</button>
-      <button class="shop-tab" data-tab="cosmetics">外观</button>
-      <button class="shop-tab" data-tab="packs">礼包</button>
-      <button class="shop-tab" data-tab="vip">会员</button>
-      <button class="shop-tab" data-tab="inventory">背包</button>
+      <button class="shop-tab active" data-tab="shop">🛒 商品</button>
+      <button class="shop-tab" data-tab="vip">👑 会员</button>
+      <button class="shop-tab" data-tab="inventory">🎒 背包</button>
     </div>
 
-    <!-- 搜索和筛选栏 -->
-    <div class="search-filter-bar" id="searchFilterBar" style="display:none;">
-      <input type="text" class="search-input" id="searchInput" placeholder="🔍 搜索道具、名称、描述、标签...">
+    <!-- 商品二级标签（道具/外观/礼包） -->
+    <div class="shop-sub-tabs" id="shopSubTabs">
+      <button class="shop-sub-tab active" data-sub="items">道具</button>
+      <button class="shop-sub-tab" data-sub="cosmetics">外观</button>
+      <button class="shop-sub-tab" data-sub="packs">礼包</button>
+    </div>
+
+    <!-- 外观三级标签（头像/头像框/皮肤/背景/称号） -->
+    <div class="shop-sub-tabs cosmetic-tabs" id="cosmeticTabs" style="display:none;">
+      <button class="shop-sub-tab active" data-cosmetic="avatars">头像</button>
+      <button class="shop-sub-tab" data-cosmetic="frames">头像框</button>
+      <button class="shop-sub-tab" data-cosmetic="skins">皮肤</button>
+      <button class="shop-sub-tab" data-cosmetic="backgrounds">背景</button>
+      <button class="shop-sub-tab" data-cosmetic="titles">称号</button>
+    </div>
+
+    <!-- 背包二级标签（全部/道具/礼包/头像/头像框/皮肤/背景/称号） -->
+    <div class="shop-sub-tabs inventory-tabs" id="inventoryTabs" style="display:none; flex-wrap: wrap;">
+      <button class="shop-sub-tab active" data-inv="all">全部</button>
+      <button class="shop-sub-tab" data-inv="items">道具</button>
+      <button class="shop-sub-tab" data-inv="packs">礼包</button>
+      <button class="shop-sub-tab" data-inv="avatars">头像</button>
+      <button class="shop-sub-tab" data-inv="frames">头像框</button>
+      <button class="shop-sub-tab" data-inv="skins">皮肤</button>
+      <button class="shop-sub-tab" data-inv="backgrounds">背景</button>
+      <button class="shop-sub-tab" data-inv="titles">称号</button>
+    </div>
+
+    <!-- 搜索和筛选栏（全局显示） -->
+    <div class="search-filter-bar" id="searchFilterBar">
+      <input type="text" class="search-input" id="searchInput" placeholder="🔍 搜索商品、名称、描述、标签...">
       <select class="filter-select" id="rarityFilter">
         <option value="">全部稀有度</option>
         <option value="common">普通</option>
@@ -932,7 +1231,10 @@
     let inventory = null;
     let cosmetics = null;
     let vipInfo = null;
-    let activeTab = 'items';
+    let activeTab = 'shop';
+    let activeSubTab = 'items';
+    let activeCosmeticTab = 'avatars';
+    let activeInvTab = 'all';
     let searchKeyword = '';
     let rarityFilter = '';
 
@@ -1043,25 +1345,65 @@
       // 生成礼包内容HTML
       let contentHtml = '';
       if (itemType === 'pack' && item.content) {
+        let packRows = '';
+        for (const [itemId, count] of Object.entries(item.content)) {
+          const itemInfo = shopData.items?.[itemId];
+          packRows += `
+            <div class="info-item" style="flex-direction: row; justify-content: space-between; align-items: center;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 20px;">${itemInfo?.icon || '📦'}</span>
+                <span style="font-weight: bold;">${itemInfo?.name || itemId}</span>
+              </div>
+              <span style="font-weight: bold; color: #007bff;">×${count}</span>
+            </div>
+          `;
+        }
         contentHtml = `
           <div class="detail-section">
             <h4>🎁 礼包内容</h4>
             <div class="info-grid" style="grid-template-columns: 1fr;">
-              ${Object.entries(item.content).map(([itemId, count]) => {
-          const itemInfo = shopData.items?.[itemId];
-          return `
-                  <div class="info-item" style="flex-direction: row; justify-content: space-between; align-items: center;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                      <span style="font-size: 20px;">${itemInfo?.icon || '📦'}</span>
-                      <span style="font-weight: bold;">${itemInfo?.name || itemId}</span>
-                    </div>
-                    <span style="font-weight: bold; color: #007bff;">×${count}</span>
-                  </div>
-                `;
-        }).join('')}
+              ${packRows}
             </div>
           </div>
         `;
+      }
+
+      // VIP 特权 + 每日礼包显示
+      let vipBenefitHtml = '';
+      if (itemType === 'vip') {
+        const benefits = Array.isArray(item.benefits) && item.benefits.length > 0
+          ? item.benefits
+          : [
+            `⚡ 经验 ×${item.expBonus || 2}`,
+            item.discountPercent ? `💎 全场 ${(100 - item.discountPercent)}折` : '💎 专属会员标识'
+          ];
+        const daily = item.dailyReward;
+        const color = rarity.color;
+
+        let benefitRows = '';
+        for (const b of benefits) {
+          benefitRows += `<div class="info-item" style="flex-direction:row; justify-content:flex-start; align-items:center; gap:8px;"><span style="color:${color}; font-weight:bold;">✓</span><span>${b}</span></div>`;
+        }
+
+        let dailyHtml = '';
+        if (daily) {
+          dailyHtml = '<div class="detail-section"><h4>📬 每日邮件礼包</h4>';
+          dailyHtml += '<div class="info-grid">';
+          if (daily.starCoins) dailyHtml += `<div class="info-item"><span class="info-label">💎 星钻</span><span class="info-value">+${daily.starCoins}/天</span></div>`;
+          if (daily.exp) dailyHtml += `<div class="info-item"><span class="info-label">📈 经验</span><span class="info-value">+${daily.exp}/天</span></div>`;
+          dailyHtml += '</div>';
+          if (Array.isArray(daily.items) && daily.items.length > 0) {
+            dailyHtml += '<div class="info-grid" style="grid-template-columns: 1fr; margin-top: 8px;">';
+            for (const it of daily.items) {
+              const info = shopData.items?.[it.id];
+              dailyHtml += `<div class="info-item" style="flex-direction:row; justify-content:space-between; align-items:center;"><span style="display:flex; align-items:center; gap:6px;"><span style="font-size:18px;">${info?.icon || '📦'}</span><span>${info?.name || it.id}</span></span><span style="font-weight:bold; color:#007bff;">×${it.count}/天</span></div>`;
+            }
+            dailyHtml += '</div>';
+          }
+          dailyHtml += '</div>';
+        }
+
+        vipBenefitHtml = `<div class="detail-section"><h4>✨ 会员特权</h4><div class="info-grid" style="grid-template-columns: 1fr;">${benefitRows}</div></div>${dailyHtml}`;
       }
 
       const modalHtml = `
@@ -1084,6 +1426,8 @@
                 </div>
 
                 ${contentHtml}
+
+                ${vipBenefitHtml}
 
                 ${item.tags && item.tags.length > 0 ? `
                 <div class="detail-section">
@@ -1127,19 +1471,15 @@
 
               <div class="item-detail-actions">
                 ${fromInventory && (item.usable || itemType === 'pack') ? `
-                  <button class="action-btn primary" onclick="useItem('${itemId}'); closeItemDetail();">${itemType === 'pack' ? '开启' : '使用'}</button>
+                  <button class="action-btn primary" onclick="useItem('${itemId}'); closeItemDetail();">${itemType === 'pack' ? '🎁 开启' : '✋ 使用'}</button>
                 ` : ''}
                 ${!fromInventory && item.price ? `
-                  <div style="display:flex; align-items:center; gap:8px; flex:1;">
-                    <div style="display:flex; align-items:center; gap:2px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:6px; overflow:hidden;">
-                      <button style="width:32px;height:32px;border:none;background:transparent;cursor:pointer;font-weight:bold;color:#495057;font-size:18px;display:flex;align-items:center;justify-content:center;" onclick="document.getElementById('modal-qty-${itemId}').textContent = Math.max(1, parseInt(document.getElementById('modal-qty-${itemId}').textContent)-1">−</button>
-                      <span style="width:36px;text-align:center;font-weight:700;font-size:16px;color:#2d3748;" id="modal-qty-${itemId}">1</span>
-                      <button style="width:32px;height:32px;border:none;background:transparent;cursor:pointer;font-weight:bold;color:#495057;font-size:18px;display:flex;align-items:center;justify-content:center;" onclick="document.getElementById('modal-qty-${itemId}').textContent = Math.min(999, parseInt(document.getElementById('modal-qty-${itemId}').textContent)+1)">+</button>
-                    </div>
-                    <button class="action-btn buy" style="flex:1;" onclick="buyItem('${itemId}', parseInt(document.getElementById('modal-qty-${itemId}').textContent)||1); closeItemDetail();">
-                      ${showItemDiscount ? `💎 ${itemDiscountPrice} <span style="font-size:12px; text-decoration:line-through; opacity:0.6;">原价 ${item.price}</span>` : `💎 ${item.price}`} 购买
-                    </button>
-                  </div>
+                  <button class="action-btn buy" onclick="buyItem('${itemId}', parseInt(document.getElementById('modal-qty-${itemId}')?.textContent||'1')); closeItemDetail();">
+                    <span class="buy-price">💎 ${showItemDiscount ? itemDiscountPrice : item.price}</span>
+                    <span class="buy-sep">·</span>
+                    <span class="buy-label">购买</span>
+                    ${showItemDiscount ? `<span class="buy-original">原价 ${item.price}</span>` : ''}
+                  </button>
                 ` : ''}
                 <button class="action-btn secondary" onclick="closeItemDetail()">关闭</button>
               </div>
@@ -1233,7 +1573,6 @@
         });
         const data = await res.json();
         if (data.success) {
-          // 判断是否为 VIP 商品，提供更醒目的提示
           const isVipItem = typeof itemId === 'string' && itemId.startsWith('vip_');
           if (isVipItem) {
             const vipMap = { 'vip_week': '周卡', 'vip_month': '月卡', 'vip_year': '年卡' };
@@ -1246,7 +1585,8 @@
           } else {
             showMessage(data.message || '购买成功！', 'success');
           }
-          await loadData();
+          refreshState(data);
+          renderTab();
         } else {
           showMessage(data.message || '购买失败', 'error');
         }
@@ -1255,7 +1595,38 @@
       }
     }
 
-    async function equipCosmetic(category, cosmeticId) {
+    async function buyCosmetic(category, cosmeticId) {
+      try {
+        const res = await fetch(`${API_BASE}/shop/buy`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, itemId: cosmeticId, quantity: 1 })
+        });
+        const data = await res.json();
+        if (data.success) {
+          refreshState(data);
+          await equipCosmetic(category, cosmeticId, true);
+        } else {
+          showMessage(data.message || '购买失败', 'error');
+        }
+      } catch (e) {
+        showMessage('网络错误', 'error');
+      }
+    }
+
+    function refreshState(data) {
+      if (data.account) {
+        if (typeof data.account.starCoins === 'number') {
+          const el = document.getElementById('starCoins');
+          if (el) el.textContent = data.account.starCoins;
+        }
+        if (data.account.inventory) inventory = data.account.inventory;
+        if (data.account.cosmetics) cosmetics = data.account.cosmetics;
+        if (data.account.vip) vipInfo = data.account.vip;
+      }
+    }
+
+    async function equipCosmetic(category, cosmeticId, silent) {
       try {
         const res = await fetch(`${API_BASE}/shop/cosmetics/equip`, {
           method: 'POST',
@@ -1264,8 +1635,9 @@
         });
         const data = await res.json();
         if (data.success) {
-          showMessage('装备成功！', 'success');
-          await loadData();
+          if (!silent) showMessage('装备成功！', 'success');
+          refreshState(data);
+          renderTab();
         } else {
           showMessage(data.message || '装备失败', 'error');
         }
@@ -1289,7 +1661,8 @@
           } else {
             showMessage(data.message || '使用成功！', 'success');
           }
-          await loadData();
+          refreshState(data);
+          renderTab();
         } else {
           showMessage(data.message || '使用失败', 'error');
         }
@@ -1342,18 +1715,13 @@
                 ${item.tags.slice(0, 3).map(tag => `<span class="item-tag">${tag}</span>`).join('')}
               </div>
             ` : ''}
-            <div class="item-price">
-              ${showDiscount ? `<span style="text-decoration: line-through; color: #adb5bd; font-size: 14px;">💎${item.price}</span> ` : ''}
-              💎 ${discountedPrice}
-            </div>
-            ${count > 0 ? `<div class="item-count">已拥有: ${count}</div>` : ''}
-            <div style="display:flex; align-items:center; gap:6px; margin-top:8px;" onclick="event.stopPropagation();">
-              <div style="display:flex; align-items:center; gap:2px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:6px; overflow:hidden;">
-                <button style="width:28px;height:28px;border:none;background:transparent;cursor:pointer;font-weight:bold;color:#495057;font-size:16px;display:flex;align-items:center;justify-content:center;" onclick="changeQty('${id}', -1)">−</button>
-                <span style="width:32px;text-align:center;font-weight:600;font-size:14px;color:#2d3748;" id="qty-${id}">1</span>
-                <button style="width:28px;height:28px;border:none;background:transparent;cursor:pointer;font-weight:bold;color:#495057;font-size:16px;display:flex;align-items:center;justify-content:center;" onclick="changeQty('${id}', 1)">+</button>
+            <div class="card-footer">
+              <div class="item-price">
+                ${showDiscount ? `<span style="text-decoration: line-through; color: #adb5bd; font-size: 14px;">💎${item.price}</span> ` : ''}
+                💎 ${discountedPrice}
               </div>
-              <button class="buy-btn" style="flex:1; padding:8px 12px; font-size:13px;" onclick="buyItemWithQty('${id}')">购买</button>
+              ${count > 0 ? `<div class="item-count">已拥有: ${count}</div>` : '<div class="item-count"></div>'}
+              <button class="buy-btn quick-buy-btn" onclick="event.stopPropagation(); buyItem('${id}');">💎 ${discountedPrice} · 购买</button>
             </div>
           </div>
         `;
@@ -1362,60 +1730,69 @@
       return html;
     }
 
-    // 批量购买数量状态
-    const itemQtys = {};
-    function changeQty(itemId, delta) {
-      if (!itemQtys[itemId]) itemQtys[itemId] = 1;
-      itemQtys[itemId] = Math.max(1, Math.min(999, (itemQtys[itemId] || 1) + delta));
-      const el = document.getElementById(`qty-${itemId}`);
-      if (el) el.textContent = itemQtys[itemId];
-    }
-    function buyItemWithQty(itemId) {
-      const qty = itemQtys[itemId] || 1;
-      buyItem(itemId, qty);
-    }
-
     function renderCosmetics() {
       if (!shopData || !cosmetics) return '<div class="loading">加载中...</div>';
 
-      const categories = [
-        { key: 'frames', title: '头像框', category: 'frame' },
-        { key: 'skins', title: '皮肤', category: 'skin' },
-        { key: 'backgrounds', title: '背景', category: 'background' },
-        { key: 'titles', title: '称号', category: 'title' }
-      ];
+      const categories = {
+        avatars: { title: '头像', category: 'avatar' },
+        frames: { title: '头像框', category: 'frame' },
+        skins: { title: '皮肤', category: 'skin' },
+        backgrounds: { title: '背景', category: 'background' },
+        titles: { title: '称号', category: 'title' }
+      };
 
-      let html = '';
-      for (const cat of categories) {
-        const items = shopData[cat.key] || {};
-        if (Object.keys(items).length === 0) continue;
+      const cat = categories[activeCosmeticTab] || categories.avatars;
+      const items = shopData[activeCosmeticTab] || {};
 
-        html += `<div class="category-title">${cat.title}</div>`;
-        html += '<div class="items-grid">';
-        for (const [id, item] of Object.entries(items)) {
-          const isComingSoon = item.enabled === false;
-          const owned = cosmetics.owned?.[cat.key]?.includes(id);
-          const equipped = cosmetics.equipped?.[cat.category] === id;
+      if (Object.keys(items).length === 0) {
+        return '<div class="inventory-empty">暂无商品</div>';
+      }
 
-          html += `
-            <div class="item-card ${isComingSoon ? 'disabled' : ''}">
-              <div class="item-icon">${item.icon}</div>
-              <div class="item-name">${item.name}</div>
-              <div class="item-desc">${item.description}</div>
-              ${!isComingSoon && !owned ? `<div class="item-price">💎 ${item.price}</div>` : ''}
-              ${!isComingSoon && equipped ? `<div class="equipped-tag">已装备</div>` : ''}
+      let html = `<div class="category-title">${cat.title}</div>`;
+      html += '<div class="items-grid">';
+
+      for (const [id, item] of Object.entries(items)) {
+        const isComingSoon = item.enabled === false;
+        const owned = cosmetics.owned?.[activeCosmeticTab]?.includes(id);
+        const equipped = cosmetics.equipped?.[cat.category] === id;
+        const isVipActive = vipInfo?.expireAt > Date.now();
+        const isVipOnly = item.vipOnly === true;
+        const canBuy = !isComingSoon && !owned && item.price > 0 && (!isVipOnly || isVipActive);
+
+        const rarityClass = item.rarity ? `rarity-${item.rarity}` : '';
+        const glowClass = (item.rarity === 'legendary' || item.rarity === 'epic') ? `glow-${item.rarity}` : '';
+        const rarityName = RARITY_CONFIG[item.rarity]?.name || '普通';
+
+        let iconHtml = '';
+        if (cat.category === 'frame') {
+          const frameBg = item.color || 'rgba(160,174,192,0.3)';
+          iconHtml = `<div class="cosmetic-item-icon"><div class="frame-ring" style="background:${frameBg};"></div></div>`;
+        } else {
+          iconHtml = `<div class="item-icon">${item.emoji || item.icon || '📦'}</div>`;
+        }
+
+        html += `
+          <div class="item-card ${rarityClass} ${glowClass} ${isComingSoon ? 'disabled' : ''} ${equipped ? 'equipped-card' : ''}">
+            ${iconHtml}
+            <div class="item-name">${item.name}</div>
+            <div class="item-desc">${item.description}</div>
+            <div class="rarity-badge ${item.rarity || 'common'}">${rarityName}</div>
+            <div class="card-footer">
+              ${canBuy ? `<div class="item-price">💎 ${item.price}</div>` : '<div class="item-price" style="visibility:hidden">💎 0</div>'}
+              ${!isComingSoon && equipped ? `<div class="equipped-tag">✓ 已装备</div>` : ''}
               ${!isComingSoon && owned && !equipped ? `
                 <button class="buy-btn equip" onclick="equipCosmetic('${cat.category}', '${id}')">装备</button>
               ` : ''}
-              ${!isComingSoon && !owned ? `<button class="buy-btn" onclick="buyItem('${id}')">购买</button>` : ''}
+              ${canBuy ? `<button class="buy-btn quick-buy-btn" onclick="buyCosmetic('${cat.category}', '${id}')">💎 ${item.price} · 购买并装备</button>` : ''}
               ${isComingSoon ? `<button class="buy-btn" disabled>敬请期待</button>` : ''}
+              ${!isComingSoon && isVipOnly && !isVipActive && !owned ? `<button class="buy-btn" disabled>VIP专属</button>` : ''}
             </div>
-          `;
-        }
-        html += '</div>';
+          </div>
+        `;
       }
 
-      return html || '<div class="inventory-empty">暂无商品</div>';
+      html += '</div>';
+      return html;
     }
 
     function renderPacks() {
@@ -1462,17 +1839,13 @@
                 ${pack.tags.slice(0, 3).map(tag => `<span class="item-tag">${tag}</span>`).join('')}
               </div>
             ` : ''}
-            <div class="item-price">
-              ${showDiscount ? `<span style="text-decoration: line-through; color: #adb5bd; font-size: 14px;">💎${pack.price}</span> ` : ''}
-              💎 ${discountedPrice}
-            </div>
-            <div style="display:flex; align-items:center; gap:6px; margin-top:8px;" onclick="event.stopPropagation();">
-              <div style="display:flex; align-items:center; gap:2px; background:#f8f9fa; border:1px solid #dee2e6; border-radius:6px; overflow:hidden;">
-                <button style="width:28px;height:28px;border:none;background:transparent;cursor:pointer;font-weight:bold;color:#495057;font-size:16px;display:flex;align-items:center;justify-content:center;" onclick="changeQty('${id}', -1)">−</button>
-                <span style="width:32px;text-align:center;font-weight:600;font-size:14px;color:#2d3748;" id="qty-${id}">1</span>
-                <button style="width:28px;height:28px;border:none;background:transparent;cursor:pointer;font-weight:bold;color:#495057;font-size:16px;display:flex;align-items:center;justify-content:center;" onclick="changeQty('${id}', 1)">+</button>
+            <div class="card-footer">
+              <div class="item-price">
+                ${showDiscount ? `<span style="text-decoration: line-through; color: #adb5bd; font-size: 14px;">💎${pack.price}</span> ` : ''}
+                💎 ${discountedPrice}
               </div>
-              <button class="buy-btn" style="flex:1; padding:8px 12px; font-size:13px;" onclick="buyItemWithQty('${id}')">购买</button>
+              <div class="item-count"></div>
+              <button class="buy-btn quick-buy-btn" onclick="event.stopPropagation(); buyItem('${id}');">💎 ${discountedPrice} · 购买</button>
             </div>
           </div>
         `;
@@ -1494,8 +1867,9 @@
         const remainingDays = Math.floor(vipInfo.remainingDays || 0);
         const remainingHours = Math.floor(vipInfo.remainingHours || 0);
         const displayTime = remainingDays >= 1 ? `${remainingDays} 天` : `${remainingHours} 小时`;
-        const typeName = vipInfo.type === 'vip_year' ? '年度会员' : vipInfo.type === 'vip_month' ? '月度会员' : '周度会员';
+        const typeName = vipInfo.type === 'vip_year' ? '年度会员' : vipInfo.type === 'vip_season' ? '季度会员' : vipInfo.type === 'vip_month' ? '月度会员' : '周度会员';
         const discountText = vipInfo.discountPercent ? `${(100 - vipInfo.discountPercent).toFixed(0)}折` : '9折';
+        const expBonusText = (vipInfo.expBonus % 1 === 0) ? vipInfo.expBonus.toFixed(0) : vipInfo.expBonus.toFixed(1);
         const expireText = vipInfo.expireAtFormatted || new Date(vipInfo.expireAt).toLocaleString('zh-CN', { hour12: false });
 
         html += `
@@ -1511,7 +1885,7 @@
             <div class="vip-status-benefits">
               <div class="benefit-chip">
                 <span class="benefit-icon">⚡</span>
-                <span class="benefit-value">×${(vipInfo.expBonus || 2).toFixed(0)}</span>
+                <span class="benefit-value">×${expBonusText}</span>
                 <span class="benefit-label">经验加成</span>
               </div>
               <div class="benefit-chip">
@@ -1560,8 +1934,7 @@
         'uncommon': 'linear-gradient(135deg, #28a745 0%, #20c997 100%)'
       };
 
-      const nameShortMap = { 'vip_week': '周卡', 'vip_month': '月卡', 'vip_year': '年卡' };
-      const discountMap = { 'vip_week': '9折', 'vip_month': '9折', 'vip_year': '8.5折' };
+      const nameShortMap = { 'vip_week': '周卡', 'vip_month': '月卡', 'vip_season': '季卡', 'vip_year': '年卡' };
 
       html += '<div class="vip-cards-row">';
       for (const [id, vip] of Object.entries(vips)) {
@@ -1574,13 +1947,25 @@
         if (vip.bigDiscount) badge = '🏆 最超值';
         else if (vip.recommend) badge = '🔥 推荐';
 
-        const benefitList = [
-          `经验 ×${vip.expBonus || 2}`,
-          `全场 ${discountMap[id] || '9折'}`,
-          '专属会员标识'
-        ];
-        if (vip.savePercent && vip.savePercent > 0) {
-          benefitList.push(`省 ${vip.savePercent}%`);
+        const discountPct = vip.discountPercent || 0;
+        const discountLabel = discountPct > 0 ? `全场 ${(100 - discountPct)}折` : '专属会员标识';
+
+        let benefitList;
+        if (Array.isArray(vip.benefits) && vip.benefits.length > 0) {
+          benefitList = vip.benefits;
+        } else {
+          benefitList = [
+            `经验 ×${vip.expBonus || 2}`,
+            discountLabel
+          ];
+          if (vip.savePercent && vip.savePercent > 0) {
+            benefitList.push(`省 ${vip.savePercent}%`);
+          }
+        }
+
+        let benefitHtml = '';
+        for (const b of benefitList) {
+          benefitHtml += `<div class="vip-benefit-row"><span class="vip-check" style="color: ${rarityColor};">✓</span><span>${b}</span></div>`;
         }
 
         html += `
@@ -1593,152 +1978,250 @@
             <div class="vip-card-subtitle">${vip.days}天会员</div>
             <div class="vip-card-divider"></div>
             <div class="vip-card-benefits">
-              ${benefitList.map(b => `<div class="vip-benefit-row"><span class="vip-check" style="color: ${rarityColor};">✓</span><span>${b}</span></div>`).join('')}
+              ${benefitHtml}
             </div>
             <div class="vip-card-price">
               <span class="price-icon">💎</span>
               <span class="price-num">${vip.price}</span>
             </div>
             <div class="vip-card-daily">日均约 ${dailyPrice}💎</div>
+            <button class="buy-btn quick-buy-btn vip-buy-btn" onclick="event.stopPropagation(); buyItem('${id}');">💎 ${vip.price} · 立即开通</button>
           </div>
         `;
       }
-      html += '</div></div>';
+      html += '</div>';
+
+      // ===== 会员特权横向对比表 =====
+      const vipOrder = ['vip_week', 'vip_month', 'vip_season', 'vip_year'];
+      const tiers = [{ id: null, name: '无会员', icon: '🚫' }];
+      for (const id of vipOrder) {
+        if (vips[id]) tiers.push({ id, name: nameShortMap[id] || vips[id].name, vip: vips[id] });
+      }
+
+      // 表头
+      let tableHtml = '<div class="vip-compare-wrap"><div class="vip-compare-title">📊 会员特权横向对比</div><div class="vip-compare-table">';
+      let headerRow = '<div class="vip-compare-row header"><div class="vip-compare-cell cell-label">特权</div>';
+      for (const t of tiers) {
+        if (!t.vip) {
+          headerRow += `<div class="vip-compare-cell"><strong style="color:#6c757d;">${t.name}</strong></div>`;
+        } else {
+          const rc = RARITY_CONFIG[t.vip.rarity]?.color || '#007bff';
+          headerRow += `<div class="vip-compare-cell"><strong style="color:${rc};">${t.vip.icon || '⭐'} ${t.name}</strong></div>`;
+        }
+      }
+      headerRow += '</div>';
+      tableHtml += headerRow;
+
+      // 行定义
+      const rowDefs = [
+        { label: '💎 价格', values: tiers.map(t => t.vip ? `${t.vip.price} 💎` : '免费') },
+        { label: '⏳ 有效期', values: tiers.map(t => t.vip ? `${t.vip.days} 天` : '-') },
+        { label: '⚡ 经验加成', values: tiers.map(t => t.vip ? `×${t.vip.expBonus || 1}` : '×1') },
+        { label: '🛒 购物折扣', values: tiers.map(t => t.vip && t.vip.discountPercent ? `${(100 - t.vip.discountPercent).toFixed(0)} 折` : '原价') },
+        { label: '📬 每日邮件礼包', values: tiers.map(t => t.vip ? '✅ 发送' : '❌') },
+        { label: '💎 每日星钻', values: tiers.map(t => t.vip?.dailyReward?.starCoins ? `+${t.vip.dailyReward.starCoins}` : '-') },
+        { label: '📈 每日经验', values: tiers.map(t => t.vip?.dailyReward?.exp ? `+${t.vip.dailyReward.exp}` : '-') },
+        {
+          label: '🎁 每日物品',
+          values: tiers.map(t => {
+            if (!t.vip?.dailyReward?.items || t.vip.dailyReward.items.length === 0) return '-';
+            return t.vip.dailyReward.items.map(it => {
+              const info = shopData?.items?.[it.id];
+              return `${info?.icon || '📦'}×${it.count}`;
+            }).join(' ');
+          })
+        },
+        { label: '🎨 专属头像框', values: tiers.map(t => t.vip?.id === 'vip_year' ? '🏆 传说' : t.vip ? '🔒 敬请期待' : '❌') },
+        { label: '👑 专属称号', values: tiers.map(t => t.id === 'vip_season' || t.id === 'vip_year' ? '🔒 敬请期待' : '❌') },
+        { label: '🛍️ 限定商店', values: tiers.map(t => t.id === 'vip_year' ? '✅ 解锁' : t.id === 'vip_season' ? '🔒 敬请期待' : '❌') },
+        { label: '🏅 排行榜高亮', values: tiers.map(t => t.id === 'vip_year' ? '🏆 金色' : '❌') }
+      ];
+
+      for (const rd of rowDefs) {
+        let rowHtml = '<div class="vip-compare-row">';
+        rowHtml += `<div class="vip-compare-cell cell-label">${rd.label}</div>`;
+        for (const v of rd.values) {
+          rowHtml += `<div class="vip-compare-cell">${v}</div>`;
+        }
+        rowHtml += '</div>';
+        tableHtml += rowHtml;
+      }
+
+      tableHtml += '</div></div>';
+      html += tableHtml;
+
       return html;
     }
 
     function renderInventory() {
       if (!inventory || !cosmetics) return '<div class="loading">加载中...</div>';
 
-      let html = '';
-
-      let items = {};
-      let packs = {};
+      // 收集道具和礼包
+      let itemsMap = {};
+      let packsMap = {};
       for (const [id, count] of Object.entries(inventory.items || {})) {
         const itemInfo = shopData?.items?.[id];
         const packInfo = shopData?.packs?.[id];
-        if (itemInfo) {
-          items[id] = { ...itemInfo, _count: count };
-        } else if (packInfo) {
-          packs[id] = { ...packInfo, _count: count };
-        } else {
-          items[id] = { id, icon: '📦', name: id, description: '', rarity: 'common', _count: count };
-        }
+        if (itemInfo) itemsMap[id] = { ...itemInfo, _count: count };
+        else if (packInfo) packsMap[id] = { ...packInfo, _count: count };
+        else itemsMap[id] = { id, icon: '📦', name: id, description: '', rarity: 'common', _count: count };
       }
+      itemsMap = filterItems(itemsMap);
 
-      items = filterItems(items);
-
-      if (Object.keys(items).length > 0) {
-        html += '<div class="category-title">道具</div>';
-        html += '<div class="items-grid">';
-        for (const [id, item] of Object.entries(items)) {
-          const count = item._count;
-          const rarityClass = item.rarity ? `rarity-${item.rarity}` : '';
-          const glowClass = item.rarity === 'legendary' || item.rarity === 'epic' ? `glow-${item.rarity}` : '';
-
-          html += `
-            <div class="item-card ${rarityClass} ${glowClass}" onclick="showItemDetail('${id}', true)">
-              <div class="item-icon">${item.icon}</div>
-              <div class="item-name">${item.name}</div>
-              <div class="item-desc">${item.description}</div>
-              <div class="rarity-badge ${item.rarity || 'common'}">${RARITY_CONFIG[item.rarity]?.name || '普通'}</div>
-              <div style="font-size:24px;font-weight:bold;color:#007bff;">×${count}</div>
-              <button class="buy-btn" onclick="event.stopPropagation(); useItem('${id}')">使用</button>
-            </div>
-          `;
-        }
-        html += '</div>';
-      }
-
-      if (Object.keys(packs).length > 0) {
-        html += '<div class="category-title">礼包</div>';
-        html += '<div class="items-grid">';
-        for (const [id, pack] of Object.entries(packs)) {
-          const count = pack._count;
-          const rarityClass = pack.rarity ? `rarity-${pack.rarity}` : '';
-          const glowClass = pack.rarity === 'legendary' || pack.rarity === 'epic' ? `glow-${pack.rarity}` : '';
-          html += `
-            <div class="item-card ${rarityClass} ${glowClass}" onclick="showItemDetail('${id}', true)">
-              <div class="item-icon">${pack.icon}</div>
-              <div class="item-name">${pack.name}</div>
-              <div class="item-desc">${pack.description}</div>
-              <div class="rarity-badge ${pack.rarity || 'common'}">${RARITY_CONFIG[pack.rarity]?.name || '普通'}</div>
-              <div style="font-size:24px;font-weight:bold;color:#007bff;">×${count}</div>
-              <button class="buy-btn" onclick="event.stopPropagation(); useItem('${id}')">开启</button>
-            </div>
-          `;
-        }
-        html += '</div>';
-      }
-
-      const categories = [
+      // 外观分类配置
+      const cosmeticCats = [
+        { key: 'avatars', title: '头像', category: 'avatar' },
         { key: 'frames', title: '头像框', category: 'frame' },
         { key: 'skins', title: '皮肤', category: 'skin' },
         { key: 'backgrounds', title: '背景', category: 'background' },
         { key: 'titles', title: '称号', category: 'title' }
       ];
 
-      for (const cat of categories) {
-        const owned = cosmetics.owned?.[cat.key] || [];
-        if (owned.length === 0) continue;
-
-        html += `<div class="category-title">${cat.title}</div>`;
-        html += '<div class="items-grid">';
-        for (const id of owned) {
-          const itemInfo = shopData?.[cat.key]?.[id] || { icon: '📦', name: id, description: '' };
-          const equipped = cosmetics.equipped?.[cat.category] === id;
-          html += `
-            <div class="item-card">
-              <div class="item-icon">${itemInfo.icon}</div>
-              <div class="item-name">${itemInfo.name}</div>
-              <div class="item-desc">${itemInfo.description}</div>
-              ${equipped ? `<div class="equipped-tag">已装备</div>` : ''}
-              ${!equipped ? `
-                <button class="buy-btn equip" onclick="equipCosmetic('${cat.category}', '${id}')">装备</button>
-              ` : ''}
+      // 渲染单个道具/礼包卡片
+      function renderItemCard(item, isPack) {
+        const count = item._count;
+        const rarityClass = item.rarity ? `rarity-${item.rarity}` : '';
+        const glowClass = (item.rarity === 'legendary' || item.rarity === 'epic') ? `glow-${item.rarity}` : '';
+        return `
+          <div class="item-card ${rarityClass} ${glowClass}" onclick="showItemDetail('${item.id}', true)">
+            <div class="item-icon">${item.icon}</div>
+            <div class="item-name">${item.name}</div>
+            <div class="item-desc">${item.description}</div>
+            <div class="rarity-badge ${item.rarity || 'common'}">${RARITY_CONFIG[item.rarity]?.name || '普通'}</div>
+            <div class="card-footer">
+              <div style="font-size:24px;font-weight:bold;color:#007bff;margin-bottom:8px;">×${count}</div>
+              <button class="buy-btn quick-buy-btn" onclick="event.stopPropagation(); useItem('${item.id}');">${isPack ? '🎁 开启' : '✋ 使用'}</button>
             </div>
-          `;
-        }
-        html += '</div>';
+          </div>
+        `;
       }
 
-      return html || '<div class="inventory-empty">背包是空的</div>';
+      // 渲染单个外观卡片
+      function renderCosmeticCard(id, cat) {
+        const itemInfo = shopData?.[cat.key]?.[id] || { icon: '📦', name: id, description: '' };
+        const equipped = cosmetics.equipped?.[cat.category] === id;
+        const rarityClass = itemInfo.rarity ? `rarity-${itemInfo.rarity}` : '';
+        const glowClass = (itemInfo.rarity === 'legendary' || itemInfo.rarity === 'epic') ? `glow-${itemInfo.rarity}` : '';
+        const rarityName = RARITY_CONFIG[itemInfo.rarity]?.name || '普通';
+
+        let iconHtml = '';
+        if (cat.category === 'frame') {
+          const frameBg = itemInfo.color || 'rgba(160,174,192,0.3)';
+          iconHtml = `<div class="cosmetic-item-icon"><div class="frame-ring" style="background:${frameBg};"></div></div>`;
+        } else {
+          iconHtml = `<div class="item-icon">${itemInfo.emoji || itemInfo.icon || '📦'}</div>`;
+        }
+
+        return `
+          <div class="item-card ${rarityClass} ${glowClass} ${equipped ? 'equipped-card' : ''}">
+            ${iconHtml}
+            <div class="item-name">${itemInfo.name}</div>
+            <div class="item-desc">${itemInfo.description}</div>
+            <div class="rarity-badge ${itemInfo.rarity || 'common'}">${rarityName}</div>
+            <div class="card-footer">
+              ${equipped ? '<div class="equipped-tag">✓ 已装备</div>' : ''}
+              ${!equipped ? `<button class="buy-btn quick-buy-btn" style="background: linear-gradient(135deg, #17a2b8, #117a8b);" onclick="equipCosmetic('${cat.category}', '${id}');">✨ 装备</button>` : ''}
+            </div>
+          </div>
+        `;
+      }
+
+      // 渲染一个分组
+      function renderSection(title, content) {
+        return `<div class="category-title">${title}</div><div class="items-grid">${content}</div>`;
+      }
+
+      // 判断要渲染哪些分类
+      let html = '';
+      let hasContent = false;
+
+      // 定义要渲染的分区列表
+      const sections = [];
+      if (activeInvTab === 'all' || activeInvTab === 'items') {
+        const items = Object.values(itemsMap);
+        if (items.length > 0) {
+          sections.push({ title: '道具', content: items.map(i => renderItemCard(i, false)).join('') });
+        }
+      }
+      if (activeInvTab === 'all' || activeInvTab === 'packs') {
+        const packs = Object.values(packsMap);
+        if (packs.length > 0) {
+          sections.push({ title: '礼包', content: packs.map(p => renderItemCard(p, true)).join('') });
+        }
+      }
+      for (const cat of cosmeticCats) {
+        if (activeInvTab !== 'all' && activeInvTab !== cat.key) continue;
+        const owned = cosmetics.owned?.[cat.key] || [];
+        if (owned.length > 0) {
+          sections.push({ title: cat.title, content: owned.map(id => renderCosmeticCard(id, cat)).join('') });
+        }
+      }
+
+      for (const sec of sections) {
+        html += renderSection(sec.title, sec.content);
+        hasContent = true;
+      }
+
+      return hasContent ? html : '<div class="inventory-empty">背包是空的</div>';
     }
 
     function renderTab() {
       const content = document.getElementById('content');
-      const searchBar = document.getElementById('searchFilterBar');
+      const shopSubTabs = document.getElementById('shopSubTabs');
+      const cosmeticTabs = document.getElementById('cosmeticTabs');
+      const inventoryTabs = document.getElementById('inventoryTabs');
 
-      // 控制搜索栏显示/隐藏
-      if (['items', 'packs', 'vip', 'inventory'].includes(activeTab)) {
-        searchBar.style.display = 'flex';
-      } else {
-        searchBar.style.display = 'none';
-      }
+      // 控制二级/三级 tab 显示
+      shopSubTabs.style.display = (activeTab === 'shop') ? 'flex' : 'none';
+      cosmeticTabs.style.display = (activeTab === 'shop' && activeSubTab === 'cosmetics') ? 'flex' : 'none';
+      inventoryTabs.style.display = (activeTab === 'inventory') ? 'flex' : 'none';
 
-      switch (activeTab) {
-        case 'items':
-          content.innerHTML = renderItems();
-          break;
-        case 'cosmetics':
-          content.innerHTML = renderCosmetics();
-          break;
-        case 'packs':
-          content.innerHTML = renderPacks();
-          break;
-        case 'vip':
-          content.innerHTML = renderVip();
-          break;
-        case 'inventory':
-          content.innerHTML = renderInventory();
-          break;
+      if (activeTab === 'shop') {
+        if (activeSubTab === 'items') content.innerHTML = renderItems();
+        else if (activeSubTab === 'cosmetics') content.innerHTML = renderCosmetics();
+        else if (activeSubTab === 'packs') content.innerHTML = renderPacks();
+      } else if (activeTab === 'vip') {
+        content.innerHTML = renderVip();
+      } else if (activeTab === 'inventory') {
+        content.innerHTML = renderInventory();
       }
     }
 
+    // 主 tab 事件
     document.querySelectorAll('.shop-tab').forEach(tab => {
       tab.addEventListener('click', () => {
         activeTab = tab.dataset.tab;
         document.querySelectorAll('.shop-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        renderTab();
+      });
+    });
+
+    // 商品二级 tab 事件
+    document.querySelectorAll('.shop-sub-tabs:not(.cosmetic-tabs) .shop-sub-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        activeSubTab = tab.dataset.sub;
+        document.querySelectorAll('.shop-sub-tabs:not(.cosmetic-tabs) .shop-sub-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        renderTab();
+      });
+    });
+
+    // 外观三级 tab 事件
+    document.querySelectorAll('.cosmetic-tabs .shop-sub-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        activeCosmeticTab = tab.dataset.cosmetic;
+        document.querySelectorAll('.cosmetic-tabs .shop-sub-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        renderTab();
+      });
+    });
+
+    // 背包二级 tab 事件
+    document.querySelectorAll('.inventory-tabs .shop-sub-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        activeInvTab = tab.dataset.inv;
+        document.querySelectorAll('.inventory-tabs .shop-sub-tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         renderTab();
       });

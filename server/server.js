@@ -3233,6 +3233,36 @@ setInterval(() => {
   });
 }, 600000);
 
+// 每天0点检查邮件触发器（VIP每日礼包等）
+// 计算到下一个0点的时间，用 setTimeout 递归，避免 setInterval 频繁检查
+function scheduleDailyMailTrigger() {
+  const now = new Date();
+  const nextMidnight = new Date(now);
+  nextMidnight.setHours(24, 0, 0, 0); // 下一个0点
+  const delay = nextMidnight.getTime() - now.getTime();
+
+  logger.info('邮件触发器-每日任务已计划', {
+    nextRunAt: nextMidnight.toLocaleString('zh-CN', { hour12: false }),
+    delayMinutes: Math.round(delay / 60000)
+  });
+
+  setTimeout(async () => {
+    if (!accountManager || !accountManager.checkAndSendAllTriggers) return;
+    try {
+      const results = await accountManager.checkAndSendAllTriggers();
+      logger.info('邮件触发器-每日任务执行完成', {
+        vipDailySent: results.vipDaily?.sent || 0,
+        vipDailyTotal: results.vipDaily?.total || 0
+      });
+    } catch (err) {
+      logger.error('邮件触发器-每日任务执行失败', { error: err.message });
+    }
+    // 递归调用，计划下一天的0点
+    scheduleDailyMailTrigger();
+  }, delay);
+}
+scheduleDailyMailTrigger();
+
 // ========== 启动服务器 ==========
 
 const PORT = config.server.port;
@@ -3275,6 +3305,20 @@ server.listen(PORT, HOST, () => {
       console.log(`   - http://${addr}:${PORT}`);
     });
   }
+
+  // 服务器启动后立即检查一次邮件触发器（VIP每日礼包等）
+  setTimeout(async () => {
+    if (!accountManager || !accountManager.checkAndSendAllTriggers) return;
+    try {
+      const results = await accountManager.checkAndSendAllTriggers();
+      logger.info('服务器启动-邮件触发器执行完成', {
+        vipDailySent: results.vipDaily?.sent || 0,
+        vipDailyTotal: results.vipDaily?.total || 0
+      });
+    } catch (err) {
+      logger.error('服务器启动-邮件触发器执行失败', { error: err.message });
+    }
+  }, 3000);
 });
 
 // 优雅关闭

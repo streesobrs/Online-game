@@ -76,7 +76,7 @@
       "id": "frame_vip",
       "name": "VIP头像框",
       "description": "尊贵的VIP专属头像框，仅限VIP会员使用",
-      "icon": "�",
+      "icon": "👑",
       "price": 0,
       "category": "frame",
       "color": "linear-gradient(135deg, #d69e2e, #b7791f)",

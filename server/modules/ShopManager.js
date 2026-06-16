@@ -91,6 +91,7 @@ class ShopManager {
     const result = {
       version: this.config.version,
       items: {},
+      avatars: {},
       frames: {},
       skins: {},
       backgrounds: {},
@@ -107,7 +108,7 @@ class ShopManager {
     });
 
     // 处理外观
-    ['frames', 'skins', 'backgrounds', 'titles'].forEach(category => {
+    ['avatars', 'frames', 'skins', 'backgrounds', 'titles'].forEach(category => {
       Object.values(this.cosmetics[category] || {}).forEach(item => {
         if (this.filterItem(item, userId)) {
           result[category][item.id] = item;

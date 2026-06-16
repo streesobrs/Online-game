@@ -11987,7 +11987,7 @@
 
       // 优先显示自定义头像
       if (equipped.avatarCustom) {
-        return `<img src="/data/cosmetics/avatars/${equipped.avatarCustom}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.style.display='none'">`;
+        return `<img src="/data/cosmetics/avatars/${equipped.avatarCustom}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" onerror="this.style.display='none'">`;
       }
 
       // 然后显示预设头像
@@ -11999,28 +11999,56 @@
       return '👤';
     }
 
-    // 获取头像框样式
+    // 获取头像框样式（只返回圆环/边框的 CSS 字符串，不含内容）
     function getAvatarFrameStyle() {
       const equipped = userCosmetics?.equipped || {};
       const frames = cosmeticsConfig?.frames || {};
       const frame = equipped.frame && frames[equipped.frame] ? frames[equipped.frame] : null;
 
-      if (!frame) {
-        return 'background: rgba(226, 232, 240, 0.3); border: 2px solid rgba(160, 174, 192, 0.6);';
-      }
+      let ringColor = 'rgba(226, 232, 240, 0.6)';
+      let ringThickness = 3;
+      let shadow = '0 1px 4px rgba(0, 0, 0, 0.15)';
 
-      let background = '';
-      if (frame.color) {
-        if (frame.color.startsWith('linear-gradient') || frame.color.startsWith('radial-gradient')) {
-          background = `background: ${frame.color};`;
-        } else {
-          background = `background: ${frame.color};`;
+      if (frame) {
+        ringColor = frame.color || 'rgba(226, 232, 240, 0.6)';
+        if (frame.rarity === 'rare') {
+          ringThickness = 4;
+          shadow = '0 2px 8px rgba(66, 153, 225, 0.3)';
+        } else if (frame.rarity === 'epic') {
+          ringThickness = 4;
+          shadow = '0 2px 10px rgba(128, 90, 213, 0.4)';
+        } else if (frame.rarity === 'legendary') {
+          ringThickness = 5;
+          shadow = '0 2px 12px rgba(229, 62, 62, 0.4)';
+        } else if (frame.vipOnly) {
+          ringThickness = 5;
+          shadow = '0 2px 12px rgba(217, 119, 6, 0.5)';
         }
-      } else {
-        background = 'background: rgba(160, 174, 192, 0.3);';
       }
 
-      return `${background} border: 3px solid rgba(255, 255, 255, 0.8); box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);`;
+      return `
+        background: ${ringColor};
+        padding: ${ringThickness}px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: ${shadow};
+        flex-shrink: 0;
+      `;
+    }
+
+    // 获取完整的头像 + 头像框 HTML（推荐用这个）
+    function getAvatarWithFrame(sizePx = 36) {
+      const frameStyle = getAvatarFrameStyle();
+      const content = getAvatarDisplay();
+      return `
+        <div style="${frameStyle} width: ${sizePx}px; height: ${sizePx}px;">
+          <div style="width:100%;height:100%;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:${Math.floor(sizePx * 0.55)}px;background:white;">
+            ${content}
+          </div>
+        </div>
+      `;
     }
 
     function updateAccountBar() {
@@ -12078,7 +12106,11 @@
         accountBar.innerHTML = `
           <div class="account-info">
             <div class="account-user-section">
-              <span class="account-avatar" style="${avatarFrameStyle}">${avatarContent}</span>
+              <div style="${avatarFrameStyle} width: 44px; height: 44px; flex-shrink: 0;">
+                <div style="width:100%;height:100%;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:24px;background:white;">
+                  ${avatarContent}
+                </div>
+              </div>
               <div class="account-user-details">
                 <span class="account-nickname">${nickname || username}</span>
                 <div class="account-stats">
