@@ -224,6 +224,21 @@ app.post('/api/avatar/delete', async (req, res) => {
   }
 });
 
+// 重命名自定义头像
+app.post('/api/avatar/rename', async (req, res) => {
+  try {
+    const { userId, avatarFile, name } = req.body;
+    if (!userId || !avatarFile || !name) {
+      return res.status(400).json({ success: false, message: '参数错误' });
+    }
+    const result = await accountManager.renameCustomAvatar(userId, avatarFile, name);
+    res.json(result);
+  } catch (err) {
+    logger.error('改名失败', { error: err.message });
+    res.status(500).json({ success: false, message: '改名失败' });
+  }
+});
+
 // 获取用户会员信息
 app.get('/api/shop/vip', async (req, res) => {
   try {

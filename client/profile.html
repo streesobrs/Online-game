@@ -1965,6 +1965,7 @@
               <div class="cosmetic-name">${customAvatar.name}</div>
               <div class="cosmetic-actions">
                 <button class="btn-mini" onclick="event.stopPropagation();uploadReplaceAvatar('${customAvatar.file}')" title="替换">📷</button>
+                <button class="btn-mini" style="margin-top:4px;" onclick="event.stopPropagation();renameCustomAvatar('${customAvatar.file}', '${customAvatar.name.replace(/'/g, "\\'")}')" title="改名">✏️</button>
                 <button class="btn-mini" style="margin-top:4px;" onclick="event.stopPropagation();deleteCustomAvatar('${customAvatar.file}')" title="删除">🗑️</button>
               </div>
             </div>
@@ -2237,6 +2238,40 @@
       } catch (e) {
         console.error('删除头像失败', e);
         showToast('删除失败，请重试', 'error');
+      }
+    }
+
+    // 重命名自定义头像
+    async function renameCustomAvatar(avatarFile, currentName) {
+      const newName = prompt('请输入新的名称（最多20字）：', currentName);
+      if (newName === null) return;
+      const trimmedName = newName.trim();
+      if (!trimmedName) {
+        showToast('名称不能为空', 'warning');
+        return;
+      }
+      if (trimmedName.length > 20) {
+        showToast('名称不能超过20字', 'warning');
+        return;
+      }
+      try {
+        const res = await fetch('/api/avatar/rename', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: currentAccountId, avatarFile: avatarFile, name: trimmedName })
+        });
+        const json = await res.json();
+        if (json.success) {
+          if (!userCosmetics.owned.customAvatars) userCosmetics.owned.customAvatars = [];
+          userCosmetics.owned.customAvatars = json.avatars || [];
+          renderCosmetics();
+          showToast('改名成功', 'success');
+        } else {
+          showToast(json.message || '改名失败', 'error');
+        }
+      } catch (e) {
+        console.error('改名失败', e);
+        showToast('改名失败，请重试', 'error');
       }
     }
 

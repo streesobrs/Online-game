@@ -2955,6 +2955,13 @@ class AccountManager {
       const extMap = { png: 'png', gif: 'gif', jpeg: 'jpg', jpg: 'jpg', webp: 'webp', bmp: 'bmp' };
       const ext = mimeMatch && extMap[mimeMatch[1]] ? extMap[mimeMatch[1]] : 'png';
 
+      const existingNames = account.cosmetics.owned.customAvatars.map(a => a.name);
+      const getNextDefaultName = () => {
+        let n = 1;
+        while (existingNames.includes(`自定义头像 ${n}`)) n++;
+        return `自定义头像 ${n}`;
+      };
+
       let avatarFile;
       let avatarId;
       let isReplace = false;
@@ -2976,7 +2983,7 @@ class AccountManager {
           avatarFile = avatarId + '.' + ext;
           account.cosmetics.owned.customAvatars[targetIdx] = {
             file: avatarFile,
-            name: name || ('自定义头像 ' + (targetIdx + 1)),
+            name: name || oldAvatar.name || getNextDefaultName(),
             uploadedAt: Date.now()
           };
           isReplace = true;
@@ -3001,7 +3008,7 @@ class AccountManager {
         avatarFile = avatarId + '.' + ext;
         account.cosmetics.owned.customAvatars.push({
           file: avatarFile,
-          name: name || ('自定义头像 ' + (account.cosmetics.owned.customAvatars.length + 1)),
+          name: name || getNextDefaultName(),
           uploadedAt: Date.now()
         });
       }
@@ -3267,6 +3274,41 @@ class AccountManager {
     } catch (err) {
       logger.error('删除自定义头像失败', { userId, error: err.message });
       return { success: false, message: '删除失败' };
+    }
+  }
+
+  /**
+   * 重命名自定义头像
+   */
+  async renameCustomAvatar(userId, avatarFile, newName) {
+    try {
+      const account = await this._getAccount(userId);
+      if (!account) {
+        return { success: false, message: '账号不存在' };
+      }
+      if (!account.cosmetics || !account.cosmetics.owned.customAvatars) {
+        return { success: false, message: '没有自定义头像' };
+      }
+
+      const idx = account.cosmetics.owned.customAvatars.findIndex(a => a.file === avatarFile);
+      if (idx < 0) {
+        return { success: false, message: '头像不存在' };
+      }
+
+      const trimmedName = (newName || '').toString().trim();
+      if (!trimmedName) {
+        return { success: false, message: '名称不能为空' };
+      }
+      if (trimmedName.length > 20) {
+        return { success: false, message: '名称不能超过20字' };
+      }
+
+      account.cosmetics.owned.customAvatars[idx].name = trimmedName;
+      await this._saveAccount(userId, account);
+      return { success: true, message: '改名成功', avatars: account.cosmetics.owned.customAvatars };
+    } catch (err) {
+      logger.error('重命名自定义头像失败', { userId, error: err.message });
+      return { success: false, message: '改名失败' };
     }
   }
 
