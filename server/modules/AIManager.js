@@ -1841,7 +1841,7 @@ class AIManager {
   // 棋子基础价值
   chessPieceValue(tp) {
     const v = {
-      'shuai': 10000, 'jiang': 10000,
+      'shuai': 100000, 'jiang': 100000,
       'ju': 900, 'pao': 450, 'ma': 400,
       'xiang': 200, 'shi': 200,
       'bing': 100, 'zu': 100
@@ -1887,7 +1887,61 @@ class AIManager {
     return false;
   }
 
-  // 对一步棋全面评分
+  // 检查一步棋后目标位置是否会被对方合法吃掉
+  chessMoveWillBeCaptured(board, fromR, fromC, toR, toC, opCol) {
+    const simBoard = this.chessSimMove(board, fromR, fromC, toR, toC);
+    for (const op of this.chessPieces(simBoard, opCol)) {
+      for (const om of this.chessLegal(simBoard, op.r, op.c)) {
+        if (om.r === toR && om.c === toC) return true;
+      }
+    }
+    return false;
+  }
+
+  // 棋子位置加分
+  chessPosBonus(tp, r, c, isRed) {
+    let score = 0;
+    const rr = isRed ? (9 - r) : r;
+    switch (tp) {
+      case 'ju':
+        if (c === 4) score += 8;
+        if (rr >= 3 && rr <= 6) score += 5;
+        break;
+      case 'ma':
+        if (rr >= 2 && rr <= 7 && (c === 3 || c === 4 || c === 5)) score += 10;
+        break;
+      case 'pao':
+        if (c === 4) score += 6;
+        if (rr >= 4 && rr <= 6) score += 4;
+        break;
+      case 'bing':
+      case 'zu':
+        if (rr <= 4) {
+          score += 20 + (4 - rr) * 6;
+          if (c === 3 || c === 4 || c === 5) score += 5;
+        }
+        break;
+      default:
+        break;
+    }
+    return score;
+  }
+
+  // 直接在棋盘上走子，返回被吃的子
+  chessDoMove(board, fromR, fromC, toR, toC) {
+    const captured = board[toR][toC];
+    board[toR][toC] = board[fromR][fromC];
+    board[fromR][fromC] = 0;
+    return captured;
+  }
+
+  // 撤销一步棋
+  chessUndoMove(board, fromR, fromC, toR, toC, captured) {
+    board[fromR][fromC] = board[toR][toC];
+    board[toR][toC] = captured;
+  }
+
+  // 对一步棋的启发式评分（新版）
   chessScoreMove(board, fromR, fromC, toR, toC, aiCol, opCol) {
     let s = 0;
     const tp = this.chessType(board[fromR][fromC]);
@@ -1895,109 +1949,161 @@ class AIManager {
     const isR = aiCol === 'r';
     const movingPieceVal = this.chessPieceValue(tp);
 
-    // 1. 吃子价值（只有真正赚的交换才给高分）
-    let captureScore = 0;
+    // 1. 吃子价值（被吃子价值越高分越高）
+    let capturedVal = 0;
     if (captured !== 0) {
-      const capturedType = this.chessType(captured);
-      const capturedVal = this.chessPieceValue(capturedType);
-      const netGain = capturedVal - movingPieceVal;
+      capturedVal = this.chessPieceValue(this.chessType(captured));
+      s += capturedVal * 10;
+      if (movingPieceVal < capturedVal) s += (capturedVal - movingPieceVal) * 5;
+    }
 
-      if (netGain > 0) {
-        // 赚了：低价值吃高价值（如马吃车），大幅加分
-        captureScore = capturedVal * 5 + netGain * 15;
-        if (capturedVal >= 900) captureScore += 800; // 吃车额外加分
-      } else if (netGain === 0) {
-        // 等价交换（如炮换马）：基础加分但不高
-        captureScore = capturedVal * 2;
+    // 2. 走子后是否会被对方吃掉（避免送子）
+    if (this.chessMoveWillBeCaptured(board, fromR, fromC, toR, toC, opCol)) {
+      if (captured !== 0) {
+        const net = capturedVal - movingPieceVal;
+        if (net < 0) s += net * 8;
+        else s += net * 3;
       } else {
-        // 亏了：高价值吃低价值，只给少量加分
-        captureScore = capturedVal * 1;
+        s -= movingPieceVal * 8;
       }
     }
 
-    // 2. 吃子后的反击评估（走之后这个棋子是否会被对方吃掉）
+    // 3. 将军 / 将杀
     const simBoard = this.chessSimMove(board, fromR, fromC, toR, toC);
-    if (this.chessIsAttacked(simBoard, toR, toC, opCol)) {
-      const capturedVal = captured !== 0 ? this.chessPieceValue(this.chessType(captured)) : 0;
-      let willBeCaptured = false;
-      let attackerVal = 0;
-
-      for (const op of this.chessPieces(simBoard, opCol)) {
-        for (const om of this.chessLegal(simBoard, op.r, op.c)) {
-          if (om.r === toR && om.c === toC) {
-            willBeCaptured = true;
-            attackerVal = this.chessPieceValue(this.chessType(simBoard[op.r][op.c]));
-            break;
-          }
-        }
-        if (willBeCaptured) break;
-      }
-
-      if (willBeCaptured) {
-        const netGain = capturedVal - movingPieceVal;
-        if (netGain > 0) {
-          // 赚了但会被吃回：只保留净收益的部分加分
-          captureScore = netGain * 5;
-          if (capturedVal >= 900) captureScore += 200;
-        } else if (netGain === 0) {
-          // 等价交换后会被吃回：这是无意义的换子，扣分
-          captureScore = -movingPieceVal * 3;
-        } else {
-          // 亏了：高价值吃低价值后被吃回，严重扣分
-          captureScore = -Math.abs(netGain) * 10 - movingPieceVal * 2;
-        }
-      }
-    }
-    s += captureScore;
-
-    // 3. 将军/将杀加分
     if (this.chessCheck(simBoard, opCol)) {
-      s += 800;
-      const opAllLegal = this.chessAllLegal(simBoard, opCol);
-      if (opAllLegal.length === 0) {
-        s += 10000; // 将杀！最高优先级
-      }
+      s += 1500;
+      const opMoves = this.chessAllLegal(simBoard, opCol);
+      if (opMoves.length === 0) s += 100000;
     }
 
-    // 4. 己方被将军时解围
+    // 4. 己方被将军时的防守加分
     if (this.chessCheck(board, aiCol)) {
-      if (!this.chessCheck(simBoard, aiCol)) {
-        s += 1000;
-      }
+      if (!this.chessCheck(simBoard, aiCol)) s += 1200;
     }
 
-    // 5. 向前推进（红方r减小，黑方r增大）
+    // 5. 向前推进
     if ((isR && toR < fromR) || (!isR && toR > fromR)) {
-      s += 10;
-      if (tp === 'bing' || tp === 'zu') s += 20;
+      s += 8;
+      if (tp === 'bing' || tp === 'zu') s += 15;
     }
 
-    // 6. 棋子位置价值
-    s += 12 - Math.abs(toR - 4.5) - Math.abs(toC - 4);
-    if (toR >= 4 && toR <= 5) s += 5;
+    // 6. 位置加分
+    s += this.chessPosBonus(tp, toR, toC, isR);
 
-    // 7. 兵/卒过河加分
+    // 7. 兵 / 卒过河
     if ((tp === 'bing' && isR && toR <= 4) || (tp === 'zu' && !isR && toR >= 5)) {
+      s += 30;
+    }
+
+    // 8. 让棋子离开初始位置
+    if (this.chessPieceDefaultPos(fromR, fromC, tp, isR)) {
+      s += 12;
+    }
+
+    // 9. 己方高价值棋子被攻击时逃开
+    if (this.chessIsAttacked(board, fromR, fromC, opCol)) {
       s += 50;
     }
 
-    // 8. 活跃棋子加分（离开初始位置）
-    if (!this.chessPieceDefaultPos(fromR, fromC, tp, isR)) {
-      const startPos = this.chessPieceDefaultPos(fromR, fromC, tp, isR);
-      if (startPos) s += 15;
-    }
+    return s;
+  }
 
-    // 9. 保护己方高价值棋子
-    for (const p of this.chessPieces(simBoard, aiCol)) {
-      const pt = this.chessType(simBoard[p.r][p.c]);
-      if (this.chessPieceValue(pt) >= 400 && this.chessIsAttacked(simBoard, p.r, p.c, opCol)) {
-        if (this.chessFriend(simBoard, toR, toC, aiCol)) {
-          s += 60;
-        }
+  // 整体棋盘评估（用于 Minimax）
+  chessEvaluateBoard(board, aiCol) {
+    const opCol = aiCol === 'r' ? 'b' : 'r';
+    let score = 0;
+    const aiPieces = this.chessPieces(board, aiCol);
+    const opPieces = this.chessPieces(board, opCol);
+
+    let aiVal = 0, opVal = 0;
+    const isR = aiCol === 'r';
+    for (let i = 0; i < aiPieces.length; i++) {
+      const p = aiPieces[i];
+      const tp = this.chessType(board[p.r][p.c]);
+      aiVal += this.chessPieceValue(tp);
+      score += this.chessPosBonus(tp, p.r, p.c, isR);
+    }
+    for (let i = 0; i < opPieces.length; i++) {
+      const p = opPieces[i];
+      const tp = this.chessType(board[p.r][p.c]);
+      opVal += this.chessPieceValue(tp);
+      score -= this.chessPosBonus(tp, p.r, p.c, !isR);
+    }
+    score += (aiVal - opVal) * 10;
+
+    if (this.chessCheck(board, opCol)) score += 200;
+    if (this.chessCheck(board, aiCol)) score -= 200;
+
+    return score;
+  }
+
+  // 获取排序后的合法走法（支持限制返回数量以加速搜索）
+  chessOrderedMoves(board, color, limit) {
+    const opCol = color === 'r' ? 'b' : 'r';
+    const pieces = this.chessPieces(board, color);
+    const all = [];
+    for (let i = 0; i < pieces.length; i++) {
+      const p = pieces[i];
+      const legal = this.chessLegal(board, p.r, p.c);
+      for (let j = 0; j < legal.length; j++) {
+        const m = legal[j];
+        const s = this.chessScoreMove(board, p.r, p.c, m.r, m.c, color, opCol);
+        all.push({ fromR: p.r, fromC: p.c, toR: m.r, toC: m.c, score: s });
       }
     }
+    all.sort((a, b) => b.score - a.score);
+    if (limit && limit > 0 && all.length > limit) return all.slice(0, limit);
+    return all;
+  }
 
-    return s;
+  // Minimax + Alpha-Beta 剪枝搜索（修复了 alpha/beta 传递 bug）
+  chessMinimax(board, depth, alpha, beta, maximizing, aiCol, moveLimit) {
+    if (depth === 0) {
+      return { score: this.chessEvaluateBoard(board, aiCol) };
+    }
+
+    const currentCol = maximizing ? aiCol : (aiCol === 'r' ? 'b' : 'r');
+    const moves = this.chessOrderedMoves(board, currentCol, moveLimit);
+
+    if (moves.length === 0) {
+      if (this.chessCheck(board, currentCol)) {
+        return { score: maximizing ? -100000 : 100000 };
+      }
+      return { score: this.chessEvaluateBoard(board, aiCol) };
+    }
+
+    let bestMove = null;
+    if (maximizing) {
+      let bestScore = -Infinity;
+      for (let i = 0; i < moves.length; i++) {
+        const mv = moves[i];
+        const captured = this.chessDoMove(board, mv.fromR, mv.fromC, mv.toR, mv.toC);
+        const result = this.chessMinimax(board, depth - 1, alpha, beta, false, aiCol, moveLimit);
+        this.chessUndoMove(board, mv.fromR, mv.fromC, mv.toR, mv.toC, captured);
+        if (result.score > bestScore) {
+          bestScore = result.score;
+          bestMove = mv;
+        }
+        alpha = Math.max(alpha, bestScore);
+        if (beta <= alpha) break;
+      }
+      return { score: bestScore, move: bestMove };
+    } else {
+      let bestScore = Infinity;
+      for (let i = 0; i < moves.length; i++) {
+        const mv = moves[i];
+        const captured = this.chessDoMove(board, mv.fromR, mv.fromC, mv.toR, mv.toC);
+        const result = this.chessMinimax(board, depth - 1, alpha, beta, true, aiCol, moveLimit);
+        this.chessUndoMove(board, mv.fromR, mv.fromC, mv.toR, mv.toC, captured);
+        if (result.score < bestScore) {
+          bestScore = result.score;
+          bestMove = mv;
+        }
+        beta = Math.min(beta, bestScore);
+        if (beta <= alpha) break;
+      }
+      return { score: bestScore, move: bestMove };
+    }
   }
 
   // 判断棋子是否在默认起始位置（粗略）
@@ -2026,7 +2132,7 @@ class AIManager {
     return false;
   }
 
-  // 象棋简单AI (增强版)
+  // 象棋简单 AI：避免送子，从前若干高分走法中随机选择
   chessAIEasy(board, aiCol) {
     const pieces = this.chessPieces(board, aiCol);
     if (pieces.length === 0) return null;
@@ -2034,83 +2140,65 @@ class AIManager {
     const scored = [];
     for (const p of pieces) {
       for (const m of this.chessLegal(board, p.r, p.c)) {
-        let s = this.chessScoreMove(board, p.r, p.c, m.r, m.c, aiCol, opCol);
-        // 简单AI降低一些权重，增加随机性
-        s = Math.round(s / 10);
+        const s = this.chessScoreMove(board, p.r, p.c, m.r, m.c, aiCol, opCol);
         scored.push({ fromR: p.r, fromC: p.c, toR: m.r, toC: m.c, score: s });
       }
     }
     if (scored.length === 0) return null;
     scored.sort((a, b) => b.score - a.score);
-    const pick = scored[Math.floor(Math.random() * Math.min(10, scored.length))];
+    const topN = Math.min(6, scored.length);
+    const pick = scored[Math.floor(Math.random() * topN)];
     return { fromR: pick.fromR, fromC: pick.fromC, toR: pick.toR, toC: pick.toC };
   }
 
-  // 象棋中等AI (增强版)
+  // 象棋中等 AI：1 步前瞻 + 整体评估
   chessAIMedium(board, aiCol) {
     const pieces = this.chessPieces(board, aiCol);
     if (pieces.length === 0) return null;
     const opCol = aiCol === 'r' ? 'b' : 'r';
-    // 检查是否有直接吃子（不吃会被吃的高价值棋子的防守）
-    const defensiveMoves = [];
-    const captureMoves = [];
-    const scored = [];
-    for (const p of pieces) {
-      for (const m of this.chessLegal(board, p.r, p.c)) {
-        const s = this.chessScoreMove(board, p.r, p.c, m.r, m.c, aiCol, opCol);
-        const captured = board[m.r][m.c];
-        if (captured !== 0 && this.chessColor(captured) === opCol) {
-          captureMoves.push({ fromR: p.r, fromC: p.c, toR: m.r, toC: m.c, score: s });
-        }
-        // 防守：当前棋子正被攻击
-        if (this.chessIsAttacked(board, p.r, p.c, opCol)) {
-          defensiveMoves.push({ fromR: p.r, fromC: p.c, toR: m.r, toC: m.c, score: s });
-        }
-        scored.push({ fromR: p.r, fromC: p.c, toR: m.r, toC: m.c, score: s });
+
+    const moves = this.chessOrderedMoves(board, aiCol);
+    if (moves.length === 0) return null;
+
+    // 只在前 10 个候选走法中进行一步前瞻
+    const topMoves = moves.slice(0, Math.min(10, moves.length));
+    let bestScore = -Infinity;
+    let bestMoves = [];
+
+    for (const mv of topMoves) {
+      const simBoard = this.chessSimMove(board, mv.fromR, mv.fromC, mv.toR, mv.toC);
+      let score = this.chessEvaluateBoard(simBoard, aiCol);
+      // 扣减对手最佳反击的粗略影响
+      const opMoves = this.chessOrderedMoves(simBoard, opCol);
+      if (opMoves.length > 0) score -= opMoves[0].score * 0.3;
+      if (score > bestScore) {
+        bestScore = score;
+        bestMoves = [mv];
+      } else if (score === bestScore) {
+        bestMoves.push(mv);
       }
     }
-
-    // 优先级：将军 > 吃高价值子 > 解被将军 > 防守 > 吃子 > 其他
-    if (scored.length === 0) return null;
-    scored.sort((a, b) => b.score - a.score);
-
-    // 前3候选随机（半确定性）
-    const pick = scored[Math.floor(Math.random() * Math.min(5, scored.length))];
+    const pick = bestMoves[Math.floor(Math.random() * bestMoves.length)];
     return { fromR: pick.fromR, fromC: pick.fromC, toR: pick.toR, toC: pick.toC };
   }
 
-  // 象棋困难AI (增强版 - 带2层搜索)
+  // 象棋困难 AI：Minimax + Alpha-Beta 剪枝搜索 (2-3 层 + 走法限制)
   chessAIHard(board, aiCol) {
     const pieces = this.chessPieces(board, aiCol);
     if (pieces.length === 0) return null;
     const opCol = aiCol === 'r' ? 'b' : 'r';
-    const scored = [];
-    for (const p of pieces) {
-      for (const m of this.chessLegal(board, p.r, p.c)) {
-        let s = this.chessScoreMove(board, p.r, p.c, m.r, m.c, aiCol, opCol);
+    const totalPieces = pieces.length + this.chessPieces(board, opCol).length;
 
-        // 2层搜索：走完后评估对手最佳应手的影响
-        const simBoard = this.chessSimMove(board, p.r, p.c, m.r, m.c);
-        // 查找对手的最佳走法
-        let opponentBestResponse = 0;
-        for (const op of this.chessPieces(simBoard, opCol)) {
-          for (const om of this.chessLegal(simBoard, op.r, op.c)) {
-            const opScore = this.chessScoreMove(simBoard, op.r, op.c, om.r, om.c, opCol, aiCol);
-            if (opScore > opponentBestResponse) {
-              opponentBestResponse = opScore;
-            }
-          }
-        }
-        // 扣减对手最佳反击的伤害（对方吃/将军的威胁）
-        s -= opponentBestResponse * 0.3;
+    let depth = 2;
+    let moveLimit = 12;
+    if (totalPieces <= 10) { depth = 3; moveLimit = 15; }
+    if (totalPieces <= 6) { depth = 4; moveLimit = 20; }
 
-        scored.push({ fromR: p.r, fromC: p.c, toR: m.r, toC: m.c, score: s });
-      }
+    const result = this.chessMinimax(board, depth, -Infinity, Infinity, true, aiCol, moveLimit);
+    if (result && result.move) {
+      return { fromR: result.move.fromR, fromC: result.move.fromC, toR: result.move.toR, toC: result.move.toC };
     }
-    if (scored.length === 0) return null;
-    scored.sort((a, b) => b.score - a.score);
-    const pick = scored[0];
-    return { fromR: pick.fromR, fromC: pick.fromC, toR: pick.toR, toC: pick.toC };
+    return this.chessAIMedium(board, aiCol);
   }
 
   // 围棋 AI 移动

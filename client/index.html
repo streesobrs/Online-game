@@ -4266,10 +4266,10 @@
           showLeaderboard();
           break;
         case 'showProfile':
-          showProfileModal();
+          window.location.href = '/profile.html';
           break;
         case 'showGameHistory':
-          showGameHistoryModal();
+          window.location.href = '/games-history.html';
           break;
         case 'showAIGame':
           showAIGame();
@@ -6237,77 +6237,6 @@
               snakeGameState.highScore = displayScore;
             }
           }
-
-          // 如果资料模态框已打开，重新更新其内容
-          const profileModal = document.getElementById('account-modal');
-          if (profileModal) {
-            // 处理不同的数据结构
-            const accountData = currentAccount.account.account || currentAccount.account;
-            const statsData = currentAccount.stats || {};
-
-            // 重新打开资料模态框以显示最新数据
-            const modal = profileModal;
-            modal.innerHTML = `
-              <div class="account-modal" style="max-width: 500px;">
-                <div class="account-modal-title">👤 用户资料</div>
-                
-                <div class="account-form-group">
-                  <label class="account-form-label">用户名</label>
-                  <input type="text" class="account-form-input" value="${accountData?.username}" disabled style="background: #f7fafc; cursor: not-allowed;">
-                </div>
-                
-                <div class="account-form-group">
-                  <label class="account-form-label">昵称</label>
-                  <input type="text" class="account-form-input" id="profile-nickname" value="${accountData?.nickname || ''}" placeholder="请输入昵称">
-                </div>
-                
-                <div class="account-form-group">
-                  <label class="account-form-label">个人简介</label>
-                  <textarea class="account-form-input" id="profile-bio" rows="3" placeholder="介绍一下自己...">${accountData?.profile?.bio || ''}</textarea>
-                </div>
-                
-                <div class="account-form-group">
-                  <label class="account-form-label">等级</label>
-                  <input type="text" class="account-form-input" value="Lv.${accountData?.profile?.level || 1}" disabled style="background: #f7fafc; cursor: not-allowed;">
-                </div>
-                
-                <div class="account-form-group">
-                  <label class="account-form-label">经验值</label>
-                  <div style="background: #f7fafc; padding: 12px; border-radius: 8px;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px;">
-                      <span>${accountData?.profile?.exp || 0} EXP</span>
-                      <span>经验: ${accountData?.profile?.exp || 0}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div class="account-form-group">
-                  <label class="account-form-label">游戏统计</label>
-                  <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
-                    <div style="background: #f7fafc; padding: 10px; border-radius: 8px; text-align: center;">
-                      <div style="font-size: 20px; font-weight: bold; color: #38a169;">${statsData?.wins || 0}</div>
-                      <div style="font-size: 12px; color: #718096;">胜</div>
-                    </div>
-                    <div style="background: #f7fafc; padding: 10px; border-radius: 8px; text-align: center;">
-                      <div style="font-size: 20px; font-weight: bold; color: #e53e3e;">${statsData?.losses || 0}</div>
-                      <div style="font-size: 12px; color: #718096;">负</div>
-                    </div>
-                    <div style="background: #f7fafc; padding: 10px; border-radius: 8px; text-align: center;">
-                      <div style="font-size: 20px; font-weight: bold; color: #d69e2e;">${statsData?.draws || 0}</div>
-                      <div style="font-size: 12px; color: #718096;">平</div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div class="account-form-actions">
-                  <button class="account-btn btn-secondary" onclick="closeAccountModal()">返回</button>
-                  <button class="account-btn btn-info" onclick="showGameHistoryModal()">游戏历史</button>
-                  <button class="account-btn btn-warning" onclick="showChangePasswordModal()">修改密码</button>
-                  <button class="account-btn btn-primary" onclick="saveProfile()">保存资料</button>
-                </div>
-              </div>
-            `;
-          }
         }
       });
     }
@@ -6326,6 +6255,12 @@
         msg += `（基础 ${base} + 额外 ${bonus}）`;
       }
       showToast(msg, 'success');
+    });
+
+    // 新邮件通知
+    socket.on('mail_received', (data) => {
+      if (!data?.mail) return;
+      showToast('📬 收到新邮件：' + (data.mail.title || '新邮件'), 'success');
     });
 
     // 更新排行榜显示
@@ -12097,7 +12032,7 @@
 
         // 游客用户也显示资料按钮（可查看个人信息和转正）
         const profileButton = '<button class="account-btn btn-info" onclick="window.location.href=\'/profile.html\'">👤 资料</button>';
-        const historyButton = '<button class="account-btn" onclick="showGameHistoryModal()" style="background: #9b59b6;">📜 历史</button>';
+        const historyButton = '<button class="account-btn" onclick="window.location.href=\'/games-history.html\'" style="background: #9b59b6;">📜 历史</button>';
         const adminButton = isAdmin ? '<button class="account-btn" onclick="window.location.href=\'/admin\'" style="background: #e74c3c;">🛠️ 管理</button>' : '';
 
         const avatarContent = getAvatarDisplay();
@@ -12451,152 +12386,18 @@
     }
 
     function showProfileModal() {
-      // 处理不同的数据结构
-      const accountData = currentAccount.account.account || currentAccount.account;
-      const statsData = currentAccount.stats || {};
-
-      const modal = document.createElement('div');
-      modal.className = 'account-modal-overlay';
-      modal.id = 'account-modal';
-      modal.innerHTML = `
-        <div class="account-modal" style="max-width: 500px;">
-          <div class="account-modal-title">👤 用户资料</div>
-          
-          <div class="account-form-group">
-            <label class="account-form-label">用户名</label>
-            <input type="text" class="account-form-input" value="${accountData?.username}" disabled style="background: #f7fafc; cursor: not-allowed;">
-          </div>
-          
-          <div class="account-form-group">
-            <label class="account-form-label">昵称</label>
-            <input type="text" class="account-form-input" id="profile-nickname" value="${accountData?.nickname || ''}" placeholder="请输入昵称">
-          </div>
-          
-          <div class="account-form-group">
-            <label class="account-form-label">个人简介</label>
-            <textarea class="account-form-input" id="profile-bio" rows="3" placeholder="介绍一下自己...">${accountData?.profile?.bio || ''}</textarea>
-          </div>
-          
-          <div class="account-form-group">
-            <label class="account-form-label">等级</label>
-            <input type="text" class="account-form-input" value="Lv.${accountData?.profile?.level || 1}" disabled style="background: #f7fafc; cursor: not-allowed;">
-          </div>
-          
-          <div class="account-form-group">
-            <label class="account-form-label">经验值</label>
-            <div style="background: #f7fafc; padding: 12px; border-radius: 8px;">
-              <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px;">
-                <span>${accountData?.profile?.exp || 0} EXP</span>
-                <span>经验: ${accountData?.profile?.exp || 0}</span>
-              </div>
-            </div>
-          </div>
-          
-          <div class="account-form-group">
-            <label class="account-form-label">总游戏统计</label>
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
-              <div style="background: #f7fafc; padding: 10px; border-radius: 8px; text-align: center;">
-                <div style="font-size: 20px; font-weight: bold; color: #38a169;">${statsData?.totalWins || 0}</div>
-                <div style="font-size: 12px; color: #718096;">胜</div>
-              </div>
-              <div style="background: #f7fafc; padding: 10px; border-radius: 8px; text-align: center;">
-                <div style="font-size: 20px; font-weight: bold; color: #e53e3e;">${statsData?.totalLosses || 0}</div>
-                <div style="font-size: 12px; color: #718096;">负</div>
-              </div>
-              <div style="background: #f7fafc; padding: 10px; border-radius: 8px; text-align: center;">
-                <div style="font-size: 20px; font-weight: bold; color: #4299e1;">${statsData?.totalDraws || 0}</div>
-                <div style="font-size: 12px; color: #718096;">平</div>
-              </div>
-            </div>
-          </div>
-          
-          <div class="account-form-group">
-            <label class="account-form-label">对战类型统计</label>
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
-              <div style="background: #ebf8ff; padding: 12px; border-radius: 8px; border: 1px solid #90cdf4;">
-                <div style="font-size: 14px; font-weight: bold; color: #2b6cb0; margin-bottom: 8px;">👥 真人对战</div>
-                <div style="display: flex; justify-content: space-between; font-size: 12px;">
-                  <span>胜: <span style="color: #38a169; font-weight: bold;">${statsData?.humanWins || 0}</span></span>
-                  <span>负: <span style="color: #e53e3e; font-weight: bold;">${statsData?.humanLosses || 0}</span></span>
-                  <span>平: <span style="color: #4299e1; font-weight: bold;">${statsData?.humanDraws || 0}</span></span>
-                </div>
-              </div>
-              <div style="background: #faf5ff; padding: 12px; border-radius: 8px; border: 1px solid #d6bcfa;">
-                <div style="font-size: 14px; font-weight: bold; color: #6b46c1; margin-bottom: 8px;">🤖 AI对战</div>
-                <div style="display: flex; justify-content: space-between; font-size: 12px;">
-                  <span>胜: <span style="color: #38a169; font-weight: bold;">${statsData?.aiWins || 0}</span></span>
-                  <span>负: <span style="color: #e53e3e; font-weight: bold;">${statsData?.aiLosses || 0}</span></span>
-                  <span>平: <span style="color: #4299e1; font-weight: bold;">${statsData?.aiDraws || 0}</span></span>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div class="account-modal-footer">
-            <button class="account-btn" onclick="closeAccountModal();">返回</button>
-            <button class="account-btn" onclick="showGameHistoryModal()">游戏历史</button>
-            <button class="account-btn" onclick="showChangePasswordModal()">修改密码</button>
-            <button class="account-btn btn-primary" onclick="doUpdateProfile()">保存资料</button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(modal);
+      // 已移至独立的 profile.html 页面
+      window.location.href = '/profile.html';
     }
 
     function showChangePasswordModal() {
-      closeAccountModal();
-      const modal = document.createElement('div');
-      modal.className = 'account-modal-overlay';
-      modal.id = 'account-modal';
-      modal.innerHTML = `
-        <div class="account-modal">
-          <div class="account-modal-title">🔐 修改密码</div>
-          
-          <div class="account-form-group">
-            <label class="account-form-label">原密码</label>
-            <input type="password" class="account-form-input" id="old-password" placeholder="请输入原密码">
-          </div>
-          
-          <div class="account-form-group">
-            <label class="account-form-label">新密码</label>
-            <input type="password" class="account-form-input" id="new-password" placeholder="请输入新密码（至少6位）">
-          </div>
-          
-          <div class="account-form-group">
-            <label class="account-form-label">确认新密码</label>
-            <input type="password" class="account-form-input" id="new-password2" placeholder="请再次输入新密码">
-          </div>
-          
-          <div class="account-modal-footer">
-            <button class="account-btn" onclick="closeAccountModal();showProfileModal();">返回</button>
-            <button class="account-btn btn-primary" onclick="doChangePassword()">确认修改</button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(modal);
+      // 已移至独立的 profile.html 页面
+      window.location.href = '/profile.html';
     }
 
     function showGameHistoryModal() {
-      closeAccountModal();
-      const modal = document.createElement('div');
-      modal.className = 'account-modal-overlay';
-      modal.id = 'account-modal';
-      modal.innerHTML = `
-        <div class="account-modal" style="max-width: 600px;">
-          <div class="account-modal-title">📜 游戏历史记录</div>
-          
-          <div class="game-history-list" id="game-history-list" style="max-height: 400px; overflow-y: auto;">
-            <div style="color: #718096; text-align: center; padding: 20px;">加载中...</div>
-          </div>
-          
-          <div class="account-modal-footer">
-            <button class="account-btn" onclick="closeAccountModal();">关闭</button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(modal);
-
-      socket.emit('get_game_history', { limit: 20 });
+      // 已移至独立的 games-history.html 页面
+      window.location.href = '/games-history.html';
     }
 
     function updateGameHistory(history) {
@@ -12655,65 +12456,6 @@
           </div>
         `;
       }).join('');
-    }
-
-    function doUpdateProfile() {
-      if (!currentAccount) {
-        showToast('请先登录', 'warning');
-        return;
-      }
-
-      // 处理不同的数据结构
-      const accountData = currentAccount.account.account || currentAccount.account;
-
-      const nickname = document.getElementById('profile-nickname').value.trim();
-      const bio = document.getElementById('profile-bio').value.trim();
-
-      const updates = {
-        id: accountData?.id,
-        nickname: nickname || null,
-        profile: {
-          ...accountData?.profile,
-          bio: bio
-        }
-      };
-
-      socket.emit('account_update_profile', updates);
-    }
-
-    function doChangePassword() {
-      if (!currentAccount) {
-        showToast('请先登录', 'warning');
-        return;
-      }
-
-      // 处理不同的数据结构
-      const accountData = currentAccount.account.account || currentAccount.account;
-
-      const oldPassword = document.getElementById('old-password').value;
-      const newPassword = document.getElementById('new-password').value;
-      const newPassword2 = document.getElementById('new-password2').value;
-
-      if (!oldPassword || !newPassword || !newPassword2) {
-        showToast('请填写完整信息', 'warning');
-        return;
-      }
-
-      if (newPassword !== newPassword2) {
-        showToast('两次输入的新密码不一致', 'error');
-        return;
-      }
-
-      if (newPassword.length < 6) {
-        showToast('新密码至少需要6位', 'warning');
-        return;
-      }
-
-      socket.emit('account_change_password', {
-        id: accountData?.id,
-        oldPassword: oldPassword,
-        newPassword: newPassword
-      });
     }
 
     let currentChallenge = null; // 存储当前收到的挑战信息
@@ -13609,7 +13351,7 @@
       }
 
       // 个人资料功能控制
-      const profileButtons = document.querySelectorAll('.account-btn[onclick*="showProfileModal"]');
+      const profileButtons = document.querySelectorAll('.account-btn[onclick*="/profile.html"]');
       if (permissions.canEditProfile) {
         profileButtons.forEach(btn => {
           btn.style.display = 'inline-block';

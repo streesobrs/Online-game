@@ -8,13 +8,15 @@ const fs = require('fs');
 const path = require('path');
 
 class AccountManager {
-  constructor() {
+  constructor(io = null) {
     // 密码哈希迭代次数 - 可根据需要调整
     this.iterations = 10000;
     // 密钥长度
     this.keyLength = 64;
     // 哈希算法
     this.digest = 'sha512';
+    // socket.io 引用，用于发送实时通知
+    this.io = io;
     // 加载等级经验配置
     this.levelExpConfig = this.loadLevelExpConfig();
   }
@@ -3687,6 +3689,17 @@ class AccountManager {
 
       await this._saveMailStore(userId, mailStore);
       logger.info('发送邮件', { userId, mailId: mail.id, title: mail.title });
+
+      // 通过 socket.io 通知前端有新邮件
+      if (this.io) {
+        try {
+          this.io.to(userId).emit('mail_received', { mail });
+          logger.info('已通知前端新邮件', { userId, mailId: mail.id });
+        } catch (notifyErr) {
+          logger.warn('通知前端新邮件失败', { userId, mailId: mail.id, error: notifyErr.message });
+        }
+      }
+
       return { success: true, mail };
     } catch (err) {
       logger.error('发送邮件失败', { userId, error: err.message, stack: err.stack });

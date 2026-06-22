@@ -1333,7 +1333,7 @@ app.post('/api/mails/:accountId/cleanup', async (req, res) => {
 
 // 初始化管理器
 const versionManager = new VersionManager();
-const accountManager = new AccountManager();
+const accountManager = new AccountManager(io);
 // 后台加载节假日数据
 AccountManager.initHolidays().catch(err => logger.warn('节假日初始化失败', { error: err.message }));
 // 启动时迁移邮件和背包数据到独立存储
@@ -1653,6 +1653,7 @@ io.on('connection', (socket) => {
         // 存储新的会话
         userManager.socketToAccount.set(socket.id, newAccountId);
         userManager.onlineUsers.set(newAccountId, userSession);
+        try { socket.join(newAccountId); } catch (e) { /* 忽略房间加入错误 */ }
       }
 
       // 广播用户上线
@@ -1692,6 +1693,7 @@ io.on('connection', (socket) => {
           userManager.onlineUsers.delete(oldAccountId);
           userManager.onlineUsers.set(newAccountId, userSession);
           userSession.accountId = newAccountId;
+          try { socket.join(newAccountId); } catch (e) { /* 忽略房间加入错误 */ }
         }
 
         // 刷新在线用户列表给此客户端（清除旧的匿名条目）
@@ -1873,12 +1875,14 @@ io.on('connection', (socket) => {
           };
           userManager.socketToAccount.set(socket.id, accountId);
           userManager.onlineUsers.set(accountId, userSession);
+          try { socket.join(accountId); } catch (e) { /* 忽略房间加入错误 */ }
         } else {
           userSession.accountData = result.data;
           userSession.token = token;
           userSession.accountId = accountId;
           userManager.socketToAccount.set(socket.id, accountId);
           userManager.onlineUsers.set(accountId, userSession);
+          try { socket.join(accountId); } catch (e) { /* 忽略房间加入错误 */ }
         }
       }
     }

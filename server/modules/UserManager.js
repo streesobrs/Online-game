@@ -111,6 +111,13 @@ class UserManager {
       this.socketToAccount.set(socket.id, accountId || socket.id);
       if (accountId) {
         this.onlineUsers.set(accountId, userSession);
+        // 加入以 accountId 命名的房间，用于发送私人通知（邮件、账号更新等）
+        try {
+          socket.join(accountId);
+          logger.info('用户加入房间', { accountId, socketId: socket.id });
+        } catch (roomErr) {
+          logger.warn('用户加入房间失败', { accountId, error: roomErr.message });
+        }
       } else {
         this.onlineUsers.set(socket.id, userSession);
       }
