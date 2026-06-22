@@ -112,7 +112,7 @@ app.get('/api/config/levelExp', (req, res) => {
 app.get('/api/shop/data', async (req, res) => {
   try {
     const userId = req.query.userId;
-    const data = shopManager.getShopData(userId);
+    const data = await shopManager.getShopData(userId, accountManager);
     res.json({ success: true, data });
   } catch (err) {
     logger.error('获取商店数据失败', { error: err.message });
@@ -2265,18 +2265,14 @@ io.on('connection', (socket) => {
     }
     const result = await accountManager.useItem(user.accountId, itemId, 1);
     if (result.success) {
-      // 获取更新后的账号信息
-      const account = await accountManager.getAccount(user.accountId);
-      const undoCount = account?.inventory?.undoCount || 0;
-      const hintCount = account?.inventory?.hintCount || 0;
-      // 还返回更新后的 items 数据，以便客户端刷新库存
-      const items = account?.inventory?.items || {};
+      const invResult = await accountManager.getInventory(user.accountId);
+      const inv = invResult?.inventory || {};
       socket.emit('game_item_used', {
         success: true,
         itemId,
-        undoCount,
-        hintCount,
-        items
+        undoCount: inv.undoCount || 0,
+        hintCount: inv.hintCount || 0,
+        items: inv.items || {}
       });
     } else {
       socket.emit('game_item_used', {

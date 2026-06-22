@@ -44,7 +44,7 @@
     "name": "三倍经验卡",
     "description": "使用后获得1小时三倍经验加成，经验值获得速度提升200%",
     "icon": "🌟",
-    "price": 250,
+    "price": 160,
     "category": "item",
     "type": "buff",
     "rarity": "rare",
@@ -85,7 +85,7 @@
   "item_level_up": {
     "id": "item_level_up",
     "name": "等级直升券",
-    "description": "使用后直接提升1级，无论当前等级",
+    "description": "使用后直接提升1级，无论当前等级（已下架）",
     "icon": "🚀",
     "price": 1000,
     "category": "item",
@@ -97,12 +97,64 @@
     "tags": [
       "等级",
       "升级",
-      "稀有"
+      "稀有",
+      "下架"
+    ],
+    "enabled": false,
+    "rollout": 100,
+    "effect": {
+      "levelUp": 1
+    }
+  },
+  "item_exp_pack": {
+    "id": "item_exp_pack",
+    "name": "等级经验包",
+    "description": "按当前等级升级经验购买，使用时获得购买时锁定的经验值（不会随等级提升而增值）",
+    "icon": "📦",
+    "price": 0,
+    "category": "item",
+    "type": "instant",
+    "rarity": "epic",
+    "dynamic": true,
+    "maxRatio": 0.5,
+    "minRatio": 0.18,
+    "ratioPower": 0.7,
+    "maxStack": 99,
+    "hasMeta": true,
+    "usable": true,
+    "tradable": false,
+    "tags": [
+      "经验",
+      "升级",
+      "超值"
     ],
     "enabled": true,
     "rollout": 100,
     "effect": {
-      "levelUp": 1
+      "type": "locked_exp"
+    }
+  },
+  "item_reward_exp": {
+    "id": "item_reward_exp",
+    "name": "奖励经验包",
+    "description": "系统奖励，使用后立即获得3000经验值",
+    "icon": "🎁",
+    "price": 0,
+    "category": "item",
+    "type": "instant",
+    "rarity": "rare",
+    "maxStack": 99,
+    "usable": true,
+    "tradable": false,
+    "tags": [
+      "经验",
+      "奖励",
+      "升级"
+    ],
+    "enabled": false,
+    "rollout": 100,
+    "effect": {
+      "exp": 3000
     }
   },
   "item_undo": {
@@ -133,7 +185,7 @@
     "name": "提示卡",
     "description": "获得5次提示次数，显示下一步最佳位置",
     "icon": "💡",
-    "price": 150,
+    "price": 120,
     "category": "item",
     "type": "consumable",
     "rarity": "uncommon",
@@ -156,7 +208,7 @@
     "name": "贪吃蛇·复活卡",
     "description": "贪吃蛇游戏中使用，撞墙或撞身后可原地复活一次，保留当前分数",
     "icon": "❤️",
-    "price": 100,
+    "price": 60,
     "category": "item",
     "type": "consumable",
     "rarity": "rare",
@@ -176,7 +228,7 @@
     "name": "贪吃蛇·加速卡",
     "description": "贪吃蛇游戏中使用，10秒内移动速度翻倍，快速冲刺获取高分",
     "icon": "⚡",
-    "price": 80,
+    "price": 50,
     "category": "item",
     "type": "consumable",
     "rarity": "uncommon",
@@ -196,7 +248,7 @@
     "name": "贪吃蛇·双倍卡",
     "description": "贪吃蛇游戏中使用，15秒内吃掉食物获得双倍分数",
     "icon": "✖️2",
-    "price": 120,
+    "price": 80,
     "category": "item",
     "type": "consumable",
     "rarity": "rare",
@@ -216,7 +268,7 @@
     "name": "贪吃蛇·缩短卡",
     "description": "贪吃蛇游戏中使用，身体立即缩短3节，降低碰撞风险",
     "icon": "🔽",
-    "price": 60,
+    "price": 40,
     "category": "item",
     "type": "consumable",
     "rarity": "common",

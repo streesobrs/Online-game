@@ -1289,7 +1289,12 @@
 
     // 过滤商品
     function filterItems(items) {
-      let result = { ...items };
+      let result = {};
+      for (const [id, item] of Object.entries(items)) {
+        if (item.enabled !== false) {
+          result[id] = item;
+        }
+      }
 
       // 稀有度筛选
       if (rarityFilter) {
@@ -1313,6 +1318,228 @@
       }
 
       return result;
+    }
+
+    // 绘制价格曲线图表（带坐标轴和折线，支持 VIP 折扣价对比）
+    function drawPriceChart(chartId) {
+      const canvas = document.getElementById(chartId);
+      if (!canvas) return;
+      const data = window.__priceChartData?.[chartId];
+      if (!data || !data.table || data.table.length === 0) return;
+
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const displayWidth = canvas.clientWidth || 600;
+      const displayHeight = 240;
+      canvas.width = displayWidth * dpr;
+      canvas.height = displayHeight * dpr;
+      canvas.style.width = displayWidth + 'px';
+      canvas.style.height = displayHeight + 'px';
+      ctx.scale(dpr, dpr);
+
+      const W = displayWidth;
+      const H = displayHeight;
+      const paddingLeft = 50;
+      const paddingRight = 80; // 增加右侧 padding 以便放价格标签
+      const paddingTop = 40; // 增加顶部 padding 给图例留空间
+      const paddingBottom = 40;
+      const chartW = W - paddingLeft - paddingRight;
+      const chartH = H - paddingTop - paddingBottom;
+
+      // 背景
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, W, H);
+
+      // 折扣信息
+      const discount = data.discount || 0;
+      const hasDiscount = discount > 0;
+
+      // 数据范围（以原价为最大范围）
+      const minLevel = data.table[0].level;
+      const maxLevel = data.table[data.table.length - 1].level;
+      const minPrice = 0;
+      const maxPrice = Math.max(...data.table.map(d => d.price));
+
+      // 绘制网格线（Y轴）
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1;
+      ctx.fillStyle = '#64748b';
+      ctx.font = '11px Arial, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+
+      const yGridCount = 5;
+      for (let i = 0; i <= yGridCount; i++) {
+        const y = paddingTop + (chartH * i) / yGridCount;
+        const price = maxPrice - ((maxPrice - minPrice) * i) / yGridCount;
+
+        // 横线
+        ctx.beginPath();
+        ctx.moveTo(paddingLeft, y);
+        ctx.lineTo(W - paddingRight, y);
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.stroke();
+
+        // Y轴标签
+        ctx.fillText(Math.floor(price).toLocaleString(), paddingLeft - 6, y);
+      }
+
+      // 绘制 X 轴标签（每 10 级一个）
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      const xStep = Math.ceil((maxLevel - minLevel) / 5);
+      for (let lv = minLevel; lv <= maxLevel; lv += xStep) {
+        const x = paddingLeft + ((lv - minLevel) / (maxLevel - minLevel)) * chartW;
+        ctx.fillText(lv + '级', x, paddingTop + chartH + 8);
+      }
+
+      // 计算坐标（完整数据）
+      const allPoints = data.table.map(d => ({
+        x: paddingLeft + ((d.level - minLevel) / (maxLevel - minLevel)) * chartW,
+        y: paddingTop + (1 - (d.price - minPrice) / (maxPrice - minPrice || 1)) * chartH,
+        level: d.level,
+        price: d.price,
+        discPrice: hasDiscount ? Math.floor(d.price * (100 - discount) / 100) : d.price
+      }));
+
+      // 稀疏采样（每 5 级一个点）
+      const points = allPoints.filter((_, i) => i % 5 === 0 || i === allPoints.length - 1);
+
+      // 绘制折后价折线（绿色，先画，在下方）
+      if (hasDiscount) {
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y * 0 + paddingTop + (1 - (points[0].discPrice - minPrice) / (maxPrice - minPrice || 1)) * chartH);
+        for (let i = 0; i < points.length; i++) {
+          const discY = paddingTop + (1 - (points[i].discPrice - minPrice) / (maxPrice - minPrice || 1)) * chartH;
+          if (i === 0) ctx.moveTo(points[i].x, discY);
+          else ctx.lineTo(points[i].x, discY);
+        }
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // 折后价小圆点
+        ctx.fillStyle = '#10b981';
+        for (let i = 0; i < points.length; i++) {
+          const discY = paddingTop + (1 - (points[i].discPrice - minPrice) / (maxPrice - minPrice || 1)) * chartH;
+          ctx.beginPath();
+          ctx.arc(points[i].x, discY, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // 绘制原价折线（橙色，后画，在上方）
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x, points[i].y);
+      }
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // 原价填充区域
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, paddingTop + chartH);
+      for (let i = 0; i < points.length; i++) {
+        ctx.lineTo(points[i].x, points[i].y);
+      }
+      ctx.lineTo(points[points.length - 1].x, paddingTop + chartH);
+      ctx.closePath();
+      const gradient = ctx.createLinearGradient(0, paddingTop, 0, paddingTop + chartH);
+      gradient.addColorStop(0, 'rgba(245, 158, 11, 0.2)');
+      gradient.addColorStop(1, 'rgba(245, 158, 11, 0.02)');
+      ctx.fillStyle = gradient;
+      ctx.fill();
+
+      // 原价小圆点
+      ctx.fillStyle = '#f59e0b';
+      for (let i = 0; i < points.length; i++) {
+        ctx.beginPath();
+        ctx.arc(points[i].x, points[i].y, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 当前等级高亮（用完整数据找当前等级）
+      const currentPoint = allPoints.find(p => p.level === data.currLevel);
+      if (currentPoint) {
+        // 垂直虚线
+        ctx.beginPath();
+        ctx.setLineDash([4, 4]);
+        ctx.moveTo(currentPoint.x, paddingTop);
+        ctx.lineTo(currentPoint.x, paddingTop + chartH);
+        ctx.strokeStyle = '#3b82f6';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // 原价高亮圆点
+        ctx.beginPath();
+        ctx.arc(currentPoint.x, currentPoint.y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#f59e0b';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 如果有折扣，也绘制折后价高亮圆点
+        if (hasDiscount) {
+          const discY = paddingTop + (1 - (currentPoint.discPrice - minPrice) / (maxPrice - minPrice || 1)) * chartH;
+          ctx.beginPath();
+          ctx.arc(currentPoint.x, discY, 6, 0, Math.PI * 2);
+          ctx.fillStyle = '#10b981';
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+
+        // 价格标签（在图表右侧空白区，垂直排列）
+        const labelX = W - paddingRight + 8;
+        ctx.textAlign = 'left';
+        ctx.font = 'bold 12px Arial, sans-serif';
+        if (hasDiscount) {
+          ctx.textBaseline = 'bottom';
+          ctx.fillStyle = '#10b981';
+          ctx.fillText(`折后`, labelX, currentPoint.y + 18);
+          ctx.fillText(`💎${currentPoint.discPrice}`, labelX, currentPoint.y + 34);
+
+          ctx.textBaseline = 'top';
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillText(`原价`, labelX, currentPoint.y - 18);
+          ctx.fillText(`💎${currentPoint.price}`, labelX, currentPoint.y - 2);
+        } else {
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillText(`${data.currLevel}级`, labelX, currentPoint.y - 8);
+          ctx.fillText(`💎${currentPoint.price}`, labelX, currentPoint.y + 10);
+        }
+      }
+
+      // 图例（顶部，图表区上方）
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.font = '11px Arial, sans-serif';
+      const legendY = paddingTop / 2;
+      ctx.fillStyle = '#f59e0b';
+      ctx.fillRect(paddingLeft, legendY - 2, 12, 3);
+      ctx.fillStyle = '#475569';
+      ctx.fillText('原价', paddingLeft + 18, legendY);
+      if (hasDiscount) {
+        ctx.fillStyle = '#10b981';
+        ctx.fillRect(paddingLeft + 60, legendY - 2, 12, 3);
+        ctx.fillStyle = '#475569';
+        ctx.fillText(`折后(${100 - discount}%)`, paddingLeft + 78, legendY);
+      }
+
+      // 坐标轴
+      ctx.beginPath();
+      ctx.moveTo(paddingLeft, paddingTop);
+      ctx.lineTo(paddingLeft, paddingTop + chartH);
+      ctx.lineTo(W - paddingRight, paddingTop + chartH);
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
     }
 
     // 显示道具详情
@@ -1406,6 +1633,56 @@
         vipBenefitHtml = `<div class="detail-section"><h4>✨ 会员特权</h4><div class="info-grid" style="grid-template-columns: 1fr;">${benefitRows}</div></div>${dailyHtml}`;
       }
 
+      let priceTableHtml = '';
+      if (item.dynamic && item.priceTable && item.priceTable.length > 0) {
+        const currLevel = item.currentLevel || 1;
+        const chartId = 'priceChart_' + item.id + '_' + Date.now();
+        // 保存图表数据到全局变量（供绘制函数读取）
+        window.__priceChartData = window.__priceChartData || {};
+        const _isVipActive = vipInfo?.expireAt > Date.now();
+        const _discount = (_isVipActive && vipInfo?.discountPercent) ? vipInfo.discountPercent : 0;
+        window.__priceChartData[chartId] = { table: item.priceTable, currLevel, discount: _discount };
+
+        // 完整价格表格（横向滚动，5 列并排：1-10, 11-20, ...）
+        let fullTableHtml = '<div class="price-table-container" style="display:flex;gap:20px;margin-top:8px;overflow-x:auto; padding: 12px 0; white-space:nowrap;">';
+        const levelsPerCol = 10;
+        const fullCols = Math.ceil(item.priceTable.length / levelsPerCol);
+        for (let col = 0; col < fullCols; col++) {
+          fullTableHtml += '<div style="flex:0 0 auto; min-width: 140px;">';
+          for (let row = 0; row < levelsPerCol; row++) {
+            const idx = col * levelsPerCol + row;
+            if (idx >= item.priceTable.length) continue;
+            const rowData = item.priceTable[idx];
+            const isCurrent = rowData.level === currLevel;
+            const bgColor = isCurrent ? 'background:#dcfce7; font-weight:700;' : '';
+            fullTableHtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-radius:4px;font-size:12px;margin:2px 0;${bgColor}">
+              <span style="color:#475569;">${rowData.level} 级</span>
+              <span style="color:#166534;font-weight:600;">💎${rowData.price}</span>
+            </div>`;
+          }
+          fullTableHtml += '</div>';
+        }
+        fullTableHtml += '</div>';
+
+        priceTableHtml = `<div class="detail-section" style="margin-bottom:16px;">
+          <h4 style="display:flex;align-items:center;gap:8px;cursor:pointer;" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'; const icon = this.querySelector('.toggle-icon'); if(icon){icon.textContent = this.nextElementSibling.style.display === 'none' ? '▶' : '▼'}"  >
+            <span style="font-size:16px;">📊 价格曲线</span>
+            <span class="toggle-icon" style="font-size:12px;color:#64748b;transition:transform 0.2s;">▼</span>
+          </h4>
+          <div class="price-table-container" style="display:block;margin-top:8px;">
+            <div style="padding: 12px; background:#f8fafc; border-radius:8px;">
+              <canvas id="${chartId}" width="600" height="240" style="width:100%; max-width:600px; height:auto; display:block; margin: 0 auto;"></canvas>
+              <div style="text-align:center; font-size:12px; color:#64748b; margin-top:8px;">等级 → 价格（💎）</div>
+            </div>
+            <div style="font-size:13px; color:#64748b; margin-top:12px; font-weight:600;">📋 完整价格表（${item.priceTable.length} 个等级）</div>
+            ${fullTableHtml}
+          </div>
+        </div>`;
+
+        // 延迟绘制图表（等待 DOM 插入完成）
+        setTimeout(() => drawPriceChart(chartId), 10);
+      }
+
       const modalHtml = `
         <div class="modal-overlay" id="itemDetailModal" onclick="closeItemDetail()">
           <div class="item-detail-modal" onclick="event.stopPropagation()" style="border-top: 4px solid ${rarity.color}">
@@ -1423,7 +1700,20 @@
                 <div class="detail-section">
                   <h4>📋 描述</h4>
                   <p>${item.description}</p>
+                  ${item.dynamic && item.currentLevel ? `
+                    <div style="margin-top:12px;padding:12px;background:#fef3c7;border-radius:8px;border:1px dashed #f59e0b;">
+                      <div style="font-weight:600;color:#f59e0b;margin-bottom:4px;">⏳ 动态价格道具</div>
+                      <div style="font-size:13px;color:#78350f;line-height:1.6;">
+                        · 当前等级：<b>${item.currentLevel}</b> 级<br>
+                        · 使用后可获得：<b>+${item.lockedExp}</b> 经验<br>
+                        · 购买时锁定经验值，等级提升后价格会变化<br>
+                        · 每个道具的经验值独立计算，购买后不再变动
+                      </div>
+                    </div>
+                  ` : ''}
                 </div>
+
+                ${priceTableHtml}
 
                 ${contentHtml}
 
@@ -1703,6 +1993,7 @@
         const glowClass = item.rarity === 'legendary' || item.rarity === 'epic' ? `glow-${item.rarity}` : '';
         const discountedPrice = Math.floor(item.price * (100 - vipDiscount) / 100);
         const showDiscount = isVipActive && vipDiscount > 0;
+        const isDynamic = item.dynamic === true;
 
         html += `
           <div class="item-card ${rarityClass} ${glowClass}" onclick="showItemDetail('${id}', false)">
@@ -1710,6 +2001,11 @@
             <div class="item-name">${item.name}${showDiscount ? ' <span style="font-size:12px;background:#667eea;color:white;padding:2px 8px;border-radius:4px;vertical-align:middle;">-' + vipDiscount + '%</span>' : ''}</div>
             <div class="item-desc">${item.description}</div>
             <div class="rarity-badge ${item.rarity || 'common'}">${RARITY_CONFIG[item.rarity]?.name || '普通'}</div>
+            ${isDynamic && item.currentLevel ? `
+              <div style="font-size:12px;color:#f59e0b;background:#fef3c7;padding:4px 8px;border-radius:6px;margin-top:6px;">
+                当前等级 ${item.currentLevel}：+${item.lockedExp} 经验
+              </div>
+            ` : ''}
             ${item.tags && item.tags.length > 0 ? `
               <div class="item-tags">
                 ${item.tags.slice(0, 3).map(tag => `<span class="item-tag">${tag}</span>`).join('')}

@@ -125,7 +125,19 @@ class AccountManager {
     if (this.levelExpConfig[level]) {
       return this.levelExpConfig[level];
     }
-    // 如果配置表中没有，使用默认公式
+    // 如果配置表中没有，使用最高配置等级的经验值（避免超出配置后经验暴跌）
+    if (!this._maxLevelExp) {
+      const keys = Object.keys(this.levelExpConfig).map(Number);
+      if (keys.length > 0) {
+        this._maxLevelExp = Math.max(...keys);
+      } else {
+        this._maxLevelExp = 1;
+      }
+    }
+    if (level > this._maxLevelExp) {
+      return this.levelExpConfig[this._maxLevelExp] || 100;
+    }
+    // 等级 <=1 的特殊情况
     return (level - 1) * 100;
   }
 
@@ -2616,8 +2628,14 @@ class AccountManager {
    */
   async getInventory(userId) {
     const invStore = await this._getInventoryStore(userId);
+    const items = {};
+    if (invStore.items) {
+      for (const [id, val] of Object.entries(invStore.items)) {
+        items[id] = Array.isArray(val) ? val.length : (Number(val) || 0);
+      }
+    }
     const inventory = {
-      items: invStore.items || {},
+      items,
       undoCount: invStore.undoCount || 0,
       hintCount: invStore.hintCount || 0
     };
@@ -2625,14 +2643,91 @@ class AccountManager {
   }
 
   /**
-   * 添加道具
+   * 根据等级取动态价格系数（不同等级区间用不同系数）
    */
-  async addItem(userId, itemId, count = 1) {
+  getPriceRatio(currentLevel) {
+    return (level) => {
+      if (level <= 10) return 0.5;
+      if (level <= 25) return 0.35;
+      if (level <= 40) return 0.25;
+      return 0.18;
+    };
+  }
+
+  /**
+   * 计算某个商品的动态价格（根据用户当前等级）
+   */
+  getDynamicPrice(itemConfig, currentLevel) {
+    if (!itemConfig?.dynamic) return itemConfig?.price || 0;
+    const maxLevel = this.getMaxLevel();
+    // 达到/超出最高等级时按上一级计算（防止价格回落）
+    const calcLevel = Math.min(currentLevel, maxLevel - 1);
+    const nextLevel = calcLevel + 1;
+    const expNeeded = this.getExpForLevel(nextLevel);
+
+    const maxRatio = itemConfig.maxRatio || 0.5;
+    const minRatio = itemConfig.minRatio || 0.18;
+    const t = Math.min(1, (calcLevel - 1) / Math.max(1, maxLevel - 1));
+    const power = itemConfig.ratioPower || 0.7;
+    const adjustedT = Math.pow(t, power);
+    const ratio = maxRatio - (maxRatio - minRatio) * adjustedT;
+
+    return Math.max(1, Math.floor(expNeeded * ratio));
+  }
+
+  /**
+   * 获取某个道具的持有数量（兼容数字和数组两种存储格式）
+   */
+  _getItemCount(invStore, itemId) {
+    const val = invStore?.items?.[itemId];
+    if (val == null) return 0;
+    if (Array.isArray(val)) return val.length;
+    return Number(val) || 0;
+  }
+
+  /**
+   * 添加道具（支持带 meta 信息的道具，meta 模式下用数组存储每个实例）
+   */
+  async addItem(userId, itemId, count = 1, meta = null, shopManager = null) {
     const invStore = await this._getInventoryStore(userId);
     if (!invStore.items) invStore.items = {};
-    invStore.items[itemId] = (invStore.items[itemId] || 0) + count;
+
+    let hasMeta = meta != null;
+    if (!hasMeta && shopManager) {
+      const cfg = shopManager.findItem(itemId);
+      if (cfg?.hasMeta) hasMeta = true;
+    }
+
+    if (hasMeta) {
+      if (!Array.isArray(invStore.items[itemId])) {
+        const existingCount = invStore.items[itemId] || 0;
+        invStore.items[itemId] = [];
+        for (let i = 0; i < existingCount; i++) {
+          invStore.items[itemId].push({});
+        }
+      }
+      for (let i = 0; i < count; i++) {
+        invStore.items[itemId].push(meta || {});
+      }
+    } else {
+      invStore.items[itemId] = (invStore.items[itemId] || 0) + count;
+    }
     await this._saveInventoryStore(userId, invStore);
     return { success: true };
+  }
+
+  /**
+   * 从背包中扣除道具（兼容数字和数组两种存储格式）
+   */
+  _consumeItem(invStore, itemId, count) {
+    const val = invStore.items[itemId];
+    if (Array.isArray(val)) {
+      val.splice(0, count);
+      if (val.length === 0) delete invStore.items[itemId];
+    } else {
+      invStore.items[itemId] = val - count;
+      if (invStore.items[itemId] <= 0) delete invStore.items[itemId];
+    }
   }
 
   /**
@@ -2640,7 +2735,8 @@ class AccountManager {
    */
   async useItem(userId, itemId, count = 1, shopManager = null) {
     const invStore = await this._getInventoryStore(userId);
-    if (!invStore.items?.[itemId] || invStore.items[itemId] < count) {
+    const itemCount = this._getItemCount(invStore, itemId);
+    if (itemCount < count) {
       return { success: false, message: '道具不足' };
     }
 
@@ -2650,11 +2746,7 @@ class AccountManager {
       if (itemInfo && itemInfo.category === 'pack') {
         const openResult = await shopManager.openPack(userId, itemId, this);
         if (openResult.success) {
-          // 扣除礼包数量
-          invStore.items[itemId] -= count;
-          if (invStore.items[itemId] <= 0) {
-            delete invStore.items[itemId];
-          }
+          this._consumeItem(invStore, itemId, count);
           await this._saveInventoryStore(userId, invStore);
           return { ...openResult };
         }
@@ -2665,10 +2757,7 @@ class AccountManager {
       if (itemInfo && itemInfo.category === 'slot') {
         const slotAdd = (itemInfo.slots || 1) * count;
         await this.addAvatarSlots(userId, slotAdd);
-        invStore.items[itemId] -= count;
-        if (invStore.items[itemId] <= 0) {
-          delete invStore.items[itemId];
-        }
+        this._consumeItem(invStore, itemId, count);
         await this._saveInventoryStore(userId, invStore);
         return { success: true, message: `成功增加${slotAdd}个自定义头像槽位！` };
       }
@@ -2676,6 +2765,7 @@ class AccountManager {
 
     let result = { success: true };
     let expToAdd = 0;
+    let eventLabel = '道具使用';
     const account = await this._getAccount(userId);
 
     switch (itemId) {
@@ -2708,18 +2798,43 @@ class AccountManager {
         break;
       case 'item_exp_potion':
         expToAdd = 500 * count;
+        eventLabel = '经验药水';
         result.message = `使用成功！获得${expToAdd}经验值`;
         break;
       case 'item_level_up':
         if (!account) return { success: false, message: '账号不存在' };
-        const currentLevel = account.account?.profile?.level || 1;
-        const targetLevel = currentLevel + count;
-        let totalExpNeeded = 0;
-        for (let l = currentLevel + 1; l <= targetLevel; l++) {
-          totalExpNeeded += this.getExpForLevel(l);
+        const lvUpCurrentLevel = account.account?.profile?.level || 1;
+        const lvUpTargetLevel = lvUpCurrentLevel + count;
+        let lvUpExp = 0;
+        for (let l = lvUpCurrentLevel + 1; l <= lvUpTargetLevel; l++) {
+          lvUpExp += this.getExpForLevel(l);
         }
-        expToAdd = totalExpNeeded;
-        result.message = `使用成功！等级从${currentLevel}提升到${targetLevel}`;
+        expToAdd = lvUpExp;
+        eventLabel = '等级直升券';
+        result.message = `使用成功！等级从${lvUpCurrentLevel}提升到${lvUpTargetLevel}`;
+        break;
+      case 'item_exp_pack':
+        if (!account) return { success: false, message: '账号不存在' };
+        // 遍历选中的 count 个实例，累加锁定的经验值
+        let lockedTotal = 0;
+        const instArr = invStore.items[itemId];
+        if (Array.isArray(instArr)) {
+          for (let i = 0; i < count && i < instArr.length; i++) {
+            lockedTotal += instArr[i]?.lockedExp || 0;
+          }
+        } else {
+          // 老数据（数字形式）：按当前等级换算
+          const lv = account.account?.profile?.level || 1;
+          lockedTotal = this.getExpForLevel(lv + 1) * count;
+        }
+        expToAdd = lockedTotal;
+        eventLabel = '等级经验包';
+        result.message = `使用成功！获得${expToAdd}经验值`;
+        break;
+      case 'item_reward_exp':
+        expToAdd = 3000 * count;
+        eventLabel = '奖励经验包';
+        result.message = `使用成功！获得${expToAdd}经验值`;
         break;
       case 'item_undo':
         if (!invStore.undoCount) invStore.undoCount = 0;
@@ -2769,7 +2884,7 @@ class AccountManager {
           bonusExp: 0,
           finalExp: expToAdd,
           levelMult: 1,
-          eventLabel: itemId === 'item_exp_potion' ? '经验药水' : '等级直升券',
+          eventLabel: eventLabel,
           oldLevel: oldLevel,
           newLevel: newLevel,
           totalExp: account.account.profile.exp,
@@ -2787,10 +2902,7 @@ class AccountManager {
     }
 
     // 扣除道具
-    invStore.items[itemId] -= count;
-    if (invStore.items[itemId] <= 0) {
-      delete invStore.items[itemId];
-    }
+    this._consumeItem(invStore, itemId, count);
 
     await this._saveInventoryStore(userId, invStore);
     return result;

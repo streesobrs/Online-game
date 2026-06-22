@@ -84,8 +84,8 @@ class ShopManager {
     return false;
   }
 
-  // 获取商店数据（支持灰度）
-  getShopData(userId = null) {
+  // 获取商店数据（支持灰度，支持动态价格）
+  async getShopData(userId = null, accountManager = null) {
     this.checkUpdate();
 
     const result = {
@@ -100,9 +100,37 @@ class ShopManager {
       vip: {}
     };
 
-    // 处理道具
+    // 查询用户等级，用于动态价格商品的算价
+    let userLevel = 1;
+    if (userId && accountManager) {
+      try {
+        const acc = await accountManager._getAccount(userId);
+        userLevel = acc?.account?.profile?.level || 1;
+      } catch (e) { /* 取默认值 */ }
+    }
+
+    // 处理道具（动态价格商品：用当前等级算实时价格）
+    // 注意：所有道具（包括 enabled:false 的）都返回基础信息，以便背包中展示已下架但玩家持有的道具
     Object.values(this.items || {}).forEach(item => {
-      if (this.filterItem(item, userId)) {
+      const canBuy = this.filterItem(item, userId);
+      if (canBuy) {
+        if (item.dynamic && accountManager) {
+          const unitPrice = accountManager.getDynamicPrice(item, userLevel);
+          const nextLvExp = accountManager.getExpForLevel(userLevel + 1);
+          const maxLevel = accountManager.getMaxLevel();
+          const priceTable = [];
+          const showLevels = [];
+          for (let l = 1; l <= maxLevel; l++) showLevels.push(l);
+          for (const l of showLevels) {
+            const p = accountManager.getDynamicPrice(item, l);
+            const e = accountManager.getExpForLevel(l + 1);
+            priceTable.push({ level: l, exp: e, price: p });
+          }
+          result.items[item.id] = { ...item, price: unitPrice, currentLevel: userLevel, lockedExp: nextLvExp, priceTable, maxLevel };
+        } else {
+          result.items[item.id] = item;
+        }
+      } else {
         result.items[item.id] = item;
       }
     });
@@ -116,11 +144,9 @@ class ShopManager {
       });
     });
 
-    // 处理礼包
+    // 处理礼包（包括 enabled:false 的，以便背包显示）
     Object.values(this.packs || {}).forEach(item => {
-      if (this.filterItem(item, userId)) {
-        result.packs[item.id] = item;
-      }
+      result.packs[item.id] = item;
     });
 
     // 处理会员
@@ -183,18 +209,29 @@ class ShopManager {
       return { success: false, message: '该商品暂未上线' };
     }
 
-    // 检查VIP折扣
+    // 动态价格商品：根据用户当前等级算价
+    let lockedExp = 0;
+    let currentLv = 1;
+    let unitPrice = item.price || 0;
+    if (item.dynamic) {
+      const acc = await accountManager._getAccount(userId);
+      currentLv = acc?.account?.profile?.level || 1;
+      unitPrice = accountManager.getDynamicPrice(item, currentLv);
+      // 锁定的经验 = 当前升到下一级所需经验
+      lockedExp = accountManager.getExpForLevel(currentLv + 1);
+    }
+
+    // 检查VIP折扣 - 根据VIP类型（周卡/月卡/季卡/年卡）取对应的折扣率
     let discount = 0;
     try {
       const vipInfo = await accountManager.getVip(userId);
       if (vipInfo?.vip?.expireAt > Date.now()) {
-        discount = this.getVipDiscountPercent();
+        discount = vipInfo.vip.discountPercent || 0;
       }
     } catch (e) {
       // VIP查询失败不影响购买
     }
 
-    const unitPrice = item.price;
     const discountedPrice = Math.floor(unitPrice * (100 - discount) / 100);
     const totalPrice = discountedPrice * quantity;
     const savedAmount = (unitPrice - discountedPrice) * quantity;
@@ -206,8 +243,11 @@ class ShopManager {
     }
 
     await accountManager.useCurrency(userId, totalPrice, `购买${item.name}×${quantity}`);
+
+    // 给动态价格商品准备 meta（锁定的经验 + 购买时等级）
+    const itemMeta = item.dynamic ? { lockedExp, purchasedLevel: currentLv, purchasedAt: Date.now() } : null;
     for (let i = 0; i < quantity; i++) {
-      await this.deliverItem(userId, item, accountManager);
+      await this.deliverItem(userId, item, accountManager, itemMeta);
     }
 
     return {
@@ -218,15 +258,16 @@ class ShopManager {
       item,
       quantity,
       totalPrice,
-      discount
+      discount,
+      unitPrice
     };
   }
 
   // 发放商品
-  async deliverItem(userId, item, accountManager) {
+  async deliverItem(userId, item, accountManager, meta = null) {
     switch (item.category) {
       case 'item':
-        await accountManager.addItem(userId, item.id, 1);
+        await accountManager.addItem(userId, item.id, 1, meta, this);
         break;
       case 'frame':
       case 'avatar':
