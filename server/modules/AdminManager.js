@@ -1546,6 +1546,455 @@ class AdminManager {
       socket.emit('admin_users_select_list', { users: [], success: false, message: '读取失败' });
     }
   }
+
+  // 经验来源标签映射
+  getExpSourceLabel(record) {
+    if (record.eventLabel) return record.eventLabel;
+    if (record.source) return record.source;
+    return '游戏对战';
+  }
+
+  // 星钻来源标签映射
+  getCoinSourceLabel(source) {
+    const sourceMap = {
+      'exp_reward': '经验兑换',
+      'level_up': '升级奖励',
+      'level_reward': '等级奖励',
+      'admin_grant': '管理员发放',
+      'system': '系统发放',
+      'shop_purchase': '商城购买',
+      'mail_reward': '邮件奖励',
+      'mail_reward_batch': '邮件奖励(批量)',
+      'achievement': '成就奖励',
+      'daily_login': '每日签到',
+      'spend': '消费支出',
+      'game_win': '游戏胜利',
+      'game_draw': '游戏平局',
+      'vip_daily': 'VIP每日礼包'
+    };
+    return sourceMap[source] || source || '未知来源';
+  }
+
+  // 获取经验值获取记录（分页、筛选）
+  async getExpRecords(socket, options = {}) {
+    try {
+      const {
+        accountId = null,
+        keyword = '',
+        source = 'all',
+        startTime = null,
+        endTime = null,
+        page = 1,
+        pageSize = 20
+      } = options;
+
+      const allRecords = await dataStore.read('expTransactions');
+      const accounts = await dataStore.read('accounts');
+
+      const accountMap = new Map();
+      for (const acc of accounts) {
+        const id = acc.account?.id || acc.id;
+        if (id) {
+          accountMap.set(id, {
+            id,
+            username: acc.account?.username || '-',
+            nickname: acc.account?.nickname || '-',
+            level: acc.account?.profile?.level || 1
+          });
+        }
+      }
+
+      let records = [];
+
+      // 如果指定了单个用户ID，只取该用户的记录
+      if (accountId) {
+        const userRecords = allRecords.find(r => r.userId === accountId);
+        if (userRecords && userRecords.transactions) {
+          const userInfo = accountMap.get(accountId);
+          records = userRecords.transactions.map(t => ({
+            ...t,
+            userId: accountId,
+            username: userInfo?.username || '-',
+            nickname: userInfo?.nickname || '-',
+            sourceLabel: this.getExpSourceLabel(t)
+          }));
+        }
+      } else {
+        // 合并所有用户的记录
+        for (const userRec of allRecords) {
+          const userInfo = accountMap.get(userRec.userId);
+          if (!userRec.transactions) continue;
+          const userTx = userRec.transactions.map(t => ({
+            ...t,
+            userId: userRec.userId,
+            username: userInfo?.username || '-',
+            nickname: userInfo?.nickname || '-',
+            sourceLabel: this.getExpSourceLabel(t)
+          }));
+          records.push(...userTx);
+        }
+      }
+
+      // 按时间倒序
+      records.sort((a, b) => b.timestamp - a.timestamp);
+
+      // 筛选时间范围
+      if (startTime) {
+        const start = new Date(startTime).getTime();
+        if (!isNaN(start)) {
+          records = records.filter(r => r.timestamp >= start);
+        }
+      }
+      if (endTime) {
+        const end = new Date(endTime + ' 23:59:59').getTime();
+        if (!isNaN(end)) {
+          records = records.filter(r => r.timestamp <= end);
+        }
+      }
+
+      // 筛选来源
+      if (source && source !== 'all') {
+        records = records.filter(r => {
+          if (source === 'battle') return !r.eventLabel && !r.source;
+          return r.sourceLabel.includes(source) || (r.source === source);
+        });
+      }
+
+      // 关键词搜索（用户名/昵称）
+      if (keyword) {
+        const kw = keyword.toLowerCase();
+        records = records.filter(r =>
+          r.username?.toLowerCase().includes(kw) ||
+          r.nickname?.toLowerCase().includes(kw)
+        );
+      }
+
+      const total = records.length;
+      const totalPages = Math.max(1, Math.ceil(total / pageSize));
+      const currentPage = Math.min(Math.max(1, page), totalPages);
+      const startIndex = (currentPage - 1) * pageSize;
+      const pagedRecords = records.slice(startIndex, startIndex + pageSize);
+
+      // 汇总统计
+      const summary = {
+        totalRecords: total,
+        totalExp: records.reduce((s, r) => s + (r.finalExp || 0), 0),
+        totalBonusExp: records.reduce((s, r) => s + (r.bonusExp || 0), 0),
+        uniqueUsers: new Set(records.map(r => r.userId)).size
+      };
+
+      socket.emit('admin_exp_records', {
+        success: true,
+        records: pagedRecords,
+        summary,
+        pagination: {
+          page: currentPage,
+          pageSize,
+          total,
+          totalPages
+        }
+      });
+    } catch (err) {
+      logger.error('获取经验记录失败', { error: err.message, stack: err.stack });
+      socket.emit('admin_exp_records', {
+        success: false,
+        message: '获取经验记录失败: ' + err.message,
+        records: [],
+        summary: {},
+        pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 }
+      });
+    }
+  }
+
+  // 获取星钻获取/消费记录（分页、筛选）
+  async getCoinRecords(socket, options = {}) {
+    try {
+      const {
+        accountId = null,
+        keyword = '',
+        source = 'all',
+        type = 'all',
+        startTime = null,
+        endTime = null,
+        page = 1,
+        pageSize = 20
+      } = options;
+
+      const allRecords = await dataStore.read('currencyTransactions');
+      const accounts = await dataStore.read('accounts');
+
+      const accountMap = new Map();
+      for (const acc of accounts) {
+        const id = acc.account?.id || acc.id;
+        if (id) {
+          accountMap.set(id, {
+            id,
+            username: acc.account?.username || '-',
+            nickname: acc.account?.nickname || '-',
+            starCoins: acc.currency?.starCoins || 0
+          });
+        }
+      }
+
+      let records = [];
+
+      if (accountId) {
+        const userRecords = allRecords.find(r => r.userId === accountId);
+        if (userRecords && userRecords.transactions) {
+          const userInfo = accountMap.get(accountId);
+          records = userRecords.transactions.map(t => ({
+            ...t,
+            userId: accountId,
+            username: userInfo?.username || '-',
+            nickname: userInfo?.nickname || '-',
+            sourceLabel: this.getCoinSourceLabel(t.source),
+            signedAmount: t.type === 'spend' ? -t.amount : t.amount
+          }));
+        }
+      } else {
+        for (const userRec of allRecords) {
+          const userInfo = accountMap.get(userRec.userId);
+          if (!userRec.transactions) continue;
+          const userTx = userRec.transactions.map(t => ({
+            ...t,
+            userId: userRec.userId,
+            username: userInfo?.username || '-',
+            nickname: userInfo?.nickname || '-',
+            sourceLabel: this.getCoinSourceLabel(t.source),
+            signedAmount: t.type === 'spend' ? -t.amount : t.amount
+          }));
+          records.push(...userTx);
+        }
+      }
+
+      // 按时间倒序
+      records.sort((a, b) => b.timestamp - a.timestamp);
+
+      // 筛选时间范围
+      if (startTime) {
+        const start = new Date(startTime).getTime();
+        if (!isNaN(start)) {
+          records = records.filter(r => r.timestamp >= start);
+        }
+      }
+      if (endTime) {
+        const end = new Date(endTime + ' 23:59:59').getTime();
+        if (!isNaN(end)) {
+          records = records.filter(r => r.timestamp <= end);
+        }
+      }
+
+      // 筛选类型（收入/支出）
+      if (type && type !== 'all') {
+        records = records.filter(r => r.type === type);
+      }
+
+      // 筛选来源
+      if (source && source !== 'all') {
+        records = records.filter(r => r.source === source);
+      }
+
+      // 关键词搜索
+      if (keyword) {
+        const kw = keyword.toLowerCase();
+        records = records.filter(r =>
+          r.username?.toLowerCase().includes(kw) ||
+          r.nickname?.toLowerCase().includes(kw) ||
+          r.reason?.toLowerCase().includes(kw)
+        );
+      }
+
+      const total = records.length;
+      const totalPages = Math.max(1, Math.ceil(total / pageSize));
+      const currentPage = Math.min(Math.max(1, page), totalPages);
+      const startIndex = (currentPage - 1) * pageSize;
+      const pagedRecords = records.slice(startIndex, startIndex + pageSize);
+
+      // 汇总统计
+      const earnRecords = records.filter(r => r.type === 'earn');
+      const spendRecords = records.filter(r => r.type === 'spend');
+      const summary = {
+        totalRecords: total,
+        totalEarned: earnRecords.reduce((s, r) => s + r.amount, 0),
+        totalSpent: spendRecords.reduce((s, r) => s + r.amount, 0),
+        netFlow: earnRecords.reduce((s, r) => s + r.amount, 0) - spendRecords.reduce((s, r) => s + r.amount, 0),
+        uniqueUsers: new Set(records.map(r => r.userId)).size
+      };
+
+      socket.emit('admin_coin_records', {
+        success: true,
+        records: pagedRecords,
+        summary,
+        pagination: {
+          page: currentPage,
+          pageSize,
+          total,
+          totalPages
+        }
+      });
+    } catch (err) {
+      logger.error('获取星钻记录失败', { error: err.message, stack: err.stack });
+      socket.emit('admin_coin_records', {
+        success: false,
+        message: '获取星钻记录失败: ' + err.message,
+        records: [],
+        summary: {},
+        pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 }
+      });
+    }
+  }
+
+  // 获取邮件发送/领取记录（分页、筛选）
+  async getMailRecords(socket, options = {}) {
+    try {
+      const {
+        keyword = '',
+        status = 'all',
+        from = 'all',
+        startTime = null,
+        endTime = null,
+        page = 1,
+        pageSize = 20
+      } = options;
+
+      const allMailStores = await dataStore.read('mails');
+      const accounts = await dataStore.read('accounts');
+
+      const accountMap = new Map();
+      for (const acc of accounts) {
+        const id = acc.account?.id || acc.id;
+        if (id) {
+          accountMap.set(id, {
+            id,
+            username: acc.account?.username || '-',
+            nickname: acc.account?.nickname || '-'
+          });
+        }
+      }
+
+      let mails = [];
+      for (const userMail of allMailStores) {
+        if (!userMail.mails || !Array.isArray(userMail.mails)) continue;
+        const userInfo = accountMap.get(userMail.userId);
+        for (const m of userMail.mails) {
+          mails.push({
+            ...m,
+            userId: userMail.userId,
+            username: userInfo?.username || '-',
+            nickname: userInfo?.nickname || '-'
+          });
+        }
+      }
+
+      // 按发送时间倒序
+      mails.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+      // 筛选时间范围
+      if (startTime) {
+        const start = new Date(startTime).getTime();
+        if (!isNaN(start)) mails = mails.filter(m => (m.createdAt || 0) >= start);
+      }
+      if (endTime) {
+        const end = new Date(endTime + ' 23:59:59').getTime();
+        if (!isNaN(end)) mails = mails.filter(m => (m.createdAt || 0) <= end);
+      }
+
+      // 筛选状态（已领取/未领取）
+      if (status === 'claimed') {
+        mails = mails.filter(m => m.claimed === true);
+      } else if (status === 'unclaimed') {
+        mails = mails.filter(m => m.claimed !== true);
+      }
+
+      // 筛选发件人
+      if (from && from !== 'all') {
+        mails = mails.filter(m => {
+          const sender = (m.from || '系统').toString();
+          return sender.includes(from);
+        });
+      }
+
+      // 关键词搜索（用户名/昵称/标题）
+      if (keyword) {
+        const kw = keyword.toLowerCase();
+        mails = mails.filter(m =>
+          m.username?.toLowerCase().includes(kw) ||
+          m.nickname?.toLowerCase().includes(kw) ||
+          m.title?.toLowerCase().includes(kw) ||
+          m.content?.toLowerCase().includes(kw)
+        );
+      }
+
+      const total = mails.length;
+      const totalPages = Math.max(1, Math.ceil(total / pageSize));
+      const currentPage = Math.min(Math.max(1, page), totalPages);
+      const startIndex = (currentPage - 1) * pageSize;
+      const pagedMails = mails.slice(startIndex, startIndex + pageSize).map(m => {
+        const itemList = (m.items || []).map(i => ({
+          icon: i.icon || '📦', name: i.name || i.id, count: i.count || 1
+        }));
+        const cosmeticList = (m.cosmetics || []).map(c => ({
+          icon: c.icon || '🎨', name: c.name || c.id, category: c.category || ''
+        }));
+        const vipInfo = m.vip ? {
+          icon: m.vip.icon || '💎', name: m.vip.name || `${m.vip.days}天会员`, days: m.vip.days || 0
+        } : null;
+        return {
+          id: m.id,
+          userId: m.userId,
+          username: m.username,
+          nickname: m.nickname,
+          title: m.title,
+          content: m.content,
+          from: m.from || '系统',
+          claimed: !!m.claimed,
+          read: !!m.read,
+          claimedAt: m.claimedAt || null,
+          createdAt: m.createdAt,
+          starCoins: m.starCoins || 0,
+          exp: m.exp || 0,
+          items: itemList,
+          cosmetics: cosmeticList,
+          vip: vipInfo
+        };
+      });
+
+      // 汇总统计
+      const claimed = mails.filter(m => m.claimed);
+      const unclaimed = mails.filter(m => !m.claimed);
+      const totalStarCoins = mails.reduce((s, m) => s + (m.starCoins || 0), 0);
+      const totalExp = mails.reduce((s, m) => s + (m.exp || 0), 0);
+      const summary = {
+        totalMails: total,
+        totalClaimed: claimed.length,
+        totalUnclaimed: unclaimed.length,
+        uniqueRecipients: new Set(mails.map(m => m.userId)).size,
+        totalStarCoins,
+        totalExp
+      };
+
+      socket.emit('admin_mail_records', {
+        success: true,
+        mails: pagedMails,
+        summary,
+        pagination: {
+          page: currentPage,
+          pageSize,
+          total,
+          totalPages
+        }
+      });
+    } catch (err) {
+      logger.error('获取邮件记录失败', { error: err.message, stack: err.stack });
+      socket.emit('admin_mail_records', {
+        success: false,
+        message: '获取邮件记录失败: ' + err.message,
+        mails: [],
+        summary: {},
+        pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 }
+      });
+    }
+  }
 }
 
 module.exports = AdminManager;

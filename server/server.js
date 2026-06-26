@@ -277,6 +277,16 @@ app.post('/api/shop/use-item', async (req, res) => {
       return res.status(400).json({ success: false, message: '参数错误' });
     }
     const result = await accountManager.useItem(userId, itemId, 1, shopManager);
+    if (result.success) {
+      const [invResult, currencyResult] = await Promise.all([
+        accountManager.getInventory(userId),
+        accountManager.getCurrency(userId)
+      ]);
+      result.account = {
+        inventory: invResult.inventory || {},
+        starCoins: currencyResult?.balance ?? 0
+      };
+    }
     res.json(result);
   } catch (err) {
     logger.error('使用道具失败', { error: err.message });
@@ -3215,6 +3225,21 @@ adminNamespace.on('connection', (socket) => {
   // 获取用户选择列表
   socket.on('get_users_select_list', (data) => {
     adminManager.getUsersForSelect(socket, data.keyword);
+  });
+
+  // 获取经验值获取记录
+  socket.on('get_exp_records', (data) => {
+    adminManager.getExpRecords(socket, data || {});
+  });
+
+  // 获取星钻获取/消费记录
+  socket.on('get_coin_records', (data) => {
+    adminManager.getCoinRecords(socket, data || {});
+  });
+
+  // 获取邮件发送/领取记录
+  socket.on('get_mail_records', (data) => {
+    adminManager.getMailRecords(socket, data || {});
   });
 
   // 断开连接

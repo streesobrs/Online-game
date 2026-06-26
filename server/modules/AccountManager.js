@@ -1479,7 +1479,8 @@ class AccountManager {
 
   // 添加经验值
   // applyEventMult: false 表示不应用任何倍率（如经验药水、等级直升券）
-  async addExp(id, exp, applyEventMult = true) {
+  // source: 经验来源标识，用于后台记录统计
+  async addExp(id, exp, applyEventMult = true, source = 'battle') {
     try {
       const account = await dataStore.findOne('accounts', { 'account.id': id });
       if (!account) {
@@ -1585,6 +1586,7 @@ class AccountManager {
           bonusExp: finalExp - exp,
           finalExp,
           levelMult,
+          source,
           eventLabel: eventLabel || null,
           oldLevel,
           newLevel: level,
@@ -2884,6 +2886,7 @@ class AccountManager {
           bonusExp: 0,
           finalExp: expToAdd,
           levelMult: 1,
+          source: 'item_use',
           eventLabel: eventLabel,
           oldLevel: oldLevel,
           newLevel: newLevel,
@@ -3996,6 +3999,7 @@ class AccountManager {
             bonusExp: 0,
             finalExp: mail.exp,
             levelMult: 1,
+            source: 'mail_reward',
             eventLabel: '邮件奖励',
             oldLevel,
             newLevel,
@@ -4189,6 +4193,7 @@ class AccountManager {
             bonusExp: 0,
             finalExp: expToAdd,
             levelMult: 1,
+            source: 'mail_reward',
             eventLabel: '邮件奖励',
             oldLevel,
             newLevel,

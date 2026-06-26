@@ -177,6 +177,65 @@ class ShopManager {
     return true;
   }
 
+  // 检查限购
+  async checkPurchaseLimit(userId, item, accountManager) {
+    const limit = item.purchaseLimit;
+    if (!limit || !limit.period || !limit.max) {
+      return { allowed: true };
+    }
+
+    try {
+      const records = await accountManager.getTransactionRecords(userId);
+      const transactions = records.transactions || [];
+
+      // 确定周期起始时间
+      const now = Date.now();
+      let periodStart;
+      switch (limit.period) {
+        case 'monthly':
+          const d = new Date();
+          periodStart = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+          break;
+        case 'weekly':
+          const w = new Date();
+          const dayOfWeek = w.getDay();
+          const diff = w.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+          periodStart = new Date(w.getFullYear(), w.getMonth(), diff).getTime();
+          break;
+        case 'daily':
+          const today = new Date();
+          periodStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+          break;
+        case 'total':
+          periodStart = 0;
+          break;
+        default:
+          return { allowed: true };
+      }
+
+      // 统计周期内购买次数
+      const purchaseCount = transactions.filter(tx => {
+        return tx.type === 'spend'
+          && tx.timestamp >= periodStart
+          && tx.reason && tx.reason.includes(`购买${item.name}`);
+      }).length;
+
+      if (purchaseCount >= limit.max) {
+        const periodMap = { monthly: '本月', weekly: '本周', daily: '今日', total: '累计' };
+        const periodLabel = periodMap[limit.period] || limit.period;
+        return {
+          allowed: false,
+          message: `${item.name}${periodLabel}限购${limit.max}个，已达到购买上限`
+        };
+      }
+
+      return { allowed: true };
+    } catch (e) {
+      console.error('[商店] 限购检查失败:', e.message);
+      return { allowed: true };
+    }
+  }
+
   // 查找商品
   findItem(itemId) {
     const allItems = [
@@ -235,6 +294,14 @@ class ShopManager {
     const discountedPrice = Math.floor(unitPrice * (100 - discount) / 100);
     const totalPrice = discountedPrice * quantity;
     const savedAmount = (unitPrice - discountedPrice) * quantity;
+
+    // 检查限购
+    if (item.purchaseLimit) {
+      const limitCheck = await this.checkPurchaseLimit(userId, item, accountManager);
+      if (!limitCheck.allowed) {
+        return { success: false, message: limitCheck.message };
+      }
+    }
 
     const currencyResult = await accountManager.getCurrency(userId);
     const balance = currencyResult?.balance ?? 0;

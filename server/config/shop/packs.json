@@ -4,7 +4,7 @@
     "name": "新手礼包",
     "description": "适合新手玩家的实惠礼包，包含3张双倍经验卡和5张幸运符，快速上手",
     "icon": "🎁",
-    "price": 200,
+    "price": 180,
     "category": "pack",
     "type": "bundle",
     "rarity": "uncommon",
@@ -27,7 +27,7 @@
     "name": "经验礼包",
     "description": "快速提升等级的经验礼包，包含10张双倍经验卡，冲级必备",
     "icon": "📈",
-    "price": 500,
+    "price": 600,
     "category": "pack",
     "type": "bundle",
     "rarity": "rare",
@@ -49,7 +49,7 @@
     "name": "幸运礼包",
     "description": "充满惊喜的幸运礼包，包含10张幸运符，星钻滚滚来",
     "icon": "🍀",
-    "price": 300,
+    "price": 250,
     "category": "pack",
     "type": "bundle",
     "rarity": "rare",
@@ -69,9 +69,9 @@
   "pack_premium": {
     "id": "pack_premium",
     "name": "尊享礼包",
-    "description": "高级玩家的尊享礼包，包含8张双倍经验卡和8张幸运符，尽情享受",
+    "description": "高级玩家的尊享礼包，包含8张双倍经验卡和8张幸运符，超值组合",
     "icon": "💎",
-    "price": 800,
+    "price": 680,
     "category": "pack",
     "type": "bundle",
     "rarity": "epic",
@@ -80,7 +80,7 @@
     "tags": [
       "高级",
       "尊享",
-      "礼包"
+      "超值"
     ],
     "enabled": true,
     "rollout": 100,
@@ -94,7 +94,7 @@
     "name": "超级礼包",
     "description": "超值优惠的超级礼包，包含20张双倍经验卡和20张幸运符，超长续航",
     "icon": "🎉",
-    "price": 1500,
+    "price": 1600,
     "category": "pack",
     "type": "bundle",
     "rarity": "legendary",
@@ -117,7 +117,7 @@
     "name": "成长礼包",
     "description": "新手成长必备，包含双倍×3 + 经验药水×5 + 提示卡×3",
     "icon": "🌱",
-    "price": 400,
+    "price": 420,
     "category": "pack",
     "type": "bundle",
     "rarity": "uncommon",
@@ -141,7 +141,7 @@
     "name": "棋王进阶礼包",
     "description": "进阶高手必备，包含提示卡×10 + 悔棋卡×10 + 双倍×5",
     "icon": "👑",
-    "price": 800,
+    "price": 900,
     "category": "pack",
     "type": "bundle",
     "rarity": "rare",
@@ -163,9 +163,9 @@
   "pack_supreme": {
     "id": "pack_supreme",
     "name": "至尊荣耀礼包",
-    "description": "传说级礼包，包含等级直升券×1 + 三倍×5 + 经验药水×10",
+    "description": "传说级礼包，包含等级直升券×1 + 三倍×5 + 经验药水×10，每月限购1个",
     "icon": "🏆",
-    "price": 2000,
+    "price": 3500,
     "category": "pack",
     "type": "bundle",
     "rarity": "legendary",
@@ -174,10 +174,14 @@
     "tags": [
       "至尊",
       "荣耀",
-      "礼包"
+      "限购"
     ],
     "enabled": true,
     "rollout": 100,
+    "purchaseLimit": {
+      "period": "monthly",
+      "max": 1
+    },
     "content": {
       "item_level_up": 1,
       "item_triple_exp": 5,
@@ -189,7 +193,7 @@
     "name": "对战辅助礼包",
     "description": "棋盘对战神器，包含提示卡×5 + 悔棋卡×5",
     "icon": "🎯",
-    "price": 500,
+    "price": 520,
     "category": "pack",
     "type": "bundle",
     "rarity": "uncommon",
@@ -212,13 +216,17 @@
     "name": "贪吃蛇新手包",
     "description": "贪吃蛇必备道具包，包含复活卡×1 + 加速卡×2 + 缩短卡×2，轻松上手",
     "icon": "🐍",
-    "price": 280,
+    "price": 200,
     "category": "pack",
     "type": "bundle",
     "rarity": "uncommon",
     "usable": true,
     "tradable": false,
-    "tags": ["贪吃蛇", "新手", "礼包"],
+    "tags": [
+      "贪吃蛇",
+      "新手",
+      "礼包"
+    ],
     "enabled": true,
     "rollout": 100,
     "content": {
@@ -232,13 +240,17 @@
     "name": "贪吃蛇高手包",
     "description": "高分冲刺必备，包含复活卡×3 + 双倍卡×3 + 加速卡×3，冲击最高分",
     "icon": "🏆",
-    "price": 680,
+    "price": 500,
     "category": "pack",
     "type": "bundle",
     "rarity": "rare",
     "usable": true,
     "tradable": false,
-    "tags": ["贪吃蛇", "高手", "礼包"],
+    "tags": [
+      "贪吃蛇",
+      "高手",
+      "礼包"
+    ],
     "enabled": true,
     "rollout": 100,
     "content": {
@@ -252,13 +264,17 @@
     "name": "贪吃蛇至尊包",
     "description": "贪吃蛇全道具大礼包！复活卡×5 + 双倍卡×5 + 加速卡×5 + 缩短卡×5，无限畅玩",
     "icon": "💎",
-    "price": 1280,
+    "price": 950,
     "category": "pack",
     "type": "bundle",
     "rarity": "legendary",
     "usable": true,
     "tradable": false,
-    "tags": ["贪吃蛇", "至尊", "礼包"],
+    "tags": [
+      "贪吃蛇",
+      "至尊",
+      "礼包"
+    ],
     "enabled": true,
     "rollout": 100,
     "content": {

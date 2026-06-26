@@ -3022,8 +3022,18 @@
     }
 
     let statusTimer = null;
+    let lastFetchTime = 0;
+    let cachedBuffs = {};
+    let cachedVip = {};
 
     async function loadStatus() {
+      const now = Date.now();
+      // 每60秒才真实请求服务器，其余时间用本地缓存
+      if (now - lastFetchTime < 60000 && Object.keys(cachedBuffs).length > 0) {
+        return;
+      }
+      lastFetchTime = now;
+
       const accountId = currentAccountId;
       if (!accountId) return;
       try {
@@ -3034,8 +3044,10 @@
         const buffsData = await buffsRes.json();
         const vipData = await vipRes.json();
         if (buffsData.success && vipData.success) {
+          cachedBuffs = buffsData.buffs;
+          cachedVip = vipData.vip;
           vipInfo = vipData.vip;
-          renderStatus(buffsData.buffs, vipData.vip);
+          renderStatus(cachedBuffs, cachedVip);
         }
       } catch (e) {
         console.error(e);
@@ -3044,25 +3056,54 @@
 
     function renderStatus(buffs, vipData) {
       const container = document.getElementById('statusBars');
+
+      // 保存数据供本地倒计时使用
+      cachedBuffs = buffs || cachedBuffs;
+      cachedVip = vipData || cachedVip;
+
+      updateStatusDisplay();
+
+      // 本地每秒刷新倒计时，不请求服务器
+      if (statusTimer) clearInterval(statusTimer);
+      statusTimer = setInterval(() => { updateStatusDisplay(); }, 1000);
+    }
+
+    function formatRemaining(expireAt) {
+      const now = Date.now();
+      const remaining = expireAt - now;
+      if (remaining <= 0) return null;
+      const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+      return { days, hours, minutes, seconds };
+    }
+
+    function updateStatusDisplay() {
+      const container = document.getElementById('statusBars');
+      if (!container) return;
       const now = Date.now();
       let html = '';
 
-      // 会员状态
-      if (vipData && vipData.isActive && vipData.expireAt > now) {
-        const remaining = vipData.expireAt - now;
-        const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
-        html += `
-          <div class="status-bar vip">
-            <span class="status-icon">⭐</span>
-            <span>VIP</span>
-            <span class="status-tag vip">×${vipData.expBonus}</span>
-            <span class="status-timer">${days}天 ${hours}时 ${minutes}分 ${seconds}秒</span>
-          </div>
-        `;
+      // 会员状态 - 本地倒计时
+      if (cachedVip && cachedVip.isActive && cachedVip.expireAt > now) {
+        const t = formatRemaining(cachedVip.expireAt);
+        if (t) {
+          html += `
+            <div class="status-bar vip">
+              <span class="status-icon">⭐</span>
+              <span>VIP</span>
+              <span class="status-tag vip">×${cachedVip.expBonus}</span>
+              <span class="status-timer">${t.days}天 ${t.hours}时 ${t.minutes}分 ${t.seconds}秒</span>
+            </div>
+          `;
+        }
       } else {
+        // VIP 已过期，清理缓存并显示暂无
+        if (cachedVip?.expireAt && cachedVip.expireAt <= now) {
+          cachedVip = {};
+          vipInfo = {};
+        }
         html += `
           <div class="status-bar vip-inactive">
             <span class="status-icon">⭐</span>
@@ -3071,26 +3112,24 @@
         `;
       }
 
-      // 活跃buff
+      // 活跃buff - 本地倒计时
       const buffConfig = {
         doubleExp: { icon: '✨', name: '双倍经验' },
         tripleExp: { icon: '🌟', name: '三倍经验' },
         luckBoost: { icon: '🍀', name: '幸运提升' }
       };
 
-      for (const [key, value] of Object.entries(buffs)) {
+      for (const [key, value] of Object.entries(cachedBuffs)) {
         if (!value) continue;
 
         const config = buffConfig[key] || { icon: '🎁', name: key };
         let timerText = '';
 
         if (typeof value === 'number' && value > now) {
-          const remaining = value - now;
-          const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
-          const hours = Math.floor((remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-          const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-          const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
-          timerText = (days ? days + '天 ' : '') + (hours ? hours + '时 ' : '') + (minutes ? minutes + '分 ' : '') + seconds + '秒';
+          const t = formatRemaining(value);
+          if (t) {
+            timerText = (t.days ? t.days + '天 ' : '') + (t.hours ? t.hours + '时 ' : '') + (t.minutes ? t.minutes + '分 ' : '') + t.seconds + '秒';
+          }
         } else if (value === true) {
           timerText = '永久';
         } else {
@@ -3107,9 +3146,6 @@
       }
 
       container.innerHTML = html;
-
-      if (statusTimer) clearInterval(statusTimer);
-      statusTimer = setInterval(() => { loadStatus(); }, 1000);
     }
 
     async function fetchProfile(accountId) {

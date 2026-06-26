@@ -46,11 +46,18 @@
       scrollbar-color: #475569 #1e293b;
     }
 
+    html {
+      height: 100%;
+      overflow: hidden;
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
       background: #0f172a;
       color: #e2e8f0;
-      min-height: 100vh;
+      height: 100%;
+      overflow: hidden;
+      margin: 0;
     }
 
     /* 登录页 */
@@ -58,7 +65,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      min-height: 100vh;
+      height: 100vh;
       background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
     }
 
@@ -120,7 +127,8 @@
     /* 主布局 */
     .admin-layout {
       display: flex;
-      min-height: 100vh;
+      height: 100vh;
+      overflow: hidden;
     }
 
     .sidebar {
@@ -129,11 +137,14 @@
       border-right: 1px solid #334155;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
+      flex-shrink: 0;
     }
 
     .sidebar-header {
       padding: 24px;
       border-bottom: 1px solid #334155;
+      flex-shrink: 0;
     }
 
     .sidebar-title {
@@ -154,6 +165,8 @@
     .nav-menu {
       flex: 1;
       padding: 16px 12px;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
 
     .nav-item {
@@ -190,6 +203,7 @@
     .sidebar-footer {
       padding: 16px;
       border-top: 1px solid #334155;
+      flex-shrink: 0;
     }
 
     .status-bar {
@@ -226,6 +240,8 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      min-width: 0;
+      min-height: 0;
     }
 
     .top-bar {
@@ -236,6 +252,7 @@
       align-items: center;
       justify-content: space-between;
       padding: 0 24px;
+      flex-shrink: 0;
     }
 
     .page-title {
@@ -272,6 +289,8 @@
       flex: 1;
       padding: 18px;
       overflow-y: auto;
+      overflow-x: hidden;
+      min-height: 0;
     }
 
     .content-section {
@@ -549,6 +568,8 @@
       border-radius: 20px;
       font-size: 12px;
       font-weight: 500;
+      white-space: nowrap;
+      display: inline-block;
     }
 
     .badge-online {
@@ -968,6 +989,263 @@
     .sidebar-toggle {
       display: none;
     }
+
+    /* 分页控件 */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .pagination-info {
+      font-size: 13px;
+      color: #94a3b8;
+    }
+
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .page-btn {
+      min-width: 34px;
+      height: 34px;
+      padding: 0 10px;
+      border: 1px solid #334155;
+      background: #1e293b;
+      color: #cbd5e1;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .page-btn:hover:not(:disabled) {
+      background: #334155;
+      border-color: #475569;
+    }
+
+    .page-btn.active {
+      background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+      border-color: transparent;
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .page-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .page-size-select {
+      background: #1e293b;
+      color: #cbd5e1;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    /* 统计摘要卡片 */
+    .summary-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .summary-card {
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .summary-card .summary-label {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .summary-card .summary-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: #e2e8f0;
+    }
+
+    .summary-card .summary-value.positive {
+      color: #22c55e;
+    }
+
+    .summary-card .summary-value.negative {
+      color: #ef4444;
+    }
+
+    .summary-card .summary-value.accent {
+      color: #3b82f6;
+    }
+
+    /* 筛选栏增强 */
+    .filter-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .filter-row label {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-right: 2px;
+    }
+
+    .filter-row input[type="date"],
+    .filter-row input[type="text"],
+    .filter-row select {
+      background: #1e293b;
+      color: #cbd5e1;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+      min-width: 100px;
+    }
+
+    .filter-row input[type="text"] {
+      min-width: 140px;
+    }
+
+    .filter-row select {
+      min-width: 110px;
+      cursor: pointer;
+    }
+
+    .filter-row input:focus,
+    .filter-row select:focus {
+      border-color: #3b82f6;
+    }
+
+    /* 数值标记 */
+    .amount-positive {
+      color: #22c55e;
+      font-weight: 600;
+    }
+
+    .amount-negative {
+      color: #ef4444;
+      font-weight: 600;
+    }
+
+    .amount-bonus {
+      color: #f59e0b;
+      font-size: 12px;
+    }
+
+    .source-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      background: #334155;
+      color: #cbd5e1;
+      white-space: nowrap;
+    }
+
+    .source-badge.battle {
+      background: #1e3a5f;
+      color: #60a5fa;
+    }
+
+    .source-badge.achievement {
+      background: #3f2e1e;
+      color: #fbbf24;
+    }
+
+    .source-badge.item_use {
+      background: #1e3a2e;
+      color: #4ade80;
+    }
+
+    .source-badge.mail_reward {
+      background: #3a1e3f;
+      color: #c084fc;
+    }
+
+    .source-badge.admin_grant {
+      background: #3f1e1e;
+      color: #f87171;
+    }
+
+    .source-badge.exp_reward {
+      background: #1e3a3f;
+      color: #2dd4bf;
+    }
+
+    .source-badge.level_up,
+    .source-badge.level_reward {
+      background: #3f3a1e;
+      color: #facc15;
+    }
+
+    .source-badge.shop_purchase,
+    .source-badge.spend {
+      background: #3a1e3f;
+      color: #f472b6;
+    }
+
+    .source-badge.vip_daily {
+      background: #1e2f3f;
+      color: #38bdf8;
+    }
+
+    .reward-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      margin: 2px 2px 2px 0;
+    }
+
+    .reward-scroll {
+      max-height: 82px;
+      overflow-y: auto;
+      line-height: 1.6;
+      padding-right: 4px;
+    }
+
+    .reward-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .reward-scroll::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 2px;
+    }
+
+    .reward-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+    }
+
+    .reward-scroll::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.35);
+    }
   </style>
 </head>
 
@@ -1028,6 +1306,18 @@
         <div class="nav-item" onclick="switchView('mail')">
           <span class="nav-icon">📬</span>
           <span class="nav-text">邮件系统</span>
+        </div>
+        <div class="nav-item" onclick="switchView('exp-records')">
+          <span class="nav-icon">📈</span>
+          <span class="nav-text">经验记录</span>
+        </div>
+        <div class="nav-item" onclick="switchView('coin-records')">
+          <span class="nav-icon">💎</span>
+          <span class="nav-text">星钻记录</span>
+        </div>
+        <div class="nav-item" onclick="switchView('mail-records')">
+          <span class="nav-icon">📧</span>
+          <span class="nav-text">邮件记录</span>
         </div>
       </nav>
       <div class="sidebar-footer">
@@ -1591,6 +1881,318 @@
             </div>
           </div>
         </section>
+
+        <!-- 经验值获取记录 -->
+        <section id="view-exp-records" class="content-section">
+          <div class="data-card">
+            <div class="card-header">
+              <span class="card-title">📈 经验值获取记录</span>
+              <div class="card-tools">
+                <button class="action-btn btn-secondary" onclick="loadExpRecords()"
+                  style="padding:8px 16px;font-size:13px;">刷新</button>
+              </div>
+            </div>
+
+            <!-- 汇总统计 -->
+            <div class="summary-row" id="exp-summary-row">
+              <div class="summary-card">
+                <div class="summary-label">记录总数</div>
+                <div class="summary-value accent" id="exp-stat-total">0</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">总经验获取</div>
+                <div class="summary-value positive" id="exp-stat-total-exp">0</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">加成经验总和</div>
+                <div class="summary-value" style="color:#f59e0b" id="exp-stat-bonus">0</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">涉及用户数</div>
+                <div class="summary-value" id="exp-stat-users">0</div>
+              </div>
+            </div>
+
+            <!-- 筛选栏 -->
+            <div class="filter-row">
+              <label>用户搜索:</label>
+              <input type="text" id="exp-keyword" placeholder="用户名/昵称" style="width:140px;">
+              <label>来源:</label>
+              <select id="exp-source-filter">
+                <option value="all">全部来源</option>
+                <option value="battle">游戏对战</option>
+                <option value="achievement">成就奖励</option>
+                <option value="item_use">道具使用</option>
+                <option value="mail_reward">邮件奖励</option>
+              </select>
+              <label>开始日期:</label>
+              <input type="date" id="exp-start-date">
+              <label>结束日期:</label>
+              <input type="date" id="exp-end-date">
+              <button class="action-btn btn-primary" onclick="applyExpFilter()"
+                style="padding:7px 14px;font-size:13px;">查询</button>
+              <button class="action-btn btn-secondary" onclick="resetExpFilter()"
+                style="padding:7px 14px;font-size:13px;">重置</button>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>时间</th>
+                    <th>用户</th>
+                    <th>来源</th>
+                    <th>基础经验</th>
+                    <th>加成经验</th>
+                    <th>最终获得</th>
+                    <th>倍率</th>
+                    <th>等级变化</th>
+                    <th>总经验值</th>
+                  </tr>
+                </thead>
+                <tbody id="exp-records-body">
+                  <tr>
+                    <td colspan="9">
+                      <div class="empty-state">
+                        <div class="empty-icon">📈</div>加载中...
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- 分页 -->
+            <div class="pagination">
+              <div class="pagination-info" id="exp-page-info">共 0 条</div>
+              <div class="pagination-controls">
+                <select class="page-size-select" id="exp-page-size" onchange="changeExpPageSize()">
+                  <option value="20">20条/页</option>
+                  <option value="50">50条/页</option>
+                  <option value="100">100条/页</option>
+                </select>
+                <button class="page-btn" id="exp-prev-btn" onclick="prevExpPage()">‹</button>
+                <span id="exp-page-numbers"></span>
+                <button class="page-btn" id="exp-next-btn" onclick="nextExpPage()">›</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 星钻获取记录 -->
+        <section id="view-coin-records" class="content-section">
+          <div class="data-card">
+            <div class="card-header">
+              <span class="card-title">💎 星钻获取记录</span>
+              <div class="card-tools">
+                <button class="action-btn btn-secondary" onclick="loadCoinRecords()"
+                  style="padding:8px 16px;font-size:13px;">刷新</button>
+              </div>
+            </div>
+
+            <!-- 汇总统计 -->
+            <div class="summary-row" id="coin-summary-row">
+              <div class="summary-card">
+                <div class="summary-label">记录总数</div>
+                <div class="summary-value accent" id="coin-stat-total">0</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">总收入</div>
+                <div class="summary-value positive" id="coin-stat-earned">0 💎</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">总支出</div>
+                <div class="summary-value negative" id="coin-stat-spent">0 💎</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">净流量</div>
+                <div class="summary-value" id="coin-stat-net">0 💎</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">涉及用户数</div>
+                <div class="summary-value" id="coin-stat-users">0</div>
+              </div>
+            </div>
+
+            <!-- 筛选栏 -->
+            <div class="filter-row">
+              <label>用户搜索:</label>
+              <input type="text" id="coin-keyword" placeholder="用户名/昵称/原因" style="width:160px;">
+              <label>类型:</label>
+              <select id="coin-type-filter">
+                <option value="all">全部</option>
+                <option value="earn">收入</option>
+                <option value="spend">支出</option>
+              </select>
+              <label>来源:</label>
+              <select id="coin-source-filter">
+                <option value="all">全部来源</option>
+                <option value="exp_reward">经验兑换</option>
+                <option value="level_up">升级奖励</option>
+                <option value="level_reward">等级奖励</option>
+                <option value="admin_grant">管理员发放</option>
+                <option value="mail_reward">邮件奖励</option>
+                <option value="achievement">成就奖励</option>
+                <option value="spend">消费支出</option>
+              </select>
+              <label>开始日期:</label>
+              <input type="date" id="coin-start-date">
+              <label>结束日期:</label>
+              <input type="date" id="coin-end-date">
+              <button class="action-btn btn-primary" onclick="applyCoinFilter()"
+                style="padding:7px 14px;font-size:13px;">查询</button>
+              <button class="action-btn btn-secondary" onclick="resetCoinFilter()"
+                style="padding:7px 14px;font-size:13px;">重置</button>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>时间</th>
+                    <th>用户</th>
+                    <th>类型</th>
+                    <th>来源</th>
+                    <th>说明</th>
+                    <th>变动数量</th>
+                    <th>变动后余额</th>
+                  </tr>
+                </thead>
+                <tbody id="coin-records-body">
+                  <tr>
+                    <td colspan="7">
+                      <div class="empty-state">
+                        <div class="empty-icon">💎</div>加载中...
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- 分页 -->
+            <div class="pagination">
+              <div class="pagination-info" id="coin-page-info">共 0 条</div>
+              <div class="pagination-controls">
+                <select class="page-size-select" id="coin-page-size" onchange="changeCoinPageSize()">
+                  <option value="20">20条/页</option>
+                  <option value="50">50条/页</option>
+                  <option value="100">100条/页</option>
+                </select>
+                <button class="page-btn" id="coin-prev-btn" onclick="prevCoinPage()">‹</button>
+                <span id="coin-page-numbers"></span>
+                <button class="page-btn" id="coin-next-btn" onclick="nextCoinPage()">›</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 邮件发放记录 -->
+        <section id="view-mail-records" class="content-section">
+          <div class="data-card">
+            <div class="card-header">
+              <span class="card-title">📧 邮件发放记录</span>
+              <div class="card-tools">
+                <button class="action-btn btn-secondary" onclick="loadMailRecords()"
+                  style="padding:8px 16px;font-size:13px;">刷新</button>
+              </div>
+            </div>
+
+            <div class="summary-row" id="mail-summary-row">
+              <div class="summary-card">
+                <div class="summary-label">邮件总数</div>
+                <div class="summary-value accent" id="mail-total-count">-</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">收件人数</div>
+                <div class="summary-value positive" id="mail-recipients-count">-</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">已领取</div>
+                <div class="summary-value" style="color:#3b82f6;" id="mail-claimed-count">-</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">待领取</div>
+                <div class="summary-value" style="color:#f59e0b;" id="mail-unclaimed-count">-</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">星钻奖励</div>
+                <div class="summary-value" style="color:#f59e0b;" id="mail-coins-total">-</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">经验奖励</div>
+                <div class="summary-value" style="color:#8b5cf6;" id="mail-exp-total">-</div>
+              </div>
+            </div>
+
+            <!-- 筛选栏 -->
+            <div class="filter-row">
+              <label>搜索:</label>
+              <input type="text" id="mail-search-input" placeholder="用户名/昵称/标题" style="width:180px;"
+                onkeypress="if(event.key==='Enter'){mailState.keyword=this.value;mailState.page=1;loadMailRecords();}">
+              <label>状态:</label>
+              <select id="mail-status-filter"
+                onchange="mailState.status=this.value;mailState.page=1;loadMailRecords();">
+                <option value="all">全部状态</option>
+                <option value="claimed">已领取</option>
+                <option value="unclaimed">待领取</option>
+              </select>
+              <label>发件人:</label>
+              <select id="mail-from-filter" onchange="mailState.from=this.value;mailState.page=1;loadMailRecords();">
+                <option value="all">全部来源</option>
+                <option value="系统">系统</option>
+                <option value="管理员">管理员</option>
+                <option value="会员中心">会员中心</option>
+              </select>
+              <label>开始日期:</label>
+              <input type="date" id="mail-start-date"
+                onchange="mailState.startTime=this.value;mailState.page=1;loadMailRecords();">
+              <label>结束日期:</label>
+              <input type="date" id="mail-end-date"
+                onchange="mailState.endTime=this.value;mailState.page=1;loadMailRecords();">
+              <button class="action-btn btn-primary"
+                onclick="mailState.keyword=document.getElementById('mail-search-input').value;mailState.page=1;loadMailRecords();"
+                style="padding:7px 14px;font-size:13px;">查询</button>
+              <button class="action-btn btn-secondary" onclick="resetMailFilters();"
+                style="padding:7px 14px;font-size:13px;">重置</button>
+            </div>
+
+            <div class="table-wrap">
+              <table style="table-layout:fixed;width:100%;">
+                <thead>
+                  <tr>
+                    <th style="width:150px;">发送时间</th>
+                    <th style="width:120px;">收件人</th>
+                    <th style="width:30%;">邮件标题</th>
+                    <th style="width:90px;white-space:nowrap;">发件人</th>
+                    <th>奖励内容</th>
+                    <th style="width:70px;white-space:nowrap;">状态</th>
+                    <th style="width:150px;white-space:nowrap;">领取时间</th>
+                  </tr>
+                </thead>
+                <tbody id="mail-records-body">
+                  <tr>
+                    <td colspan="7" style="text-align:center;color:var(--text-secondary);padding:40px;">加载中...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="pagination">
+              <div class="pagination-info" id="mail-page-info">共 0 条</div>
+              <div class="pagination-controls">
+                <select class="page-size-select" id="mail-page-size" onchange="changeMailPageSize()">
+                  <option value="20">20条/页</option>
+                  <option value="50">50条/页</option>
+                  <option value="100">100条/页</option>
+                </select>
+                <button class="page-btn" id="mail-prev-btn" onclick="prevMailPage()">‹</button>
+                <span id="mail-page-numbers"></span>
+                <button class="page-btn" id="mail-next-btn" onclick="nextMailPage()">›</button>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </main>
   </div>
@@ -1646,6 +2248,22 @@
         if (socket.connected) {
           onConnect();
         }
+
+        // 修复：处理 adminToken 过期场景
+        // 当 adminToken 过期时，socket.io 中间件会拒绝连接并触发 connect_error
+        // 之前没有监听此事件导致连接静默失败，页面卡在登录界面
+        socket.on('connect_error', (err) => {
+          console.error('[DEBUG] Admin socket 连接失败:', err.message);
+          localStorage.removeItem('adminToken');
+          // 如果存在 userToken，清除 adminToken 后刷新页面
+          // 重新加载时会进入 savedUserToken 分支，使用 userToken 自动登录
+          if (savedUserToken) {
+            window.location.reload();
+          } else {
+            document.getElementById('login-page').classList.remove('hidden');
+            document.getElementById('admin-app').classList.add('hidden');
+          }
+        });
 
         socket.on('auth_error', (data) => {
           showToast(data.message || '认证失败，请重新登录', 'error');
@@ -1737,6 +2355,21 @@
           if (data.success && pendingUserListId) {
             renderUserList(data.users, pendingUserListId);
           }
+        });
+
+        // 经验记录数据
+        socket.on('admin_exp_records', (data) => {
+          handleExpRecordsData(data);
+        });
+
+        // 星钻记录数据
+        socket.on('admin_coin_records', (data) => {
+          handleCoinRecordsData(data);
+        });
+
+        // 邮件记录数据
+        socket.on('admin_mail_records', (data) => {
+          handleMailRecordsData(data);
         });
       } else if (savedUserToken) {
         // 没有 adminToken，但有 userToken，尝试通过用户 token 自动登录
@@ -1871,6 +2504,21 @@
             renderUserList(data.users, pendingUserListId);
           }
         });
+
+        // 经验记录数据
+        socket.on('admin_exp_records', (data) => {
+          handleExpRecordsData(data);
+        });
+
+        // 星钻记录数据
+        socket.on('admin_coin_records', (data) => {
+          handleCoinRecordsData(data);
+        });
+
+        // 邮件记录数据
+        socket.on('admin_mail_records', (data) => {
+          handleMailRecordsData(data);
+        });
       } else {
         // 没有任何 token，显示登录页面
         console.log('[DEBUG] 没有检测到token，显示登录页面');
@@ -1899,7 +2547,10 @@
         accounts: '账号管理',
         system: '系统设置',
         feedbacks: '反馈管理',
-        mail: '邮件系统'
+        mail: '邮件系统',
+        'exp-records': '经验值获取记录',
+        'coin-records': '星钻获取记录',
+        'mail-records': '邮件发放记录'
       };
       document.getElementById('page-title').textContent = titles[view];
 
@@ -1915,6 +2566,9 @@
       if (view === 'chat') loadChatMessages();
       if (view === 'accounts') loadAccounts();
       if (view === 'system') loadSystemStats();
+      if (view === 'exp-records') loadExpRecords();
+      if (view === 'coin-records') loadCoinRecords();
+      if (view === 'mail-records') loadMailRecords();
 
       // 移动端切换页面后关闭侧边栏
       if (window.innerWidth <= 768) {
@@ -2128,6 +2782,542 @@
           renderUserList(data.users, pendingUserListId);
         }
       });
+
+      // 经验记录数据
+      socket.on('admin_exp_records', (data) => {
+        handleExpRecordsData(data);
+      });
+
+      // 星钻记录数据
+      socket.on('admin_coin_records', (data) => {
+        handleCoinRecordsData(data);
+      });
+
+      // 邮件记录数据
+      socket.on('admin_mail_records', (data) => {
+        handleMailRecordsData(data);
+      });
+    }
+
+    // ==================== 经验值记录模块 ====================
+    const expState = {
+      page: 1,
+      pageSize: 20,
+      total: 0,
+      totalPages: 0,
+      keyword: '',
+      source: 'all',
+      startTime: null,
+      endTime: null,
+      records: []
+    };
+
+    function formatFullTime(timestamp) {
+      if (!timestamp) return '-';
+      const d = new Date(timestamp);
+      const pad = (n) => n.toString().padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+
+    function getExpSourceClass(source) {
+      const map = { battle: 'battle', achievement: 'achievement', item_use: 'item_use', mail_reward: 'mail_reward', admin_grant: 'admin_grant' };
+      return map[source] || '';
+    }
+
+    function getExpSourceLabel(source, eventLabel) {
+      if (eventLabel) return eventLabel;
+      const map = {
+        battle: '游戏对战',
+        achievement: '成就奖励',
+        item_use: '道具使用',
+        mail_reward: '邮件奖励',
+        admin_grant: '管理员发放'
+      };
+      return map[source] || source || '游戏对战';
+    }
+
+    function getCoinSourceClass(source) {
+      const map = {
+        exp_reward: 'exp_reward', level_up: 'level_up', level_reward: 'level_reward',
+        admin_grant: 'admin_grant', mail_reward: 'mail_reward', mail_reward_batch: 'mail_reward',
+        achievement: 'achievement', spend: 'spend', shop_purchase: 'shop_purchase', vip_daily: 'vip_daily'
+      };
+      return map[source] || '';
+    }
+
+    function loadExpRecords() {
+      if (!socket || !socket.connected) return;
+      socket.emit('get_exp_records', {
+        page: expState.page,
+        pageSize: expState.pageSize,
+        keyword: expState.keyword,
+        source: expState.source,
+        startTime: expState.startTime,
+        endTime: expState.endTime
+      });
+    }
+
+    function handleExpRecordsData(data) {
+      if (!data.success) {
+        showToast(data.message || '加载经验记录失败', 'error');
+        document.getElementById('exp-records-body').innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">❌</div>加载失败</div></td></tr>';
+        return;
+      }
+      expState.records = data.records || [];
+      expState.total = data.pagination?.total || 0;
+      expState.totalPages = data.pagination?.totalPages || 0;
+      expState.page = data.pagination?.page || 1;
+
+      // 更新统计
+      const s = data.summary || {};
+      document.getElementById('exp-stat-total').textContent = s.totalRecords?.toLocaleString() || 0;
+      document.getElementById('exp-stat-total-exp').textContent = (s.totalExp || 0).toLocaleString();
+      document.getElementById('exp-stat-bonus').textContent = (s.totalBonusExp || 0).toLocaleString();
+      document.getElementById('exp-stat-users').textContent = s.uniqueUsers || 0;
+
+      renderExpRecords();
+      renderExpPagination();
+    }
+
+    function renderExpRecords() {
+      const tbody = document.getElementById('exp-records-body');
+      if (!expState.records || expState.records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">📈</div>暂无记录</div></td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = expState.records.map(r => {
+        const levelChange = r.newLevel > r.oldLevel
+          ? `<span style="color:#22c55e;font-weight:600;">Lv.${r.oldLevel} → Lv.${r.newLevel}</span>`
+          : `Lv.${r.oldLevel}`;
+        const bonusHtml = r.bonusExp > 0
+          ? `<span class="amount-bonus">(+${r.bonusExp} 加成)</span>`
+          : '';
+        const multDisplay = r.levelMult && r.levelMult !== 1
+          ? `×${r.levelMult.toFixed(1)}`
+          : (r.eventLabel ? r.eventLabel : '×1.0');
+        return `
+        <tr>
+          <td style="white-space:nowrap;font-size:12px;">${formatFullTime(r.timestamp)}</td>
+          <td>
+            <div style="font-weight:500;">${r.nickname || r.username || '-'}</div>
+            <div style="font-size:11px;color:#64748b;">@${r.username || r.userId?.substr(0, 8)}</div>
+          </td>
+          <td><span class="source-badge ${getExpSourceClass(r.source)}">${getExpSourceLabel(r.source, r.eventLabel)}</span></td>
+          <td>${r.baseExp || 0}</td>
+          <td class="amount-bonus">+${r.bonusExp || 0}</td>
+          <td class="amount-positive">+${r.finalExp || 0} ${bonusHtml}</td>
+          <td style="font-size:12px;color:#94a3b8;">${multDisplay}</td>
+          <td>${levelChange}</td>
+          <td style="font-weight:600;">${(r.totalExp || 0).toLocaleString()}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderExpPagination() {
+      const info = document.getElementById('exp-page-info');
+      const numbers = document.getElementById('exp-page-numbers');
+      const prevBtn = document.getElementById('exp-prev-btn');
+      const nextBtn = document.getElementById('exp-next-btn');
+
+      const start = expState.total === 0 ? 0 : (expState.page - 1) * expState.pageSize + 1;
+      const end = Math.min(expState.page * expState.pageSize, expState.total);
+      info.textContent = `显示 ${start}-${end} 条，共 ${expState.total.toLocaleString()} 条（第 ${expState.page}/${expState.totalPages} 页）`;
+
+      prevBtn.disabled = expState.page <= 1;
+      nextBtn.disabled = expState.page >= expState.totalPages;
+
+      // 页码按钮（最多显示7个）
+      let html = '';
+      const total = expState.totalPages;
+      const current = expState.page;
+      const maxVisible = 5;
+      let startPage = Math.max(1, current - Math.floor(maxVisible / 2));
+      let endPage = Math.min(total, startPage + maxVisible - 1);
+      if (endPage - startPage < maxVisible - 1) startPage = Math.max(1, endPage - maxVisible + 1);
+
+      if (startPage > 1) {
+        html += `<button class="page-btn" onclick="goToExpPage(1)">1</button>`;
+        if (startPage > 2) html += `<span style="color:#64748b;padding:0 4px;">...</span>`;
+      }
+      for (let i = startPage; i <= endPage; i++) {
+        html += `<button class="page-btn ${i === current ? 'active' : ''}" onclick="goToExpPage(${i})">${i}</button>`;
+      }
+      if (endPage < total) {
+        if (endPage < total - 1) html += `<span style="color:#64748b;padding:0 4px;">...</span>`;
+        html += `<button class="page-btn" onclick="goToExpPage(${total})">${total}</button>`;
+      }
+      numbers.innerHTML = html;
+    }
+
+    function goToExpPage(page) {
+      expState.page = page;
+      loadExpRecords();
+    }
+    function prevExpPage() { if (expState.page > 1) { expState.page--; loadExpRecords(); } }
+    function nextExpPage() { if (expState.page < expState.totalPages) { expState.page++; loadExpRecords(); } }
+    function changeExpPageSize() {
+      expState.pageSize = parseInt(document.getElementById('exp-page-size').value) || 20;
+      expState.page = 1;
+      loadExpRecords();
+    }
+    function applyExpFilter() {
+      expState.keyword = document.getElementById('exp-keyword').value.trim();
+      expState.source = document.getElementById('exp-source-filter').value;
+      expState.startTime = document.getElementById('exp-start-date').value || null;
+      expState.endTime = document.getElementById('exp-end-date').value || null;
+      expState.page = 1;
+      loadExpRecords();
+    }
+    function resetExpFilter() {
+      document.getElementById('exp-keyword').value = '';
+      document.getElementById('exp-source-filter').value = 'all';
+      document.getElementById('exp-start-date').value = '';
+      document.getElementById('exp-end-date').value = '';
+      expState.keyword = '';
+      expState.source = 'all';
+      expState.startTime = null;
+      expState.endTime = null;
+      expState.page = 1;
+      loadExpRecords();
+    }
+
+    // ==================== 星钻记录模块 ====================
+    const coinState = {
+      page: 1,
+      pageSize: 20,
+      total: 0,
+      totalPages: 0,
+      keyword: '',
+      source: 'all',
+      type: 'all',
+      startTime: null,
+      endTime: null,
+      records: []
+    };
+
+    function loadCoinRecords() {
+      if (!socket || !socket.connected) return;
+      socket.emit('get_coin_records', {
+        page: coinState.page,
+        pageSize: coinState.pageSize,
+        keyword: coinState.keyword,
+        source: coinState.source,
+        type: coinState.type,
+        startTime: coinState.startTime,
+        endTime: coinState.endTime
+      });
+    }
+
+    function handleCoinRecordsData(data) {
+      if (!data.success) {
+        showToast(data.message || '加载星钻记录失败', 'error');
+        document.getElementById('coin-records-body').innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">❌</div>加载失败</div></td></tr>';
+        return;
+      }
+      coinState.records = data.records || [];
+      coinState.total = data.pagination?.total || 0;
+      coinState.totalPages = data.pagination?.totalPages || 0;
+      coinState.page = data.pagination?.page || 1;
+
+      const s = data.summary || {};
+      document.getElementById('coin-stat-total').textContent = s.totalRecords?.toLocaleString() || 0;
+      document.getElementById('coin-stat-earned').textContent = (s.totalEarned || 0).toLocaleString() + ' 💎';
+      document.getElementById('coin-stat-spent').textContent = (s.totalSpent || 0).toLocaleString() + ' 💎';
+      const netEl = document.getElementById('coin-stat-net');
+      const net = s.netFlow || 0;
+      netEl.textContent = (net >= 0 ? '+' : '') + net.toLocaleString() + ' 💎';
+      netEl.className = 'summary-value ' + (net > 0 ? 'positive' : net < 0 ? 'negative' : '');
+      document.getElementById('coin-stat-users').textContent = s.uniqueUsers || 0;
+
+      renderCoinRecords();
+      renderCoinPagination();
+    }
+
+    function getCoinTypeBadge(type) {
+      if (type === 'earn') return '<span class="badge badge-online">收入</span>';
+      if (type === 'spend') return '<span class="badge badge-danger">支出</span>';
+      return '<span class="badge">' + type + '</span>';
+    }
+
+    function getCoinSourceLabel(source) {
+      const map = {
+        exp_reward: '经验兑换', level_up: '升级奖励', level_reward: '等级奖励',
+        admin_grant: '管理员发放', mail_reward: '邮件奖励', mail_reward_batch: '邮件奖励(批量)',
+        achievement: '成就奖励', spend: '消费支出', shop_purchase: '商城购买', system: '系统发放',
+        vip_daily: 'VIP每日礼包', daily_login: '每日签到', game_win: '游戏胜利', game_draw: '游戏平局'
+      };
+      return map[source] || source || '未知';
+    }
+
+    function renderCoinRecords() {
+      const tbody = document.getElementById('coin-records-body');
+      if (!coinState.records || coinState.records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">💎</div>暂无记录</div></td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = coinState.records.map(r => {
+        const amountClass = r.type === 'earn' ? 'amount-positive' : 'amount-negative';
+        const sign = r.type === 'earn' ? '+' : '-';
+        return `
+        <tr>
+          <td style="white-space:nowrap;font-size:12px;">${formatFullTime(r.timestamp)}</td>
+          <td>
+            <div style="font-weight:500;">${r.nickname || r.username || '-'}</div>
+            <div style="font-size:11px;color:#64748b;">@${r.username || r.userId?.substr(0, 8)}</div>
+          </td>
+          <td>${getCoinTypeBadge(r.type)}</td>
+          <td><span class="source-badge ${getCoinSourceClass(r.source)}">${getCoinSourceLabel(r.source)}</span></td>
+          <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.reason || ''}">${r.reason || '-'}</td>
+          <td class="${amountClass}" style="font-weight:700;font-size:14px;">${sign}${r.amount || 0} 💎</td>
+          <td style="font-weight:600;">${(r.balance || 0).toLocaleString()} 💎</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderCoinPagination() {
+      const info = document.getElementById('coin-page-info');
+      const numbers = document.getElementById('coin-page-numbers');
+      const prevBtn = document.getElementById('coin-prev-btn');
+      const nextBtn = document.getElementById('coin-next-btn');
+
+      const start = coinState.total === 0 ? 0 : (coinState.page - 1) * coinState.pageSize + 1;
+      const end = Math.min(coinState.page * coinState.pageSize, coinState.total);
+      info.textContent = `显示 ${start}-${end} 条，共 ${coinState.total.toLocaleString()} 条（第 ${coinState.page}/${coinState.totalPages} 页）`;
+
+      prevBtn.disabled = coinState.page <= 1;
+      nextBtn.disabled = coinState.page >= coinState.totalPages;
+
+      let html = '';
+      const total = coinState.totalPages;
+      const current = coinState.page;
+      const maxVisible = 5;
+      let startPage = Math.max(1, current - Math.floor(maxVisible / 2));
+      let endPage = Math.min(total, startPage + maxVisible - 1);
+      if (endPage - startPage < maxVisible - 1) startPage = Math.max(1, endPage - maxVisible + 1);
+
+      if (startPage > 1) {
+        html += `<button class="page-btn" onclick="goToCoinPage(1)">1</button>`;
+        if (startPage > 2) html += `<span style="color:#64748b;padding:0 4px;">...</span>`;
+      }
+      for (let i = startPage; i <= endPage; i++) {
+        html += `<button class="page-btn ${i === current ? 'active' : ''}" onclick="goToCoinPage(${i})">${i}</button>`;
+      }
+      if (endPage < total) {
+        if (endPage < total - 1) html += `<span style="color:#64748b;padding:0 4px;">...</span>`;
+        html += `<button class="page-btn" onclick="goToCoinPage(${total})">${total}</button>`;
+      }
+      numbers.innerHTML = html;
+    }
+
+    function goToCoinPage(page) { coinState.page = page; loadCoinRecords(); }
+    function prevCoinPage() { if (coinState.page > 1) { coinState.page--; loadCoinRecords(); } }
+    function nextCoinPage() { if (coinState.page < coinState.totalPages) { coinState.page++; loadCoinRecords(); } }
+    function changeCoinPageSize() {
+      coinState.pageSize = parseInt(document.getElementById('coin-page-size').value) || 20;
+      coinState.page = 1;
+      loadCoinRecords();
+    }
+    function applyCoinFilter() {
+      coinState.keyword = document.getElementById('coin-keyword').value.trim();
+      coinState.source = document.getElementById('coin-source-filter').value;
+      coinState.type = document.getElementById('coin-type-filter').value;
+      coinState.startTime = document.getElementById('coin-start-date').value || null;
+      coinState.endTime = document.getElementById('coin-end-date').value || null;
+      coinState.page = 1;
+      loadCoinRecords();
+    }
+    function resetCoinFilter() {
+      document.getElementById('coin-keyword').value = '';
+      document.getElementById('coin-source-filter').value = 'all';
+      document.getElementById('coin-type-filter').value = 'all';
+      document.getElementById('coin-start-date').value = '';
+      document.getElementById('coin-end-date').value = '';
+      coinState.keyword = '';
+      coinState.source = 'all';
+      coinState.type = 'all';
+      coinState.startTime = null;
+      coinState.endTime = null;
+      coinState.page = 1;
+      loadCoinRecords();
+    }
+
+    // ==================== 邮件发放记录模块 ====================
+    function escapeHtml(str) {
+      if (str == null) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    const mailState = {
+      page: 1,
+      pageSize: 20,
+      total: 0,
+      totalPages: 0,
+      keyword: '',
+      status: 'all',
+      from: 'all',
+      startTime: null,
+      endTime: null,
+      mails: []
+    };
+
+    function loadMailRecords() {
+      if (!socket || !socket.connected) return;
+      socket.emit('get_mail_records', {
+        page: mailState.page,
+        pageSize: mailState.pageSize,
+        keyword: mailState.keyword,
+        status: mailState.status,
+        from: mailState.from,
+        startTime: mailState.startTime,
+        endTime: mailState.endTime
+      });
+    }
+
+    function handleMailRecordsData(data) {
+      if (!data.success) {
+        showToast(data.message || '加载失败', 'error');
+        document.getElementById('mail-records-body').innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">❌</div>加载失败</div></td></tr>';
+        return;
+      }
+
+      mailState.mails = data.mails || [];
+      mailState.total = data.pagination?.total || 0;
+      mailState.totalPages = data.pagination?.totalPages || 0;
+      mailState.page = data.pagination?.page || 1;
+
+      // 更新统计
+      if (data.summary) {
+        document.getElementById('mail-total-count').textContent = (data.summary.totalMails || 0).toLocaleString();
+        document.getElementById('mail-recipients-count').textContent = (data.summary.uniqueRecipients || 0).toLocaleString();
+        document.getElementById('mail-claimed-count').textContent = (data.summary.totalClaimed || 0).toLocaleString();
+        document.getElementById('mail-unclaimed-count').textContent = (data.summary.totalUnclaimed || 0).toLocaleString();
+        document.getElementById('mail-coins-total').textContent = (data.summary.totalStarCoins || 0).toLocaleString();
+        document.getElementById('mail-exp-total').textContent = (data.summary.totalExp || 0).toLocaleString();
+      }
+
+      renderMailRecords();
+      renderMailPagination();
+    }
+
+    function renderMailRecords() {
+      const tbody = document.getElementById('mail-records-body');
+      if (!mailState.mails || mailState.mails.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📭</div><div>暂无邮件记录</div></div></td></tr>';
+        return;
+      }
+
+      let html = '';
+      for (const mail of mailState.mails) {
+        const timeStr = mail.createdAt ? new Date(mail.createdAt).toLocaleString('zh-CN', { hour12: false }) : '-';
+        const claimTimeStr = mail.claimed && mail.claimedAt ? new Date(mail.claimedAt).toLocaleString('zh-CN', { hour12: false }) : '-';
+        const statusBadge = mail.claimed
+          ? '<span class="badge badge-success">已领取</span>'
+          : '<span class="badge badge-warning">待领取</span>';
+
+        const userDisplay = (mail.nickname && mail.nickname !== mail.username)
+          ? escapeHtml(mail.nickname) + '<br><span style="color:var(--text-secondary);font-size:11px;">' + escapeHtml(mail.username) + '</span>'
+          : escapeHtml(mail.username || '-');
+
+        // 构建奖励内容
+        const rewardHtmls = [];
+        if (mail.starCoins > 0) {
+          rewardHtmls.push('<span class="reward-tag" style="background:rgba(245,158,11,0.15);color:#f59e0b;">💎 +' + mail.starCoins + ' 星钻</span>');
+        }
+        if (mail.exp > 0) {
+          rewardHtmls.push('<span class="reward-tag" style="background:rgba(139,92,246,0.15);color:#a78bfa;">📈 +' + mail.exp + ' 经验</span>');
+        }
+        if (mail.vip) {
+          const vipName = mail.vip.name || (mail.vip.days + '天会员');
+          const vipIcon = mail.vip.icon || '💎';
+          rewardHtmls.push('<span class="reward-tag" style="background:rgba(59,130,246,0.15);color:#60a5fa;">' + escapeHtml(vipIcon) + ' ' + escapeHtml(vipName) + '</span>');
+        }
+        if (mail.items && mail.items.length > 0) {
+          for (const it of mail.items) {
+            const name = it.name || it.id;
+            const icon = it.icon || '📦';
+            rewardHtmls.push('<span class="reward-tag" style="background:rgba(34,197,94,0.12);color:#4ade80;">' + escapeHtml(icon) + ' ' + escapeHtml(name) + '×' + it.count + '</span>');
+          }
+        }
+        if (mail.cosmetics && mail.cosmetics.length > 0) {
+          for (const co of mail.cosmetics) {
+            const name = co.name || co.id;
+            const icon = co.icon || '🎨';
+            rewardHtmls.push('<span class="reward-tag" style="background:rgba(236,72,153,0.12);color:#f472b6;">' + escapeHtml(icon) + ' ' + escapeHtml(name) + '</span>');
+          }
+        }
+
+        const rewardsHtml = rewardHtmls.length > 0
+          ? '<div class="reward-scroll">' + rewardHtmls.join('') + '</div>'
+          : '<span style="color:var(--text-secondary);font-size:12px;">无奖励</span>';
+
+        const titleHtml = '<span title="' + escapeHtml(mail.content || '') + '">' + escapeHtml(mail.title || '-') + '</span>';
+
+        html += '<tr>' +
+          '<td style="font-size:12px;color:var(--text-secondary);white-space:nowrap;vertical-align:top;padding-top:10px;">' + timeStr + '</td>' +
+          '<td style="white-space:nowrap;vertical-align:top;padding-top:10px;">' + userDisplay + '</td>' +
+          '<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:top;padding-top:10px;">' + titleHtml + '</td>' +
+          '<td style="white-space:nowrap;text-align:center;vertical-align:top;padding-top:10px;"><span class="source-badge" style="white-space:nowrap;">' + escapeHtml(mail.from || '系统') + '</span></td>' +
+          '<td style="vertical-align:top;padding:6px 8px;">' + rewardsHtml + '</td>' +
+          '<td style="white-space:nowrap;text-align:center;vertical-align:top;padding-top:10px;">' + statusBadge + '</td>' +
+          '<td style="font-size:12px;color:var(--text-secondary);white-space:nowrap;text-align:center;vertical-align:top;padding-top:10px;">' + claimTimeStr + '</td>' +
+          '</tr>';
+      }
+      tbody.innerHTML = html;
+    }
+
+    function renderMailPagination() {
+      document.getElementById('mail-page-info').textContent = `共 ${mailState.total.toLocaleString()} 条 · 第 ${mailState.page}/${mailState.totalPages} 页`;
+      document.getElementById('mail-prev-btn').disabled = mailState.page <= 1;
+      document.getElementById('mail-next-btn').disabled = mailState.page >= mailState.totalPages;
+
+      const pageNumbersEl = document.getElementById('mail-page-numbers');
+      let html = '';
+      const maxVisible = 5;
+      let start = Math.max(1, mailState.page - Math.floor(maxVisible / 2));
+      let end = Math.min(mailState.totalPages, start + maxVisible - 1);
+      if (end - start + 1 < maxVisible) start = Math.max(1, end - maxVisible + 1);
+
+      for (let i = start; i <= end; i++) {
+        const active = i === mailState.page ? 'active' : '';
+        html += `<button class="page-btn ${active}" onclick="goToMailPage(${i})">${i}</button>`;
+      }
+      pageNumbersEl.innerHTML = html;
+    }
+
+    function goToMailPage(page) {
+      if (page < 1 || page > mailState.totalPages) return;
+      mailState.page = page;
+      loadMailRecords();
+    }
+    function prevMailPage() { goToMailPage(mailState.page - 1); }
+    function nextMailPage() { goToMailPage(mailState.page + 1); }
+
+    function changeMailPageSize() {
+      mailState.pageSize = parseInt(document.getElementById('mail-page-size').value) || 20;
+      mailState.page = 1;
+      loadMailRecords();
+    }
+
+    function resetMailFilters() {
+      document.getElementById('mail-search-input').value = '';
+      document.getElementById('mail-status-filter').value = 'all';
+      document.getElementById('mail-from-filter').value = 'all';
+      document.getElementById('mail-start-date').value = '';
+      document.getElementById('mail-end-date').value = '';
+      mailState.keyword = '';
+      mailState.status = 'all';
+      mailState.from = 'all';
+      mailState.startTime = null;
+      mailState.endTime = null;
+      mailState.page = 1;
+      loadMailRecords();
     }
 
     function logout() {
