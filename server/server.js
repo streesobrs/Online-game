@@ -1540,6 +1540,56 @@ io.on('connection', (socket) => {
         accountId: userSession.accountId
       });
     }
+
+    // 重连时恢复游戏状态
+    if (userSession.accountId && userSession.status === 'playing' && userSession.game) {
+      try {
+        if (userSession.game === 'ai') {
+          // 恢复AI对战
+          const aiGame = gameManager.aiGames.get(userSession.accountId);
+          if (aiGame && aiGame.status === 'playing') {
+            socket.emit('ai_game_start', {
+              gameType: aiGame.gameType,
+              difficulty: aiGame.difficulty,
+              board: aiGame.board,
+              currentPlayer: aiGame.currentPlayer,
+              moves: aiGame.moves,
+              reconnected: true
+            });
+            logger.info('重连恢复AI对战', { accountId: userSession.accountId, gameType: aiGame.gameType });
+          } else {
+            // AI游戏已不存在，重置用户状态
+            userSession.status = 'online';
+            userSession.game = null;
+            userSession.gameType = null;
+          }
+        } else {
+          // 恢复PvP游戏
+          const game = gameManager.games.get(userSession.game);
+          if (game && game.status === 'playing') {
+            socket.emit('game_reconnected', {
+              gameId: game.gameId,
+              gameType: game.gameType,
+              board: game.board,
+              currentPlayer: game.currentPlayer,
+              player1: game.player1,
+              player2: game.player2,
+              player1Nickname: game.player1Nickname,
+              player2Nickname: game.player2Nickname,
+              moves: game.moves,
+              yourTurn: game.currentPlayer === (game.player1 === userSession.accountId ? 1 : 2)
+            });
+            logger.info('重连恢复PvP游戏', { accountId: userSession.accountId, gameId: game.gameId });
+          } else {
+            userSession.status = 'online';
+            userSession.game = null;
+            userSession.gameType = null;
+          }
+        }
+      } catch (err) {
+        logger.error('重连恢复游戏状态失败', { accountId: userSession.accountId, error: err.message });
+      }
+    }
   });
 
   // ========== 登录相关事件 ==========

@@ -11989,48 +11989,32 @@
     function updateAccountBar() {
       const accountBar = document.getElementById('account-bar');
       if (currentAccount) {
-        // 处理不同的数据结构
-        let accountType, nickname, username, level, exp, starCoins;
-        let isAdmin = false;
-        let undoCount = 0, hintCount = 0;
-        if (currentAccount.account.account) {
-          // 账号登录的数据结构
-          accountType = currentAccount.account.account.type;
-          nickname = currentAccount.account.account.nickname;
-          username = currentAccount.account.account.username;
-          level = currentAccount.account.account.profile?.level || 1;
-          exp = currentAccount.account.account.profile?.exp || 0;
-          starCoins = currentAccount.account.currency?.starCoins || 0;
-          isAdmin = currentAccount.account.account.isAdmin === true;
-          undoCount = currentAccount.account.inventory?.undoCount || 0;
-          hintCount = currentAccount.account.inventory?.hintCount || 0;
-          // 加上道具卡可兑换的次数（每张悔棋卡=3次，每张提示卡=5次）
-          const items = currentAccount.account.inventory?.items || {};
-          undoCount += (items.item_undo || 0) * 3;
-          hintCount += (items.item_hint || 0) * 5;
-        } else {
-          // 游客登录的数据结构
-          accountType = currentAccount.account.type;
-          nickname = currentAccount.account.nickname;
-          username = currentAccount.account.username;
-          level = currentAccount.account.profile?.level || 1;
-          exp = currentAccount.account.profile?.exp || 0;
-          starCoins = currentAccount.currency?.starCoins || 0;
-          isAdmin = currentAccount.account.isAdmin === true;
-          undoCount = currentAccount.account.inventory?.undoCount || 0;
-          hintCount = currentAccount.account.inventory?.hintCount || 0;
-          // 加上道具卡可兑换的次数
-          const items = currentAccount.account.inventory?.items || {};
-          undoCount += (items.item_undo || 0) * 3;
-          hintCount += (items.item_hint || 0) * 5;
+        const acc = currentAccount.account || {};
+        const profile = acc.account || acc || {};
+        const currency = acc.currency || currentAccount.currency || {};
+        const inventory = acc.inventory || {};
+
+        const accountType = profile.type || acc.type || 'guest';
+        let nickname = profile.nickname || acc.nickname;
+        const username = profile.username || acc.username;
+        const level = profile.profile?.level || acc.profile?.level || 1;
+        const exp = profile.profile?.exp || acc.profile?.exp || 0;
+        const starCoins = currency.starCoins || 0;
+        const isAdmin = profile.isAdmin === true || acc.isAdmin === true;
+        let undoCount = inventory.undoCount || 0;
+        let hintCount = inventory.hintCount || 0;
+        const items = inventory.items || {};
+        undoCount += (items.item_undo || 0) * 3;
+        hintCount += (items.item_hint || 0) * 5;
+
+        if (!nickname && accountId) {
+          nickname = accountId;
         }
 
-        // 根据用户类型显示不同的退出按钮
-        const isGuest = accountType === 'guest' || currentAccount.loginType === 'guest';
+        const isGuest = accountType === 'guest' || currentAccount.loginType === 'guest' || accountType === 'anonymous';
         const logoutText = isGuest ? '退出游客' : '退出登录';
         const logoutFunction = isGuest ? 'guestLogout()' : 'logout()';
 
-        // 游客用户也显示资料按钮（可查看个人信息和转正）
         const profileButton = '<button class="account-btn btn-info" onclick="window.location.href=\'/profile.html\'">👤 资料</button>';
         const historyButton = '<button class="account-btn" onclick="window.location.href=\'/games-history.html\'" style="background: #9b59b6;">📜 历史</button>';
         const adminButton = isAdmin ? '<button class="account-btn" onclick="window.location.href=\'/admin\'" style="background: #e74c3c;">🛠️ 管理</button>' : '';
@@ -12047,7 +12031,7 @@
                 </div>
               </div>
               <div class="account-user-details">
-                <span class="account-nickname">${nickname || username}</span>
+                <span class="account-nickname">${escapeHtml(nickname || username || '用户')}</span>
                 <div class="account-stats">
                   <span class="account-level">Lv.${level}</span>
                   <span class="account-exp">${exp} EXP</span>

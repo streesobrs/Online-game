@@ -310,9 +310,11 @@ class GameManager {
     // 更新用户状态
     user1.status = 'playing';
     user1.game = gameId;
+    user1.gameType = gameType;
     user1.lastActivity = Date.now();
     user2.status = 'playing';
     user2.game = gameId;
+    user2.gameType = gameType;
     user2.lastActivity = Date.now();
 
     logger.gameEvent(gameId, '游戏开始', {
@@ -1154,92 +1156,100 @@ class GameManager {
 
     // 如果在游戏中，结束游戏
     if (user.status === 'playing' && user.game) {
-      logger.info('用户正在游戏中，准备结束游戏', { accountId: user.accountId, gameId: user.game });
-      const game = this.games.get(user.game);
-      logger.info('检查游戏状态', {
-        accountId: user.accountId,
-        gameId: user.game,
-        gameExists: !!game,
-        gameStatus: game ? game.status : 'no game'
-      });
-      if (game && game.status === 'playing') {
-        const opponentId = game.player1 === user.accountId ? game.player2 : game.player1;
-        const opponent = this.userManager.getUserByAccountId(opponentId);
-
-        // 根据游戏进度决定结算方式
-        const gameDuration = Date.now() - game.startTime;
-        const moveCount = game.moves.length;
-
-        // 非正常结算逻辑
-        if (moveCount < 5 && gameDuration < 60000) {
-          // 游戏刚开始不久，判定为无效游戏
-          gameResult = 'invalid';
-          winnerId = null;
-          reason = '游戏刚开始，判定为无效游戏';
-        } else if (moveCount < 10 && gameDuration < 120000) {
-          // 游戏进行中但时间较短，判定为平局
-          gameResult = 'draw';
-          winnerId = null;
-          reason = '游戏进行中，判定为平局';
-        } else {
-          // 正常游戏，对方获胜
+      // AI对战游戏
+      if (user.game === 'ai') {
+        const aiGame = this.aiGames.get(user.accountId);
+        if (aiGame && aiGame.status === 'playing') {
+          logger.info('用户从AI对战返回大厅，结束AI游戏', { accountId: user.accountId, gameType: aiGame.gameType });
+          aiGame.status = 'ended';
+          this.aiGames.delete(user.accountId);
+          gameEnded = true;
           gameResult = 'resign';
-          winnerId = opponentId;
-          reason = '玩家离开游戏';
+          reason = reason === '主动返回' ? '主动退出AI对战' : reason;
         }
-
-        // 通知对手
-        const opponentSocket = this.userManager.getSocketByAccountId(opponentId);
-        if (opponentSocket) {
-          // 发送即时通知
-          opponentSocket.emit('opponent_left', {
-            userId: user.accountId,
-            nickname: user.nickname,
-            reason: reason,
-            result: gameResult,
-            winner: winnerId,
-            moveCount: moveCount,
-            gameDuration: gameDuration
-          });
-
-          // 发送游戏结束通知
-          opponentSocket.emit('game_ended', {
-            result: gameResult,
-            winner: winnerId,
-            reason: reason,
-            opponentLeft: true,
-            leaverNickname: user.nickname,
-            moveCount: moveCount,
-            gameDuration: gameDuration
-          });
-
-          // 发送广播消息
-          opponentSocket.emit('game_message', {
-            type: 'opponent_left',
-            message: `${user.nickname} 已离开游戏，${reason}`,
-            timestamp: Date.now()
-          });
-        }
-
-        // 结束游戏
-        this.endGame(game.gameId, gameResult, io, winnerId, reason);
-        gameEnded = true;
-
-        // 记录非正常结算
-        logger.gameEvent(game.gameId, '非正常结算', {
-          leaver: user.accountId,
-          opponent: opponentId,
-          result: gameResult,
-          reason: reason,
-          moveCount: moveCount,
-          duration: gameDuration
+      } else {
+        // PvP游戏
+        logger.info('用户正在游戏中，准备结束游戏', { accountId: user.accountId, gameId: user.game });
+        const game = this.games.get(user.game);
+        logger.info('检查游戏状态', {
+          accountId: user.accountId,
+          gameId: user.game,
+          gameExists: !!game,
+          gameStatus: game ? game.status : 'no game'
         });
+        if (game && game.status === 'playing') {
+          const opponentId = game.player1 === user.accountId ? game.player2 : game.player1;
+          const opponent = this.userManager.getUserByAccountId(opponentId);
+
+          // 根据游戏进度决定结算方式
+          const gameDuration = Date.now() - game.startTime;
+          const moveCount = game.moves.length;
+
+          // 非正常结算逻辑
+          if (moveCount < 5 && gameDuration < 60000) {
+            gameResult = 'invalid';
+            winnerId = null;
+            reason = '游戏刚开始，判定为无效游戏';
+          } else if (moveCount < 10 && gameDuration < 120000) {
+            gameResult = 'draw';
+            winnerId = null;
+            reason = '游戏进行中，判定为平局';
+          } else {
+            gameResult = 'resign';
+            winnerId = opponentId;
+            reason = '玩家离开游戏';
+          }
+
+          // 通知对手
+          const opponentSocket = this.userManager.getSocketByAccountId(opponentId);
+          if (opponentSocket) {
+            opponentSocket.emit('opponent_left', {
+              userId: user.accountId,
+              nickname: user.nickname,
+              reason: reason,
+              result: gameResult,
+              winner: winnerId,
+              moveCount: moveCount,
+              gameDuration: gameDuration
+            });
+
+            opponentSocket.emit('game_ended', {
+              result: gameResult,
+              winner: winnerId,
+              reason: reason,
+              opponentLeft: true,
+              leaverNickname: user.nickname,
+              moveCount: moveCount,
+              gameDuration: gameDuration
+            });
+
+            opponentSocket.emit('game_message', {
+              type: 'opponent_left',
+              message: `${user.nickname} 已离开游戏，${reason}`,
+              timestamp: Date.now()
+            });
+          }
+
+          // 结束游戏
+          this.endGame(game.gameId, gameResult, io, winnerId, reason);
+          gameEnded = true;
+
+          logger.gameEvent(game.gameId, '非正常结算', {
+            leaver: user.accountId,
+            opponent: opponentId,
+            result: gameResult,
+            reason: reason,
+            moveCount: moveCount,
+            duration: gameDuration
+          });
+        }
       }
     }
 
     // 更新用户状态（必须在游戏结束逻辑之后）
     user.status = 'online';
     user.game = null;
+    user.gameType = null;
     user.lastActivity = Date.now();
 
     // 通知用户返回大厅结果
@@ -1270,16 +1280,48 @@ class GameManager {
     const user = this.userManager.getUserBySocketId(socketId);
     if (!user) return;
 
+    const accountId = user.accountId;
+
     // 如果在等待队列中，移除
     if (user.status === 'waiting') {
       this.handleCancelMatch(socketId, io);
     }
 
-    // 如果在游戏中，结束游戏
+    // 如果在游戏中
     if (user.status === 'playing' && user.game) {
+      // AI对战游戏
+      if (user.game === 'ai') {
+        const aiGame = this.aiGames.get(accountId);
+        if (aiGame && aiGame.status === 'playing') {
+          logger.info('AI对战玩家断开，等待重连', { accountId, gameType: aiGame.gameType });
+          // 设置30秒超时，如果未重连则结束AI游戏
+          setTimeout(() => {
+            const currentAiGame = this.aiGames.get(accountId);
+            if (currentAiGame && currentAiGame.status === 'playing') {
+              const userSession = this.userManager.getUserByAccountId(accountId);
+              const userSocket = userSession ? this.userManager.getSocketByAccountId(accountId) : null;
+              if (!userSocket) {
+                // 未重连，结束AI游戏（按失败处理）
+                logger.info('AI对战玩家超时未重连，结束游戏', { accountId });
+                currentAiGame.status = 'ended';
+                this.aiGames.delete(accountId);
+                // 恢复用户状态
+                if (userSession) {
+                  userSession.status = 'online';
+                  userSession.game = null;
+                  userSession.gameType = null;
+                }
+              }
+            }
+          }, 30000);
+        }
+        return;
+      }
+
+      // PvP游戏
       const game = this.games.get(user.game);
       if (game && game.status === 'playing') {
-        const opponentId = game.player1 === user.accountId ? game.player2 : game.player1;
+        const opponentId = game.player1 === accountId ? game.player2 : game.player1;
 
         // 贪吃蛇游戏立即结束，不等待重连
         if (game.gameType === 'snake') {
@@ -1291,13 +1333,13 @@ class GameManager {
         setTimeout(() => {
           const currentGame = this.games.get(game.gameId);
           if (currentGame && currentGame.status === 'playing') {
-            // 检查玩家是否重新连接
-            const user1 = this.userManager.getUserByAccountId(game.player1);
-            const user2 = this.userManager.getUserByAccountId(game.player2);
+            // 检查两个玩家是否都已重新连接（有有效socket）
+            const user1Socket = this.userManager.getSocketByAccountId(game.player1);
+            const user2Socket = this.userManager.getSocketByAccountId(game.player2);
 
-            if (!user1 || !user2) {
-              // 有玩家离线，结束游戏
-              const winner = user1 ? game.player1 : game.player2;
+            if (!user1Socket || !user2Socket) {
+              // 有玩家未重连，结束游戏
+              const winner = user1Socket ? game.player1 : game.player2;
               this.endGame(game.gameId, 'resign', io, winner, '对手断开连接');
             }
           }
@@ -1631,6 +1673,7 @@ class GameManager {
     // 更新用户状态
     user.status = 'playing';
     user.game = 'ai';
+    user.gameType = gameType;
     user.lastActivity = Date.now();
     this.userManager.broadcastUserStatus(accountId, 'playing', io);
 

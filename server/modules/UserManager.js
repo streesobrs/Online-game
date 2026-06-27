@@ -13,6 +13,10 @@ class UserManager {
     this.socketToAccount = new Map();
     // 在线用户管理：accountId -> 用户会话数据
     this.onlineUsers = new Map();
+    // 断开重连定时器：accountId -> timeoutId
+    this.disconnectTimers = new Map();
+    // 重连宽限期（毫秒）
+    this.RECONNECT_GRACE_PERIOD = 30000;
     // 系统统计
     this.stats = {
       totalConnections: 0,
@@ -71,7 +75,6 @@ class UserManager {
 
       // 情况2：没有有效token，创建匿名会话（不分配ID）
       if (!accountId) {
-        accountId = null; // 不分配ID
         sessionToken = null;
         accountData = {
           account: {
@@ -90,36 +93,84 @@ class UserManager {
         logger.info('创建匿名会话', { socketId: socket.id });
       }
 
-      // 创建在线用户会话数据
-      const userSession = {
-        accountId: accountId,
-        socketId: socket.id,
-        socket: socket,
-        token: sessionToken,
-        nickname: accountData.account?.nickname || '未登录',
-        status: 'online',
-        gameType: null,
-        connectedAt: Date.now(),
-        lastActivity: Date.now(),
-        accountData: accountData,
-        ip: socket.handshake.address,
-        userAgent: socket.handshake.headers['user-agent'],
-        warningSent: false
-      };
+      let userSession;
+      const isReconnect = accountId && this.onlineUsers.has(accountId);
 
-      // 存储会话数据（使用socketId作为key，因为没有accountId）
-      this.socketToAccount.set(socket.id, accountId || socket.id);
-      if (accountId) {
-        this.onlineUsers.set(accountId, userSession);
-        // 加入以 accountId 命名的房间，用于发送私人通知（邮件、账号更新等）
+      if (isReconnect) {
+        // 重连：恢复已有会话，取消清理定时器
+        const existingSession = this.onlineUsers.get(accountId);
+        const pendingTimer = this.disconnectTimers.get(accountId);
+        if (pendingTimer) {
+          clearTimeout(pendingTimer);
+          this.disconnectTimers.delete(accountId);
+        }
+
+        // 更新socket引用
+        const oldSocketId = existingSession.socketId;
+        if (oldSocketId && oldSocketId !== socket.id) {
+          this.socketToAccount.delete(oldSocketId);
+        }
+
+        existingSession.socketId = socket.id;
+        existingSession.socket = socket;
+        existingSession.connectedAt = Date.now();
+        existingSession.lastActivity = Date.now();
+        existingSession.disconnectedAt = null;
+        existingSession.ip = socket.handshake.address;
+        if (accountData && accountData.account) {
+          existingSession.accountData = accountData;
+          existingSession.nickname = accountData.account.nickname || existingSession.nickname;
+        }
+        userSession = existingSession;
+
+        this.socketToAccount.set(socket.id, accountId);
+
+        // 重新加入私人房间
         try {
           socket.join(accountId);
-          logger.info('用户加入房间', { accountId, socketId: socket.id });
         } catch (roomErr) {
-          logger.warn('用户加入房间失败', { accountId, error: roomErr.message });
+          logger.warn('用户重连加入房间失败', { accountId, error: roomErr.message });
         }
+
+        logger.info('用户重连成功，恢复会话', {
+          accountId,
+          oldSocketId,
+          newSocketId: socket.id,
+          status: existingSession.status,
+          game: existingSession.game || null
+        });
       } else {
-        this.onlineUsers.set(socket.id, userSession);
+        // 新连接：创建新会话
+        userSession = {
+          accountId: accountId,
+          socketId: socket.id,
+          socket: socket,
+          token: sessionToken,
+          nickname: accountData.account?.nickname || '未登录',
+          status: 'online',
+          game: null,
+          gameType: null,
+          connectedAt: Date.now(),
+          lastActivity: Date.now(),
+          accountData: accountData,
+          ip: socket.handshake.address,
+          userAgent: socket.handshake.headers['user-agent'],
+          warningSent: false
+        };
+
+        // 存储会话数据
+        this.socketToAccount.set(socket.id, accountId || socket.id);
+        if (accountId) {
+          this.onlineUsers.set(accountId, userSession);
+          try {
+            socket.join(accountId);
+            logger.info('用户加入房间', { accountId, socketId: socket.id });
+          } catch (roomErr) {
+            logger.warn('用户加入房间失败', { accountId, error: roomErr.message });
+          }
+        } else {
+          this.onlineUsers.set(socket.id, userSession);
+        }
       }
 
       // 更新峰值在线人数
@@ -128,17 +179,26 @@ class UserManager {
         await this.saveStats();
       }
 
-      logger.userAction(accountId || socket.id, '连接', { ip: userSession.ip });
+      logger.userAction(accountId || socket.id, isReconnect ? '重连' : '连接', { ip: userSession.ip });
 
-      // 发送用户信息给客户端
-      socket.emit('user_connected', {
+      // 构建连接响应
+      const connectResponse = {
         accountId: accountId,
         token: sessionToken,
         nickname: userSession.nickname,
         status: userSession.status,
         accountType: accountData.account?.type || 'anonymous',
         stats: accountData.stats || {}
-      });
+      };
+
+      // 如果重连时正在游戏中，告知客户端恢复游戏状态
+      if (isReconnect && userSession.status === 'playing') {
+        connectResponse.reconnected = true;
+        connectResponse.game = userSession.game;
+        connectResponse.gameType = userSession.gameType;
+      }
+
+      socket.emit('user_connected', connectResponse);
 
       // 广播用户上线（只有已登录用户）
       if (accountId) {
@@ -160,7 +220,6 @@ class UserManager {
     } catch (err) {
       logger.error('处理用户连接失败', { socketId: socket.id, error: err.message });
 
-      // 发送错误信息给客户端
       socket.emit('connection_error', {
         message: '连接失败，请稍后重试',
         code: 'CONNECTION_FAILED'
@@ -249,7 +308,12 @@ class UserManager {
   // 发送在线用户列表
   sendOnlineUsers(socket, io) {
     const onlineUsers = Array.from(this.onlineUsers.values())
-      .filter(userSession => userSession.accountId && userSession.accountId !== userSession.socketId) // 过滤匿名用户（accountId 为 null 或等于 socketId）
+      .filter(userSession => {
+        if (!userSession.accountId) return false;
+        if (!userSession.socket) return false; // 已断开但在宽限期内的用户不显示在线
+        if (userSession.accountId === userSession.socketId) return false; // 匿名用户
+        return true;
+      })
       .map(userSession => ({
         accountId: userSession.accountId,
         nickname: userSession.nickname,
@@ -265,43 +329,82 @@ class UserManager {
   // 处理用户断开连接
   async handleUserDisconnect(socketId, io) {
     const accountId = this.socketToAccount.get(socketId);
-    if (accountId) {
-      // 检查是否是匿名用户（accountId === socketId）
-      if (accountId === socketId) {
-        // 匿名用户，直接清理
-        this.onlineUsers.delete(socketId);
-        this.socketToAccount.delete(socketId);
-        logger.info('匿名用户断开连接', { socketId });
-        return null;
-      }
+    if (!accountId) return null;
 
-      // 已登录用户
-      const userSession = this.onlineUsers.get(accountId);
-      if (userSession) {
-        logger.userAction(accountId, '断开连接', {
-          onlineDuration: Date.now() - userSession.connectedAt
-        });
+    // 检查是否是匿名用户（accountId === socketId）
+    if (accountId === socketId) {
+      // 匿名用户，直接清理
+      this.onlineUsers.delete(socketId);
+      this.socketToAccount.delete(socketId);
+      logger.info('匿名用户断开连接', { socketId });
+      return null;
+    }
 
-        // 广播离线状态
-        this.broadcastUserStatus(accountId, 'offline', io);
+    // 已登录用户
+    const userSession = this.onlineUsers.get(accountId);
+    if (!userSession) {
+      this.socketToAccount.delete(socketId);
+      return null;
+    }
 
-        // 委托给AccountManager保存最后在线时间
-        if (this.accountManager) {
-          try {
-            await this.accountManager.updateLastSeen(accountId);
-          } catch (err) {
-            logger.warn('保存最后在线时间失败', { accountId, error: err.message });
-          }
-        }
+    // 取消之前的重连定时器（如果有）
+    const existingTimer = this.disconnectTimers.get(accountId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
 
-        // 清理会话数据
-        this.socketToAccount.delete(socketId);
-        this.onlineUsers.delete(accountId);
+    logger.userAction(accountId, '断开连接', {
+      onlineDuration: Date.now() - userSession.connectedAt
+    });
 
-        return userSession;
+    // 标记为断开状态，但保留会话数据（给重连留宽限期）
+    userSession.disconnectedAt = Date.now();
+    userSession.socket = null;
+    userSession.socketId = null;
+    this.socketToAccount.delete(socketId);
+
+    // 广播离线状态
+    this.broadcastUserStatus(accountId, 'offline', io);
+
+    // 保存最后在线时间
+    if (this.accountManager) {
+      try {
+        await this.accountManager.updateLastSeen(accountId);
+      } catch (err) {
+        logger.warn('保存最后在线时间失败', { accountId, error: err.message });
       }
     }
-    return null;
+
+    // 设置延迟清理定时器
+    const timer = setTimeout(() => {
+      this.finalizeDisconnect(accountId, io);
+    }, this.RECONNECT_GRACE_PERIOD);
+    this.disconnectTimers.set(accountId, timer);
+
+    return userSession;
+  }
+
+  // 最终清理断开的用户会话（宽限期结束后调用）
+  finalizeDisconnect(accountId, io) {
+    this.disconnectTimers.delete(accountId);
+    const userSession = this.onlineUsers.get(accountId);
+    if (!userSession) return;
+
+    // 如果用户已经重连（socket已恢复），不清理
+    if (userSession.socket && userSession.socketId) {
+      return;
+    }
+
+    logger.info('用户重连宽限期结束，清理会话', { accountId });
+
+    // 清理游戏状态（如果还在游戏中）
+    if (userSession.status === 'playing') {
+      userSession.status = 'online';
+      userSession.game = null;
+      userSession.gameType = null;
+    }
+
+    this.onlineUsers.delete(accountId);
   }
 
   // 获取用户会话（通过socketId）
@@ -433,13 +536,18 @@ class UserManager {
 
   // 获取在线用户数
   getOnlineCount() {
-    return this.onlineUsers.size;
+    let count = 0;
+    for (const userSession of this.onlineUsers.values()) {
+      if (userSession.socket) count++;
+    }
+    return count;
   }
 
   // 获取等待匹配的用户数
   getWaitingCount(gameType = null) {
     let count = 0;
     for (const userSession of this.onlineUsers.values()) {
+      if (!userSession.socket) continue;
       if (userSession.status === 'waiting') {
         if (!gameType || userSession.gameType === gameType) {
           count++;
@@ -453,6 +561,7 @@ class UserManager {
   getPlayingCount() {
     let count = 0;
     for (const userSession of this.onlineUsers.values()) {
+      if (!userSession.socket) continue;
       if (userSession.status === 'playing') {
         count++;
       }
