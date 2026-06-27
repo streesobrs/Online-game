@@ -1094,9 +1094,25 @@ class AccountManager {
       if (!account) {
         return null;
       }
-      // 不返回密码相关信息
+
+      const hasPassword = !!(account.account?.security?.passwordSalt && account.account?.security?.passwordHash);
+
+      let inventory = account.inventory || null;
+      if (!inventory) {
+        try {
+          const invResult = await this.getInventory(id);
+          if (invResult && invResult.inventory) {
+            inventory = invResult.inventory;
+          }
+        } catch (invErr) {
+          logger.warn('获取账号背包数据失败', { id, error: invErr.message });
+        }
+      }
+
       const safeAccount = {
         ...account,
+        hasPassword,
+        inventory: inventory || { items: {}, undoCount: 0, hintCount: 0 },
         account: {
           ...account.account,
           security: undefined
@@ -1593,9 +1609,6 @@ class AccountManager {
           totalExp: newTotalExp,
           timestamp: Date.now()
         });
-        if (expRecords.transactions.length > 500) {
-          expRecords.transactions = expRecords.transactions.slice(-500);
-        }
         await dataStore.writeOne('expTransactions', id, expRecords);
       } catch (recErr) {
         logger.warn('记录经验变动失败', { id, error: recErr.message });
@@ -2089,11 +2102,6 @@ class AccountManager {
         timestamp: Date.now()
       });
 
-      // 限制交易记录数量，只保留最近1000条
-      if (transactionRecords.transactions.length > 1000) {
-        transactionRecords.transactions = transactionRecords.transactions.slice(-1000);
-      }
-
       await dataStore.writeOne('currencyTransactions', accountId, transactionRecords);
       logger.info('添加星钻', { accountId, amount, reason, balance: newBalance });
 
@@ -2134,10 +2142,6 @@ class AccountManager {
         reason,
         timestamp: Date.now()
       });
-
-      if (transactionRecords.transactions.length > 1000) {
-        transactionRecords.transactions = transactionRecords.transactions.slice(-1000);
-      }
 
       await dataStore.writeOne('currencyTransactions', accountId, transactionRecords);
       logger.info('使用星钻', { accountId, amount, reason, balance: newBalance });
@@ -2352,7 +2356,6 @@ class AccountManager {
             type: 'earn', amount: total, balance: account.currency.starCoins,
             source: 'compensation', reason, timestamp: Date.now()
           });
-          if (records.transactions.length > 1000) records.transactions = records.transactions.slice(-1000);
           await dataStore.writeOne('currencyTransactions', accountId, records);
 
           await this.checkLevelRewards(accountId);
@@ -2893,9 +2896,6 @@ class AccountManager {
           totalExp: account.account.profile.exp,
           timestamp: Date.now()
         });
-        if (expRecords.transactions.length > 500) {
-          expRecords.transactions = expRecords.transactions.slice(-500);
-        }
         await dataStore.writeOne('expTransactions', userId, expRecords);
       } catch (recErr) {
         logger.warn('记录经验变动失败', { userId, error: recErr.message });
@@ -3968,10 +3968,6 @@ class AccountManager {
             reason: mail.title + ' - 邮件奖励',
             timestamp: Date.now()
           });
-          const recentLimit = 100;
-          if (transactionRecords.transactions.length > recentLimit) {
-            transactionRecords.transactions = transactionRecords.transactions.slice(-recentLimit);
-          }
           await dataStore.writeOne('currencyTransactions', userId, transactionRecords);
         } catch (recErr) {
           logger.warn('记录邮件星钻奖励失败', { userId, error: recErr.message });
@@ -4007,9 +4003,6 @@ class AccountManager {
             reason: mail.title,
             timestamp: Date.now()
           });
-          if (expRecords.transactions.length > 500) {
-            expRecords.transactions = expRecords.transactions.slice(-500);
-          }
           await dataStore.writeOne('expTransactions', userId, expRecords);
         } catch (recErr) {
           logger.warn('记录邮件经验奖励失败', { userId, error: recErr.message });
@@ -4163,10 +4156,6 @@ class AccountManager {
             reason: '邮件奖励（批量）',
             timestamp: Date.now()
           });
-          const recentLimit = 100;
-          if (transactionRecords.transactions.length > recentLimit) {
-            transactionRecords.transactions = transactionRecords.transactions.slice(-recentLimit);
-          }
           await dataStore.writeOne('currencyTransactions', userId, transactionRecords);
         } catch (recErr) {
           logger.warn('记录批量邮件星钻奖励失败', { userId, error: recErr.message });
@@ -4201,9 +4190,6 @@ class AccountManager {
             reason: '批量领取邮件奖励',
             timestamp: Date.now()
           });
-          if (expRecords.transactions.length > 500) {
-            expRecords.transactions = expRecords.transactions.slice(-500);
-          }
           await dataStore.writeOne('expTransactions', userId, expRecords);
         } catch (recErr) {
           logger.warn('记录批量邮件经验奖励失败', { userId, error: recErr.message });
