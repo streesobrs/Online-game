@@ -24,7 +24,7 @@ class AdminManager {
     // 清理过期Token的定时任务
     this.cleanupInterval = setInterval(() => {
       this.cleanupExpiredTokens();
-    }, 5 * 60 * 1000); // 每5分钟清理一次
+    }, config.admin.tokenCleanupInterval); // 每5分钟清理一次
   }
 
   // 生成动态管理员Token
@@ -33,7 +33,7 @@ class AdminManager {
       return config.admin.token; // 回退到静态Token
     }
 
-    const token = crypto.randomBytes(32).toString('hex');
+    const token = crypto.randomBytes(config.security.adminTokenBytes).toString('hex');
     const tokenInfo = {
       token: token,
       createdAt: Date.now(),
@@ -521,7 +521,7 @@ class AdminManager {
   // 获取系统日志
   async getSystemLogs(socket, options = {}) {
     try {
-      const { level = 'all', limit = 100, startTime, endTime } = options;
+      const { level = 'all', limit = config.validation.defaultLogLimit, startTime, endTime } = options;
 
       // 这里可以从日志文件读取
       // 简化版本：返回最近的系统事件
@@ -542,7 +542,7 @@ class AdminManager {
   }
 
   // 获取排行榜数据
-  async getLeaderboard(socket, limit = 10) {
+  async getLeaderboard(socket, limit = config.validation.defaultLeaderboardLimit) {
     try {
       const leaderboard = await this.userManager.getLeaderboard(limit);
 
@@ -563,7 +563,7 @@ class AdminManager {
   // 获取历史游戏记录
   async getGameHistory(socket, options = {}) {
     try {
-      const { limit = 50, gameType, startDate, endDate } = options;
+      const { limit = config.validation.defaultGameHistoryLimit, gameType, startDate, endDate } = options;
 
       let games = await dataStore.read('games');
 
@@ -653,7 +653,7 @@ class AdminManager {
   }
 
   // 禁言用户
-  muteUser(socket, accountId, duration = 10, reason = '') {
+  muteUser(socket, accountId, duration = config.admin.defaultMuteMinutes, reason = '') {
     if (!this.chatManager) {
       socket.emit('admin_action_result', {
         action: 'mute_user',
@@ -867,7 +867,7 @@ class AdminManager {
   }
 
   // 获取用户游戏历史
-  async getUserGameHistory(socket, accountId, limit = 20) {
+  async getUserGameHistory(socket, accountId, limit = config.validation.defaultUserGameHistoryLimit) {
     try {
       const games = await dataStore.read('games');
       const userGames = games
@@ -900,7 +900,7 @@ class AdminManager {
       return;
     }
 
-    const { scope = 'global', gameId, limit = 50 } = options;
+    const { scope = 'global', gameId, limit = config.chat.defaultQueryLimit } = options;
     let messages = [];
 
     if (scope === 'all') {

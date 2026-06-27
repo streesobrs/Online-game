@@ -1,4 +1,5 @@
 // ChatManager.js - 聊天管理模块
+const config = require('../config');
 const logger = require('../utils/logger');
 const dataStore = require('../utils/dataStore');
 
@@ -9,7 +10,7 @@ class ChatManager {
     this.accountManager = accountManager;
     this.globalChatHistory = []; // 全局聊天记录
     this.gameChatHistory = new Map(); // gameId -> 聊天记录
-    this.maxHistoryLength = 100; // 最大保存消息数
+    this.maxHistoryLength = config.chat.maxHistoryMessages; // 最大保存消息数
     this.muteList = new Map(); // 被禁言用户列表 -> { reason, expiresAt, timeoutId }
     this.messageRateLimit = new Map(); // 用户消息频率限制
     this.init();
@@ -64,7 +65,7 @@ class ChatManager {
     if (muteInfo) {
       const remaining = Math.max(0, Math.ceil((muteInfo.expiresAt - Date.now()) / 1000 / 60));
       let message = '您已被禁言';
-      if (remaining > 0 && remaining < 365 * 24 * 60) {
+      if (remaining > 0 && remaining < config.chat.permanentMuteThresholdMinutes) {
         message += `，剩余 ${remaining} 分钟`;
       }
       if (muteInfo.reason) {
@@ -143,7 +144,7 @@ class ChatManager {
     if (muteInfo) {
       const remaining = Math.max(0, Math.ceil((muteInfo.expiresAt - Date.now()) / 1000 / 60));
       let message = '您已被禁言';
-      if (remaining > 0 && remaining < 365 * 24 * 60) {
+      if (remaining > 0 && remaining < config.chat.permanentMuteThresholdMinutes) {
         message += `，剩余 ${remaining} 分钟`;
       }
       if (muteInfo.reason) {
@@ -291,18 +292,18 @@ class ChatManager {
   }
 
   // 获取全局聊天记录
-  getGlobalChatHistory(limit = 50) {
+  getGlobalChatHistory(limit = config.chat.defaultHistoryLimit) {
     return this.globalChatHistory.slice(-limit);
   }
 
   // 获取游戏聊天记录
-  getGameChatHistory(gameId, limit = 50) {
+  getGameChatHistory(gameId, limit = config.chat.defaultHistoryLimit) {
     const history = this.gameChatHistory.get(gameId);
     return history ? history.slice(-limit) : [];
   }
 
   // 禁言用户
-  muteUser(accountId, duration = 3600000, reason = '') { // 默认1小时
+  muteUser(accountId, duration = config.chat.defaultMuteDuration, reason = '') { // 默认1小时
     // 如果用户已被禁言，先清理之前的定时器
     const existingMute = this.muteList.get(accountId);
     if (existingMute && existingMute.timeoutId) {
@@ -348,12 +349,12 @@ class ChatManager {
     }
 
     // 1分钟内最多发送20条消息
-    if (now - userLimit.lastTime > 60000) {
+    if (now - userLimit.lastTime > config.chat.rateLimitWindowMs) {
       this.messageRateLimit.set(accountId, { count: 1, lastTime: now });
       return true;
     }
 
-    if (userLimit.count >= 20) {
+    if (userLimit.count >= config.chat.maxMessagesPerMinute) {
       return false;
     }
 
@@ -365,7 +366,7 @@ class ChatManager {
   validateMessage(message) {
     if (!message || typeof message !== 'string') return false;
     if (message.trim().length === 0) return false;
-    if (message.length > 500) return false; // 最大500字符
+    if (message.length > config.chat.maxMessageLength) return false; // 最大500字符
     return true;
   }
 
@@ -373,7 +374,7 @@ class ChatManager {
   sanitizeMessage(message) {
     return message
       .trim()
-      .substring(0, 500)
+      .substring(0, config.chat.maxMessageLength)
       .replace(/[<>]/g, '') // 移除HTML标签
       .replace(/\s+/g, ' '); // 合并连续空格
   }

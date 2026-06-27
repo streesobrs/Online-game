@@ -1,5 +1,6 @@
 const logger = require('../utils/logger');
 const dataStore = require('../utils/dataStore');
+const config = require('../config');
 
 class FeedbackManager {
   constructor() {
@@ -67,7 +68,7 @@ class FeedbackManager {
     const getNickname = async (accountId) => {
       if (cache[accountId]) return cache[accountId];
       const account = await this.accountManager.getAccount(accountId);
-      cache[accountId] = account?.account?.nickname || account?.account?.username || accountId?.slice(0, 8) || '未知';
+      cache[accountId] = account?.account?.nickname || account?.account?.username || accountId?.slice(0, config.display.nicknameTruncateLength) || '未知';
       return cache[accountId];
     };
 

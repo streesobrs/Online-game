@@ -262,14 +262,14 @@ class DataStore {
   }
 
   // 原子化的 rename，带重试：避免 Windows 文件句柄未释放导致 ENOENT/EACCES
-  async atomicRename(tmpPath, targetPath, retries = 5) {
+  async atomicRename(tmpPath, targetPath, retries = config.dataStore.renameRetries) {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         await fs.rename(tmpPath, targetPath);
         return;
       } catch (err) {
         if (attempt === retries) throw err;
-        const delay = 50 * attempt;
+        const delay = config.dataStore.retryDelayBaseMs * attempt;
         logger.warn('rename 失败，准备重试', {
           tmpPath,
           targetPath,

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const appConfig = require('../config');
 
 class ShopManager {
   constructor() {
@@ -51,7 +52,7 @@ class ShopManager {
   // 检查更新（热更新）
   checkUpdate() {
     const now = Date.now();
-    const checkInterval = this.config?.hotUpdate?.checkInterval || 30000;
+    const checkInterval = this.config?.hotUpdate?.checkInterval || appConfig.shop.configCheckInterval;
 
     if (now - this.lastCheck < checkInterval) {
       return false;
@@ -253,7 +254,7 @@ class ShopManager {
 
   // VIP折扣（百分比）
   getVipDiscountPercent() {
-    return this.config?.vipDiscount || 10; // 默认9折
+    return this.config?.vipDiscount || appConfig.shop.vipDiscountPercent; // 默认9折
   }
 
   // 购买商品（支持批量数量）
@@ -291,7 +292,7 @@ class ShopManager {
       // VIP查询失败不影响购买
     }
 
-    const discountedPrice = Math.floor(unitPrice * (100 - discount) / 100);
+    const discountedPrice = Math.floor(unitPrice * (100 - discount) / appConfig.shop.discountDenominator);
     const totalPrice = discountedPrice * quantity;
     const savedAmount = (unitPrice - discountedPrice) * quantity;
 
@@ -383,14 +384,14 @@ class ShopManager {
       hash = ((hash << 5) - hash) + userId.charCodeAt(i);
       hash |= 0;
     }
-    return Math.abs(hash % 100) + 1;
+    return Math.abs(hash % appConfig.shop.userGrayMod) + 1;
   }
 
   // 默认配置
   getDefaultConfig() {
     return {
       version: '1.0.0',
-      hotUpdate: { enabled: true, checkInterval: 30000 }
+      hotUpdate: { enabled: true, checkInterval: appConfig.shop.defaultHotUpdateInterval }
     };
   }
 }

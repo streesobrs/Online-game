@@ -10,9 +10,9 @@ const path = require('path');
 class AccountManager {
   constructor(io = null) {
     // 密码哈希迭代次数 - 可根据需要调整
-    this.iterations = 10000;
+    this.iterations = config.security.passwordHashIterations;
     // 密钥长度
-    this.keyLength = 64;
+    this.keyLength = config.security.passwordKeyLength;
     // 哈希算法
     this.digest = 'sha512';
     // socket.io 引用，用于发送实时通知
@@ -23,14 +23,14 @@ class AccountManager {
 
   // 节假日名称→倍率映射
   static HOLIDAY_MULTIPLIERS = {
-    '春节': 2.5,
-    '除夕': 2.5,
-    '国庆节': 2.5,
-    '元旦': 2.0,
-    '劳动节': 2.0,
-    '清明节': 2.0,
-    '端午节': 2.0,
-    '中秋节': 2.0,
+    '春节': config.holidays.majorHolidayMultiplier,
+    '除夕': config.holidays.majorHolidayMultiplier,
+    '国庆节': config.holidays.majorHolidayMultiplier,
+    '元旦': config.holidays.normalHolidayMultiplier,
+    '劳动节': config.holidays.normalHolidayMultiplier,
+    '清明节': config.holidays.normalHolidayMultiplier,
+    '端午节': config.holidays.normalHolidayMultiplier,
+    '中秋节': config.holidays.normalHolidayMultiplier,
   };
 
   // 节假日缓存（静态）
@@ -88,10 +88,10 @@ class AccountManager {
       const cache = {};
       for (const [dateStr, info] of Object.entries(data)) {
         if (info.isOffDay) {
-          const mult = AccountManager.HOLIDAY_MULTIPLIERS[info.name] || 2.0;
+          const mult = AccountManager.HOLIDAY_MULTIPLIERS[info.name] || config.holidays.normalHolidayMultiplier;
           cache[dateStr] = { name: info.name, multiplier: mult };
         } else {
-          cache[dateStr] = { name: info.name, multiplier: 1.0, isMakeup: true };
+          cache[dateStr] = { name: info.name, multiplier: config.exp.workdayMultiplier, isMakeup: true };
         }
       }
       AccountManager.holidayCache = cache;
@@ -135,10 +135,10 @@ class AccountManager {
       }
     }
     if (level > this._maxLevelExp) {
-      return this.levelExpConfig[this._maxLevelExp] || 100;
+      return this.levelExpConfig[this._maxLevelExp] || config.exp.baseExpPerLevel;
     }
     // 等级 <=1 的特殊情况
-    return (level - 1) * 100;
+    return (level - 1) * config.exp.baseExpPerLevel;
   }
 
   getTotalExpForLevel(level) {
@@ -171,7 +171,7 @@ class AccountManager {
 
   // 生成密码盐
   generateSalt() {
-    return crypto.randomBytes(16).toString('hex');
+    return crypto.randomBytes(config.security.passwordSaltBytes).toString('hex');
   }
 
   // 哈希密码
@@ -190,13 +190,13 @@ class AccountManager {
 
   // 生成用户ID
   generateUserId() {
-    return crypto.randomBytes(8).toString('hex');
+    return crypto.randomBytes(config.security.userIdBytes).toString('hex');
   }
 
   // 生成会话token
   generateSessionToken(accountId) {
     const timestamp = Date.now();
-    const random = crypto.randomBytes(16).toString('hex');
+    const random = crypto.randomBytes(config.security.sessionTokenBytes).toString('hex');
     const tokenData = `${accountId}|${timestamp}|${random}`;
     return Buffer.from(tokenData).toString('base64');
   }
@@ -218,7 +218,7 @@ class AccountManager {
 
       // 验证token时效性（7天有效期）
       const tokenAge = Date.now() - parseInt(timestamp);
-      const maxAge = 7 * 24 * 60 * 60 * 1000; // 7天
+      const maxAge = config.security.sessionTokenExpiry; // 7天
 
       if (tokenAge > maxAge) {
         logger.warn('Token已过期', { accountId, tokenAge });
@@ -366,7 +366,7 @@ class AccountManager {
   // 生成会话令牌
   generateSessionToken(id) {
     const timestamp = Date.now();
-    const random = crypto.randomBytes(16).toString('hex');
+    const random = crypto.randomBytes(config.security.sessionTokenBytes).toString('hex');
     const tokenData = `${id}|${timestamp}|${random}`;
     return Buffer.from(tokenData).toString('base64');
   }
@@ -540,7 +540,7 @@ class AccountManager {
       const account = accounts[accountIndex];
 
       // 生成新的盐和哈希
-      const salt = crypto.randomBytes(16).toString('hex');
+      const salt = crypto.randomBytes(config.security.passwordSaltBytes).toString('hex');
       const hash = this.hashPassword(newPassword, salt);
 
       // 更新账号信息
@@ -1458,9 +1458,9 @@ class AccountManager {
     // 1. 检查中国节假日（API 拉取，优先级最高）
     if (AccountManager.holidayCache && AccountManager.holidayCache[mmdd]) {
       const h = AccountManager.holidayCache[mmdd];
-      if (h.isMakeup) return { multiplier: 1.0, label: '' }; // 补班日，无加成
+      if (h.isMakeup) return { multiplier: config.exp.workdayMultiplier, label: '' }; // 补班日，无加成
       if (isWeekend) {
-        const stacked = h.multiplier * 1.5;
+        const stacked = h.multiplier * config.exp.weekendHolidayMultiplier;
         return { multiplier: stacked, label: `${h.name}·周末 限时翻倍×${stacked}` };
       }
       return { multiplier: h.multiplier, label: `${h.name} 限时翻倍×${h.multiplier}` };
@@ -1470,7 +1470,7 @@ class AccountManager {
     const intl = this.getInternationalHoliday();
     if (intl) {
       if (isWeekend) {
-        const stacked = intl.multiplier * 1.5;
+        const stacked = intl.multiplier * config.exp.weekendHolidayMultiplier;
         return { multiplier: stacked, label: `${intl.label.split('限时')[0]}·周末 限时翻倍×${stacked}` };
       }
       return intl;
@@ -1478,19 +1478,20 @@ class AccountManager {
 
     // 3. 周末 1.5 倍
     if (isWeekend) {
-      return { multiplier: 1.5, label: '周末 限时翻倍×1.5' };
+      return { multiplier: config.exp.weekendMultiplier, label: `周末 限时翻倍×${config.exp.weekendMultiplier}` };
     }
 
-    return { multiplier: 1.0, label: '' };
+    return { multiplier: config.exp.workdayMultiplier, label: '' };
   }
 
   // 等级经验倍率：等级越高倍率越大，保证后期升级不吃力
   getExpMultiplier(level) {
-    if (level <= 10) return 1.0;
-    if (level <= 20) return 1.5;
-    if (level <= 30) return 2.0;
-    if (level <= 40) return 2.5;
-    return 3.0;
+    const lm = config.exp.levelMultipliers;
+    if (level <= lm.low.maxLevel) return lm.low.multiplier;
+    if (level <= lm.mid.maxLevel) return lm.mid.multiplier;
+    if (level <= lm.high.maxLevel) return lm.high.multiplier;
+    if (level <= lm.veryHigh.maxLevel) return lm.veryHigh.multiplier;
+    return lm.max.multiplier;
   }
 
   // 添加经验值
@@ -1521,29 +1522,29 @@ class AccountManager {
 
         // 1. 周末/节假日活动倍率
         const eventResult = this.getEventMultiplier();
-        if (eventResult.multiplier !== 1.0) {
+        if (eventResult.multiplier !== config.exp.workdayMultiplier) {
           multipliers.push(eventResult.multiplier);
           labels.push(eventResult.label);
         }
 
         // 2. 双倍/三倍经验buff（优先使用三倍）
         if (account.activeBuffs?.tripleExp && account.activeBuffs.tripleExp > now) {
-          multipliers.push(3.0);
+          multipliers.push(config.exp.itemMultipliers.tripleExp);
           labels.push('三倍经验');
         } else if (account.activeBuffs?.doubleExp && account.activeBuffs.doubleExp > now) {
-          multipliers.push(2.0);
+          multipliers.push(config.exp.itemMultipliers.doubleExp);
           labels.push('双倍经验');
         }
 
         // 3. VIP会员
         if (account.vip?.expireAt > now) {
-          const vipBonus = account.vip.expBonus || 2.0;
+          const vipBonus = account.vip.expBonus || config.exp.vipDefaultMultiplier;
           multipliers.push(vipBonus);
           labels.push(`VIP×${vipBonus}`);
         }
 
         // 计算总倍率
-        let eventMultTotal = 1.0;
+        let eventMultTotal = config.exp.workdayMultiplier;
         for (const m of multipliers) {
           eventMultTotal *= m;
         }
@@ -1575,8 +1576,8 @@ class AccountManager {
       await dataStore.update('accounts', { 'account.id': id }, { 'account.profile': updatedProfile, 'account.updatedAt': Date.now() });
       logger.info('添加经验值', { id, addedExp: finalExp, levelMult, eventLabel, totalMult, baseExp: exp, currentExp, newTotalExp, newLevel: level });
 
-      // 每获得10点经验，奖励1星钻
-      let currencyReward = Math.max(1, Math.floor(finalExp / 10));
+      // 每获得N点经验，奖励1星钻
+      let currencyReward = Math.max(1, Math.floor(finalExp / config.exp.expToCoinRatio));
       // 幸运符提升星钻奖励
       if (account.activeBuffs?.luckBoost && account.activeBuffs.luckBoost > Date.now()) {
         currencyReward = Math.floor(currencyReward * 2); // 双倍星钻奖励
@@ -1588,7 +1589,7 @@ class AccountManager {
       // 升级时额外奖励星钻并检查等级奖励
       let levelUpCurrency = 0;
       if (level > oldLevel) {
-        levelUpCurrency = (level - oldLevel) * 50; // 每升1级奖励50星钻
+        levelUpCurrency = (level - oldLevel) * config.exp.levelUpCoinReward; // 每升1级奖励星钻
         await this.addCurrency(id, levelUpCurrency, `从${oldLevel}级升到${level}级奖励`, 'level_up');
       }
       await this.checkLevelRewards(id);
@@ -1597,7 +1598,7 @@ class AccountManager {
       try {
         const expRecords = await this.getExpRecords(id);
         expRecords.transactions.push({
-          id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+          id: Date.now().toString(36) + Math.random().toString(36).substr(2, config.security.randomIdSuffixLength),
           baseExp: exp,
           bonusExp: finalExp - exp,
           finalExp,
@@ -1738,18 +1739,18 @@ class AccountManager {
   // 验证用户名格式
   validateUsername(username) {
     if (!username || typeof username !== 'string') return false;
-    if (username.length < 3 || username.length > 20) return false;
+    if (username.length < config.validation.usernameMinLength || username.length > config.validation.usernameMaxLength) return false;
     return /^[a-zA-Z0-9_]+$/.test(username);
   }
 
   // 验证密码格式
   validatePassword(password) {
     if (!password || typeof password !== 'string') return false;
-    return password.length >= 6;
+    return password.length >= config.validation.passwordMinLength;
   }
 
   // 获取所有账号列表（用于后台管理）
-  async getAllAccounts(limit = 50) {
+  async getAllAccounts(limit = config.validation.defaultAccountListLimit) {
     try {
       // 强制重新读取数据，确保获取最新状态
       const accounts = await dataStore.read('accounts');
@@ -1959,87 +1960,94 @@ class AccountManager {
 
   // 等级奖励配置
   getLevelRewards() {
-    return [
-      {
-        level: 5, rewards: [
-          { type: 'currency', amount: 100 },
-          { type: 'title', name: '棋坛新秀' },
-          { type: 'item', id: 'item_exp_potion', count: 3 },
-          { type: 'item', id: 'item_undo', count: 1 }
-        ], description: '获得100💎 + 称号"棋坛新秀" + 🧪经验药水×3 + ↩️悔棋卡×1'
-      },
-      {
-        level: 10, rewards: [
-          { type: 'currency', amount: 250 },
-          { type: 'title', name: '对弈达人' },
-          { type: 'item', id: 'item_exp_potion', count: 5 },
-          { type: 'item', id: 'item_double_exp', count: 2 },
-          { type: 'item', id: 'item_hint', count: 3 },
-          { type: 'vip', days: 7, expBonus: 2.0 }
-        ], description: '获得250💎 + 称号"对弈达人" + 🧪经验药水×5 + ✨双倍经验卡×2 + 💡提示卡×3 + 💎7天月卡'
-      },
-      {
-        level: 15, rewards: [
-          { type: 'currency', amount: 500 },
-          { type: 'title', name: '棋艺高手' },
-          { type: 'item', id: 'item_exp_potion', count: 10 },
-          { type: 'item', id: 'item_double_exp', count: 3 },
-          { type: 'item', id: 'item_undo', count: 3 }
-        ], description: '获得500💎 + 称号"棋艺高手" + 🧪经验药水×10 + ✨双倍经验卡×3 + ↩️悔棋卡×3'
-      },
-      {
-        level: 20, rewards: [
-          { type: 'currency', amount: 800 },
-          { type: 'badge', name: 'level_20_reward' },
-          { type: 'item', id: 'item_exp_potion', count: 10 },
-          { type: 'item', id: 'item_double_exp', count: 5 },
-          { type: 'item', id: 'item_hint', count: 5 },
-          { type: 'item', id: 'item_luck_boost', count: 1 },
-          { type: 'vip', days: 30, expBonus: 2.0 }
-        ], description: '获得800💎 + 限定徽章 + 🧪经验药水×10 + ✨双倍经验卡×5 + 💡提示卡×5 + 🍀幸运符×1 + 💎30天月卡'
-      },
-      {
-        level: 25, rewards: [
-          { type: 'currency', amount: 1200 },
-          { type: 'title', name: '棋坛精英' },
-          { type: 'item', id: 'item_triple_exp', count: 2 },
-          { type: 'item', id: 'item_undo', count: 5 },
-          { type: 'item', id: 'item_hint', count: 5 }
-        ], description: '获得1200💎 + 称号"棋坛精英" + 🌟三倍经验卡×2 + ↩️悔棋卡×5 + 💡提示卡×5'
-      },
-      {
-        level: 30, rewards: [
-          { type: 'currency', amount: 1800 },
-          { type: 'badge', name: 'level_30_reward' },
-          { type: 'item', id: 'item_triple_exp', count: 3 },
-          { type: 'item', id: 'item_exp_potion', count: 20 },
-          { type: 'item', id: 'item_luck_boost', count: 3 },
-          { type: 'vip', days: 30, expBonus: 2.0 }
-        ], description: '获得1800💎 + 限定徽章 + 🌟三倍经验卡×3 + 🧪经验药水×20 + 🍀幸运符×3 + 💎30天月卡'
-      },
-      {
-        level: 40, rewards: [
-          { type: 'currency', amount: 3000 },
-          { type: 'title', name: '传奇大师' },
-          { type: 'item', id: 'item_triple_exp', count: 5 },
-          { type: 'item', id: 'item_exp_potion', count: 30 },
-          { type: 'item', id: 'item_level_up', count: 1 },
-          { type: 'vip', days: 30, expBonus: 2.0 }
-        ], description: '获得3000💎 + 称号"传奇大师" + 🌟三倍经验卡×5 + 🧪经验药水×30 + 🚀等级直升券×1 + 💎30天月卡'
-      },
-      {
-        level: 50, rewards: [
-          { type: 'currency', amount: 5000 },
-          { type: 'badge', name: 'level_50_reward' },
-          { type: 'title', name: '至尊棋圣' },
-          { type: 'item', id: 'item_triple_exp', count: 10 },
-          { type: 'item', id: 'item_exp_potion', count: 50 },
-          { type: 'item', id: 'item_level_up', count: 3 },
-          { type: 'item', id: 'item_luck_boost', count: 5 },
-          { type: 'vip', days: 30, expBonus: 2.0 }
-        ], description: '获得5000💎 + 限定徽章 + 称号"至尊棋圣" + 🌟三倍经验卡×10 + 🧪经验药水×50 + 🚀等级直升券×3 + 🍀幸运符×5 + 💎30天月卡'
+    const milestones = config.levelRewards.milestones;
+    const result = [];
+
+    const levelTitles = {
+      5: '棋坛新秀',
+      10: '对弈达人',
+      15: '棋艺高手',
+      25: '棋坛精英',
+      40: '传奇大师',
+      50: '至尊棋圣'
+    };
+
+    const levelBadges = {
+      20: 'level_20_reward',
+      30: 'level_30_reward',
+      50: 'level_50_reward'
+    };
+
+    for (const [levelStr, milestone] of Object.entries(milestones)) {
+      const level = parseInt(levelStr);
+      const rewards = [];
+      const descParts = [];
+
+      if (milestone.starCoins) {
+        rewards.push({ type: 'currency', amount: milestone.starCoins });
+        descParts.push(`${milestone.starCoins}💎`);
       }
-    ];
+
+      if (levelBadges[level]) {
+        rewards.push({ type: 'badge', name: levelBadges[level] });
+        descParts.push('限定徽章');
+      }
+
+      if (levelTitles[level]) {
+        rewards.push({ type: 'title', name: levelTitles[level] });
+        descParts.push(`称号"${levelTitles[level]}"`);
+      }
+
+      if (milestone.expPotions) {
+        rewards.push({ type: 'item', id: 'item_exp_potion', count: milestone.expPotions });
+        descParts.push(`🧪经验药水×${milestone.expPotions}`);
+      }
+
+      if (milestone.undoCards) {
+        rewards.push({ type: 'item', id: 'item_undo', count: milestone.undoCards });
+        descParts.push(`↩️悔棋卡×${milestone.undoCards}`);
+      }
+
+      if (milestone.doubleExpCards) {
+        rewards.push({ type: 'item', id: 'item_double_exp', count: milestone.doubleExpCards });
+        descParts.push(`✨双倍经验卡×${milestone.doubleExpCards}`);
+      }
+
+      if (milestone.hintCards) {
+        rewards.push({ type: 'item', id: 'item_hint', count: milestone.hintCards });
+        descParts.push(`💡提示卡×${milestone.hintCards}`);
+      }
+
+      if (milestone.tripleExpCards) {
+        rewards.push({ type: 'item', id: 'item_triple_exp', count: milestone.tripleExpCards });
+        descParts.push(`🌟三倍经验卡×${milestone.tripleExpCards}`);
+      }
+
+      if (milestone.luckyCharms) {
+        rewards.push({ type: 'item', id: 'item_luck_boost', count: milestone.luckyCharms });
+        descParts.push(`🍀幸运符×${milestone.luckyCharms}`);
+      }
+
+      if (milestone.levelUpTickets) {
+        rewards.push({ type: 'item', id: 'item_level_up', count: milestone.levelUpTickets });
+        descParts.push(`🚀等级直升券×${milestone.levelUpTickets}`);
+      }
+
+      if (milestone.vipDays) {
+        const vipMultiplier = milestone.vipMultiplier || config.exp.vipDefaultMultiplier;
+        rewards.push({ type: 'vip', days: milestone.vipDays, expBonus: vipMultiplier });
+        descParts.push(`💎${milestone.vipDays}天月卡`);
+      }
+
+      result.push({
+        level,
+        rewards,
+        description: '获得' + descParts.join(' + ')
+      });
+    }
+
+    result.sort((a, b) => a.level - b.level);
+    return result;
   }
 
   // 获取用户星钻余额
@@ -2093,7 +2101,7 @@ class AccountManager {
       // 添加交易记录到独立集合
       const transactionRecords = await this.getTransactionRecords(accountId);
       transactionRecords.transactions.push({
-        id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+        id: Date.now().toString(36) + Math.random().toString(36).substr(2, config.security.randomIdSuffixLength),
         type: 'earn',
         amount,
         balance: newBalance,
@@ -2134,7 +2142,7 @@ class AccountManager {
       // 添加交易记录到独立集合
       const transactionRecords = await this.getTransactionRecords(accountId);
       transactionRecords.transactions.push({
-        id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+        id: Date.now().toString(36) + Math.random().toString(36).substr(2, config.security.randomIdSuffixLength),
         type: 'spend',
         amount,
         balance: newBalance,
@@ -2154,7 +2162,7 @@ class AccountManager {
   }
 
   // 获取星钻交易记录
-  async getCurrencyTransactions(accountId, limit = 50) {
+  async getCurrencyTransactions(accountId, limit = config.validation.defaultTransactionQueryLimit) {
     try {
       const [account, transactionRecords] = await Promise.all([
         dataStore.findOne('accounts', { 'account.id': accountId }),
@@ -2173,7 +2181,7 @@ class AccountManager {
   }
 
   // 获取经验记录
-  async getExpTransactions(accountId, limit = 50) {
+  async getExpTransactions(accountId, limit = config.exp.defaultQueryLimit) {
     try {
       const records = await this.getExpRecords(accountId);
       const transactions = (records.transactions || []).slice(-limit).reverse();
@@ -2290,7 +2298,7 @@ class AccountManager {
    *   - 每场胜利补偿10星钻
    */
   async compensateOldPlayers() {
-    const BASE_BONUS = 500;
+    const BASE_BONUS = config.compensation.newPlayerGiftCoins;
 
     try {
       const accounts = await dataStore.read('accounts');
@@ -2318,11 +2326,11 @@ class AccountManager {
           const totalWins = playerStats.totalWins || 0;
 
           // 老玩家额外部分
-          const expComp = Math.max(0, Math.floor(totalExp / 10));
-          const levelComp = (level - 1) * 50;
-          const achieveComp = achievementCount * 50;
-          const gameComp = totalGames * 5;
-          const winComp = totalWins * 10;
+          const expComp = Math.max(0, Math.floor(totalExp / config.compensation.expToCoinRate));
+          const levelComp = (level - 1) * config.compensation.perLevelCoins;
+          const achieveComp = achievementCount * config.compensation.perAchievementCoins;
+          const gameComp = totalGames * config.compensation.perGameCoins;
+          const winComp = totalWins * config.compensation.perWinCoins;
           const veteranTotal = expComp + levelComp + achieveComp + gameComp + winComp;
 
           // 总发放 = 固定礼包 + 老玩家额外
@@ -2352,7 +2360,7 @@ class AccountManager {
           // 交易记录
           const records = await this.getTransactionRecords(accountId);
           records.transactions.push({
-            id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+            id: Date.now().toString(36) + Math.random().toString(36).substr(2, config.security.randomIdSuffixLength),
             type: 'earn', amount: total, balance: account.currency.starCoins,
             source: 'compensation', reason, timestamp: Date.now()
           });
@@ -2650,13 +2658,12 @@ class AccountManager {
   /**
    * 根据等级取动态价格系数（不同等级区间用不同系数）
    */
-  getPriceRatio(currentLevel) {
-    return (level) => {
-      if (level <= 10) return 0.5;
-      if (level <= 25) return 0.35;
-      if (level <= 40) return 0.25;
-      return 0.18;
-    };
+  getPriceRatio(level) {
+    const lr = config.dynamicPricing.levelRatios;
+    if (level <= lr.low.maxLevel) return lr.low.ratio;
+    if (level <= lr.mid.maxLevel) return lr.mid.ratio;
+    if (level <= lr.high.maxLevel) return lr.high.ratio;
+    return lr.max.ratio;
   }
 
   /**
@@ -2670,10 +2677,10 @@ class AccountManager {
     const nextLevel = calcLevel + 1;
     const expNeeded = this.getExpForLevel(nextLevel);
 
-    const maxRatio = itemConfig.maxRatio || 0.5;
-    const minRatio = itemConfig.minRatio || 0.18;
+    const maxRatio = itemConfig.maxRatio || config.dynamicPricing.maxRatio;
+    const minRatio = itemConfig.minRatio || config.dynamicPricing.minRatio;
     const t = Math.min(1, (calcLevel - 1) / Math.max(1, maxLevel - 1));
-    const power = itemConfig.ratioPower || 0.7;
+    const power = itemConfig.ratioPower || config.dynamicPricing.curveExponent;
     const adjustedT = Math.pow(t, power);
     const ratio = maxRatio - (maxRatio - minRatio) * adjustedT;
 
@@ -2779,7 +2786,7 @@ class AccountManager {
         if (!account.activeBuffs) account.activeBuffs = {};
         const now = Date.now();
         const existingExpire = account.activeBuffs.doubleExp || now;
-        account.activeBuffs.doubleExp = Math.max(existingExpire, now) + 60 * 60 * 1000;
+        account.activeBuffs.doubleExp = Math.max(existingExpire, now) + config.items.durations.doubleExp;
         result.message = '双倍经验卡已激活！1小时内经验翻倍';
         await this._saveAccount(userId, account);
         break;
@@ -2788,7 +2795,7 @@ class AccountManager {
         if (!account.activeBuffs) account.activeBuffs = {};
         const luckNow = Date.now();
         const existingLuckExpire = account.activeBuffs.luckBoost || luckNow;
-        account.activeBuffs.luckBoost = Math.max(existingLuckExpire, luckNow) + 60 * 60 * 1000;
+        account.activeBuffs.luckBoost = Math.max(existingLuckExpire, luckNow) + config.items.durations.luckyCharm;
         result.message = '幸运符已激活！1小时内星钻奖励翻倍';
         await this._saveAccount(userId, account);
         break;
@@ -2797,12 +2804,12 @@ class AccountManager {
         if (!account.activeBuffs) account.activeBuffs = {};
         const tripleNow = Date.now();
         const existingTripleExpire = account.activeBuffs.tripleExp || tripleNow;
-        account.activeBuffs.tripleExp = Math.max(existingTripleExpire, tripleNow) + 60 * 60 * 1000;
+        account.activeBuffs.tripleExp = Math.max(existingTripleExpire, tripleNow) + config.items.durations.tripleExp;
         result.message = '三倍经验卡已激活！1小时内经验三倍';
         await this._saveAccount(userId, account);
         break;
       case 'item_exp_potion':
-        expToAdd = 500 * count;
+        expToAdd = config.items.effects.expPotion * count;
         eventLabel = '经验药水';
         result.message = `使用成功！获得${expToAdd}经验值`;
         break;
@@ -2837,19 +2844,19 @@ class AccountManager {
         result.message = `使用成功！获得${expToAdd}经验值`;
         break;
       case 'item_reward_exp':
-        expToAdd = 3000 * count;
+        expToAdd = config.items.effects.expPackage * count;
         eventLabel = '奖励经验包';
         result.message = `使用成功！获得${expToAdd}经验值`;
         break;
       case 'item_undo':
         if (!invStore.undoCount) invStore.undoCount = 0;
-        invStore.undoCount += 3 * count;
-        result.message = `使用成功！获得${3 * count}次悔棋次数`;
+        invStore.undoCount += config.items.effects.undoCard * count;
+        result.message = `使用成功！获得${config.items.effects.undoCard * count}次悔棋次数`;
         break;
       case 'item_hint':
         if (!invStore.hintCount) invStore.hintCount = 0;
-        invStore.hintCount += 5 * count;
-        result.message = `使用成功！获得${5 * count}次提示次数`;
+        invStore.hintCount += config.items.effects.hintCard * count;
+        result.message = `使用成功！获得${config.items.effects.hintCard * count}次提示次数`;
         break;
       default:
         break;
@@ -2870,13 +2877,13 @@ class AccountManager {
       account.account.profile.level = calculatedLevel;
       const newLevel = calculatedLevel;
 
-      let currencyReward = Math.max(1, Math.floor(expToAdd / 10));
+      let currencyReward = Math.max(1, Math.floor(expToAdd / config.exp.expToCoinRatio));
       if (currencyReward > 0) {
         await this.addCurrency(userId, currencyReward, `获得${expToAdd}经验值奖励`, 'exp_reward');
       }
 
       if (newLevel > oldLevel) {
-        const levelUpCurrency = (newLevel - oldLevel) * 50;
+        const levelUpCurrency = (newLevel - oldLevel) * config.exp.levelUpCoinReward;
         await this.addCurrency(userId, levelUpCurrency, `从${oldLevel}级升到${newLevel}级奖励`, 'level_up');
       }
       await this.checkLevelRewards(userId);
@@ -2884,7 +2891,7 @@ class AccountManager {
       try {
         const expRecords = await this.getExpRecords(userId);
         expRecords.transactions.push({
-          id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+          id: Date.now().toString(36) + Math.random().toString(36).substr(2, config.security.randomIdSuffixLength),
           baseExp: expToAdd,
           bonusExp: 0,
           finalExp: expToAdd,
@@ -3058,9 +3065,9 @@ class AccountManager {
 
       const now = Date.now();
       const isVipActive = account.vip?.expireAt > now || account.rank === 'svip' || account.rank === 'admin';
-      const defaultSlots = 3;
+      const defaultSlots = config.avatar.defaultSlots;
       const purchasedSlots = account.cosmetics.slots || 0;
-      const vipBonusSlots = isVipActive ? 10 : 0;
+      const vipBonusSlots = isVipActive ? config.avatar.vipBonusSlots : 0;
       const maxAvatars = defaultSlots + purchasedSlots + vipBonusSlots;
 
       const avatarDir = path.join(__dirname, '..', '..', 'data', 'cosmetics', 'avatars', userId);
@@ -3287,7 +3294,7 @@ class AccountManager {
 
     // 3. 当前进程 PATH 中是否已有
     try {
-      execFileSync('ffmpeg', ['-version'], { stdio: 'ignore', timeout: 2000 });
+      execFileSync('ffmpeg', ['-version'], { stdio: 'ignore', timeout: config.ffmpeg.versionCheckTimeout });
       this._ffmpegPathCache = 'ffmpeg';
       return 'ffmpeg';
     } catch (e) { /* PATH 中找不到 */ }
@@ -3297,12 +3304,12 @@ class AccountManager {
       const { execSync } = require('child_process');
       let freshPathDirs = [];
       try {
-        const sysOut = execSync('reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path', { encoding: 'utf8', timeout: 3000 });
+        const sysOut = execSync('reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path', { encoding: 'utf8', timeout: config.ffmpeg.registryQueryTimeout });
         const sysMatch = sysOut.match(/Path\s+(?:REG_SZ|REG_EXPAND_SZ|REG_MULTI_SZ)\s+([\s\S]+?)(?:\r?\n\r?\n|$)/i);
         if (sysMatch) freshPathDirs.push(...sysMatch[1].trim().split(';').filter(Boolean));
       } catch (e) { /* 继续 */ }
       try {
-        const userOut = execSync('reg query "HKCU\\Environment" /v Path', { encoding: 'utf8', timeout: 3000 });
+        const userOut = execSync('reg query "HKCU\\Environment" /v Path', { encoding: 'utf8', timeout: config.ffmpeg.registryQueryTimeout });
         const userMatch = userOut.match(/Path\s+(?:REG_SZ|REG_EXPAND_SZ|REG_MULTI_SZ)\s+([\s\S]+?)(?:\r?\n\r?\n|$)/i);
         if (userMatch) freshPathDirs.push(...userMatch[1].trim().split(';').filter(Boolean));
       } catch (e) { /* 继续 */ }
@@ -3960,7 +3967,7 @@ class AccountManager {
         try {
           const transactionRecords = await this.getTransactionRecords(userId);
           transactionRecords.transactions.push({
-            id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+            id: Date.now().toString(36) + Math.random().toString(36).substr(2, config.security.randomIdSuffixLength),
             type: 'earn',
             amount: mail.starCoins,
             balance: account.currency.starCoins,
@@ -3990,7 +3997,7 @@ class AccountManager {
         try {
           const expRecords = await this.getExpRecords(userId);
           expRecords.transactions.push({
-            id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+            id: Date.now().toString(36) + Math.random().toString(36).substr(2, config.security.randomIdSuffixLength),
             baseExp: mail.exp,
             bonusExp: 0,
             finalExp: mail.exp,
@@ -4148,7 +4155,7 @@ class AccountManager {
         try {
           const transactionRecords = await this.getTransactionRecords(userId);
           transactionRecords.transactions.push({
-            id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+            id: Date.now().toString(36) + Math.random().toString(36).substr(2, config.security.randomIdSuffixLength),
             type: 'earn',
             amount: starCoinsToAdd,
             balance: account.currency.starCoins,
@@ -4177,7 +4184,7 @@ class AccountManager {
         try {
           const expRecords = await this.getExpRecords(userId);
           expRecords.transactions.push({
-            id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+            id: Date.now().toString(36) + Math.random().toString(36).substr(2, config.security.randomIdSuffixLength),
             baseExp: expToAdd,
             bonusExp: 0,
             finalExp: expToAdd,

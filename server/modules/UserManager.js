@@ -16,7 +16,7 @@ class UserManager {
     // 断开重连定时器：accountId -> timeoutId
     this.disconnectTimers = new Map();
     // 重连宽限期（毫秒）
-    this.RECONNECT_GRACE_PERIOD = 30000;
+    this.RECONNECT_GRACE_PERIOD = config.session.reconnectGracePeriod;
     // 系统统计
     this.stats = {
       totalConnections: 0,
@@ -45,12 +45,12 @@ class UserManager {
 
   // 生成用户ID
   generateUserId() {
-    return crypto.randomBytes(4).toString('hex'); // 8位十六进制
+    return crypto.randomBytes(config.security.guestUserIdBytes).toString('hex'); // 8位十六进制
   }
 
   // 生成会话token
   generateToken() {
-    return crypto.randomBytes(16).toString('hex'); // 32位十六进制
+    return crypto.randomBytes(config.security.sessionTokenBytes).toString('hex'); // 32位十六进制
   }
 
   // 处理用户连接 - 只负责连接管理，不自动分配ID
@@ -592,7 +592,7 @@ class UserManager {
         const inactivityTime = now - userSession.lastActivity;
 
         // 第一阶段：15分钟无活动，发送警告
-        if (inactivityTime > 15 * 60 * 1000 && !userSession.warningSent) {
+        if (inactivityTime > config.session.inactiveWarningTime && !userSession.warningSent) {
           warningUsers.push({ accountId, userSession, inactivityTime });
         }
 
@@ -634,7 +634,7 @@ class UserManager {
             this.kickUser(accountId, '长时间未活动');
             logger.info('断开不活跃用户', { accountId, inactivityTime: Math.floor((Date.now() - userSession.lastActivity) / 1000 / 60) });
           }
-        }, 30000); // 30秒后断开
+        }, config.session.inactiveKickDelay); // 30秒后断开
       }
     }
 

@@ -31,11 +31,11 @@ const io = socketIo(server, {
     methods: ['GET', 'POST'],
     credentials: true
   },
-  pingTimeout: 120000,
-  pingInterval: 30000,
+  pingTimeout: config.server.socket.pingTimeout,
+  pingInterval: config.server.socket.pingInterval,
   transports: ['websocket', 'polling'],
-  upgradeTimeout: 10000,
-  maxHttpBufferSize: 1e6,
+  upgradeTimeout: config.server.socket.upgradeTimeout,
+  maxHttpBufferSize: config.server.socket.maxHttpBufferSize,
   // 认证中间件
   allowRequest: (req, callback) => {
     const token = req._query.token || (req.headers.authorization?.replace('Bearer ', ''));
@@ -46,8 +46,8 @@ const io = socketIo(server, {
 
 // 中间件
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: config.server.http.bodyLimit }));
+app.use(express.urlencoded({ extended: true, limit: config.server.http.bodyLimit }));
 
 // Token认证中间件
 function authenticateToken(req, res, next) {
@@ -127,7 +127,7 @@ app.post('/api/shop/buy', async (req, res) => {
     if (!userId || !itemId) {
       return res.status(400).json({ success: false, message: '参数错误' });
     }
-    if (quantity < 1 || quantity > 999) {
+    if (quantity < 1 || quantity > config.shop.maxPurchaseQuantity) {
       return res.status(400).json({ success: false, message: '数量不合法' });
     }
     const result = await shopManager.purchaseItem(userId, itemId, quantity, accountManager);
@@ -498,7 +498,7 @@ app.get('/api/accounts/search', authenticateToken, async (req, res) => {
         message: '请提供搜索关键词'
       });
     }
-    const accounts = await accountManager.getAllAccounts(100, 0);
+    const accounts = await accountManager.getAllAccounts(config.validation.accountSearchLimit, 0);
     const filtered = accounts.filter(a =>
       a.username?.toLowerCase().includes(keyword.toLowerCase()) ||
       a.nickname?.toLowerCase().includes(keyword.toLowerCase()) ||
@@ -783,7 +783,7 @@ app.get('/api/users/search', async (req, res) => {
         message: '请提供搜索关键词'
       });
     }
-    const accounts = await accountManager.getAllAccounts(100, 0);
+    const accounts = await accountManager.getAllAccounts(config.validation.accountSearchLimit, 0);
     const filtered = accounts.filter(a =>
       a.username?.toLowerCase().includes(keyword.toLowerCase()) ||
       a.nickname?.toLowerCase().includes(keyword.toLowerCase()) ||
@@ -2743,12 +2743,12 @@ io.on('connection', (socket) => {
 
           // 更新游戏统计数据（用于排行榜）
           // 贪吃蛇游戏：如果分数大于100，则认为是获胜
-          const result = score > 100 ? 'win' : 'loss';
+          const result = score > config.snakeRewards.winScoreThreshold ? 'win' : 'loss';
           await gameManager.accountManager.updateGameStats(accountId, result, 'snake', false, null, null);
 
           // 给予经验值奖励（基于分数）
           if (gameManager.accountManager) {
-            const expReward = 50 + Math.floor((score || 0) / 2);
+            const expReward = config.snakeRewards.baseExp + Math.floor((score || 0) / config.snakeRewards.expPerScoreDivisor);
             if (expReward > 0) {
               const expResult = await gameManager.accountManager.addExp(accountId, expReward);
               if (expResult.success) {
@@ -2769,7 +2769,7 @@ io.on('connection', (socket) => {
         const postAccount = await gameManager.accountManager.getAccount(accountId);
         if (postAccount) {
           const snakeLevel = postAccount.account?.profile?.level || 1;
-          const isWinner = score > 100;
+          const isWinner = score > config.snakeRewards.winScoreThreshold;
           const playedGameTypes = postAccount.games ? Object.keys(postAccount.games).filter(k => postAccount.games[k].totalGames > 0).length : 0;
 
           // 聚合所有游戏类型的连胜数据和最高分

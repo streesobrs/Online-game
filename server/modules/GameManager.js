@@ -30,7 +30,7 @@ class GameManager {
     const minutes = String(date.getMinutes()).padStart(2, '0');
     const seconds = String(date.getSeconds()).padStart(2, '0');
     const readableTime = `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
-    const randomId = Math.random().toString(36).substr(2, 9);
+    const randomId = Math.random().toString(36).substr(2, config.game.gameIdSuffixLength);
     return `${gameType}_${readableTime}_${randomId}`;
   }
 
@@ -87,7 +87,7 @@ class GameManager {
         }
         logger.matchEvent(user.accountId, '匹配超时', { gameType });
       }
-    }, 30000);
+    }, config.gameTimeouts.matchTimeout);
 
     // 检查匹配
     this.checkMatch(gameType, io);
@@ -355,7 +355,7 @@ class GameManager {
           player1Score: 0,
           player2Score: 0,
           foods: foods,
-          gameTimeLeft: 120,
+          gameTimeLeft: config.gameTimeouts.snakeGameDuration,
           startTime: Date.now()
         });
         // 保存回io对象
@@ -369,7 +369,7 @@ class GameManager {
               snake: [{ x: 24, y: 15 }],
               score: 0,
               foods: foods,
-              gameTimeLeft: 120
+              gameTimeLeft: config.gameTimeouts.snakeGameDuration
             });
           }
 
@@ -379,10 +379,10 @@ class GameManager {
               snake: [{ x: 5, y: 15 }],
               score: 0,
               foods: foods,
-              gameTimeLeft: 120
+              gameTimeLeft: config.gameTimeouts.snakeGameDuration
             });
           }
-        }, 500);
+        }, config.gameTimeouts.snakeSyncDelay);
       }
 
       if (socket1) {
@@ -394,7 +394,7 @@ class GameManager {
           snake: [{ x: 5, y: 15 }],
           opponentSnake: [{ x: 24, y: 15 }],
           foods,
-          gameTimeLeft: 120
+          gameTimeLeft: config.gameTimeouts.snakeGameDuration
         });
       }
 
@@ -407,7 +407,7 @@ class GameManager {
           snake: [{ x: 24, y: 15 }],
           opponentSnake: [{ x: 5, y: 15 }],
           foods,
-          gameTimeLeft: 120
+          gameTimeLeft: config.gameTimeouts.snakeGameDuration
         });
       }
 
@@ -461,7 +461,7 @@ class GameManager {
       }
 
       // 检查长时间未移动
-      if (now - game.lastMoveTime > 300000) { // 5分钟
+      if (now - game.lastMoveTime > config.gameTimeouts.inactivityWarn) { // 5分钟
         // 通知玩家
         const socket1 = this.userManager.getSocketByAccountId(game.player1);
         const socket2 = this.userManager.getSocketByAccountId(game.player2);
@@ -469,7 +469,7 @@ class GameManager {
         if (socket1) socket1.emit('game_warning', { message: '长时间未移动，游戏即将结束' });
         if (socket2) socket2.emit('game_warning', { message: '长时间未移动，游戏即将结束' });
       }
-    }, 30000); // 每30秒检查一次
+    }, config.gameTimeouts.timerCheckInterval); // 每30秒检查一次
 
     this.gameTimers.set(gameId, timer);
   }
@@ -635,7 +635,7 @@ class GameManager {
           delete game.pendingResetRequest;
           delete game.resetTimeout;
         }
-      }, 30000);
+      }, config.gameTimeouts.resetRequestTimeout);
 
       return true;
     }
@@ -919,11 +919,11 @@ class GameManager {
           // 先给予经验值奖励（更新等级），再检查成就
           let expReward = 0;
           if (playerResult === 'win') {
-            expReward = 300;
+            expReward = config.gameRewards.pvp.win;
           } else if (playerResult === 'draw') {
-            expReward = 150;
+            expReward = config.gameRewards.pvp.draw;
           } else {
-            expReward = 75;
+            expReward = config.gameRewards.pvp.lose;
           }
 
           if (expReward > 0) {
@@ -982,8 +982,8 @@ class GameManager {
             maxStreak: bestMaxStreak,
             result: playerResult,
             silentWin: isWinner && !playerChatted,
-            quickGame: gameDuration <= 5 * 60 * 1000,
-            slowGame: gameDuration >= 15 * 60 * 1000,
+            quickGame: gameDuration <= config.gameRewards.quickGameThreshold,
+            slowGame: gameDuration >= config.gameRewards.slowGameThreshold,
             gameDuration: gameDuration / 60000,
             maxMoves: game.moves ? game.moves.length : 0,
             allGameTypes: postExpAccount.games && Object.keys(postExpAccount.games).filter(k => postExpAccount.games[k].totalGames > 0).length >= 3,
@@ -1083,7 +1083,7 @@ class GameManager {
         case 'chinese-chess':
         case 'go':
           // 棋类游戏特有字段
-          record.boardSize = game.boardSize || 15; // 棋盘大小
+          record.boardSize = game.boardSize || config.gameTimeouts.defaultBoardSize; // 棋盘大小
           record.gameMode = game.gameMode || 'pvp'; // 游戏模式：pvp或ai
           record.difficulty = game.difficulty || 'normal'; // AI难度（如果是AI对战）
           record.winReason = game.winReason || 'normal'; // 获胜原因
@@ -1186,11 +1186,11 @@ class GameManager {
           const moveCount = game.moves.length;
 
           // 非正常结算逻辑
-          if (moveCount < 5 && gameDuration < 60000) {
+          if (moveCount < config.gameTimeouts.earlyGameAbortMoves && gameDuration < config.gameTimeouts.earlyGameAbortTime) {
             gameResult = 'invalid';
             winnerId = null;
             reason = '游戏刚开始，判定为无效游戏';
-          } else if (moveCount < 10 && gameDuration < 120000) {
+          } else if (moveCount < config.gameTimeouts.quickDrawMoves && gameDuration < config.gameTimeouts.quickDrawTime) {
             gameResult = 'draw';
             winnerId = null;
             reason = '游戏进行中，判定为平局';
@@ -1313,7 +1313,7 @@ class GameManager {
                 }
               }
             }
-          }, 30000);
+          }, config.session.reconnectGracePeriod);
         }
         return;
       }
@@ -1343,7 +1343,7 @@ class GameManager {
               this.endGame(game.gameId, 'resign', io, winner, '对手断开连接');
             }
           }
-        }, 30000); // 30秒延迟
+        }, config.session.reconnectGracePeriod); // 30秒延迟
       }
     }
   }
@@ -1950,18 +1950,18 @@ class GameManager {
       // 根据结果给予经验值
       let expReward = 0;
       if (result === 'win') {
-        expReward = 200; // 胜利奖励
+        expReward = config.gameRewards.ai.win; // 胜利奖励
       } else if (result === 'draw') {
-        expReward = 100; // 平局奖励
+        expReward = config.gameRewards.ai.draw; // 平局奖励
       } else {
-        expReward = 50; // 失败安慰奖
+        expReward = config.gameRewards.ai.lose; // 失败安慰奖
       }
 
       // 根据难度调整
       if (aiGame.difficulty === 'hard') {
-        expReward = Math.floor(expReward * 2.0);
+        expReward = Math.floor(expReward * config.gameRewards.aiDifficultyMultiplier.hard);
       } else if (aiGame.difficulty === 'medium') {
-        expReward = Math.floor(expReward * 1.5);
+        expReward = Math.floor(expReward * config.gameRewards.aiDifficultyMultiplier.medium);
       }
 
       // 添加经验值
@@ -2057,7 +2057,7 @@ class GameManager {
         this.aiGames.delete(accountId);
         logger.info('清理已结束的AI游戏', { accountId, gameStartTime });
       }
-    }, 5000);
+    }, config.session.aiGameCleanupDelay);
   }
 
   // 初始化棋盘
