@@ -3381,6 +3381,25 @@
 <body>
   <div id="theme-bg"></div>
 
+  <!-- 维护模式横幅 -->
+  <div id="maintenance-banner" class="maintenance-banner" style="display:none;">
+    <div class="maintenance-banner-inner">
+      <span class="maintenance-icon" id="maintenance-banner-icon">🔧</span>
+      <span class="maintenance-text" id="maintenance-banner-text">系统维护中，请稍后再试</span>
+      <span class="maintenance-countdown" id="maintenance-countdown" style="display:none;"></span>
+      <span class="maintenance-pulse"></span>
+    </div>
+  </div>
+  <!-- 维护预告横幅（黄色） -->
+  <div id="maintenance-schedule-banner" class="maintenance-banner maintenance-schedule" style="display:none;">
+    <div class="maintenance-banner-inner">
+      <span class="maintenance-icon">⏰</span>
+      <span class="maintenance-text" id="maintenance-schedule-text">系统即将维护</span>
+      <span class="maintenance-countdown" id="maintenance-schedule-countdown"></span>
+      <span class="maintenance-pulse schedule"></span>
+    </div>
+  </div>
+
   <!-- 断开连接提示框 -->
   <div id="disconnect-warning" class="disconnect-warning" style="display: none;">
     <div class="disconnect-content">
@@ -5018,6 +5037,186 @@
       return div.innerHTML;
     }
 
+    // 维护模式相关状态
+    let maintenanceState = {
+      active: false,
+      endTime: 0,
+      message: '',
+      countdownTimer: null,
+      scheduleActive: false,
+      scheduleStartTime: 0,
+      scheduleMessage: '',
+      scheduleTimer: null,
+      scheduleCountdownTimer: null
+    };
+
+    function formatTimeRemaining(ms) {
+      if (ms <= 0) return '00:00';
+      const totalSec = Math.floor(ms / 1000);
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      if (h > 0) return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function formatMinutesRemaining(min) {
+      if (min <= 0) return '即将开始';
+      if (min >= 60) {
+        const h = Math.floor(min / 60);
+        const m = min % 60;
+        return m > 0 ? `${h}小时${m}分钟` : `${h}小时`;
+      }
+      return `${min}分钟`;
+    }
+
+    // 维护模式横幅控制
+    function showMaintenanceBanner(data = {}) {
+      const banner = document.getElementById('maintenance-banner');
+      const textEl = document.getElementById('maintenance-banner-text');
+      const countdownEl = document.getElementById('maintenance-countdown');
+      const iconEl = document.getElementById('maintenance-banner-icon');
+      const message = data.message || '系统维护中，请稍后再试';
+      const endTime = data.endTime || 0;
+
+      if (textEl) textEl.textContent = message;
+      if (iconEl) iconEl.textContent = data.icon || '🔧';
+      if (banner) banner.style.display = 'block';
+      document.body.classList.add('maintenance-active');
+
+      // 隐藏预告横幅（正式维护开始）
+      hideScheduleBanner();
+
+      // 更新状态
+      maintenanceState.active = true;
+      maintenanceState.endTime = endTime;
+      maintenanceState.message = message;
+
+      // 倒计时
+      if (maintenanceState.countdownTimer) {
+        clearInterval(maintenanceState.countdownTimer);
+        maintenanceState.countdownTimer = null;
+      }
+
+      if (countdownEl) {
+        if (endTime && endTime > Date.now()) {
+          countdownEl.style.display = 'inline-block';
+          const updateCountdown = () => {
+            const remaining = endTime - Date.now();
+            if (remaining <= 0) {
+              countdownEl.textContent = '即将完成';
+              clearInterval(maintenanceState.countdownTimer);
+              maintenanceState.countdownTimer = null;
+              return;
+            }
+            countdownEl.textContent = '剩余 ' + formatTimeRemaining(remaining);
+          };
+          updateCountdown();
+          maintenanceState.countdownTimer = setInterval(updateCountdown, 1000);
+        } else {
+          countdownEl.style.display = 'none';
+        }
+      }
+
+      // 禁用游戏按钮
+      if (data.blockNewGames !== false) {
+        disableGameButtons(true);
+      }
+    }
+
+    function hideMaintenanceBanner() {
+      const banner = document.getElementById('maintenance-banner');
+      if (banner) banner.style.display = 'none';
+      document.body.classList.remove('maintenance-active');
+      maintenanceState.active = false;
+      maintenanceState.endTime = 0;
+
+      if (maintenanceState.countdownTimer) {
+        clearInterval(maintenanceState.countdownTimer);
+        maintenanceState.countdownTimer = null;
+      }
+
+      const countdownEl = document.getElementById('maintenance-countdown');
+      if (countdownEl) countdownEl.style.display = 'none';
+
+      disableGameButtons(false);
+    }
+
+    // 维护预告横幅
+    function showScheduleBanner(data = {}) {
+      const banner = document.getElementById('maintenance-schedule-banner');
+      const textEl = document.getElementById('maintenance-schedule-text');
+      const countdownEl = document.getElementById('maintenance-schedule-countdown');
+      const startTime = data.startTime || 0;
+      const message = data.message || '系统即将维护';
+      const noticeMinutes = data.noticeMinutes || 0;
+
+      if (textEl) textEl.textContent = `⏰ 系统即将维护：${message}，预计${formatMinutesRemaining(noticeMinutes)}后开始`;
+      if (banner) banner.style.display = 'block';
+      document.body.classList.add('maintenance-schedule-active');
+
+      maintenanceState.scheduleActive = true;
+      maintenanceState.scheduleStartTime = startTime;
+      maintenanceState.scheduleMessage = message;
+
+      if (maintenanceState.scheduleCountdownTimer) {
+        clearInterval(maintenanceState.scheduleCountdownTimer);
+      }
+
+      if (countdownEl && startTime > Date.now()) {
+        const updateScheduleCountdown = () => {
+          const remaining = startTime - Date.now();
+          if (remaining <= 0) {
+            countdownEl.textContent = '维护开始';
+            clearInterval(maintenanceState.scheduleCountdownTimer);
+            return;
+          }
+          countdownEl.textContent = formatTimeRemaining(remaining);
+        };
+        updateScheduleCountdown();
+        maintenanceState.scheduleCountdownTimer = setInterval(updateScheduleCountdown, 1000);
+      }
+    }
+
+    function hideScheduleBanner() {
+      const banner = document.getElementById('maintenance-schedule-banner');
+      if (banner) banner.style.display = 'none';
+      document.body.classList.remove('maintenance-schedule-active');
+      maintenanceState.scheduleActive = false;
+
+      if (maintenanceState.scheduleCountdownTimer) {
+        clearInterval(maintenanceState.scheduleCountdownTimer);
+        maintenanceState.scheduleCountdownTimer = null;
+      }
+    }
+
+    function disableGameButtons(disabled, reason = '系统维护中，暂时无法开始游戏') {
+      // 禁用/启用游戏开始和匹配按钮
+      const selectors = [
+        '#match-btn', '#ai-match-btn', '#create-room-btn',
+        '#gobang-ai-btn', '#go-ai-btn', '#chess-ai-btn', '#snake-ai-btn',
+        '.game-start-btn', '.match-start-btn', '[data-action="start-game"]',
+        'button[onclick*="startMatch"]', 'button[onclick*="startAI"]'
+      ];
+      selectors.forEach(sel => {
+        document.querySelectorAll(sel).forEach(btn => {
+          btn.disabled = disabled;
+          if (disabled) {
+            btn.dataset.origTitle = btn.title || '';
+            btn.title = reason;
+            btn.style.opacity = '0.5';
+            btn.style.cursor = 'not-allowed';
+            btn.style.pointerEvents = 'none';
+          } else {
+            btn.title = btn.dataset.origTitle || '';
+            btn.style.opacity = '';
+            btn.style.cursor = '';
+            btn.style.pointerEvents = '';
+          }
+        });
+      });
+    }
+
     // 统一错误提示函数
     function showToast(message, type = 'info', duration = 3000) {
       // 移除现有的提示
@@ -5363,6 +5562,11 @@
         // 保存用户ID到localStorage
         saveUserId(accountId);
         initUserStatus();
+
+        // 检查维护模式状态
+        if (data.maintenance && data.maintenance.enabled) {
+          showMaintenanceBanner(data.maintenance);
+        }
 
         // 如果有保存的token但没有恢复登录（currentAccount为null），说明token失效
         const hasToken = !!localStorage.getItem('userToken');
@@ -5885,8 +6089,70 @@
       // 维护模式通知
       socket.on('maintenance_notice', (data) => {
         if (data.enabled) {
-          showBroadcast(data.message, '系统维护', data.timestamp);
+          showMaintenanceBanner(data);
+          showBroadcast(data.message, '🔧 系统维护', data.timestamp);
+        } else {
+          hideMaintenanceBanner();
+          hideScheduleBanner();
+          showToast('✅ 系统维护已结束，所有功能已恢复', 'success', 4000);
         }
+      });
+
+      // 维护预告通知
+      socket.on('maintenance_scheduled', (data) => {
+        if (data.cancelled) {
+          hideScheduleBanner();
+          showToast('维护计划已取消', 'info');
+          return;
+        }
+        showScheduleBanner(data);
+        showBroadcast(`⏰ 系统将于${formatMinutesRemaining(data.noticeMinutes)}后进入维护：${data.message}`, '系统公告', Date.now());
+      });
+
+      // 维护倒计时更新（每分钟预告）
+      socket.on('maintenance_countdown', (data) => {
+        const textEl = document.getElementById('maintenance-schedule-text');
+        if (textEl) {
+          textEl.textContent = `⏰ 系统即将维护：${data.message}，${formatMinutesRemaining(data.remainingMinutes)}后开始`;
+        }
+        // 最后1分钟用红色横幅警告
+        if (data.remainingMinutes <= 1) {
+          const banner = document.getElementById('maintenance-schedule-banner');
+          if (banner) {
+            banner.style.background = 'linear-gradient(90deg, #dc2626, #ef4444, #dc2626)';
+            banner.style.backgroundSize = '200% 100%';
+            banner.style.animation = 'maintenanceShimmer 1.5s linear infinite';
+          }
+        }
+      });
+
+      // 维护模式操作被拦截
+      socket.on('maintenance_blocked', (data) => {
+        const actionMap = {
+          game: '游戏功能暂时不可用',
+          match: '匹配功能暂时不可用',
+          chat: '聊天功能暂时不可用',
+          shop: '商城功能暂时不可用',
+          purchase: '购买功能暂时不可用',
+          mail: '邮件功能暂时不可用',
+          register: '注册功能暂时不可用',
+          profile: '资料修改暂时不可用'
+        };
+        const actionName = actionMap[data.blockedAction] || '该功能暂时不可用';
+        let msg = data.message || `系统维护中，${actionName}`;
+        if (data.endTime && data.endTime > Date.now()) {
+          const remaining = Math.ceil((data.endTime - Date.now()) / 60000);
+          msg += `（预计${remaining}分钟后恢复）`;
+        }
+        showToast(msg, 'warning', 4000);
+      });
+
+      // 维护模式被踢出
+      socket.on('maintenance_kick', (data) => {
+        showBroadcast(data.message || '服务器维护中，连接将被断开', '🔧 系统维护');
+        setTimeout(() => {
+          if (socket.connected) socket.disconnect();
+        }, 2000);
       });
 
       // 管理员消息
@@ -13502,6 +13768,140 @@
         repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(0, 0, 0, 0.4) 27px, rgba(0, 0, 0, 0.4) 28px);
       pointer-events: none;
       z-index: 1;
+    }
+
+    /* 维护模式横幅 */
+    .maintenance-banner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 99999;
+      background: linear-gradient(90deg, #dc2626, #ef4444, #dc2626);
+      background-size: 200% 100%;
+      animation: maintenanceShimmer 3s linear infinite;
+      box-shadow: 0 4px 20px rgba(220, 38, 38, 0.5);
+    }
+
+    @keyframes maintenanceShimmer {
+      0% {
+        background-position: 200% 0;
+      }
+
+      100% {
+        background-position: -200% 0;
+      }
+    }
+
+    .maintenance-banner-inner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 10px 20px;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    .maintenance-icon {
+      font-size: 20px;
+      animation: maintenanceSpin 3s linear infinite;
+    }
+
+    @keyframes maintenanceSpin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    .maintenance-pulse {
+      width: 10px;
+      height: 10px;
+      background: #fff;
+      border-radius: 50%;
+      animation: maintenancePulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes maintenancePulse {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: 0.5;
+        transform: scale(0.7);
+      }
+    }
+
+    .maintenance-countdown {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      min-width: 60px;
+      text-align: center;
+    }
+
+    /* 维护预告横幅（黄色） */
+    .maintenance-banner.maintenance-schedule {
+      background: linear-gradient(90deg, #d97706, #f59e0b, #d97706);
+      background-size: 200% 100%;
+      box-shadow: 0 4px 20px rgba(217, 119, 6, 0.5);
+      animation: maintenanceShimmer 3s linear infinite;
+    }
+
+    .maintenance-banner.maintenance-schedule .maintenance-icon {
+      animation: none;
+    }
+
+    .maintenance-pulse.schedule {
+      background: #fef3c7;
+      animation: maintenancePulse 1s ease-in-out infinite;
+    }
+
+    body.maintenance-schedule-active {
+      padding-top: 44px;
+    }
+
+    body.maintenance-active.maintenance-schedule-active {
+      padding-top: 88px;
+    }
+
+    body.maintenance-active {
+      padding-top: 44px;
+    }
+
+    body.maintenance-active .maintenance-banner:not(.maintenance-schedule) {
+      display: block !important;
+    }
+
+    body.maintenance-schedule-active .maintenance-banner.maintenance-schedule {
+      display: block !important;
+    }
+
+    /* 维护时调整sticky导航栏位置，避免被横幅遮挡 */
+    body.maintenance-active .account-bar {
+      top: 54px;
+    }
+
+    body.maintenance-schedule-active .account-bar {
+      top: 54px;
+    }
+
+    body.maintenance-active.maintenance-schedule-active .account-bar {
+      top: 98px;
     }
 
     /* 断开连接提示框样式 */

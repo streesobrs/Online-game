@@ -115,11 +115,36 @@ function consoleOutput(level, message, meta = {}) {
 }
 
 // 日志对象
+const _hooks = [];
+
+function emitHook(level, message, meta) {
+  const entry = {
+    timestamp: Date.now(),
+    timeStr: getTimestamp(),
+    level,
+    message,
+    meta: Object.keys(meta).length > 0 ? meta : undefined
+  };
+  for (const hook of _hooks) {
+    try { hook(entry); } catch (e) { /* 钩子错误不影响日志 */ }
+  }
+}
+
 const logger = {
+  // 添加日志监听钩子，返回取消监听函数
+  onLog(fn) {
+    _hooks.push(fn);
+    return () => {
+      const idx = _hooks.indexOf(fn);
+      if (idx >= 0) _hooks.splice(idx, 1);
+    };
+  },
+
   error(message, meta = {}) {
     if (currentLevel >= LOG_LEVELS.error) {
       consoleOutput('error', message, meta);
       writeToFile('error', message, meta);
+      emitHook('error', message, meta);
     }
   },
 
@@ -127,6 +152,7 @@ const logger = {
     if (currentLevel >= LOG_LEVELS.warn) {
       consoleOutput('warn', message, meta);
       writeToFile('warn', message, meta);
+      emitHook('warn', message, meta);
     }
   },
 
@@ -134,6 +160,7 @@ const logger = {
     if (currentLevel >= LOG_LEVELS.info) {
       consoleOutput('info', message, meta);
       writeToFile('info', message, meta);
+      emitHook('info', message, meta);
     }
   },
 
@@ -141,6 +168,7 @@ const logger = {
     if (currentLevel >= LOG_LEVELS.debug) {
       consoleOutput('debug', message, meta);
       writeToFile('debug', message, meta);
+      emitHook('debug', message, meta);
     }
   },
 

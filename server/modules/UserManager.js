@@ -182,13 +182,27 @@ class UserManager {
       logger.userAction(accountId || socket.id, isReconnect ? '重连' : '连接', { ip: userSession.ip });
 
       // 构建连接响应
+      const config = require('../config');
       const connectResponse = {
         accountId: accountId,
         token: sessionToken,
         nickname: userSession.nickname,
         status: userSession.status,
         accountType: accountData.account?.type || 'anonymous',
-        stats: accountData.stats || {}
+        stats: accountData.stats || {},
+        maintenance: config.system.maintenanceEnabled ? {
+          enabled: true,
+          message: config.system.maintenanceMessage,
+          endTime: config.system.maintenanceEndTime || 0,
+          startTime: config.system.maintenanceStartTime,
+          durationMinutes: config.system.maintenanceCountdownMinutes,
+          blockNewGames: config.system.maintenanceBlockNewGames,
+          blockChat: config.system.maintenanceBlockChat,
+          blockShop: config.system.maintenanceBlockShop,
+          blockMail: config.system.maintenanceBlockMail,
+          blockRegister: config.system.maintenanceBlockRegister,
+          blockProfile: config.system.maintenanceBlockProfile
+        } : { enabled: false }
       };
 
       // 如果重连时正在游戏中，告知客户端恢复游戏状态

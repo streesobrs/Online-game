@@ -1520,11 +1520,11 @@ class GameManager {
 
     // 添加AI对战游戏
     const aiGames = Array.from(this.aiGames.values()).map(aiGame => {
-      const user = this.userManager.getUserByAccountId(aiGame.userId);
+      const user = this.userManager.getUserByAccountId(aiGame.accountId);
       return {
         gameId: aiGame.gameId,
         gameType: aiGame.gameType,
-        player1: user ? { nickname: user.nickname, userId: user.accountId } : null,
+        player1: user ? { nickname: user.nickname, userId: user.accountId } : { nickname: '未知玩家', userId: aiGame.accountId },
         player2: { nickname: 'AI', userId: 'ai' },
         status: aiGame.status === 'finished' ? 'ended' : aiGame.status,
         moveCount: aiGame.moves.length,

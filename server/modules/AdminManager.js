@@ -15,11 +15,27 @@ class AdminManager {
     this.io = io;
     this.adminSockets = new Map();
     this.activeTokens = new Map();
+    this.logBuffer = []; // 环形日志缓冲区
+    this.logListeners = new Set(); // 当前正在接收日志的管理员socket
     this.systemStats = {
       serverStartTime: Date.now(),
       totalRequests: 0,
       totalErrors: 0
     };
+
+    // 订阅logger，收集日志
+    this._unsubLogger = logger.onLog((entry) => {
+      this.logBuffer.push(entry);
+      if (this.logBuffer.length > config.log.adminBufferSize) {
+        this.logBuffer.shift();
+      }
+      // 实时转发给已订阅的管理员
+      for (const sock of this.logListeners) {
+        try {
+          sock.emit('log_entry', entry);
+        } catch (e) { /* 忽略发送失败 */ }
+      }
+    });
 
     // 清理过期Token的定时任务
     this.cleanupInterval = setInterval(() => {
@@ -372,27 +388,59 @@ class AdminManager {
     // 获取账号数据（如果账号管理器可用）
     let accounts = [];
     let accountMap = new Map();
+    let registeredTotal = 0;
+    let todayUsers = 0;
+    let totalGamesPlayed = 0;
     if (this.accountManager) {
       try {
         accounts = await this.accountManager.getAllAccounts();
+        registeredTotal = accounts.length;
         // 创建账号ID到账号对象的映射
         accounts.forEach(account => {
           accountMap.set(account.account?.id, account);
         });
+        // 今日活跃用户
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        todayUsers = accounts.filter(a => {
+          const acc = a.account || a;
+          const lastLogin = acc.lastLogin || acc.lastSeen;
+          return lastLogin && new Date(lastLogin) >= today;
+        }).length;
       } catch (err) {
         console.error('获取账号数据失败:', err);
       }
+    }
+    // 历史总对局数
+    try {
+      const allGames = await dataStore.read('games');
+      totalGamesPlayed = allGames.length;
+    } catch (err) {
+      // games数据可能不存在
     }
 
     socket.emit('admin_update', {
       timestamp: Date.now(),
       stats: {
-        users: userStats,
-        games: gameStats,
+        users: {
+          ...userStats,
+          registeredTotal,
+          todayActive: todayUsers
+        },
+        games: {
+          ...gameStats,
+          totalPlayed: totalGamesPlayed
+        },
         waiting: waitingStats,
         system: systemInfo,
         totalConnections: this.userManager.getSystemStats().totalConnections,
-        peakOnline: this.userManager.getSystemStats().peakOnline
+        peakOnline: this.userManager.getSystemStats().peakOnline,
+        // 扁平字段，兼容mini统计条
+        totalUsers: registeredTotal,
+        onlineUsers: userStats.online,
+        activeGames: gameStats.active,
+        totalGames: totalGamesPlayed,
+        todayUsers: todayUsers
       },
       users: users.map(u => {
         let muted = false;
@@ -412,6 +460,7 @@ class AdminManager {
 
         return {
           userId: u.accountId,
+          accountId: u.accountId,
           nickname: account?.nickname || u.nickname,
           status: u.status,
           gameType: u.gameType,
@@ -426,7 +475,7 @@ class AdminManager {
             expiresAt: muteInfo.expiresAt,
             remainingMinutes: muteInfo.expiresAt ? Math.max(0, Math.ceil((muteInfo.expiresAt - Date.now()) / 1000 / 60)) : null
           } : null,
-          account: account // 添加关联的账号信息
+          account: account
         };
       }),
       games: games.map(g => ({
@@ -434,6 +483,9 @@ class AdminManager {
         gameType: g.gameType,
         player1: g.player1,
         player2: g.player2,
+        player1Nickname: g.player1Nickname || (g.player1 === 'AI' ? 'AI' : null),
+        player2Nickname: g.player2Nickname || (g.player2 === 'AI' ? 'AI' : null),
+        isAIGame: g.player1 === 'AI' || g.player2 === 'AI' || g.isAIGame,
         status: g.status,
         moveCount: g.moveCount,
         startTime: g.startTime,
@@ -625,23 +677,132 @@ class AdminManager {
   }
 
   // 系统维护模式
-  setMaintenanceMode(socket, enabled, message = '系统维护中', io) {
+  setMaintenanceMode(socket, enabled, options = {}, io) {
+    const config = require('../config');
+    const runtimeConfig = require('./runtimeConfig');
+    const {
+      message = '系统维护中，请稍后再试',
+      durationMinutes = 0,
+      blockChat = config.system.maintenanceBlockChat,
+      kick = config.system.maintenanceKickOnEnable
+    } = options;
+
     if (enabled) {
-      // 通知所有用户
-      io.emit('maintenance_notice', {
+      // 更新配置
+      config.system.maintenanceEnabled = true;
+      config.system.maintenanceMessage = message;
+      config.system.maintenanceBlockChat = blockChat;
+      config.system.maintenanceKickOnEnable = kick;
+      config.system.maintenanceCountdownMinutes = durationMinutes;
+      config.system.maintenanceStartTime = Date.now();
+      config.system.maintenanceEndTime = durationMinutes > 0
+        ? Date.now() + durationMinutes * 60 * 1000
+        : 0;
+
+      // 持久化到运行时配置
+      try {
+        runtimeConfig.updateSetting('system.maintenanceEnabled', true);
+        runtimeConfig.updateSetting('system.maintenanceMessage', message);
+        runtimeConfig.updateSetting('system.maintenanceBlockChat', blockChat);
+        runtimeConfig.updateSetting('system.maintenanceKickOnEnable', kick);
+        runtimeConfig.updateSetting('system.maintenanceCountdownMinutes', durationMinutes);
+      } catch (e) { /* 忽略 */ }
+
+      // 自动退出维护定时器
+      if (this._maintenanceAutoEndTimer) {
+        clearTimeout(this._maintenanceAutoEndTimer);
+        this._maintenanceAutoEndTimer = null;
+      }
+      if (durationMinutes > 0 && config.system.maintenanceEndTime > Date.now()) {
+        const remaining = config.system.maintenanceEndTime - Date.now();
+        this._maintenanceAutoEndTimer = setTimeout(() => {
+          this.setMaintenanceMode(socket, false, {}, io);
+          logger.info('维护倒计时结束，自动退出维护模式');
+        }, remaining);
+      }
+
+      const noticeData = {
         enabled: true,
         message,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        endTime: config.system.maintenanceEndTime,
+        startTime: config.system.maintenanceStartTime,
+        durationMinutes,
+        blockNewGames: config.system.maintenanceBlockNewGames,
+        blockChat: blockChat,
+        blockShop: config.system.maintenanceBlockShop,
+        blockMail: config.system.maintenanceBlockMail,
+        blockRegister: config.system.maintenanceBlockRegister,
+        blockProfile: config.system.maintenanceBlockProfile
+      };
+
+      io.emit('maintenance_notice', noticeData);
+      logger.info('系统进入维护模式', {
+        adminSocket: socket.id, message, durationMinutes,
+        blockChat, kick,
+        endTime: config.system.maintenanceEndTime
       });
 
-      logger.info('系统进入维护模式', { adminSocket: socket.id, message });
+      // 踢出玩家
+      if (kick && this.userManager) {
+        const users = this.userManager.getAllUsers();
+        const adminSocketIds = new Set(this.adminSockets.keys());
+        let kickedCount = 0;
+        for (const user of users) {
+          if (!adminSocketIds.has(user.socketId) && user.socket) {
+            user.socket.emit('maintenance_kick', { message: '服务器维护中，您已被断开连接' });
+            setTimeout(() => user.socket.disconnect(true), 1500);
+            kickedCount++;
+          }
+        }
+        if (kickedCount > 0) {
+          logger.info('维护模式已踢出非管理员用户', { kickedCount });
+        }
+      }
+
+      // 记录维护历史
+      this._maintenanceHistory = this._maintenanceHistory || [];
+      this._maintenanceHistory.unshift({
+        startTime: Date.now(),
+        message,
+        durationMinutes,
+        triggeredBy: socket.id
+      });
+      if (this._maintenanceHistory.length > 20) this._maintenanceHistory.length = 20;
     } else {
-      io.emit('maintenance_notice', {
-        enabled: false,
-        timestamp: Date.now()
-      });
+      // 退出维护
+      config.system.maintenanceEnabled = false;
+      config.system.maintenanceEndTime = 0;
 
+      try {
+        runtimeConfig.updateSetting('system.maintenanceEnabled', false);
+      } catch (e) { /* 忽略 */ }
+
+      if (this._maintenanceAutoEndTimer) {
+        clearTimeout(this._maintenanceAutoEndTimer);
+        this._maintenanceAutoEndTimer = null;
+      }
+
+      // 预告定时器也清除
+      if (this._maintenanceScheduleTimer) {
+        clearTimeout(this._maintenanceScheduleTimer);
+        this._maintenanceScheduleTimer = null;
+      }
+      if (this._maintenanceScheduleInterval) {
+        clearInterval(this._maintenanceScheduleInterval);
+        this._maintenanceScheduleInterval = null;
+      }
+
+      // 通知所有客户端取消预告
+      io.emit('maintenance_scheduled', { cancelled: true });
+
+      io.emit('maintenance_notice', { enabled: false, timestamp: Date.now() });
       logger.info('系统退出维护模式', { adminSocket: socket.id });
+
+      // 更新历史记录
+      if (this._maintenanceHistory && this._maintenanceHistory[0]) {
+        this._maintenanceHistory[0].endTime = Date.now();
+      }
     }
 
     socket.emit('admin_action_result', {
@@ -650,6 +811,152 @@ class AdminManager {
       enabled,
       message: enabled ? '系统已进入维护模式' : '系统已退出维护模式'
     });
+  }
+
+  // 调度维护（预告模式）
+  scheduleMaintenance(socket, options, io) {
+    const {
+      message = '系统维护中，请稍后再试',
+      durationMinutes = 30,
+      noticeMinutes = 5,
+      blockChat = false,
+      kick = true
+    } = options;
+
+    // 清除之前的调度
+    if (this._maintenanceScheduleTimer) {
+      clearTimeout(this._maintenanceScheduleTimer);
+      this._maintenanceScheduleTimer = null;
+    }
+    if (this._maintenanceScheduleInterval) {
+      clearInterval(this._maintenanceScheduleInterval);
+      this._maintenanceScheduleInterval = null;
+    }
+
+    const startTime = Date.now() + noticeMinutes * 60 * 1000;
+    logger.info('维护调度已设置', { noticeMinutes, startTime: new Date(startTime).toISOString(), message });
+
+    // 发送预告通知
+    io.emit('maintenance_scheduled', {
+      message,
+      startTime,
+      durationMinutes,
+      noticeMinutes
+    });
+
+    // 设置倒计时广播（每分钟一次）
+    let remainingMinutes = noticeMinutes;
+    this._maintenanceScheduleInterval = setInterval(() => {
+      remainingMinutes--;
+      if (remainingMinutes > 0) {
+        io.emit('maintenance_countdown', {
+          remainingMinutes,
+          message
+        });
+      } else {
+        clearInterval(this._maintenanceScheduleInterval);
+        this._maintenanceScheduleInterval = null;
+      }
+    }, 60 * 1000);
+
+    // 保存触发socket id，若已断开则不发送结果（避免报错）
+    const triggerSocketId = socket.id;
+
+    // 到达时间后进入维护
+    this._maintenanceScheduleTimer = setTimeout(() => {
+      clearInterval(this._maintenanceScheduleInterval);
+      this._maintenanceScheduleInterval = null;
+      this._maintenanceScheduleTimer = null;
+
+      // 找一个仍在线的管理员socket来执行（优先使用触发者）
+      let execSocket = socket;
+      if (!io.sockets.sockets.has(triggerSocketId)) {
+        // 触发者已断开，使用任意在线管理员socket
+        for (const adminSocketId of this.adminSockets.keys()) {
+          if (io.sockets.sockets.has(adminSocketId)) {
+            execSocket = io.sockets.sockets.get(adminSocketId);
+            break;
+          }
+        }
+      }
+      this.setMaintenanceMode(execSocket, true, { message, durationMinutes, blockChat, kick }, io);
+    }, noticeMinutes * 60 * 1000);
+
+    try {
+      socket.emit('admin_action_result', {
+        action: 'maintenance_schedule',
+        success: true,
+        message: `维护预告已发送，${noticeMinutes}分钟后进入维护模式`
+      });
+    } catch (e) { /* socket可能已断开 */ }
+  }
+
+  // 获取维护历史
+  getMaintenanceHistory(socket) {
+    socket.emit('maintenance_history', { history: this._maintenanceHistory || [] });
+  }
+
+  // 订阅实时日志
+  subscribeLogs(socket) {
+    if (!this.adminSockets.has(socket.id)) return;
+    this.logListeners.add(socket);
+    // 发送历史日志缓冲和前端配置
+    socket.emit('log_history', {
+      logs: [...this.logBuffer],
+      config: {
+        maxDisplay: config.log.adminMaxDisplay,
+        defaultReadLines: config.log.adminFileReadLines,
+        maxReadLines: config.log.adminFileReadMaxLines
+      }
+    });
+    logger.info('管理员订阅实时日志', { adminSocket: socket.id });
+  }
+
+  // 取消订阅日志
+  unsubscribeLogs(socket) {
+    this.logListeners.delete(socket);
+  }
+
+  // 读取历史日志文件
+  async getLogFiles(socket) {
+    try {
+      const files = fs.readdirSync(config.paths.logs)
+        .filter(f => f.endsWith('.log'))
+        .map(f => {
+          const stat = fs.statSync(path.join(config.paths.logs, f));
+          return { name: f, size: stat.size, mtime: stat.mtimeMs };
+        })
+        .sort((a, b) => b.mtime - a.mtime);
+      socket.emit('log_files', { files });
+    } catch (e) {
+      socket.emit('log_files', { files: [], error: e.message });
+    }
+  }
+
+  async readLogFile(socket, filename, lines) {
+    try {
+      // 使用配置默认值并限制最大行数
+      const requestLines = Number.isInteger(lines) && lines > 0 ? lines : config.log.adminFileReadLines;
+      const safeLines = Math.min(requestLines, config.log.adminFileReadMaxLines);
+      const filePath = path.join(config.paths.logs, filename);
+      // 防止目录遍历
+      if (!filePath.startsWith(config.paths.logs)) {
+        socket.emit('log_file_content', { error: '非法路径' });
+        return;
+      }
+      if (!fs.existsSync(filePath)) {
+        socket.emit('log_file_content', { error: '文件不存在' });
+        return;
+      }
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const allLines = content.trim().split('\n').filter(Boolean);
+      const recent = allLines.slice(-safeLines).map(line => {
+        try { return JSON.parse(line); } catch { return { raw: line }; }
+      });
+      socket.emit('log_file_content', { filename, lines: recent, totalLines: allLines.length });
+    } catch (e) {
+      socket.emit('log_file_content', { error: e.message });
+    }
   }
 
   // 禁言用户
@@ -794,7 +1101,20 @@ class AdminManager {
             id: u.id,
             nickname: u.nickname,
             wins: u.stats?.wins || 0
-          }))
+          })),
+        maintenance: {
+          enabled: config.system.maintenanceEnabled,
+          message: config.system.maintenanceMessage,
+          endTime: config.system.maintenanceEndTime || 0,
+          startTime: config.system.maintenanceStartTime,
+          durationMinutes: config.system.maintenanceCountdownMinutes,
+          blockNewGames: config.system.maintenanceBlockNewGames,
+          blockChat: config.system.maintenanceBlockChat,
+          blockShop: config.system.maintenanceBlockShop,
+          blockMail: config.system.maintenanceBlockMail,
+          blockRegister: config.system.maintenanceBlockRegister,
+          blockProfile: config.system.maintenanceBlockProfile
+        }
       };
 
       socket.emit('admin_system_stats', stats);
@@ -803,7 +1123,20 @@ class AdminManager {
     }
   }
 
+  // 检查socket是否是已认证的管理员
+  isAdmin(socket) {
+    return this.adminSockets.has(socket.id);
+  }
+
   // 处理管理员断开连接
+  checkAdminAuth(socket) {
+    if (!this.adminSockets.has(socket.id)) {
+      socket.emit('auth_error', { message: '未授权操作，请重新登录' });
+      return false;
+    }
+    return true;
+  }
+
   handleAdminDisconnect(socket) {
     if (socket.adminInterval) {
       clearInterval(socket.adminInterval);
@@ -825,6 +1158,7 @@ class AdminManager {
     }
 
     this.adminSockets.delete(socket.id);
+    this.logListeners.delete(socket);
     logger.info('管理员断开连接', { socketId: socket.id });
   }
 

@@ -8,6 +8,10 @@ const fs = require('fs');
 // 加载配置
 const config = require('./config');
 const logger = require('./utils/logger');
+const runtimeConfig = require('./modules/runtimeConfig');
+
+// 初始化运行时配置（从磁盘加载覆盖值，必须在使用config之前调用）
+runtimeConfig.init(config);
 
 // 加载模块
 const UserManager = require('./modules/UserManager');
@@ -1498,6 +1502,55 @@ io.on('connection', (socket) => {
   logger.connectEvent(socket.id, { ip: socket.handshake.address });
   const snakeGames = io.snakeGames;
 
+  // 维护模式检查（返回true表示被拦截）
+  function checkMaintenance(actionType = 'game') {
+    if (!config.system.maintenanceEnabled) return false;
+    // 管理员不受限制
+    if (adminManager.isAdmin(socket)) return false;
+
+    // 根据actionType检查是否该操作被阻止
+    let isBlocked = false;
+    switch (actionType) {
+      case 'game':
+      case 'match':
+      case 'challenge':
+      case 'ai_game':
+      case 'spectate':
+        isBlocked = config.system.maintenanceBlockNewGames !== false;
+        break;
+      case 'chat':
+        isBlocked = config.system.maintenanceBlockChat === true;
+        break;
+      case 'shop':
+      case 'purchase':
+        isBlocked = config.system.maintenanceBlockShop !== false;
+        break;
+      case 'mail':
+      case 'email':
+        isBlocked = config.system.maintenanceBlockMail !== false;
+        break;
+      case 'register':
+      case 'signup':
+        isBlocked = config.system.maintenanceBlockRegister !== false;
+        break;
+      case 'profile':
+      case 'update_profile':
+        isBlocked = config.system.maintenanceBlockProfile === true;
+        break;
+      default:
+        isBlocked = true;
+    }
+
+    if (!isBlocked) return false;
+
+    socket.emit('maintenance_blocked', {
+      message: config.system.maintenanceMessage || '系统维护中，请稍后再试',
+      blockedAction: actionType,
+      endTime: config.system.maintenanceEndTime || 0
+    });
+    return true;
+  }
+
   // 处理客户端连接事件（包含版本号和token）
   socket.on('client_connect', async (data) => {
     logger.info('收到客户端连接请求', {
@@ -1589,6 +1642,24 @@ io.on('connection', (socket) => {
       } catch (err) {
         logger.error('重连恢复游戏状态失败', { accountId: userSession.accountId, error: err.message });
       }
+    }
+
+    // 发送当前维护状态（如果在维护中）
+    if (config.system.maintenanceEnabled) {
+      socket.emit('maintenance_notice', {
+        enabled: true,
+        message: config.system.maintenanceMessage,
+        timestamp: Date.now(),
+        endTime: config.system.maintenanceEndTime || 0,
+        startTime: config.system.maintenanceStartTime,
+        durationMinutes: config.system.maintenanceCountdownMinutes,
+        blockNewGames: config.system.maintenanceBlockNewGames,
+        blockChat: config.system.maintenanceBlockChat,
+        blockShop: config.system.maintenanceBlockShop,
+        blockMail: config.system.maintenanceBlockMail,
+        blockRegister: config.system.maintenanceBlockRegister,
+        blockProfile: config.system.maintenanceBlockProfile
+      });
     }
   });
 
@@ -2236,6 +2307,7 @@ io.on('connection', (socket) => {
 
   // 匹配请求
   socket.on('match_request', (data) => {
+    if (checkMaintenance()) return;
     const userSession = userManager.getUserBySocketId(socket.id);
     if (!userSession || !userSession.accountId) {
       socket.emit('error', { message: '请先登录' });
@@ -2256,6 +2328,7 @@ io.on('connection', (socket) => {
 
   // 挑战请求
   socket.on('challenge_request', (data) => {
+    if (checkMaintenance()) return;
     const userSession = userManager.getUserBySocketId(socket.id);
     if (!userSession || !userSession.accountId) {
       socket.emit('error', { message: '请先登录' });
@@ -2382,6 +2455,7 @@ io.on('connection', (socket) => {
 
   // 开始AI对战
   socket.on('ai_game_start', (data) => {
+    if (checkMaintenance()) return;
     const user = userManager.getUserBySocketId(socket.id);
     if (!user) {
       socket.emit('error', { message: '用户不存在' });
@@ -2901,6 +2975,10 @@ io.on('connection', (socket) => {
 
   // 全局聊天
   socket.on('chat_global', (data) => {
+    if (config.system.maintenanceEnabled && config.system.maintenanceBlockChat && !adminManager.isAdmin(socket)) {
+      socket.emit('chat_error', { message: config.system.maintenanceMessage || '系统维护中' });
+      return;
+    }
     const result = chatManager.handleGlobalChat(socket.id, data, io);
     if (!result.success) {
       socket.emit('chat_error', { message: result.message });
@@ -2917,6 +2995,10 @@ io.on('connection', (socket) => {
 
   // 游戏内聊天
   socket.on('chat_game', (data) => {
+    if (config.system.maintenanceEnabled && config.system.maintenanceBlockChat && !adminManager.isAdmin(socket)) {
+      socket.emit('chat_error', { message: config.system.maintenanceMessage || '系统维护中' });
+      return;
+    }
     const result = chatManager.handleGameChat(socket.id, data, io);
     if (!result.success) {
       socket.emit('chat_error', { message: result.message });
@@ -2933,6 +3015,10 @@ io.on('connection', (socket) => {
 
   // 私聊
   socket.on('chat_private', (data) => {
+    if (config.system.maintenanceEnabled && config.system.maintenanceBlockChat && !adminManager.isAdmin(socket)) {
+      socket.emit('chat_error', { message: config.system.maintenanceMessage || '系统维护中' });
+      return;
+    }
     const result = chatManager.handlePrivateChat(socket.id, data, io);
     if (!result.success) {
       socket.emit('chat_error', { message: result.message });
@@ -3113,8 +3199,18 @@ adminNamespace.on('connection', (socket) => {
 
   // 维护模式
   socket.on('maintenance_mode', (data) => {
-    const { enabled, message } = data;
-    adminManager.setMaintenanceMode(socket, enabled, message, io);
+    const { enabled, message, durationMinutes = 0, blockChat = false, kick = true } = data || {};
+    adminManager.setMaintenanceMode(socket, enabled, { message, durationMinutes, blockChat, kick }, io);
+  });
+
+  // 调度维护（预告模式）
+  socket.on('maintenance_schedule', (data) => {
+    adminManager.scheduleMaintenance(socket, data || {}, io);
+  });
+
+  // 获取维护历史
+  socket.on('get_maintenance_history', () => {
+    adminManager.getMaintenanceHistory(socket);
   });
 
   // 清理数据
@@ -3290,6 +3386,86 @@ adminNamespace.on('connection', (socket) => {
   // 获取邮件发送/领取记录
   socket.on('get_mail_records', (data) => {
     adminManager.getMailRecords(socket, data || {});
+  });
+
+  // ========== 系统设置管理 ==========
+  // 获取所有可编辑的系统设置
+  socket.on('get_system_settings', () => {
+    try {
+      if (!adminManager.checkAdminAuth(socket)) return;
+      const settings = runtimeConfig.getAllSettings();
+      const categories = runtimeConfig.getCategories();
+      socket.emit('system_settings', { success: true, settings, categories });
+    } catch (err) {
+      logger.error('获取系统设置失败', { error: err.message });
+      socket.emit('system_settings', { success: false, error: err.message });
+    }
+  });
+
+  // 更新单个系统设置
+  socket.on('update_system_setting', (data) => {
+    try {
+      if (!adminManager.checkAdminAuth(socket)) return;
+      const { key, value } = data || {};
+      if (!key) {
+        socket.emit('setting_updated', { success: false, error: '缺少配置项key' });
+        return;
+      }
+      const result = runtimeConfig.updateSetting(key, value);
+      socket.emit('setting_updated', result);
+    } catch (err) {
+      logger.error('更新系统设置失败', { error: err.message });
+      socket.emit('setting_updated', { success: false, error: err.message });
+    }
+  });
+
+  // 重置单个设置为默认值
+  socket.on('reset_system_setting', (data) => {
+    try {
+      if (!adminManager.checkAdminAuth(socket)) return;
+      const { key } = data || {};
+      if (!key) {
+        socket.emit('setting_reset', { success: false, error: '缺少配置项key' });
+        return;
+      }
+      const result = runtimeConfig.resetSetting(key);
+      socket.emit('setting_reset', result);
+    } catch (err) {
+      logger.error('重置系统设置失败', { error: err.message });
+      socket.emit('setting_reset', { success: false, error: err.message });
+    }
+  });
+
+  // 重置所有设置为默认值
+  socket.on('reset_all_settings', () => {
+    try {
+      if (!adminManager.checkAdminAuth(socket)) return;
+      const result = runtimeConfig.resetAllSettings();
+      socket.emit('all_settings_reset', result);
+    } catch (err) {
+      logger.error('重置所有系统设置失败', { error: err.message });
+      socket.emit('all_settings_reset', { success: false, error: err.message });
+    }
+  });
+
+  // ========== 实时日志 ==========
+  socket.on('subscribe_logs', () => {
+    if (!adminManager.checkAdminAuth(socket)) return;
+    adminManager.subscribeLogs(socket);
+  });
+
+  socket.on('unsubscribe_logs', () => {
+    adminManager.unsubscribeLogs(socket);
+  });
+
+  socket.on('get_log_files', () => {
+    if (!adminManager.checkAdminAuth(socket)) return;
+    adminManager.getLogFiles(socket);
+  });
+
+  socket.on('read_log_file', (data) => {
+    if (!adminManager.checkAdminAuth(socket)) return;
+    adminManager.readLogFile(socket, data?.filename, data?.lines || 200);
   });
 
   // 断开连接

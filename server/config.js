@@ -50,6 +50,21 @@ module.exports = {
     upgradeKey: process.env.ADMIN_UPGRADE_KEY || 'ADMIN-UPGRADE-2026-SECRET'
   },
 
+  // ========== 系统运维配置 ==========
+  system: {
+    maintenanceEnabled: false,                      // 维护模式开关
+    maintenanceMessage: '系统维护中，请稍后再试',     // 维护提示消息
+    maintenanceBlockNewGames: true,                 // 维护中阻止开新局
+    maintenanceBlockChat: false,                    // 维护中阻止聊天
+    maintenanceBlockShop: true,                     // 维护中阻止商城购买
+    maintenanceBlockMail: true,                     // 维护中阻止邮件发送
+    maintenanceBlockRegister: true,                 // 维护中阻止新用户注册
+    maintenanceBlockProfile: false,                 // 维护中阻止修改资料
+    maintenanceKickOnEnable: false,                 // 开启维护时是否踢出所有玩家
+    maintenanceCountdownMinutes: 0,                 // 维护预计时长（分钟），0为不确定
+    maintenanceNoticeMinutes: 5                     // 开启维护前提前通知分钟数
+  },
+
   // ========== 游戏基础配置 ==========
   game: {
     types: {
@@ -83,7 +98,11 @@ module.exports = {
   log: {
     level: process.env.LOG_LEVEL || 'info',         // 日志级别: debug/info/warn/error
     maxFiles: 7,                                     // 日志文件最大保留天数
-    maxSize: '10m'                                   // 单个日志文件最大大小
+    maxSize: '10m',                                  // 单个日志文件最大大小
+    adminBufferSize: 500,                            // 管理后台实时日志缓冲区大小（条）
+    adminMaxDisplay: 1000,                           // 管理后台日志页面最大显示条数
+    adminFileReadLines: 500,                         // 查看历史日志文件时默认读取行数
+    adminFileReadMaxLines: 2000                      // 查看历史日志文件时最大允许读取行数
   },
 
   // ========== 用户权限配置 ==========

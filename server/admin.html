@@ -378,19 +378,47 @@
       gap: 10px;
       margin-bottom: 18px;
       flex-wrap: wrap;
+      padding: 14px;
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border-radius: 12px;
+      border: 1px solid #334155;
     }
 
     .action-btn {
-      padding: 12px 20px;
+      padding: 11px 18px;
       border-radius: 10px;
       border: none;
-      font-size: 14px;
-      font-weight: 500;
+      font-size: 13px;
+      font-weight: 600;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 8px;
-      transition: all 0.2s;
+      gap: 6px;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .action-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .action-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+      filter: brightness(1.15);
+    }
+
+    .action-btn:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 
     .btn {
@@ -427,28 +455,33 @@
     }
 
     .btn-primary {
-      background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
       color: #fff;
     }
 
     .btn-success {
-      background: #22c55e;
+      background: linear-gradient(135deg, #22c55e, #16a34a);
       color: #fff;
     }
 
     .btn-warning {
-      background: #f59e0b;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
       color: #fff;
     }
 
     .btn-danger {
-      background: #ef4444;
+      background: linear-gradient(135deg, #ef4444, #dc2626);
       color: #fff;
     }
 
     .btn-secondary {
-      background: #334155;
+      background: linear-gradient(135deg, #475569, #334155);
       color: #e2e8f0;
+    }
+
+    .btn-info {
+      background: linear-gradient(135deg, #06b6d4, #0891b2);
+      color: #fff;
     }
 
     .mail-tab-btn {
@@ -1246,6 +1279,249 @@
     .reward-scroll::-webkit-scrollbar-thumb:hover {
       background: rgba(255, 255, 255, 0.35);
     }
+
+    /* ========== 系统设置面板样式 ========== */
+    .settings-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #334155;
+    }
+
+    .settings-tab {
+      padding: 6px 14px;
+      border-radius: 6px;
+      background: #1e293b;
+      color: #94a3b8;
+      border: 1px solid #334155;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+      user-select: none;
+    }
+
+    .settings-tab:hover {
+      background: #334155;
+      color: #e2e8f0;
+    }
+
+    .settings-tab.active {
+      background: #3b82f6;
+      color: white;
+      border-color: #3b82f6;
+    }
+
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 12px;
+    }
+
+    .setting-item {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 12px 14px;
+      transition: border-color 0.2s;
+    }
+
+    .setting-item:hover {
+      border-color: #334155;
+    }
+
+    .setting-item.modified {
+      border-color: #f59e0b;
+      background: #1c1917;
+    }
+
+    .setting-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .setting-key {
+      font-size: 11px;
+      color: #64748b;
+      font-family: 'Consolas', 'Monaco', monospace;
+      word-break: break-all;
+    }
+
+    .setting-label {
+      font-size: 13px;
+      color: #e2e8f0;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .setting-default {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    .setting-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .setting-input {
+      flex: 1;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 6px 10px;
+      color: #f1f5f9;
+      font-size: 13px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .setting-input:focus {
+      border-color: #3b82f6;
+    }
+
+    .setting-input[type="number"] {
+      max-width: 140px;
+    }
+
+    .setting-btn {
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .setting-btn-save {
+      background: #22c55e;
+      color: white;
+    }
+
+    .setting-btn-save:hover {
+      background: #16a34a;
+    }
+
+    .setting-btn-save:disabled {
+      background: #1e293b;
+      color: #475569;
+      cursor: not-allowed;
+    }
+
+    .setting-btn-reset {
+      background: #ef4444;
+      color: white;
+    }
+
+    .setting-btn-reset:hover {
+      background: #dc2626;
+    }
+
+    .setting-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .setting-badge-modified {
+      background: #f59e0b;
+      color: #1c1917;
+    }
+
+    .setting-badge-default {
+      background: #22c55e;
+      color: #052e16;
+    }
+
+    @media (max-width: 768px) {
+      .settings-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* 紧凑统计条 */
+    .mini-stat {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 10px 12px;
+      text-align: center;
+    }
+
+    .mini-stat-label {
+      display: block;
+      font-size: 11px;
+      color: #64748b;
+      margin-bottom: 4px;
+    }
+
+    .mini-stat-value {
+      display: block;
+      font-size: 20px;
+      font-weight: 700;
+      color: #e2e8f0;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    /* 开关样式 */
+    .toggle-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle-switch input {
+      display: none;
+    }
+
+    .toggle-slider {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      background: #475569;
+      border-radius: 12px;
+      transition: background 0.25s;
+      flex-shrink: 0;
+    }
+
+    .toggle-slider::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 18px;
+      height: 18px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.25s;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+
+    .toggle-switch input:checked+.toggle-slider {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+    }
+
+    .toggle-switch input:checked+.toggle-slider::after {
+      transform: translateX(20px);
+    }
+
+    .toggle-label-text {
+      font-size: 13px;
+      font-weight: 600;
+      color: #e2e8f0;
+      min-width: 30px;
+    }
   </style>
 </head>
 
@@ -1299,6 +1575,10 @@
           <span class="nav-icon">⚙️</span>
           <span class="nav-text">系统设置</span>
         </div>
+        <div class="nav-item" onclick="switchView('logs')">
+          <span class="nav-icon">📋</span>
+          <span class="nav-text">实时日志</span>
+        </div>
         <div class="nav-item" onclick="switchView('feedbacks')">
           <span class="nav-icon">💡</span>
           <span class="nav-text">反馈管理</span>
@@ -1321,6 +1601,12 @@
         </div>
       </nav>
       <div class="sidebar-footer">
+        <div class="status-bar" id="maintenance-status-badge"
+          style="display:none; background: rgba(239,68,68,0.15); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; color: #fca5a5; font-weight: 600; font-size: 12px; align-items: center; gap: 6px;">
+          <span
+            style="width:8px;height:8px;border-radius:50%;background:#ef4444;animation:pulse-dot 1s infinite;"></span>
+          🔧 维护模式已开启
+        </div>
         <div class="status-bar">
           <span class="status-dot"></span>
           <span id="server-status-text">服务器运行中</span>
@@ -1387,8 +1673,10 @@
 
           <div class="quick-actions">
             <button class="action-btn btn-primary" onclick="showBroadcastModal()">📢 广播消息</button>
-            <button class="action-btn btn-warning" onclick="enterMaintenanceMode()">🔧 维护模式</button>
-            <button class="action-btn btn-success" onclick="exitMaintenanceMode()">✅ 退出维护</button>
+            <button class="action-btn btn-warning" id="btn-maintenance-on" onclick="enterMaintenanceMode()">🔧
+              维护模式</button>
+            <button class="action-btn btn-success" id="btn-maintenance-off" onclick="exitMaintenanceMode()">✅
+              退出维护</button>
             <button class="action-btn btn-secondary" onclick="loadGameHistory()">📜 游戏历史</button>
             <button class="action-btn btn-secondary" onclick="loadSystemConfig()">⚙️ 系统配置</button>
             <button class="action-btn btn-secondary" onclick="loadChatHistory()">💬 聊天记录</button>
@@ -1639,47 +1927,108 @@
 
         <!-- 系统设置 -->
         <section id="view-system" class="content-section">
-          <div class="stats-row">
-            <div class="stat-box">
-              <div class="stat-header">
-                <span class="stat-name">总游戏次数</span>
-                <div class="stat-icon-box stat-icon-blue">📈</div>
-              </div>
-              <div class="stat-number" id="stat-total-games">0</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-header">
-                <span class="stat-name">最高在线</span>
-                <div class="stat-icon-box stat-icon-purple">⚡</div>
-              </div>
-              <div class="stat-number" id="stat-peak-online">0</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-header">
-                <span class="stat-name">系统运行</span>
-                <div class="stat-icon-box stat-icon-green">⏱️</div>
-              </div>
-              <div class="stat-number" id="stat-uptime">0h</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-header">
-                <span class="stat-name">内存使用</span>
-                <div class="stat-icon-box stat-icon-orange">💾</div>
-              </div>
-              <div class="stat-number" id="stat-memory">0MB</div>
-            </div>
-          </div>
-
           <div class="data-card">
             <div class="card-header">
-              <span class="card-title">⚙️ 系统操作</span>
+              <span class="card-title">🔧 系统参数设置</span>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <span style="font-size:12px;color:#94a3b8;" id="settings-overview"></span>
+                <button class="action-btn btn-primary" style="padding:6px 14px;font-size:12px;"
+                  onclick="loadSystemStats();loadSystemSettings();">🔄 刷新</button>
+                <button class="action-btn btn-secondary" style="padding:6px 14px;font-size:12px;"
+                  onclick="resetAllSettingsConfirm()">↺ 重置全部</button>
+              </div>
             </div>
-            <div style="padding: 24px;">
-              <div class="quick-actions">
-                <button class="action-btn btn-primary" onclick="loadSystemStats()">📊 刷新统计</button>
-                <button class="action-btn btn-warning" onclick="showUserAnalytics()">📈 用户分析</button>
-                <button class="action-btn btn-secondary" onclick="loadSystemConfig()">⚙️ 查看配置</button>
-                <button class="action-btn btn-secondary" onclick="exportData()">📥 导出数据</button>
+            <div style="padding:16px;">
+              <div
+                style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #334155;">
+                <div class="mini-stat"><span class="mini-stat-label">👥 总用户</span><span class="mini-stat-value"
+                    id="stat-total-users-mini">-</span></div>
+                <div class="mini-stat"><span class="mini-stat-label">🟢 在线</span><span class="mini-stat-value"
+                    id="stat-online-users-mini" style="color:#22c55e;">-</span></div>
+                <div class="mini-stat"><span class="mini-stat-label">🎮 游戏中</span><span class="mini-stat-value"
+                    id="stat-active-games-mini" style="color:#3b82f6;">-</span></div>
+                <div class="mini-stat"><span class="mini-stat-label">📊 总对局</span><span class="mini-stat-value"
+                    id="stat-total-games-mini">-</span></div>
+                <div class="mini-stat"><span class="mini-stat-label">⚡ 峰值</span><span class="mini-stat-value"
+                    id="stat-peak-online-mini" style="color:#f59e0b;">-</span></div>
+                <div class="mini-stat"><span class="mini-stat-label">⏱️ 运行</span><span class="mini-stat-value"
+                    id="stat-uptime-mini" style="color:#a78bfa;">-</span></div>
+                <div class="mini-stat"><span class="mini-stat-label">💾 内存</span><span class="mini-stat-value"
+                    id="stat-memory-mini">-</span></div>
+              </div>
+              <div class="settings-tabs" id="settings-tabs"></div>
+              <div id="settings-content" style="padding:8px 0;"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 实时日志 -->
+        <section id="view-logs" class="content-section">
+          <div class="data-card" style="height:calc(100vh - 140px); display:flex; flex-direction:column;">
+            <div class="card-header" style="flex-shrink:0;">
+              <span class="card-title">📋 实时日志监控</span>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <!-- 级别过滤 -->
+                <div style="display:flex;gap:4px;align-items:center;font-size:12px;">
+                  <label style="display:flex;align-items:center;gap:3px;cursor:pointer;color:#f87171;">
+                    <input type="checkbox" id="log-level-error" checked onchange="renderLogBuffer()"> ❌错误
+                  </label>
+                  <label style="display:flex;align-items:center;gap:3px;cursor:pointer;color:#fbbf24;">
+                    <input type="checkbox" id="log-level-warn" checked onchange="renderLogBuffer()"> ⚠️警告
+                  </label>
+                  <label style="display:flex;align-items:center;gap:3px;cursor:pointer;color:#22d3ee;">
+                    <input type="checkbox" id="log-level-info" checked onchange="renderLogBuffer()"> ℹ️信息
+                  </label>
+                  <label style="display:flex;align-items:center;gap:3px;cursor:pointer;color:#94a3b8;">
+                    <input type="checkbox" id="log-level-debug" onchange="renderLogBuffer()"> 🔍调试
+                  </label>
+                </div>
+                <div style="width:1px;height:20px;background:#334155;"></div>
+                <button class="btn btn-sm btn-secondary" id="log-pause-btn" onclick="toggleLogPause()">⏸️ 暂停</button>
+                <button class="btn btn-sm btn-secondary" onclick="clearLogView()">🗑️ 清空</button>
+                <button class="btn btn-sm btn-secondary" onclick="loadLogFiles()">📁 历史文件</button>
+                <span id="log-status" style="font-size:11px;color:#22c55e;">● 实时</span>
+                <span id="log-count" style="font-size:11px;color:#64748b;">0条</span>
+              </div>
+            </div>
+            <!-- 搜索框 -->
+            <div style="padding:8px 16px;flex-shrink:0;border-bottom:1px solid #1e293b;">
+              <input type="text" id="log-search" class="form-input" placeholder="🔍 搜索日志内容..."
+                oninput="renderLogBuffer()" style="background:#0f172a;border-color:#334155;">
+            </div>
+            <!-- 日志内容区 -->
+            <div id="log-container"
+              style="flex:1;overflow-y:auto;background:#0f172a;font-family:'Consolas','Monaco',monospace;font-size:12px;padding:8px;line-height:1.7;">
+              <div style="color:#64748b;text-align:center;padding:40px;">正在连接日志流...</div>
+            </div>
+          </div>
+          <!-- 历史日志文件弹窗 -->
+          <div id="log-files-modal"
+            style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10000;align-items:center;justify-content:center;">
+            <div
+              style="background:#1e293b;border-radius:12px;width:500px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+              <div
+                style="padding:16px;border-bottom:1px solid #334155;display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:16px;font-weight:600;">📁 历史日志文件</span>
+                <button class="btn btn-sm btn-secondary"
+                  onclick="document.getElementById('log-files-modal').style.display='none'">✕</button>
+              </div>
+              <div id="log-files-list" style="flex:1;overflow-y:auto;padding:8px;"></div>
+            </div>
+          </div>
+          <!-- 历史日志内容弹窗 -->
+          <div id="log-file-modal"
+            style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10000;align-items:center;justify-content:center;">
+            <div
+              style="background:#1e293b;border-radius:12px;width:800px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+              <div
+                style="padding:16px;border-bottom:1px solid #334155;display:flex;justify-content:space-between;align-items:center;">
+                <span id="log-file-title" style="font-size:16px;font-weight:600;"></span>
+                <button class="btn btn-sm btn-secondary"
+                  onclick="document.getElementById('log-file-modal').style.display='none'">✕</button>
+              </div>
+              <div id="log-file-content"
+                style="flex:1;overflow-y:auto;background:#0f172a;font-family:'Consolas',monospace;font-size:12px;padding:12px;line-height:1.6;max-height:60vh;">
               </div>
             </div>
           </div>
@@ -2293,6 +2642,7 @@
           adminData.games = data.games || [];
           if (data.accounts) adminData.accounts = data.accounts;
           renderStats();
+          renderSystemInfo(adminData.stats?.system);
           if (currentView === 'users') renderOnlineUsers();
           if (currentView === 'games') renderGames();
           if (currentView === 'accounts') renderAccounts();
@@ -2371,6 +2721,9 @@
         socket.on('admin_mail_records', (data) => {
           handleMailRecordsData(data);
         });
+
+        // 系统设置事件
+        bindSettingsSocketEvents();
       } else if (savedUserToken) {
         // 没有 adminToken，但有 userToken，尝试通过用户 token 自动登录
         console.log('[DEBUG] 检测到 userToken，尝试自动登录管理后台');
@@ -2441,6 +2794,7 @@
           adminData.games = data.games || [];
           if (data.accounts) adminData.accounts = data.accounts;
           renderStats();
+          renderSystemInfo(adminData.stats?.system);
           if (currentView === 'users') renderOnlineUsers();
           if (currentView === 'games') renderGames();
           if (currentView === 'accounts') renderAccounts();
@@ -2519,6 +2873,9 @@
         socket.on('admin_mail_records', (data) => {
           handleMailRecordsData(data);
         });
+
+        // 系统设置事件
+        bindSettingsSocketEvents();
       } else {
         // 没有任何 token，显示登录页面
         console.log('[DEBUG] 没有检测到token，显示登录页面');
@@ -2546,6 +2903,7 @@
         chat: '聊天管理',
         accounts: '账号管理',
         system: '系统设置',
+        logs: '实时日志',
         feedbacks: '反馈管理',
         mail: '邮件系统',
         'exp-records': '经验值获取记录',
@@ -2565,7 +2923,8 @@
       if (view === 'feedbacks') loadFeedbacks();
       if (view === 'chat') loadChatMessages();
       if (view === 'accounts') loadAccounts();
-      if (view === 'system') loadSystemStats();
+      if (view === 'system') { loadSystemStats(); loadSystemSettings(); }
+      if (view === 'logs') openLogView();
       if (view === 'exp-records') loadExpRecords();
       if (view === 'coin-records') loadCoinRecords();
       if (view === 'mail-records') loadMailRecords();
@@ -2681,6 +3040,7 @@
         }
 
         renderStats();
+        renderSystemInfo(adminData.stats?.system);
         if (currentView === 'users') renderOnlineUsers();
         if (currentView === 'games') renderGames();
         if (currentView === 'accounts') renderAccounts();
@@ -2690,7 +3050,6 @@
           renderRecentGames();
           renderOnlineUsersDetail();
           renderGameStats();
-          renderSystemInfo(data.stats?.system);
         }
       });
 
@@ -2698,6 +3057,9 @@
       socket.on('admin_action_result', (data) => {
         if (data.success) {
           showToast(data.message || '操作成功', 'success');
+          if (data.action === 'maintenance_mode') {
+            loadSystemStats();
+          }
         } else {
           showToast(data.message || '操作失败', 'error');
         }
@@ -2757,6 +3119,11 @@
         if (data) {
           adminData.stats = { ...adminData.stats, ...data };
           renderStats();
+          renderSystemInfo(adminData.stats?.system);
+          // 更新维护状态UI
+          if (data.maintenance) {
+            updateMaintenanceUI(data.maintenance.enabled, data.maintenance);
+          }
         }
       });
 
@@ -2797,6 +3164,9 @@
       socket.on('admin_mail_records', (data) => {
         handleMailRecordsData(data);
       });
+
+      // 系统设置事件
+      bindSettingsSocketEvents();
     }
 
     // ==================== 经验值记录模块 ====================
@@ -3527,15 +3897,27 @@
       const userStats = stats.users || {};
       const gameStats = stats.games || {};
 
-      // 用户统计
-      document.getElementById('stat-total-users').textContent = userStats.total || 0;
-      document.getElementById('stat-online-users').textContent = userStats.online || 0;
-      document.getElementById('stat-today-users').textContent = userStats.playing || 0; // 游戏中人数
+      // 仪表盘统计（若元素存在）
+      const setText = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = (val !== undefined && val !== null) ? val : 0;
+      };
 
-      // 游戏统计
-      document.getElementById('stat-active-games').textContent = gameStats.active || 0;
-      document.getElementById('stat-total-games').textContent = gameStats.total || 0;
-      document.getElementById('stat-peak-online').textContent = stats.peakOnline || 0;
+      // 总用户数 = 注册用户总数
+      setText('stat-total-users', userStats.registeredTotal ?? stats.totalUsers ?? 0);
+      // 在线用户
+      setText('stat-online-users', userStats.online ?? stats.onlineUsers ?? 0);
+      // 进行中游戏
+      setText('stat-active-games', gameStats.active ?? stats.activeGames ?? 0);
+      // 今日活跃
+      setText('stat-today-users', userStats.todayActive ?? stats.todayUsers ?? 0);
+
+      // 系统设置页紧凑统计条
+      setText('stat-total-users-mini', userStats.registeredTotal ?? stats.totalUsers ?? 0);
+      setText('stat-online-users-mini', userStats.online ?? stats.onlineUsers ?? 0);
+      setText('stat-active-games-mini', gameStats.active ?? stats.activeGames ?? 0);
+      setText('stat-total-games-mini', gameStats.totalPlayed ?? stats.totalGames ?? gameStats.total ?? 0);
+      setText('stat-peak-online-mini', stats.peakOnline ?? 0);
     }
 
     function renderOnlineUsers() {
@@ -3603,12 +3985,14 @@
 
       tbody.innerHTML = games.map(game => {
         const statusClass = game.status === 'playing' ? 'badge-playing' : 'badge-offline';
+        const p1Name = game.player1Nickname || (game.player1 === 'AI' ? 'AI' : (typeof game.player1 === 'object' ? game.player1?.nickname : game.player1 || '-'));
+        const p2Name = game.player2Nickname || (game.player2 === 'AI' ? 'AI' : (typeof game.player2 === 'object' ? game.player2?.nickname : game.player2 || '-'));
         return `
       <tr>
-        <td>${game.gameId}</td>
-        <td>${game.gameType}</td>
-        <td>${game.player1?.nickname || '-'}</td>
-        <td>${game.player2?.nickname || '-'}</td>
+        <td><code style="font-size:11px;color:#94a3b8;">${game.gameId}</code></td>
+        <td><span class="badge badge-info">${game.gameType}</span></td>
+        <td>${p1Name || '-'}</td>
+        <td>${p2Name || '-'}</td>
         <td>${formatTime(game.startTime || game.startedAt)}</td>
         <td><span class="badge ${statusClass}">${game.status}</span></td>
         <td>
@@ -4250,12 +4634,143 @@
     }
 
     function enterMaintenanceMode() {
-      if (!confirm('确定要进入维护模式吗？')) return;
-      socket.emit('maintenance_mode', { enabled: true, message: '系统维护中，请稍后再试' });
+      const content = `
+        <div class="form-group">
+          <label class="form-label">维护提示消息</label>
+          <input type="text" id="maintenance-msg" class="form-input" value="系统维护中，请稍后再试" placeholder="显示给玩家的提示信息">
+        </div>
+        <div class="form-group">
+          <label class="form-label">预计维护时长（分钟）</label>
+          <input type="number" id="maintenance-duration" class="form-input" value="30" min="0" placeholder="0表示不确定">
+          <div style="font-size:11px;color:#64748b;margin-top:4px;">设置后将在横幅上显示倒计时，到点自动退出维护</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">提前通知时间（分钟）</label>
+          <input type="number" id="maintenance-notice" class="form-input" value="3" min="0" placeholder="0表示立即进入">
+          <div style="font-size:11px;color:#64748b;margin-top:4px;">进入维护前倒计时广播提醒在线玩家</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="maintenance-block-chat"> 禁止聊天
+          </label>
+          <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:6px;">
+            <input type="checkbox" id="maintenance-kick" checked> 开启后踢出所有非管理员玩家
+          </label>
+        </div>
+        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px;font-size:12px;color:#991b1b;margin-top:8px;">
+          ⚠️ 维护期间玩家无法开始新游戏、匹配、购买商品、发送邮件。进行中的对局不受影响。
+        </div>
+      `;
+      showModal('🔧 进入维护模式', content, [
+        { text: '取消', class: 'btn-secondary', action: () => { closeModal(); } },
+        {
+          text: '确认开启维护', class: 'btn-danger', action: () => {
+            const msg = document.getElementById('maintenance-msg')?.value?.trim() || '系统维护中，请稍后再试';
+            const duration = parseInt(document.getElementById('maintenance-duration')?.value || '0');
+            const notice = parseInt(document.getElementById('maintenance-notice')?.value || '0');
+            const blockChat = document.getElementById('maintenance-block-chat')?.checked || false;
+            const kick = document.getElementById('maintenance-kick')?.checked || false;
+
+            closeModal();
+
+            if (notice > 0) {
+              socket.emit('maintenance_schedule', {
+                message: msg,
+                durationMinutes: duration,
+                noticeMinutes: notice,
+                blockChat,
+                kick
+              });
+              showToast(`维护预告已发送，${notice}分钟后进入维护模式`, 'success');
+            } else {
+              socket.emit('maintenance_mode', {
+                enabled: true,
+                message: msg,
+                durationMinutes: duration,
+                blockChat,
+                kick
+              });
+            }
+          }
+        }
+      ]);
     }
 
     function exitMaintenanceMode() {
-      socket.emit('maintenance_mode', { enabled: false });
+      showModal('✅ 退出维护模式', `
+        <div style="font-size:14px;color:#e2e8f0;">确定要退出维护模式吗？<br>玩家将可以正常进入游戏、开始对局。</div>
+      `, [
+        { text: '取消', class: 'btn-secondary', action: () => { closeModal(); } },
+        {
+          text: '确认退出维护', class: 'btn-success', action: () => {
+            closeModal();
+            socket.emit('maintenance_mode', { enabled: false });
+          }
+        }
+      ]);
+    }
+
+    let adminMaintenanceTimer = null;
+
+    function formatAdminCountdown(ms) {
+      if (ms <= 0) return '即将结束';
+      const totalSec = Math.floor(ms / 1000);
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      if (h > 0) return `${h}时${m}分${s}秒`;
+      if (m > 0) return `${m}分${s}秒`;
+      return `${s}秒`;
+    }
+
+    function updateMaintenanceUI(enabled, data = {}) {
+      const statusEl = document.getElementById('maintenance-status-badge');
+      if (enabled) {
+        if (statusEl) {
+          statusEl.style.display = 'flex';
+          let statusText = '🔧 维护模式已开启';
+          if (data.endTime && data.endTime > Date.now()) {
+            const updateCountdown = () => {
+              const remaining = data.endTime - Date.now();
+              if (remaining <= 0) {
+                statusEl.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#22c55e;animation:pulse-dot 1s infinite;"></span>✅ 维护已结束';
+                clearInterval(adminMaintenanceTimer);
+                adminMaintenanceTimer = null;
+                return;
+              }
+              statusEl.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:#ef4444;animation:pulse-dot 1s infinite;"></span>🔧 维护中 · ${formatAdminCountdown(remaining)}`;
+            };
+            updateCountdown();
+            if (adminMaintenanceTimer) clearInterval(adminMaintenanceTimer);
+            adminMaintenanceTimer = setInterval(updateCountdown, 1000);
+          } else {
+            statusEl.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#ef4444;animation:pulse-dot 1s infinite;"></span>🔧 维护模式已开启';
+          }
+          statusEl.title = data.message || '维护中';
+        }
+        document.body.classList.add('maintenance-active');
+        const enterBtn = document.getElementById('btn-maintenance-on');
+        const exitBtn = document.getElementById('btn-maintenance-off');
+        if (enterBtn) enterBtn.style.opacity = '0.5';
+        if (exitBtn) {
+          exitBtn.classList.remove('btn-success');
+          exitBtn.classList.add('btn-danger');
+        }
+      } else {
+        if (statusEl) statusEl.style.display = 'none';
+        document.body.classList.remove('maintenance-active');
+        if (adminMaintenanceTimer) {
+          clearInterval(adminMaintenanceTimer);
+          adminMaintenanceTimer = null;
+        }
+        const enterBtn = document.getElementById('btn-maintenance-on');
+        const exitBtn = document.getElementById('btn-maintenance-off');
+        if (enterBtn) enterBtn.style.opacity = '';
+        if (exitBtn) {
+          exitBtn.classList.remove('btn-danger');
+          exitBtn.classList.add('btn-success');
+        }
+      }
     }
 
     function kickUser(accountId) {
@@ -5095,10 +5610,23 @@
 
     function renderSystemInfo(system) {
       if (!system) return;
-      const uptime = Math.floor((system.uptime || 0) / 3600000);
+      const uptimeMs = system.uptime || 0;
+      const uptimeMin = Math.floor(uptimeMs / 60000);
+      const uptimeHours = Math.floor(uptimeMs / 3600000);
+      const uptimeDays = Math.floor(uptimeHours / 24);
+      let uptimeStr;
+      if (uptimeDays > 0) {
+        uptimeStr = `${uptimeDays}天${uptimeHours % 24}h`;
+      } else if (uptimeHours > 0) {
+        uptimeStr = `${uptimeHours}h${uptimeMin % 60}m`;
+      } else {
+        uptimeStr = `${Math.max(1, uptimeMin)}m`;
+      }
       const memory = Math.floor((system.memory?.heapUsed || 0) / 1024 / 1024);
-      document.getElementById('stat-uptime').textContent = uptime + 'h';
-      document.getElementById('stat-memory').textContent = memory + 'MB';
+      const elMiniUptime = document.getElementById('stat-uptime-mini');
+      if (elMiniUptime) elMiniUptime.textContent = uptimeStr;
+      const elMiniMemory = document.getElementById('stat-memory-mini');
+      if (elMiniMemory) elMiniMemory.textContent = memory + 'MB';
     }
 
     function filterGames(status) {
@@ -5705,6 +6233,291 @@
       if (grantList && e.target.id !== 'grant-user-id') grantList.style.display = 'none';
     });
 
+    // ==================== 系统设置面板 ====================
+    let settingsData = { settings: [], categories: {} };
+    let currentSettingsCategory = null;
+    let settingsDirty = {};
+    let settingsEventsBound = false;
+
+    function getSettingLabel(key) {
+      const labels = {
+        'exp.baseExpPerLevel': '每级经验基数',
+        'exp.weekendMultiplier': '周末经验倍率',
+        'exp.defaultHolidayMultiplier': '节假日默认倍率',
+        'exp.expToCoinRatio': '经验兑星钻比率',
+        'exp.levelUpCoinReward': '每级奖励星钻',
+        'exp.itemMultipliers.doubleExp': '双倍经验卡倍率',
+        'exp.itemMultipliers.tripleExp': '三倍经验卡倍率',
+        'exp.vipDefaultMultiplier': 'VIP默认经验倍率',
+        'exp.levelMultipliers.low.multiplier': 'Lv1-10 倍率',
+        'exp.levelMultipliers.mid.multiplier': 'Lv11-20 倍率',
+        'exp.levelMultipliers.high.multiplier': 'Lv21-30 倍率',
+        'exp.levelMultipliers.veryHigh.multiplier': 'Lv31-40 倍率',
+        'exp.levelMultipliers.max.multiplier': 'Lv41+ 倍率',
+        'gameRewards.ai.win': 'AI胜利基础经验',
+        'gameRewards.ai.draw': 'AI平局基础经验',
+        'gameRewards.ai.lose': 'AI失败安慰经验',
+        'gameRewards.aiDifficultyMultiplier.easy': 'AI简单难度倍率',
+        'gameRewards.aiDifficultyMultiplier.medium': 'AI中等难度倍率',
+        'gameRewards.aiDifficultyMultiplier.hard': 'AI困难难度倍率',
+        'gameRewards.pvp.win': 'PvP胜利经验',
+        'gameRewards.pvp.draw': 'PvP平局经验',
+        'gameRewards.pvp.lose': 'PvP失败经验',
+        'gameRewards.quickGameThreshold': '快速游戏阈值(ms)',
+        'gameRewards.slowGameThreshold': '慢速游戏阈值(ms)',
+        'snakeRewards.winScoreThreshold': '贪吃蛇胜利分数',
+        'snakeRewards.baseExp': '贪吃蛇基础经验',
+        'snakeRewards.expPerScoreDivisor': '分数经验除数',
+        'items.effects.expPotion': '经验药水(经验)',
+        'items.effects.expPackage': '奖励经验包(经验)',
+        'items.effects.undoCard': '悔棋卡(次数)',
+        'items.effects.hintCard': '提示卡(次数)',
+        'items.durations.doubleExp': '双倍卡持续时间(ms)',
+        'items.durations.luckyCharm': '幸运符持续时间(ms)',
+        'items.durations.tripleExp': '三倍卡持续时间(ms)',
+        'session.reconnectGracePeriod': '重连宽限期(ms)',
+        'session.inactiveWarningTime': '不活跃警告时间(ms)',
+        'session.inactiveKickDelay': '不活跃断开延迟(ms)',
+        'session.aiGameCleanupDelay': 'AI游戏清理延迟(ms)',
+        'gameTimeouts.matchTimeout': '匹配超时(ms)',
+        'gameTimeouts.inactivityWarn': '未移动警告(ms)',
+        'gameTimeouts.timerCheckInterval': '计时检查间隔(ms)',
+        'gameTimeouts.resetRequestTimeout': '重置请求超时(ms)',
+        'gameTimeouts.earlyGameAbortTime': '开局无效判定(ms)',
+        'gameTimeouts.quickDrawTime': '快速平局判定(ms)',
+        'chat.maxHistoryMessages': '聊天历史保留条数',
+        'chat.defaultMuteDuration': '默认禁言时长(ms)',
+        'chat.maxMessagesPerMinute': '每分钟最大消息数',
+        'chat.maxMessageLength': '单条消息最大字符',
+        'chat.permanentMuteThresholdMinutes': '永久禁言阈值(分钟)',
+        'shop.vipDiscountPercent': 'VIP折扣百分比',
+        'shop.maxPurchaseQuantity': '单次最大购买数',
+        'rateLimit.windowMs': '限流窗口(ms)',
+        'rateLimit.maxRequests': '窗口最大请求数',
+        // 系统维护
+        'system.maintenanceEnabled': '维护模式开关',
+        'system.maintenanceMessage': '维护提示消息',
+        'system.maintenanceBlockNewGames': '阻止开新游戏',
+        'system.maintenanceBlockChat': '禁止聊天',
+        'system.maintenanceBlockShop': '禁止商城购买',
+        'system.maintenanceBlockMail': '禁止邮件发送',
+        'system.maintenanceBlockRegister': '禁止新用户注册',
+        'system.maintenanceBlockProfile': '禁止修改资料',
+        'system.maintenanceKickOnEnable': '开启时踢出玩家',
+        'system.maintenanceCountdownMinutes': '预计维护时长(分钟)',
+        'system.maintenanceNoticeMinutes': '提前通知时间(分钟)',
+        // 日志管理
+        'log.adminBufferSize': '实时日志缓冲区大小',
+        'log.adminMaxDisplay': '日志页面最大显示条数',
+        'log.adminFileReadLines': '历史日志默认读取行数',
+        'log.adminFileReadMaxLines': '历史日志最大读取行数'
+      };
+      return labels[key] || key;
+    }
+
+    function formatSettingValue(key, value) {
+      if (typeof value === 'number') {
+        if (value >= 3600000) return (value / 3600000).toFixed(1) + '小时';
+        if (value >= 60000) return (value / 60000).toFixed(1) + '分钟';
+        if (value >= 1000) return (value / 1000).toFixed(1) + '秒';
+        return value;
+      }
+      return value;
+    }
+
+    function bindSettingsSocketEvents() {
+      if (settingsEventsBound) return;
+      settingsEventsBound = true;
+
+      socket.on('system_settings', (data) => {
+        if (data.success) {
+          settingsData = data;
+          if (!currentSettingsCategory) {
+            currentSettingsCategory = Object.keys(data.categories)[0];
+          }
+          renderSettingsPanel();
+        } else {
+          showToast('加载设置失败: ' + (data.error || '未知错误'), 'error');
+        }
+      });
+
+      socket.on('setting_updated', (data) => {
+        if (data.success) {
+          showToast(data.isDefault ? '已恢复默认值' : '设置已保存并生效', 'success');
+          delete settingsDirty[data.key];
+          loadSystemSettings();
+        } else {
+          showToast('保存失败: ' + (data.error || '未知错误'), 'error');
+        }
+      });
+
+      socket.on('setting_reset', (data) => {
+        if (data.success) {
+          showToast('已重置为默认值', 'success');
+          delete settingsDirty[data.key];
+          loadSystemSettings();
+        } else {
+          showToast('重置失败: ' + (data.error || '未知错误'), 'error');
+        }
+      });
+
+      socket.on('all_settings_reset', (data) => {
+        if (data.success) {
+          showToast('所有设置已重置为默认值', 'success');
+          settingsDirty = {};
+          loadSystemSettings();
+        } else {
+          showToast('重置失败: ' + (data.error || '未知错误'), 'error');
+        }
+      });
+    }
+
+    function loadSystemSettings() {
+      socket.emit('get_system_settings');
+    }
+
+    function renderSettingsPanel() {
+      const tabsEl = document.getElementById('settings-tabs');
+      const contentEl = document.getElementById('settings-content');
+      const overviewEl = document.getElementById('settings-overview');
+      const categories = settingsData.categories || {};
+      const settings = settingsData.settings || [];
+
+      let tabsHtml = '';
+      for (const cat of Object.keys(categories)) {
+        const active = cat === currentSettingsCategory ? 'active' : '';
+        tabsHtml += `<div class="settings-tab ${active}" onclick="switchSettingsCategory('${cat}')">${cat}</div>`;
+      }
+      tabsEl.innerHTML = tabsHtml;
+
+      const modifiedCount = settings.filter(s => s.isOverridden).length;
+      if (overviewEl) {
+        overviewEl.textContent = `共 ${settings.length} 项配置${modifiedCount > 0 ? ` · ${modifiedCount} 项已修改` : ''}`;
+      }
+
+      const catKeys = categories[currentSettingsCategory] || [];
+      const catSettings = settings.filter(s => catKeys.includes(s.key));
+
+      let gridHtml = '<div class="settings-grid">';
+      for (const s of catSettings) {
+        const isDirty = settingsDirty[s.key] !== undefined && settingsDirty[s.key] !== s.value;
+        const modifiedClass = s.isOverridden ? 'modified' : '';
+        const badge = s.isOverridden
+          ? '<span class="setting-badge setting-badge-modified">已修改</span>'
+          : '<span class="setting-badge setting-badge-default">默认</span>';
+
+        let inputHtml = '';
+        if (s.type === 'boolean') {
+          const checked = s.value ? 'checked' : '';
+          inputHtml = `
+            <label class="toggle-switch">
+              <input type="checkbox" ${checked} data-key="${s.key}" data-base="${s.baseValue}"
+                onchange="onBooleanSettingChange(this, '${s.key}')">
+              <span class="toggle-slider"></span>
+              <span class="toggle-label-text">${s.value ? '开启' : '关闭'}</span>
+            </label>`;
+        } else {
+          let inputType = s.type === 'number' ? 'number' : 'text';
+          let step = '';
+          if (s.type === 'number') {
+            step = s.value % 1 === 0 ? 'step="1"' : 'step="0.1"';
+          }
+          inputHtml = `
+            <input type="${inputType}" ${step} class="setting-input" value="${s.value}"
+              data-key="${s.key}" data-base="${s.baseValue}"
+              oninput="onSettingInputChange(this)" onkeydown="if(event.key==='Enter')saveSetting('${s.key}')">
+            <button class="setting-btn setting-btn-save" onclick="saveSetting('${s.key}')" id="save-btn-${s.key.replace(/\./g, '_')}">保存</button>
+            <button class="setting-btn setting-btn-reset" onclick="resetSettingConfirm('${s.key}')" title="恢复默认">↺</button>`;
+        }
+
+        gridHtml += `
+          <div class="setting-item ${modifiedClass}" data-key="${s.key}">
+            <div class="setting-header">
+              <span class="setting-label">${getSettingLabel(s.key)}</span>
+              ${badge}
+            </div>
+            <div class="setting-key">${s.key}</div>
+            <div class="setting-row" style="margin-top:8px;">
+              ${inputHtml}
+            </div>
+            <div class="setting-default">默认值: ${s.baseValue}${s.value !== s.baseValue ? ' (当前覆盖)' : ''}</div>
+          </div>`;
+      }
+      gridHtml += '</div>';
+      contentEl.innerHTML = gridHtml;
+    }
+
+    function switchSettingsCategory(cat) {
+      currentSettingsCategory = cat;
+      renderSettingsPanel();
+    }
+
+    function onSettingInputChange(input) {
+      const key = input.dataset.key;
+      let val = input.value;
+      if (input.type === 'number') val = parseFloat(val);
+      settingsDirty[key] = val;
+
+      const item = input.closest('.setting-item');
+      const baseVal = parseFloat(input.dataset.base);
+      const currentVal = input.type === 'number' ? parseFloat(input.value) : input.value;
+      if (currentVal !== baseVal && currentVal !== '') {
+        item.classList.add('modified');
+      } else {
+        item.classList.remove('modified');
+      }
+    }
+
+    function onBooleanSettingChange(checkbox, key) {
+      const val = checkbox.checked;
+      const labelText = checkbox.parentElement.querySelector('.toggle-label-text');
+      if (labelText) labelText.textContent = val ? '开启' : '关闭';
+      // 布尔值设置立即保存（无需点击保存按钮）
+      settingsDirty[key] = val;
+      const item = checkbox.closest('.setting-item');
+      const baseVal = checkbox.dataset.base === 'true';
+      if (val !== baseVal) {
+        item.classList.add('modified');
+      } else {
+        item.classList.remove('modified');
+      }
+      // 自动保存
+      saveSetting(key, val);
+    }
+
+    function saveSetting(key, explicitValue) {
+      const input = document.querySelector(`input[data-key="${key}"]`);
+      let value;
+      if (explicitValue !== undefined) {
+        value = explicitValue;
+      } else if (input) {
+        value = input.type === 'checkbox' ? input.checked : input.value;
+        if (input.type === 'number') value = parseFloat(value);
+        if (isNaN(value)) {
+          showToast('请输入有效数字', 'error');
+          return;
+        }
+      } else {
+        return;
+      }
+      socket.emit('update_system_setting', { key, value });
+
+      // 如果是维护开关，即时更新UI
+      if (key === 'system.maintenanceEnabled') {
+        setTimeout(() => loadSystemStats(), 300);
+      }
+    }
+
+    function resetSettingConfirm(key) {
+      if (!confirm('确定要将此设置恢复为默认值吗？')) return;
+      socket.emit('reset_system_setting', { key });
+    }
+
+    function resetAllSettingsConfirm() {
+      if (!confirm('确定要将所有系统设置重置为默认值吗？此操作将撤销所有自定义配置。')) return;
+      socket.emit('reset_all_settings');
+    }
+
     // 添加动画样式
     const style = document.createElement('style');
     style.textContent = `
@@ -5718,6 +6531,240 @@
   }
 `;
     document.head.appendChild(style);
+
+    // ==================== 实时日志 ====================
+    const logState = {
+      entries: [],
+      paused: false,
+      autoScroll: true,
+      subscribed: false,
+      maxEntries: 1000,
+      config: { maxDisplay: 1000, defaultReadLines: 500, maxReadLines: 2000 }
+    };
+
+    const logLevelColors = {
+      error: { bg: 'rgba(239,68,68,0.15)', fg: '#fca5a5', border: '#ef4444', icon: '❌', name: 'ERROR' },
+      warn: { bg: 'rgba(245,158,11,0.15)', fg: '#fcd34d', border: '#f59e0b', icon: '⚠️', name: 'WARN ' },
+      info: { bg: 'rgba(34,211,238,0.08)', fg: '#67e8f9', border: '#0891b2', icon: 'ℹ️', name: 'INFO ' },
+      debug: { bg: 'rgba(148,163,184,0.08)', fg: '#94a3b8', border: '#475569', icon: '🔍', name: 'DEBUG' }
+    };
+
+    function openLogView() {
+      if (!logState.subscribed && socket && socket.connected) {
+        socket.emit('subscribe_logs');
+        logState.subscribed = true;
+        bindLogEvents();
+      }
+    }
+
+    function bindLogEvents() {
+      if (logState._eventsBound) return;
+      logState._eventsBound = true;
+
+      socket.on('log_history', (data) => {
+        logState.entries = data.logs || [];
+        if (data.config) {
+          logState.config = { ...logState.config, ...data.config };
+          logState.maxEntries = logState.config.maxDisplay;
+        }
+        renderLogBuffer();
+      });
+
+      socket.on('log_entry', (entry) => {
+        if (logState.paused) return;
+        logState.entries.push(entry);
+        if (logState.entries.length > logState.maxEntries) {
+          logState.entries.splice(0, logState.entries.length - logState.maxEntries);
+        }
+        appendLogEntry(entry);
+        updateLogCount();
+      });
+
+      socket.on('log_files', (data) => {
+        renderLogFiles(data.files || []);
+      });
+
+      socket.on('log_file_content', (data) => {
+        if (data.error) {
+          showToast('读取日志失败: ' + data.error, 'error');
+          return;
+        }
+        showLogFileContent(data);
+      });
+    }
+
+    function formatLogTime(ts) {
+      const d = new Date(ts);
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3, '0')}`;
+    }
+
+    function formatMetaStr(meta) {
+      if (!meta) return '';
+      try {
+        const parts = [];
+        for (const [k, v] of Object.entries(meta)) {
+          if (typeof v === 'object') {
+            parts.push(`<span style="color:#64748b;">${k}=</span><span style="color:#a78bfa;">${escapeHtml(JSON.stringify(v))}</span>`);
+          } else {
+            parts.push(`<span style="color:#64748b;">${k}=</span><span style="color:#86efac;">${escapeHtml(String(v))}</span>`);
+          }
+        }
+        return parts.length ? ' ' + parts.join(' ') : '';
+      } catch { return ''; }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function isLevelEnabled(level) {
+      const cb = document.getElementById(`log-level-${level}`);
+      return cb ? cb.checked : true;
+    }
+
+    function isMatchSearch(text) {
+      const search = document.getElementById('log-search')?.value?.trim().toLowerCase();
+      if (!search) return true;
+      return text.toLowerCase().includes(search);
+    }
+
+    function buildLogLine(entry) {
+      const style = logLevelColors[entry.level] || logLevelColors.info;
+      const time = entry.timeStr || formatLogTime(entry.timestamp);
+      const metaStr = entry.meta ? formatMetaStr(entry.meta) : '';
+      const msg = escapeHtml(entry.message);
+      return `<div style="padding:2px 8px;border-left:2px solid ${style.border};margin-bottom:1px;background:${style.bg};display:flex;gap:8px;align-items:flex-start;">
+        <span style="color:#64748b;white-space:nowrap;flex-shrink:0;">${time}</span>
+        <span style="color:${style.fg};white-space:nowrap;flex-shrink:0;font-weight:600;">${style.icon} ${style.name}</span>
+        <span style="color:#e2e8f0;word-break:break-word;flex:1;">${msg}${metaStr}</span>
+      </div>`;
+    }
+
+    function renderLogBuffer() {
+      const container = document.getElementById('log-container');
+      if (!container) return;
+
+      const filtered = logState.entries.filter(e => isLevelEnabled(e.level) && isMatchSearch(e.message));
+      const html = filtered.map(buildLogLine).join('');
+      container.innerHTML = html || '<div style="color:#64748b;text-align:center;padding:40px;">暂无匹配的日志</div>';
+      updateLogCount();
+
+      if (logState.autoScroll) {
+        container.scrollTop = container.scrollHeight;
+      }
+    }
+
+    function appendLogEntry(entry) {
+      if (!isLevelEnabled(entry.level) || !isMatchSearch(entry.message)) {
+        updateLogCount();
+        return;
+      }
+      const container = document.getElementById('log-container');
+      if (!container) return;
+      // 如果之前显示"暂无日志"的提示，清空
+      if (logState.entries.length <= 1) {
+        container.innerHTML = '';
+      }
+      container.insertAdjacentHTML('beforeend', buildLogLine(entry));
+      if (logState.autoScroll) {
+        container.scrollTop = container.scrollHeight;
+      }
+    }
+
+    function updateLogCount() {
+      const el = document.getElementById('log-count');
+      if (!el) return;
+      const filtered = logState.entries.filter(e => isLevelEnabled(e.level) && isMatchSearch(e.message));
+      el.textContent = `${filtered.length}/${logState.entries.length}条`;
+    }
+
+    function toggleLogPause() {
+      logState.paused = !logState.paused;
+      const btn = document.getElementById('log-pause-btn');
+      const status = document.getElementById('log-status');
+      if (logState.paused) {
+        if (btn) btn.textContent = '▶️ 继续';
+        if (status) { status.textContent = '⏸️ 已暂停'; status.style.color = '#fbbf24'; }
+      } else {
+        if (btn) btn.textContent = '⏸️ 暂停';
+        if (status) { status.textContent = '● 实时'; status.style.color = '#22c55e'; }
+        renderLogBuffer();
+      }
+    }
+
+    function clearLogView() {
+      logState.entries = [];
+      const container = document.getElementById('log-container');
+      if (container) container.innerHTML = '<div style="color:#64748b;text-align:center;padding:40px;">日志已清空</div>';
+      updateLogCount();
+    }
+
+    function loadLogFiles() {
+      if (!socket || !socket.connected) return;
+      socket.emit('get_log_files');
+      document.getElementById('log-files-modal').style.display = 'flex';
+    }
+
+    function renderLogFiles(files) {
+      const list = document.getElementById('log-files-list');
+      if (!list) return;
+      if (!files.length) {
+        list.innerHTML = '<div style="padding:20px;text-align:center;color:#64748b;">暂无历史日志文件</div>';
+        return;
+      }
+      list.innerHTML = files.map(f => {
+        const sizeKB = (f.size / 1024).toFixed(1);
+        const date = new Date(f.mtime).toLocaleString('zh-CN');
+        return `<div style="padding:10px 12px;border-radius:8px;background:#0f172a;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:hover;" onmouseover="this.style.background='#1e293b'" onmouseout="this.style.background='#0f172a'" onclick="readLogFile('${f.name}')">
+          <div>
+            <div style="color:#e2e8f0;font-weight:600;">📄 ${f.name}</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px;">${sizeKB} KB · ${date}</div>
+          </div>
+          <button class="btn btn-sm btn-primary">查看</button>
+        </div>`;
+      }).join('');
+    }
+
+    function readLogFile(filename) {
+      socket.emit('read_log_file', { filename, lines: logState.config.defaultReadLines });
+    }
+
+    function showLogFileContent(data) {
+      const modal = document.getElementById('log-file-modal');
+      const title = document.getElementById('log-file-title');
+      const content = document.getElementById('log-file-content');
+      if (!modal || !title || !content) return;
+
+      title.textContent = `📄 ${data.filename} (共${data.totalLines}行，显示最近${data.lines.length}行)`;
+      const html = data.lines.map(line => {
+        if (line.raw) {
+          return `<div style="color:#94a3b8;">${escapeHtml(line.raw)}</div>`;
+        }
+        const style = logLevelColors[line.level] || logLevelColors.info;
+        const time = line.timestamp ? new Date(line.timestamp).toLocaleTimeString('zh-CN', { hour12: false }) + '.' + String(new Date(line.timestamp).getMilliseconds()).padStart(3, '0') : '';
+        const metaStr = formatMetaStr(line);
+        return `<div style="padding:2px 8px;border-left:2px solid ${style.border};margin-bottom:1px;background:${style.bg};">
+          <span style="color:#64748b;">${time}</span>
+          <span style="color:${style.fg};font-weight:600;">${style.icon} ${style.name}</span>
+          <span style="color:#e2e8f0;">${escapeHtml(line.message || '')}${metaStr}</span>
+        </div>`;
+      }).join('');
+      content.innerHTML = html;
+      modal.style.display = 'flex';
+      content.scrollTop = content.scrollHeight;
+    }
+
+    // 日志容器滚动时判断是否需要关闭自动滚动
+    document.addEventListener('DOMContentLoaded', () => {
+      const logContainer = document.getElementById('log-container');
+      if (logContainer) {
+        logContainer.addEventListener('scroll', () => {
+          const nearBottom = logContainer.scrollHeight - logContainer.scrollTop - logContainer.clientHeight < 50;
+          logState.autoScroll = nearBottom;
+        });
+      }
+    });
   </script>
 
 </body>
