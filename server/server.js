@@ -25,6 +25,7 @@ const AIManager = require('./modules/AIManager');
 const ThemeManager = require('./modules/ThemeManager');
 const FeedbackManager = require('./modules/FeedbackManager');
 const ShopManager = require('./modules/ShopManager');
+const UpdateManager = require('./modules/UpdateManager');
 
 // 初始化Express应用
 const app = express();
@@ -55,19 +56,21 @@ app.use(express.urlencoded({ extended: true, limit: config.server.http.bodyLimit
 
 // Token认证中间件
 function authenticateToken(req, res, next) {
-  // 从请求头获取token
   const token = req.headers.authorization?.replace('Bearer ', '') || req.body.token || req.query.token;
 
   if (!token) {
     return res.status(401).json({ success: false, message: '缺少认证Token' });
   }
 
-  // 验证token是否与配置中的adminToken匹配
-  if (token !== config.admin.token) {
-    return res.status(401).json({ success: false, message: '无效的认证Token' });
+  if (adminManager && adminManager.verifyToken(token)) {
+    return next();
   }
 
-  next();
+  if (token === config.admin.token) {
+    return next();
+  }
+
+  return res.status(401).json({ success: false, message: '无效的认证Token' });
 }
 
 // 静态文件服务 - 优先 client 目录，fallback 到根目录
@@ -94,8 +97,149 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: Date.now(),
-    uptime: Date.now() - serverStartTime
+    uptime: Date.now() - serverStartTime,
+    version: versionManager.getServerVersion()
   });
+});
+
+// ========== 更新系统API ==========
+app.get('/api/update/status', authenticateToken, (req, res) => {
+  try {
+    const status = updateManager.getPublicStatus();
+    res.json({
+      success: true,
+      status: {
+        state: status.status === 'in_progress' ? 'updating' :
+          status.status === 'restarting' ? 'updating' :
+            status.status === 'failed' ? 'failed' :
+              status.status === 'rolled_back' ? 'failed' :
+                status.status === 'rollback_failed' ? 'failed' :
+                  status.status === 'success' ? 'success' :
+                    (updateManager.currentZipPath ? 'uploaded' : 'idle'),
+        currentVersion: status.serverVersion || config.version,
+        packageInfo: updateManager.currentZipPath ? {
+          path: updateManager.currentZipPath,
+          size: require('fs').existsSync(updateManager.currentZipPath) ? require('fs').statSync(updateManager.currentZipPath).size : 0,
+          fileCount: status.phases && status.phases.extract ? (status.phases.extract.fileCount || 0) : 0,
+          version: status.version && status.version.to ? status.version.to : null
+        } : null,
+        lastError: status.error,
+        lastBackup: status.availableBackups && status.availableBackups.length > 0 ? (() => {
+          const b = status.availableBackups[status.availableBackups.length - 1];
+          return { id: b.name, version: b.manifest ? b.manifest.fromVersion : 'unknown', timestamp: new Date(b.mtime).toLocaleString('zh-CN') };
+        })() : null
+      }
+    });
+  } catch (err) {
+    logger.error('获取更新状态失败', { error: err.message });
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.get('/api/update/backups', authenticateToken, (req, res) => {
+  try {
+    const backups = updateManager._listBackups();
+    const list = backups.map(b => {
+      const m = b.manifest || {};
+      const sizeMB = (b.size / 1024 / 1024).toFixed(2);
+      return {
+        id: b.name,
+        version: m.fromVersion || 'unknown',
+        timestamp: new Date(b.mtime).toLocaleString('zh-CN'),
+        fileCount: m.files ? m.files.length : 0,
+        sizeFormatted: sizeMB > 1 ? sizeMB + ' MB' : ((b.size / 1024).toFixed(1) + ' KB'),
+        reason: m.toVersion ? `更新到 ${m.toVersion}` : '手动备份'
+      };
+    }).reverse();
+    res.json({ success: true, backups: list });
+  } catch (err) {
+    logger.error('获取备份列表失败', { error: err.message });
+    res.status(500).json({ success: false, message: err.message, backups: [] });
+  }
+});
+
+app.post('/api/update/upload', authenticateToken, express.raw({
+  limit: config.update.maxUploadSize,
+  type: ['application/zip', 'application/octet-stream', 'application/x-zip-compressed']
+}), async (req, res) => {
+  try {
+    if (!config.update.enabled) {
+      return res.status(403).json({ success: false, message: '更新功能未启用' });
+    }
+    if (updateManager.status && updateManager.status.status === 'in_progress') {
+      return res.status(409).json({ success: false, message: '已有更新正在进行中' });
+    }
+    if (!req.body || req.body.length === 0) {
+      return res.status(400).json({ success: false, message: '未收到文件数据' });
+    }
+    const result = await updateManager.saveUploadedFile(req.body, 'update.zip');
+    res.json({
+      success: true,
+      message: '上传成功',
+      packageInfo: {
+        size: result.size,
+        sizeFormatted: (result.size / 1024 / 1024).toFixed(2) + ' MB',
+        hash: result.hash,
+        fileCount: 0,
+        version: null
+      }
+    });
+  } catch (err) {
+    logger.error('更新包上传失败', { error: err.message });
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/update/start', authenticateToken, async (req, res) => {
+  try {
+    if (!config.update.enabled) {
+      return res.status(403).json({ success: false, message: '更新功能未启用' });
+    }
+    if (updateManager.status && updateManager.status.status === 'in_progress') {
+      return res.status(409).json({ success: false, message: '已有更新正在进行中' });
+    }
+    res.json({ success: true, message: '更新开始执行' });
+    updateManager.startUpdate().catch(err => {
+      logger.error('更新执行失败', { error: err.message });
+    });
+  } catch (err) {
+    logger.error('启动更新失败', { error: err.message });
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/update/cancel', authenticateToken, (req, res) => {
+  try {
+    updateManager.cancelUpdate();
+    res.json({ success: true, message: '更新已取消' });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/update/rollback', authenticateToken, async (req, res) => {
+  try {
+    const backupName = req.body.backupName || req.body.backupId;
+    if (!backupName) {
+      return res.status(400).json({ success: false, message: '请指定要回滚的备份' });
+    }
+    res.json({ success: true, message: '开始回滚，服务将重启' });
+    updateManager.manualRollback(backupName).catch(err => {
+      logger.error('回滚失败', { error: err.message });
+    });
+  } catch (err) {
+    logger.error('回滚失败', { error: err.message });
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.delete('/api/update/backup/:name', authenticateToken, (req, res) => {
+  try {
+    updateManager.deleteBackup(req.params.name);
+    res.json({ success: true, message: '备份已删除' });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
 });
 
 // 获取等级经验配置
@@ -1373,6 +1517,7 @@ feedbackManager.accountManager = accountManager;
 const newVersion = versionManager.incrementBuild();
 logger.info(`服务器版本更新: ${newVersion}`);
 const themeManager = new ThemeManager();
+const updateManager = new UpdateManager(io);
 
 // ========== FFmpeg 自动检测（用于 GIF 头像压缩） ==========
 (function initFfmpeg() {
@@ -3468,6 +3613,97 @@ adminNamespace.on('connection', (socket) => {
     adminManager.readLogFile(socket, data?.filename, data?.lines || 200);
   });
 
+  // ========== 系统更新 ==========
+  socket.on('get_update_status', () => {
+    if (!adminManager.checkAdminAuth(socket)) return;
+    socket.emit('update_status', updateManager.getPublicStatus());
+  });
+
+  socket.on('update_upload_chunk', async (data) => {
+    if (!adminManager.checkAdminAuth(socket)) return;
+    try {
+      const result = await updateManager.saveUploadedChunk(
+        Buffer.from(data.chunk), data.index, data.total, data.uploadId
+      );
+      socket.emit('update_upload_progress', result);
+    } catch (err) {
+      socket.emit('update_upload_error', { message: err.message });
+    }
+  });
+
+  socket.on('update_start_upload', async (data) => {
+    if (!adminManager.checkAdminAuth(socket)) return;
+    try {
+      if (!config.update.enabled) {
+        return socket.emit('update_error', { message: '更新功能未启用' });
+      }
+      if (updateManager.status && updateManager.status.status === 'in_progress') {
+        return socket.emit('update_error', { message: '已有更新正在进行中' });
+      }
+      const result = await updateManager.assembleUpload(
+        data.uploadId, data.filename, data.size, data.hash
+      );
+      socket.emit('update_upload_ready', { size: result.size });
+    } catch (err) {
+      socket.emit('update_error', { message: err.message });
+    }
+  });
+
+  socket.on('update_start', () => {
+    if (!adminManager.checkAdminAuth(socket)) return;
+    try {
+      if (!config.update.enabled) {
+        return socket.emit('update_error', { message: '更新功能未启用' });
+      }
+      if (updateManager.status && updateManager.status.status === 'in_progress') {
+        return socket.emit('update_error', { message: '已有更新正在进行中' });
+      }
+      socket.emit('update_started', { message: '更新开始执行' });
+      updateManager.startUpdate().catch(err => {
+        logger.error('更新执行失败', { error: err.message });
+      });
+    } catch (err) {
+      socket.emit('update_error', { message: err.message });
+    }
+  });
+
+  socket.on('update_cancel', () => {
+    if (!adminManager.checkAdminAuth(socket)) return;
+    try {
+      updateManager.cancelUpdate();
+      socket.emit('update_cancelled', { message: '更新已取消' });
+    } catch (err) {
+      socket.emit('update_error', { message: err.message });
+    }
+  });
+
+  socket.on('update_rollback', (data) => {
+    if (!adminManager.checkAdminAuth(socket)) return;
+    try {
+      if (!data || !data.backupName) {
+        return socket.emit('update_error', { message: '请指定要回滚的备份' });
+      }
+      socket.emit('update_rollback_started', { message: '开始回滚，服务将重启' });
+      updateManager.manualRollback(data.backupName).catch(err => {
+        logger.error('回滚失败', { error: err.message });
+      });
+    } catch (err) {
+      socket.emit('update_error', { message: err.message });
+    }
+  });
+
+  socket.on('update_delete_backup', (data) => {
+    if (!adminManager.checkAdminAuth(socket)) return;
+    try {
+      if (!data || !data.backupName) return;
+      updateManager.deleteBackup(data.backupName);
+      socket.emit('update_backup_deleted', { backupName: data.backupName });
+      socket.emit('update_status', updateManager.getPublicStatus());
+    } catch (err) {
+      socket.emit('update_error', { message: err.message });
+    }
+  });
+
   // 断开连接
   socket.on('disconnect', () => {
     adminManager.handleAdminDisconnect(socket);
@@ -3585,6 +3821,13 @@ server.listen(PORT, HOST, () => {
       logger.error('服务器启动-邮件触发器执行失败', { error: err.message });
     }
   }, 3000);
+
+  // 启动后检查更新状态（重启后验证更新是否成功）
+  setTimeout(() => {
+    updateManager.verifyStartup().catch(err => {
+      logger.error('更新状态验证失败', { error: err.message });
+    });
+  }, 5000);
 });
 
 // 优雅关闭

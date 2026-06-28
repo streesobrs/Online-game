@@ -308,6 +308,7 @@ class AdminManager {
     }
 
     this.adminSockets.set(socket.id, adminInfo);
+    try { socket.join('admins'); } catch (e) { /* ignore */ }
     logger.info('管理员连接', { socketId: socket.id, ip: adminInfo.ip, token: token.substr(0, 8) + '...' });
 
     // 发送初始数据
@@ -1159,6 +1160,7 @@ class AdminManager {
 
     this.adminSockets.delete(socket.id);
     this.logListeners.delete(socket);
+    try { socket.leave('admins'); } catch (e) { /* ignore */ }
     logger.info('管理员断开连接', { socketId: socket.id });
   }
 

@@ -1522,6 +1522,116 @@
       color: #e2e8f0;
       min-width: 30px;
     }
+
+    .update-phase {
+      padding: 10px;
+      background: #1e293b;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    .update-phase.phase-active {
+      background: rgba(59, 130, 246, 0.15);
+      border-left: 3px solid #3b82f6;
+    }
+
+    .update-phase.phase-success {
+      background: rgba(34, 197, 94, 0.1);
+      border-left: 3px solid #22c55e;
+    }
+
+    .update-phase.phase-failed {
+      background: rgba(239, 68, 68, 0.1);
+      border-left: 3px solid #ef4444;
+    }
+
+    .phase-icon {
+      font-size: 16px;
+    }
+
+    .phase-name {
+      flex: 1;
+      color: #cbd5e1;
+    }
+
+    .update-phase.phase-success .phase-name {
+      color: #86efac;
+    }
+
+    .update-phase.phase-failed .phase-name {
+      color: #fca5a5;
+    }
+
+    .phase-bar {
+      height: 4px;
+      background: #334155;
+      border-radius: 2px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+
+    .phase-bar-fill {
+      height: 100%;
+      background: #3b82f6;
+      border-radius: 2px;
+      transition: width 0.3s;
+    }
+
+    .update-phase.phase-success .phase-bar-fill {
+      background: #22c55e;
+    }
+
+    .update-log-entry {
+      padding: 2px 0;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+    }
+
+    .update-log-entry.log-error {
+      color: #f87171;
+    }
+
+    .update-log-entry.log-warn {
+      color: #fbbf24;
+    }
+
+    .update-log-entry.log-info {
+      color: #94a3b8;
+    }
+
+    .backup-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px;
+      background: #1e293b;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    .backup-item:hover {
+      background: #334155;
+    }
+
+    .backup-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .backup-version {
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+
+    .backup-meta {
+      font-size: 11px;
+      color: #64748b;
+    }
+
+    .backup-actions {
+      display: flex;
+      gap: 6px;
+    }
   </style>
 </head>
 
@@ -1574,6 +1684,10 @@
         <div class="nav-item" onclick="switchView('system')">
           <span class="nav-icon">⚙️</span>
           <span class="nav-text">系统设置</span>
+        </div>
+        <div class="nav-item" onclick="switchView('update')">
+          <span class="nav-icon">🔄</span>
+          <span class="nav-text">系统更新</span>
         </div>
         <div class="nav-item" onclick="switchView('logs')">
           <span class="nav-icon">📋</span>
@@ -1958,6 +2072,192 @@
               </div>
               <div class="settings-tabs" id="settings-tabs"></div>
               <div id="settings-content" style="padding:8px 0;"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 系统更新 -->
+        <section id="view-update" class="content-section">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+            <div class="data-card">
+              <div class="card-header">
+                <span class="card-title">🔄 系统更新</span>
+              </div>
+              <div style="padding: 16px;">
+                <div
+                  style="margin-bottom: 12px; padding: 12px; background: rgba(59,130,246,0.1); border-radius: 8px; border-left: 3px solid #3b82f6;">
+                  <div style="font-size: 13px; color: #93c5fd; margin-bottom: 4px;">当前版本</div>
+                  <div style="font-size: 20px; font-weight: 700; color: #fff;" id="update-current-version">-</div>
+                </div>
+                <div id="update-status-info"
+                  style="margin-bottom: 12px; padding: 12px; background: rgba(34,197,94,0.1); border-radius: 8px; border-left: 3px solid #22c55e;">
+                  <div style="font-size: 13px; color: #86efac;">状态</div>
+                  <div style="font-size: 16px; font-weight: 600; color: #fff;" id="update-status-text">空闲</div>
+                </div>
+                <div id="update-target-info"
+                  style="display:none; margin-bottom: 12px; padding: 12px; background: rgba(245,158,11,0.1); border-radius: 8px; border-left: 3px solid #f59e0b;">
+                  <div style="font-size: 13px; color: #fcd34d;">目标版本</div>
+                  <div style="font-size: 16px; font-weight: 600; color: #fff;" id="update-target-version">-</div>
+                </div>
+
+                <!-- 上传区域 -->
+                <div id="update-upload-area"
+                  style="border: 2px dashed #475569; border-radius: 10px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 12px;"
+                  onclick="document.getElementById('update-file-input').click()"
+                  ondragover="event.preventDefault(); this.style.borderColor='#3b82f6'; this.style.background='rgba(59,130,246,0.05)';"
+                  ondragleave="this.style.borderColor='#475569'; this.style.background='transparent';"
+                  ondrop="handleUpdateDrop(event)">
+                  <div style="font-size: 40px; margin-bottom: 8px;">📦</div>
+                  <div style="color: #e2e8f0; font-size: 14px; margin-bottom: 4px;">点击或拖拽上传更新包</div>
+                  <div style="color: #64748b; font-size: 12px;">支持 .zip 格式，最大 100MB</div>
+                  <input type="file" id="update-file-input" accept=".zip" style="display:none"
+                    onchange="handleUpdateFileSelect(event)">
+                </div>
+
+                <!-- 上传进度 -->
+                <div id="update-upload-progress" style="display:none; margin-bottom: 12px;">
+                  <div
+                    style="display:flex; justify-content:space-between; font-size:12px; color:#94a3b8; margin-bottom:4px;">
+                    <span>上传中...</span>
+                    <span id="update-upload-percent">0%</span>
+                  </div>
+                  <div style="height:6px; background:#334155; border-radius:3px; overflow:hidden;">
+                    <div id="update-upload-bar"
+                      style="height:100%; background:#3b82f6; width:0%; transition:width 0.3s;"></div>
+                  </div>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                  <button id="update-btn-start" class="action-btn btn-success" onclick="startUpdate()" disabled
+                    style="opacity:0.5; cursor:not-allowed;">
+                    🚀 开始更新
+                  </button>
+                  <button id="update-btn-cancel" class="action-btn btn-danger" onclick="cancelUpdate()"
+                    style="display:none;">
+                    ❌ 取消更新
+                  </button>
+                  <button class="action-btn btn-secondary" onclick="loadUpdateStatus()">
+                    🔄 刷新状态
+                  </button>
+                </div>
+                <div id="update-message" style="margin-top:10px; font-size:12px; color:#94a3b8;"></div>
+              </div>
+            </div>
+
+            <div class="data-card">
+              <div class="card-header">
+                <span class="card-title">📊 更新进度</span>
+              </div>
+              <div style="padding: 16px;">
+                <div id="update-phases" style="display:flex; flex-direction:column; gap:8px;">
+                  <div class="update-phase" data-phase="validate">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <span class="phase-icon">⏳</span>
+                      <span class="phase-name">校验更新包</span>
+                    </div>
+                    <div class="phase-progress" style="display:none;">
+                      <div class="phase-bar">
+                        <div class="phase-bar-fill" style="width:0%"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="update-phase" data-phase="extract">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <span class="phase-icon">⏳</span>
+                      <span class="phase-name">解压文件</span>
+                    </div>
+                    <div class="phase-progress" style="display:none;">
+                      <div class="phase-bar">
+                        <div class="phase-bar-fill" style="width:0%"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="update-phase" data-phase="diff">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <span class="phase-icon">⏳</span>
+                      <span class="phase-name">差异分析</span>
+                    </div>
+                    <div class="phase-progress" style="display:none;">
+                      <div class="phase-bar">
+                        <div class="phase-bar-fill" style="width:0%"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="update-phase" data-phase="backup">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <span class="phase-icon">⏳</span>
+                      <span class="phase-name">创建备份</span>
+                    </div>
+                    <div class="phase-progress" style="display:none;">
+                      <div class="phase-bar">
+                        <div class="phase-bar-fill" style="width:0%"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="update-phase" data-phase="apply">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <span class="phase-icon">⏳</span>
+                      <span class="phase-name">应用更新</span>
+                    </div>
+                    <div class="phase-progress" style="display:none;">
+                      <div class="phase-bar">
+                        <div class="phase-bar-fill" style="width:0%"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="update-phase" data-phase="restart">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <span class="phase-icon">⏳</span>
+                      <span class="phase-name">重启服务</span>
+                    </div>
+                    <div class="phase-progress" style="display:none;">
+                      <div class="phase-bar">
+                        <div class="phase-bar-fill" style="width:0%"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="update-phase" data-phase="verify">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <span class="phase-icon">⏳</span>
+                      <span class="phase-name">验证启动</span>
+                    </div>
+                    <div class="phase-progress" style="display:none;">
+                      <div class="phase-bar">
+                        <div class="phase-bar-fill" style="width:0%"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div id="update-current-message"
+                  style="margin-top:12px; padding:10px; background:#1e293b; border-radius:6px; font-size:12px; color:#94a3b8; min-height:40px;">
+                  等待开始...</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 实时日志 -->
+          <div class="data-card" style="margin-bottom:12px;">
+            <div class="card-header">
+              <span class="card-title">📝 更新日志</span>
+              <button class="action-btn btn-secondary" style="padding:4px 10px;font-size:11px;"
+                onclick="document.getElementById('update-log-view').innerHTML=''">清空</button>
+            </div>
+            <div id="update-log-view"
+              style="padding:12px; max-height:250px; overflow-y:auto; font-family: 'Consolas', 'Monaco', monospace; font-size:12px; background:#0f172a; border-radius:0 0 8px 8px; line-height:1.6;">
+            </div>
+          </div>
+
+          <!-- 备份列表 -->
+          <div class="data-card">
+            <div class="card-header">
+              <span class="card-title">💾 版本备份</span>
+              <span style="font-size:12px; color:#64748b;" id="update-backup-count"></span>
+            </div>
+            <div style="padding:12px;">
+              <div id="update-backup-list" style="display:flex; flex-direction:column; gap:6px;">
+                <div style="color:#64748b; font-size:13px; text-align:center; padding:20px;">加载中...</div>
+              </div>
             </div>
           </div>
         </section>
@@ -2903,6 +3203,7 @@
         chat: '聊天管理',
         accounts: '账号管理',
         system: '系统设置',
+        update: '系统更新',
         logs: '实时日志',
         feedbacks: '反馈管理',
         mail: '邮件系统',
@@ -2924,6 +3225,7 @@
       if (view === 'chat') loadChatMessages();
       if (view === 'accounts') loadAccounts();
       if (view === 'system') { loadSystemStats(); loadSystemSettings(); }
+      if (view === 'update') { bindUpdateSocketEvents(); loadUpdateStatus(); }
       if (view === 'logs') openLogView();
       if (view === 'exp-records') loadExpRecords();
       if (view === 'coin-records') loadCoinRecords();
@@ -6765,6 +7067,455 @@
         });
       }
     });
+
+    // ==================== 系统更新功能 ====================
+    let updateCurrentPackage = null;
+    let updateHandlersBound = false;
+    const updateSocketEvents = [
+      'update_progress', 'update_log', 'update_started', 'update_phase',
+      'update_restarting', 'update_success', 'update_failed',
+      'update_rollback_start', 'update_rollback_success', 'update_cancelled'
+    ];
+
+    function _onUpdateProgress(data) {
+      const { phase, progress, message } = data;
+      if (phase) {
+        if (progress === 100) {
+          setPhaseStatus(phase, 'success');
+          addUpdateLog('✓ ' + (message || phase), 'success');
+        } else {
+          setPhaseStatus(phase, 'active', progress);
+        }
+      }
+      if (message) {
+        const msgEl = document.getElementById('update-current-message');
+        if (msgEl) msgEl.textContent = message;
+        if (progress === undefined || progress === 0) {
+          addUpdateLog(message, 'info');
+        }
+      }
+    }
+    function _onUpdateLog(data) { addUpdateLog(data.message, data.level || 'info'); }
+    function _onUpdateStarted() {
+      setUpdateStatusUI('updating');
+      resetUpdatePhases();
+    }
+    function _onUpdatePhase(data) {
+      const { phase, status } = data;
+      if (status === 'start') setPhaseStatus(phase, 'active');
+      else if (status === 'complete') setPhaseStatus(phase, 'success');
+      else if (status === 'failed') setPhaseStatus(phase, 'failed');
+    }
+    function _onUpdateRestarting() {
+      addUpdateLog('服务即将重启，页面连接将中断...', 'warn');
+      setPhaseStatus('restart', 'active');
+      const msgEl = document.getElementById('update-current-message');
+      if (msgEl) msgEl.textContent = '服务正在重启，等待重新连接...';
+    }
+    function _onUpdateSuccess(data) {
+      setUpdateStatusUI('success');
+      setPhaseStatus('verify', 'success');
+      addUpdateLog('========== 更新成功! ==========', 'success');
+      if (data.version) {
+        document.getElementById('update-current-version').textContent = data.version;
+      }
+      updateCurrentPackage = null;
+      const msgEl = document.getElementById('update-current-message');
+      if (msgEl) msgEl.textContent = '更新完成，服务已重启';
+      setTimeout(() => loadBackupList(), 1000);
+    }
+    function _onUpdateFailed(data) {
+      setUpdateStatusUI('failed');
+      addUpdateLog('========== 更新失败 ==========', 'error');
+      if (data.error) addUpdateLog('错误: ' + data.error, 'error');
+      if (data.rolledBack) addUpdateLog('已自动回滚到上一版本', 'warn');
+      const msgEl = document.getElementById('update-current-message');
+      if (msgEl) msgEl.textContent = '更新失败: ' + (data.error || '未知错误');
+      setTimeout(() => loadUpdateStatus(), 2000);
+    }
+    function _onUpdateRollbackStart() {
+      setUpdateStatusUI('rolling_back');
+      addUpdateLog('开始回滚...', 'warn');
+    }
+    function _onUpdateRollbackSuccess(data) {
+      addUpdateLog('========== 回滚成功 ==========', 'success');
+      if (data.version) {
+        document.getElementById('update-current-version').textContent = data.version;
+      }
+      const msgEl = document.getElementById('update-current-message');
+      if (msgEl) msgEl.textContent = '已回滚到上一版本';
+      setTimeout(() => loadUpdateStatus(), 2000);
+    }
+    function _onUpdateCancelled() {
+      updateCurrentPackage = null;
+      resetUpdatePhases();
+      setUpdateStatusUI('idle');
+    }
+
+    function bindUpdateSocketEvents() {
+      if (!socket) return;
+      if (updateHandlersBound) return;
+      updateHandlersBound = true;
+      socket.on('update_progress', _onUpdateProgress);
+      socket.on('update_log', _onUpdateLog);
+      socket.on('update_started', _onUpdateStarted);
+      socket.on('update_phase', _onUpdatePhase);
+      socket.on('update_restarting', _onUpdateRestarting);
+      socket.on('update_success', _onUpdateSuccess);
+      socket.on('update_failed', _onUpdateFailed);
+      socket.on('update_rollback_start', _onUpdateRollbackStart);
+      socket.on('update_rollback_success', _onUpdateRollbackSuccess);
+      socket.on('update_cancelled', _onUpdateCancelled);
+    }
+
+    function unbindUpdateSocketEvents() {
+      if (!socket) { updateHandlersBound = false; return; }
+      socket.off('update_progress', _onUpdateProgress);
+      socket.off('update_log', _onUpdateLog);
+      socket.off('update_started', _onUpdateStarted);
+      socket.off('update_phase', _onUpdatePhase);
+      socket.off('update_restarting', _onUpdateRestarting);
+      socket.off('update_success', _onUpdateSuccess);
+      socket.off('update_failed', _onUpdateFailed);
+      socket.off('update_rollback_start', _onUpdateRollbackStart);
+      socket.off('update_rollback_success', _onUpdateRollbackSuccess);
+      socket.off('update_cancelled', _onUpdateCancelled);
+      updateHandlersBound = false;
+    }
+
+    function addUpdateLog(message, level = 'info') {
+      const logView = document.getElementById('update-log-view');
+      if (!logView) return;
+      const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+      const colors = { info: '#94a3b8', warn: '#fbbf24', error: '#f87171', success: '#22c55e' };
+      const icons = { info: 'ℹ️', warn: '⚠️', error: '❌', success: '✅' };
+      const entry = document.createElement('div');
+      entry.className = `update-log-entry log-${level}`;
+      entry.style.color = colors[level] || colors.info;
+      entry.textContent = `[${time}] ${icons[level] || ''} ${message}`;
+      logView.appendChild(entry);
+      logView.scrollTop = logView.scrollHeight;
+    }
+
+    function resetUpdatePhases() {
+      document.querySelectorAll('.update-phase').forEach(phase => {
+        phase.classList.remove('phase-active', 'phase-success', 'phase-failed');
+        phase.querySelector('.phase-icon').textContent = '⏳';
+        const progressDiv = phase.querySelector('.phase-progress');
+        if (progressDiv) {
+          progressDiv.style.display = 'none';
+          progressDiv.querySelector('.phase-bar-fill').style.width = '0%';
+        }
+      });
+    }
+
+    function setPhaseStatus(phaseName, status, progress) {
+      const phase = document.querySelector(`.update-phase[data-phase="${phaseName}"]`);
+      if (!phase) return;
+      phase.classList.remove('phase-active', 'phase-success', 'phase-failed');
+      phase.classList.add(`phase-${status}`);
+      const iconEl = phase.querySelector('.phase-icon');
+      const progressDiv = phase.querySelector('.phase-progress');
+      if (status === 'active') {
+        iconEl.textContent = '🔄';
+        if (progressDiv) {
+          progressDiv.style.display = 'block';
+          if (progress !== undefined) {
+            progressDiv.querySelector('.phase-bar-fill').style.width = progress + '%';
+          }
+        }
+      } else if (status === 'success') {
+        iconEl.textContent = '✅';
+        if (progressDiv) {
+          progressDiv.style.display = 'block';
+          progressDiv.querySelector('.phase-bar-fill').style.width = '100%';
+        }
+      } else if (status === 'failed') {
+        iconEl.textContent = '❌';
+      }
+    }
+
+    function setUpdateStatusUI(status) {
+      const statusEl = document.getElementById('update-status-text');
+      const statusInfo = document.getElementById('update-status-info');
+      const targetInfo = document.getElementById('update-target-info');
+      const targetVersion = document.getElementById('update-target-version');
+      const btnStart = document.getElementById('update-btn-start');
+      const btnCancel = document.getElementById('update-btn-cancel');
+      const uploadArea = document.getElementById('update-upload-area');
+
+      const statusMap = {
+        idle: { text: '空闲', color: 'rgba(34,197,94,0.1)', border: '#22c55e', textColor: '#86efac' },
+        uploading: { text: '上传中', color: 'rgba(59,130,246,0.1)', border: '#3b82f6', textColor: '#93c5fd' },
+        uploaded: { text: '待更新', color: 'rgba(245,158,11,0.1)', border: '#f59e0b', textColor: '#fcd34d' },
+        updating: { text: '更新中', color: 'rgba(139,92,246,0.1)', border: '#8b5cf6', textColor: '#c4b5fd' },
+        success: { text: '更新成功', color: 'rgba(34,197,94,0.1)', border: '#22c55e', textColor: '#86efac' },
+        failed: { text: '更新失败', color: 'rgba(239,68,68,0.1)', border: '#ef4444', textColor: '#fca5a5' },
+        rolling_back: { text: '回滚中', color: 'rgba(245,158,11,0.1)', border: '#f59e0b', textColor: '#fcd34d' }
+      };
+      const cfg = statusMap[status] || statusMap.idle;
+      if (statusEl) statusEl.textContent = cfg.text;
+      if (statusInfo) {
+        statusInfo.style.background = cfg.color;
+        statusInfo.style.borderLeftColor = cfg.border;
+        statusEl.style.color = '#fff';
+      }
+
+      const isBusy = ['uploading', 'updating', 'rolling_back'].includes(status);
+      if (btnStart) {
+        if (status === 'uploaded') {
+          btnStart.disabled = false;
+          btnStart.style.opacity = '1';
+          btnStart.style.cursor = 'pointer';
+        } else {
+          btnStart.disabled = true;
+          btnStart.style.opacity = '0.5';
+          btnStart.style.cursor = 'not-allowed';
+        }
+        btnStart.style.display = isBusy ? 'none' : '';
+      }
+      if (btnCancel) {
+        btnCancel.style.display = isBusy ? '' : 'none';
+      }
+      if (uploadArea) {
+        uploadArea.style.opacity = isBusy ? '0.5' : '1';
+        uploadArea.style.pointerEvents = isBusy ? 'none' : '';
+      }
+      if (targetInfo) {
+        targetInfo.style.display = updateCurrentPackage ? 'block' : 'none';
+      }
+    }
+
+    async function loadUpdateStatus() {
+      try {
+        const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+        const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+        const res = await fetch('/api/update/status', { headers });
+        const data = await res.json();
+        if (data.success) {
+          const s = data.status;
+          const displayVersion = s.currentVersion || await fetchServerVersion();
+          document.getElementById('update-current-version').textContent = displayVersion;
+          if (s.packageInfo) {
+            updateCurrentPackage = s.packageInfo;
+            document.getElementById('update-target-version').textContent = s.packageInfo.version || '新包';
+          } else {
+            updateCurrentPackage = null;
+          }
+          setUpdateStatusUI(s.state);
+          if (s.lastError) {
+            addUpdateLog('上次错误: ' + s.lastError, 'error');
+          }
+          if (s.lastBackup) {
+            addUpdateLog('最近备份版本: ' + s.lastBackup.version, 'info');
+          }
+          loadBackupList();
+          bindUpdateSocketEvents();
+        } else {
+          const ver = await fetchServerVersion();
+          document.getElementById('update-current-version').textContent = ver;
+          if (data.message) addUpdateLog('获取状态失败: ' + data.message, 'warn');
+        }
+      } catch (e) {
+        const ver = await fetchServerVersion();
+        document.getElementById('update-current-version').textContent = ver;
+        addUpdateLog('获取状态失败: ' + e.message, 'error');
+      }
+    }
+
+    async function fetchServerVersion() {
+      try {
+        const res = await fetch('/version');
+        const data = await res.json();
+        if (data.version) return data.version;
+        if (data.major !== undefined) return `v${data.major}.${data.minor}.${data.patch} (build ${data.build})`;
+      } catch (e) { /* ignore */ }
+      return '未知';
+    }
+
+    async function loadBackupList() {
+      try {
+        const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+        const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+        const res = await fetch('/api/update/backups', { headers });
+        const data = await res.json();
+        const listEl = document.getElementById('update-backup-list');
+        const countEl = document.getElementById('update-backup-count');
+        if (data.success && data.backups.length > 0) {
+          countEl.textContent = `(${data.backups.length}个)`;
+          listEl.innerHTML = data.backups.map(b => `
+            <div class="backup-item">
+              <div class="backup-info">
+                <span class="backup-version">${b.version}</span>
+                <span class="backup-meta">${b.timestamp} · 文件数: ${b.fileCount} · ${b.sizeFormatted}</span>
+                ${b.reason ? `<span class="backup-meta">原因: ${b.reason}</span>` : ''}
+              </div>
+              <div class="backup-actions">
+                <button class="action-btn btn-warning" style="padding:4px 10px;font-size:11px;" onclick="rollbackToBackup('${b.id}')">↩ 回滚</button>
+                <button class="action-btn btn-danger" style="padding:4px 10px;font-size:11px;" onclick="deleteBackup('${b.id}')">🗑</button>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          countEl.textContent = '';
+          listEl.innerHTML = '<div style="color:#64748b;font-size:13px;text-align:center;padding:20px;">暂无备份</div>';
+        }
+      } catch (e) {
+        console.error('加载备份列表失败', e);
+      }
+    }
+
+    function handleUpdateDrop(e) {
+      e.preventDefault();
+      e.currentTarget.style.borderColor = '#475569';
+      e.currentTarget.style.background = 'transparent';
+      const files = e.dataTransfer.files;
+      if (files.length > 0 && files[0].name.endsWith('.zip')) {
+        uploadUpdateFile(files[0]);
+      } else {
+        addUpdateLog('请上传 .zip 格式的更新包', 'warn');
+      }
+    }
+
+    function handleUpdateFileSelect(e) {
+      const file = e.target.files[0];
+      if (file) {
+        if (file.name.endsWith('.zip')) {
+          uploadUpdateFile(file);
+        } else {
+          addUpdateLog('请选择 .zip 格式的更新包', 'warn');
+        }
+      }
+      e.target.value = '';
+    }
+
+    function uploadUpdateFile(file) {
+      if (file.size > 100 * 1024 * 1024) {
+        addUpdateLog('文件大小超过100MB限制', 'error');
+        return;
+      }
+      const xhr = new XMLHttpRequest();
+
+      const progressDiv = document.getElementById('update-upload-progress');
+      const progressBar = document.getElementById('update-upload-bar');
+      const progressPercent = document.getElementById('update-upload-percent');
+      progressDiv.style.display = 'block';
+      setUpdateStatusUI('uploading');
+      addUpdateLog(`开始上传: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`, 'info');
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const percent = Math.round(e.loaded / e.total * 100);
+          progressBar.style.width = percent + '%';
+          progressPercent.textContent = percent + '%';
+        }
+      };
+
+      xhr.onload = () => {
+        progressDiv.style.display = 'none';
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (data.success) {
+            updateCurrentPackage = data.packageInfo;
+            document.getElementById('update-target-version').textContent = data.packageInfo.version || file.name;
+            addUpdateLog(`上传成功: ${data.packageInfo.sizeFormatted}`, 'success');
+            setUpdateStatusUI('uploaded');
+          } else {
+            addUpdateLog('上传失败: ' + (data.message || '未知错误'), 'error');
+            setUpdateStatusUI('idle');
+          }
+        } catch (e) {
+          addUpdateLog('上传响应解析失败', 'error');
+          setUpdateStatusUI('idle');
+        }
+      };
+
+      xhr.onerror = () => {
+        progressDiv.style.display = 'none';
+        addUpdateLog('上传失败: 网络错误', 'error');
+        setUpdateStatusUI('idle');
+      };
+
+      xhr.open('POST', '/api/update/upload');
+      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+      if (token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+      xhr.setRequestHeader('Content-Type', 'application/zip');
+      xhr.send(file);
+    }
+
+    async function startUpdate() {
+      if (!confirm('确定开始更新？更新过程中服务将短暂重启，当前在线用户会被断开。建议在维护期间执行。')) return;
+      try {
+        resetUpdatePhases();
+        addUpdateLog('========== 开始更新 ==========', 'info');
+        const res = await fetch('/api/update/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken')) }
+        });
+        const data = await res.json();
+        if (!data.success) {
+          addUpdateLog('启动更新失败: ' + data.message, 'error');
+        }
+      } catch (e) {
+        addUpdateLog('请求失败: ' + e.message, 'error');
+      }
+    }
+
+    async function cancelUpdate() {
+      if (!confirm('确定取消更新？已上传的包将被清理。')) return;
+      try {
+        const res = await fetch('/api/update/cancel', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken')) }
+        });
+        const data = await res.json();
+        if (data.success) {
+          updateCurrentPackage = null;
+          resetUpdatePhases();
+          addUpdateLog('更新已取消', 'warn');
+          setUpdateStatusUI('idle');
+        }
+      } catch (e) {
+        addUpdateLog('取消失败: ' + e.message, 'error');
+      }
+    }
+
+    async function rollbackToBackup(backupId) {
+      if (!confirm('确定回滚到此版本？服务将重启以完成回滚。')) return;
+      try {
+        addUpdateLog(`========== 开始回滚到备份 ${backupId} ==========`, 'warn');
+        const res = await fetch('/api/update/rollback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken')) },
+          body: JSON.stringify({ backupId })
+        });
+        const data = await res.json();
+        if (!data.success) {
+          addUpdateLog('回滚失败: ' + data.message, 'error');
+        }
+      } catch (e) {
+        addUpdateLog('回滚请求失败: ' + e.message, 'error');
+      }
+    }
+
+    async function deleteBackup(backupId) {
+      if (!confirm('确定删除此备份？删除后无法恢复。')) return;
+      try {
+        const res = await fetch('/api/update/backup/' + backupId, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken')) }
+        });
+        const data = await res.json();
+        if (data.success) {
+          addUpdateLog('备份已删除', 'info');
+          loadBackupList();
+        } else {
+          addUpdateLog('删除失败: ' + data.message, 'error');
+        }
+      } catch (e) {
+        addUpdateLog('删除请求失败: ' + e.message, 'error');
+      }
+    }
   </script>
 
 </body>

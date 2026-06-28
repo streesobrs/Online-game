@@ -16,7 +16,7 @@ const storageRoot = getStorageRoot();
 
 module.exports = {
   // 版本号 (语义化版本：MAJOR.MINOR.PATCH)
-  version: '1.2.0',
+  version: '1.6.0',
 
   // ========== 服务器基础配置 ==========
   server: {
@@ -47,7 +47,7 @@ module.exports = {
     tokenBytes: 32,                                // 动态Token随机字节数（64位十六进制）
     defaultMuteMinutes: 10,                        // 管理员一键禁言默认时长（分钟）
     allowedUsernames: process.env.ADMIN_USERNAMES ? process.env.ADMIN_USERNAMES.split(',') : ['admin'],
-    upgradeKey: process.env.ADMIN_UPGRADE_KEY || 'ADMIN-UPGRADE-2026-SECRET'
+    upgradeKey: process.env.ADMIN_UPGRADE_KEY || 'ccccccccccccccccccc'
   },
 
   // ========== 系统运维配置 ==========
@@ -366,6 +366,37 @@ module.exports = {
     maxRatio: 0.5,                                  // 动态价格最大系数（最低价格）
     minRatio: 0.18,                                 // 动态价格最小系数（最高价格）
     curveExponent: 0.7                              // 价格曲线幂次（控制平滑度）
+  },
+
+  // ========== 系统自动更新配置 ==========
+  update: {
+    enabled: true,                                  // 是否启用自动更新功能
+    maxUploadSize: 100 * 1024 * 1024,              // 更新包最大大小 100MB
+    maxExtractSize: 500 * 1024 * 1024,             // 解压后最大总大小 500MB
+    maxFileCount: 2000,                             // 最大文件数量
+    allowedPaths: [                                 // 允许更新的路径前缀
+      'server', 'client', 'package.json', 'package-lock.json',
+      'version.json', 'start.bat', 'start.ps1'
+    ],
+    blockedPaths: [                                 // 禁止更新的路径
+      'data', 'logs', 'update', 'config.js', '.env', 'updater'
+    ],
+    backupDir: 'update/backup',                     // 备份目录
+    tempDir: 'update/temp',                         // 临时解压目录
+    uploadDir: 'update/uploads',                    // 上传包临时存储
+    statusFile: 'update/update-status.json',        // 更新状态文件
+    lockFile: 'update/update.lock',                 // 更新锁文件
+    flagFile: 'restart.flag',                       // 重启标记文件
+    maxBackups: 3,                                  // 保留的最大版本备份数
+    gracePeriodSeconds: 30,                         // 优雅关闭等待时间（秒）
+    restartTimeoutSeconds: 60,                      // 新进程启动超时（秒）
+    healthCheckRetries: 30,                         // 健康检查最大重试次数
+    healthCheckIntervalMs: 2000,                    // 健康检查间隔（毫秒）
+    rollbackOnStartupFailure: true,                 // 启动失败自动回滚
+    autoRollbackCrashThreshold: 3,                  // 时间窗口内崩溃多少次触发自动回滚
+    autoRollbackCrashWindowMs: 10 * 60 * 1000,     // 崩溃计数时间窗口（10分钟）
+    requireSignature: false,                        // 是否要求数字签名（默认关闭，可后续开启）
+    chunkSize: 5 * 1024 * 1024                     // 分片上传大小 5MB
   },
 
   // ========== 数据存储配置 ==========
