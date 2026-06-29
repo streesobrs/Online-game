@@ -1004,7 +1004,7 @@ class UpdateManager {
       const oldPid=${process.pid};
       const batPath=${JSON.stringify(startBat)};
       const cwd=${JSON.stringify(this.storageRoot)};
-      const log=msg=>{try{const d=path.join(cwd,'logs');fs.mkdirSync(d,{recursive:true});fs.appendFileSync(path.join(d,'update.log'),new Date().toISOString()+' [restarter] '+msg+'\\n')}catch(e){}};
+      const log=msg=>{try{const d=path.join(cwd,'logs');fs.mkdirSync(d,{recursive:true});const dt=new Date();const p=n=>String(n).padStart(2,'0');const ts=dt.getFullYear()+'-'+p(dt.getMonth()+1)+'-'+p(dt.getDate())+'T'+p(dt.getHours())+':'+p(dt.getMinutes())+':'+p(dt.getSeconds())+'.'+String(dt.getMilliseconds()).padStart(3,'0');fs.appendFileSync(path.join(d,'update.log'),ts+' [restarter] '+msg+'\\n')}catch(e){}};
       log('等待旧进程 PID='+oldPid+' 退出...');
       function waitExit(){
         try{process.kill(oldPid,0);setTimeout(waitExit,500)}

@@ -8,6 +8,7 @@ const fs = require('fs');
 // 加载配置
 const config = require('./config');
 const logger = require('./utils/logger');
+const dataStore = require('./utils/dataStore');
 const runtimeConfig = require('./modules/runtimeConfig');
 
 // 初始化运行时配置（从磁盘加载覆盖值，必须在使用config之前调用）
@@ -731,6 +732,74 @@ app.get('/api/games/history', async (req, res) => {
       success: false,
       message: '获取游戏历史失败'
     });
+  }
+});
+
+// 管理员：获取所有对局记录（分页+筛选）
+app.get('/api/admin/games', authenticateToken, async (req, res) => {
+  try {
+    const { gameType, result, page = 1, pageSize = 20, keyword } = req.query;
+    const p = parseInt(page) || 1;
+    const ps = parseInt(pageSize) || 20;
+    const allGames = await dataStore.read('games');
+    let games = Array.isArray(allGames) ? allGames : [];
+
+    if (gameType && gameType !== 'all') {
+      games = games.filter(g => g.gameType === gameType);
+    }
+    if (result && result !== 'all') {
+      games = games.filter(g => g.result === result);
+    }
+    if (keyword) {
+      const kw = keyword.toLowerCase();
+      games = games.filter(g =>
+        (g.player1Nickname && g.player1Nickname.toLowerCase().includes(kw)) ||
+        (g.player2Nickname && g.player2Nickname.toLowerCase().includes(kw)) ||
+        (g.gameId && g.gameId.toLowerCase().includes(kw))
+      );
+    }
+
+    games.sort((a, b) => (b.endTime || b.savedAt || 0) - (a.endTime || a.savedAt || 0));
+
+    const total = games.length;
+    const totalPages = Math.max(1, Math.ceil(total / ps));
+    const start = (p - 1) * ps;
+    const pageData = games.slice(start, start + ps).map(g => ({
+      gameId: g.gameId,
+      gameType: g.gameType,
+      player1: g.player1Nickname || g.player1 || '-',
+      player2: g.player2Nickname || g.player2 || '-',
+      winner: g.winner,
+      winnerNickname: g.winner === g.player1 ? (g.player1Nickname || g.player1)
+        : g.winner === g.player2 ? (g.player2Nickname || g.player2)
+          : g.winner === 'ai' ? 'AI' : (g.winner || '-'),
+      result: g.result,
+      moveCount: Array.isArray(g.moves) ? g.moves.length : 0,
+      duration: g.duration || 0,
+      startTime: g.startTime,
+      endTime: g.endTime,
+      gameMode: g.gameMode || 'pvp',
+      difficulty: g.difficulty,
+      score: g.score,
+      winReason: g.winReason
+    }));
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTime = today.getTime();
+    const stats = {
+      total: allGames.length,
+      todayGames: allGames.filter(g => (g.endTime || g.savedAt || 0) >= todayTime).length,
+      pvpGames: allGames.filter(g => !g.gameMode || g.gameMode === 'pvp').length,
+      aiGames: allGames.filter(g => g.gameMode === 'ai').length,
+      activeGames: gameManager.games.size,
+      aiActiveGames: gameManager.aiGames.size
+    };
+
+    res.json({ success: true, data: pageData, pagination: { page: p, pageSize: ps, total, totalPages }, stats });
+  } catch (err) {
+    logger.error('获取对局列表失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取对局列表失败' });
   }
 });
 

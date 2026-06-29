@@ -6,9 +6,19 @@ const http = require('http');
 const logFile = path.join(__dirname, '..', 'logs', 'updater.log');
 const heartbeatFile = path.join(__dirname, 'updater.heartbeat');
 
+function localISOString() {
+  const date = new Date();
+  const pad = (n, len = 2) => String(n).padStart(len, '0');
+  const tzOffset = -date.getTimezoneOffset();
+  const tzSign = tzOffset >= 0 ? '+' : '-';
+  return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) +
+    'T' + pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds()) +
+    '.' + pad(date.getMilliseconds(), 3) + tzSign + pad(Math.floor(Math.abs(tzOffset) / 60)) + ':' + pad(Math.abs(tzOffset) % 60);
+}
+
 function log(level, message, meta) {
   const entry = {
-    timestamp: new Date().toISOString(),
+    timestamp: localISOString(),
     level,
     message,
     pid: process.pid,

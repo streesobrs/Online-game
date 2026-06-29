@@ -1673,6 +1673,10 @@
           <span class="nav-icon">🎮</span>
           <span class="nav-text">游戏管理</span>
         </div>
+        <div class="nav-item" onclick="switchView('matches')">
+          <span class="nav-icon">🏆</span>
+          <span class="nav-text">对局管理</span>
+        </div>
         <div class="nav-item" onclick="switchView('chat')">
           <span class="nav-icon">💬</span>
           <span class="nav-text">聊天管理</span>
@@ -1943,6 +1947,126 @@
                 </tbody>
               </table>
             </div>
+          </div>
+        </section>
+
+        <!-- 对局管理 -->
+        <section id="view-matches" class="content-section">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
+            <div class="stat-card" style="padding:16px;">
+              <div class="stat-label" style="font-size:12px;color:#94a3b8;">总对局数</div>
+              <div class="stat-value" id="matches-total"
+                style="font-size:24px;font-weight:700;color:#e2e8f0;margin-top:4px;">-</div>
+            </div>
+            <div class="stat-card" style="padding:16px;">
+              <div class="stat-label" style="font-size:12px;color:#94a3b8;">今日对局</div>
+              <div class="stat-value" id="matches-today"
+                style="font-size:24px;font-weight:700;color:#60a5fa;margin-top:4px;">-</div>
+            </div>
+            <div class="stat-card" style="padding:16px;">
+              <div class="stat-label" style="font-size:12px;color:#94a3b8;">进行中对局</div>
+              <div class="stat-value" id="matches-active"
+                style="font-size:24px;font-weight:700;color:#22c55e;margin-top:4px;">-</div>
+            </div>
+            <div class="stat-card" style="padding:16px;">
+              <div class="stat-label" style="font-size:12px;color:#94a3b8;">PVP / AI</div>
+              <div class="stat-value" id="matches-mode"
+                style="font-size:24px;font-weight:700;color:#f59e0b;margin-top:4px;">-</div>
+            </div>
+          </div>
+
+          <div class="data-card" style="margin-bottom:16px;">
+            <div class="card-header">
+              <span class="card-title">🔴 实时对局</span>
+              <div class="card-tools">
+                <button class="action-btn btn-secondary" onclick="loadLiveMatches()"
+                  style="padding:6px 14px;font-size:12px;">🔄 刷新</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>游戏ID</th>
+                    <th>类型</th>
+                    <th>玩家1</th>
+                    <th>玩家2</th>
+                    <th>模式</th>
+                    <th>步数</th>
+                    <th>开始时间</th>
+                    <th>时长</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="matches-live-body">
+                  <tr>
+                    <td colspan="9">
+                      <div class="empty-state">
+                        <div class="empty-icon">⏳</div>加载中...
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="data-card">
+            <div class="card-header">
+              <span class="card-title">📜 历史对局</span>
+              <div class="card-tools">
+                <input type="text" id="match-search-input" class="search-input" placeholder="搜索玩家昵称/ID"
+                  style="width:180px;" onkeyup="if(event.key==='Enter')loadMatchHistory(1)">
+                <select id="match-type-filter" class="filter-select" onchange="loadMatchHistory(1)">
+                  <option value="all">全部类型</option>
+                  <option value="gobang">五子棋</option>
+                  <option value="go">围棋</option>
+                  <option value="chinese-chess">中国象棋</option>
+                  <option value="snake">贪吃蛇</option>
+                </select>
+                <select id="match-result-filter" class="filter-select" onchange="loadMatchHistory(1)">
+                  <option value="all">全部结果</option>
+                  <option value="win">胜</option>
+                  <option value="loss">负</option>
+                  <option value="draw">平</option>
+                  <option value="resign">认输</option>
+                  <option value="timeout">超时</option>
+                  <option value="invalid">无效</option>
+                </select>
+                <button class="action-btn btn-secondary" onclick="loadMatchHistory(1)"
+                  style="padding:6px 14px;font-size:12px;">🔄 刷新</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>游戏ID</th>
+                    <th>类型</th>
+                    <th>玩家1</th>
+                    <th>玩家2</th>
+                    <th>胜者</th>
+                    <th>结果</th>
+                    <th>步数</th>
+                    <th>时长</th>
+                    <th>模式</th>
+                    <th>结束时间</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="matches-history-body">
+                  <tr>
+                    <td colspan="11">
+                      <div class="empty-state">
+                        <div class="empty-icon">⏳</div>加载中...
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="matches-pagination"
+              style="display:flex;justify-content:center;align-items:center;gap:8px;padding:12px 0;"></div>
           </div>
         </section>
 
@@ -2945,6 +3069,7 @@
           renderSystemInfo(adminData.stats?.system);
           if (currentView === 'users') renderOnlineUsers();
           if (currentView === 'games') renderGames();
+          if (currentView === 'matches') loadLiveMatches();
           if (currentView === 'accounts') renderAccounts();
           if (currentView === 'dashboard') {
             renderLeaderboard();
@@ -3097,6 +3222,7 @@
           renderSystemInfo(adminData.stats?.system);
           if (currentView === 'users') renderOnlineUsers();
           if (currentView === 'games') renderGames();
+          if (currentView === 'matches') loadLiveMatches();
           if (currentView === 'accounts') renderAccounts();
           if (currentView === 'dashboard') {
             renderLeaderboard();
@@ -3200,6 +3326,7 @@
         dashboard: '数据概览',
         users: '用户管理',
         games: '游戏管理',
+        matches: '对局管理',
         chat: '聊天管理',
         accounts: '账号管理',
         system: '系统设置',
@@ -3226,6 +3353,7 @@
       if (view === 'accounts') loadAccounts();
       if (view === 'system') { loadSystemStats(); loadSystemSettings(); }
       if (view === 'update') { bindUpdateSocketEvents(); loadUpdateStatus(); }
+      if (view === 'matches') { loadLiveMatches(); loadMatchHistory(1); }
       if (view === 'logs') openLogView();
       if (view === 'exp-records') loadExpRecords();
       if (view === 'coin-records') loadCoinRecords();
@@ -3345,6 +3473,7 @@
         renderSystemInfo(adminData.stats?.system);
         if (currentView === 'users') renderOnlineUsers();
         if (currentView === 'games') renderGames();
+        if (currentView === 'matches') loadLiveMatches();
         if (currentView === 'accounts') renderAccounts();
         if (currentView === 'dashboard') {
           renderLeaderboard();
@@ -5108,6 +5237,219 @@
       socket.emit('end_game', { gameId });
     }
 
+    // ==================== 对局管理 ====================
+    let matchHistoryPage = 1;
+    let matchHistoryPageSize = 20;
+
+    const gameTypeNames = {
+      'gobang': '五子棋', 'go': '围棋', 'chinese-chess': '象棋', 'snake': '贪吃蛇'
+    };
+    const gameTypeBadge = {
+      'gobang': 'badge-info', 'go': 'badge-success', 'chinese-chess': 'badge-warning', 'snake': 'badge-online'
+    };
+
+    function formatDuration(ms) {
+      if (!ms || ms < 0) return '-';
+      const s = Math.floor(ms / 1000);
+      if (s < 60) return s + '秒';
+      const m = Math.floor(s / 60);
+      const rs = s % 60;
+      if (m < 60) return m + '分' + (rs > 0 ? rs + '秒' : '');
+      const h = Math.floor(m / 60);
+      const rm = m % 60;
+      return h + '时' + rm + '分';
+    }
+
+    function formatResultBadge(result) {
+      const map = {
+        win: { label: '胜', cls: 'badge-online' },
+        loss: { label: '负', cls: 'badge-offline' },
+        draw: { label: '平', cls: 'badge-warning' },
+        resign: { label: '认输', cls: 'badge-offline' },
+        timeout: { label: '超时', cls: 'badge-offline' },
+        invalid: { label: '无效', cls: '' },
+        end: { label: '结束', cls: 'badge-warning' },
+        admin: { label: '管理员结束', cls: 'badge-warning' }
+      };
+      const r = map[result] || { label: result || '-', cls: '' };
+      return `<span class="badge ${r.cls}">${r.label}</span>`;
+    }
+
+    function loadLiveMatches() {
+      const liveGames = adminData.games || [];
+      const tbody = document.getElementById('matches-live-body');
+
+      if (liveGames.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">🎯</div>暂无进行中的对局</div></td></tr>';
+        return;
+      }
+
+      const now = Date.now();
+      tbody.innerHTML = liveGames.map(g => {
+        const typeName = gameTypeNames[g.gameType] || g.gameType;
+        const typeCls = gameTypeBadge[g.gameType] || '';
+        const isAI = g.player2?.userId === 'ai' || g.player2 === 'AI';
+        const p1Name = typeof g.player1 === 'object' ? (g.player1.nickname || g.player1.userId) : (g.player1Nickname || g.player1 || '-');
+        const p2Name = typeof g.player2 === 'object' ? (g.player2.nickname || g.player2.userId) : (g.player2Nickname || g.player2 || '-');
+        const duration = g.startTime ? formatDuration(now - g.startTime) : '-';
+        return `<tr>
+          <td><code style="font-size:11px;color:#94a3b8;">${g.gameId}</code></td>
+          <td><span class="badge ${typeCls}">${typeName}</span></td>
+          <td>${p1Name}</td>
+          <td>${p2Name}</td>
+          <td>${isAI ? '<span class="badge badge-warning">AI</span>' : '<span class="badge badge-info">PVP</span>'}</td>
+          <td>${g.moveCount || 0}</td>
+          <td>${formatTime(g.startTime)}</td>
+          <td>${duration}</td>
+          <td>
+            <div class="table-actions">
+              <button class="table-btn table-btn-info" onclick="viewGameDetail('${g.gameId}')">查看</button>
+              ${g.status === 'playing' ? `<button class="table-btn table-btn-danger" onclick="endGame('${g.gameId}')">结束</button>` : ''}
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    async function loadMatchHistory(page = 1) {
+      matchHistoryPage = page;
+      const tbody = document.getElementById('matches-history-body');
+      const pagEl = document.getElementById('matches-pagination');
+      tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="empty-icon">⏳</div>加载中...</div></td></tr>';
+
+      try {
+        const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+        const gameType = document.getElementById('match-type-filter')?.value || 'all';
+        const result = document.getElementById('match-result-filter')?.value || 'all';
+        const keyword = document.getElementById('match-search-input')?.value || '';
+        const params = new URLSearchParams({ page, pageSize: matchHistoryPageSize, gameType, result, keyword });
+        const res = await fetch('/api/admin/games?' + params, { headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        if (!data.success) {
+          tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><div class="empty-icon">❌</div>${data.message || '加载失败'}</div></td></tr>`;
+          return;
+        }
+
+        const list = data.data || [];
+        const stats = data.stats || {};
+
+        document.getElementById('matches-total').textContent = stats.total || 0;
+        document.getElementById('matches-today').textContent = stats.todayGames || 0;
+        document.getElementById('matches-active').textContent = (stats.activeGames || 0) + (stats.aiActiveGames || 0);
+        document.getElementById('matches-mode').textContent = (stats.pvpGames || 0) + ' / ' + (stats.aiGames || 0);
+
+        if (list.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="empty-icon">📭</div>暂无对局记录</div></td></tr>';
+          pagEl.innerHTML = '';
+          return;
+        }
+
+        tbody.innerHTML = list.map(g => {
+          const typeName = gameTypeNames[g.gameType] || g.gameType;
+          const typeCls = gameTypeBadge[g.gameType] || '';
+          const modeLabel = g.gameMode === 'ai' ? '<span class="badge badge-warning">AI</span>' : g.gameMode === 'single' ? '<span class="badge badge-info">单人</span>' : '<span class="badge badge-online">PVP</span>';
+          const diffLabel = g.difficulty && g.difficulty !== 'normal' ? `<span class="badge" style="background:rgba(168,85,247,0.15);color:#c084fc;">${g.difficulty}</span>` : '';
+          const scoreLabel = g.score !== undefined ? `<span style="color:#fbbf24;">${g.score}分</span>` : '';
+          return `<tr>
+            <td><code style="font-size:11px;color:#94a3b8;">${g.gameId}</code></td>
+            <td><span class="badge ${typeCls}">${typeName}</span></td>
+            <td>${g.player1 || '-'}</td>
+            <td>${g.player2 || '-'}</td>
+            <td style="font-weight:600;color:#86efac;">${g.winnerNickname || '-'}</td>
+            <td>${formatResultBadge(g.result)} ${scoreLabel}</td>
+            <td>${g.moveCount || 0}</td>
+            <td>${formatDuration(g.duration)}</td>
+            <td>${modeLabel} ${diffLabel}</td>
+            <td>${g.endTime ? formatTime(g.endTime) : '-'}</td>
+            <td>
+              <div class="table-actions">
+                <button class="table-btn table-btn-info" onclick="viewMatchReplay('${g.gameId}')">回放</button>
+              </div>
+            </td>
+          </tr>`;
+        }).join('');
+
+        renderMatchPagination(data.pagination);
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="empty-icon">❌</div>加载失败: ' + e.message + '</div></td></tr>';
+      }
+    }
+
+    function renderMatchPagination(pg) {
+      const pagEl = document.getElementById('matches-pagination');
+      if (!pg || pg.totalPages <= 1) { pagEl.innerHTML = ''; return; }
+      let html = '';
+      html += `<button class="action-btn btn-secondary" style="padding:4px 10px;font-size:12px;" ${pg.page <= 1 ? 'disabled' : ''} onclick="loadMatchHistory(${pg.page - 1})">上一页</button>`;
+      const maxBtn = 7;
+      let startP = Math.max(1, pg.page - 3);
+      let endP = Math.min(pg.totalPages, startP + maxBtn - 1);
+      if (endP - startP < maxBtn - 1) startP = Math.max(1, endP - maxBtn + 1);
+      for (let i = startP; i <= endP; i++) {
+        const active = i === pg.page;
+        html += `<button class="action-btn ${active ? 'btn-primary' : 'btn-secondary'}" style="padding:4px 10px;font-size:12px;" onclick="loadMatchHistory(${i})">${i}</button>`;
+      }
+      html += `<button class="action-btn btn-secondary" style="padding:4px 10px;font-size:12px;" ${pg.page >= pg.totalPages ? 'disabled' : ''} onclick="loadMatchHistory(${pg.page + 1})">下一页</button>`;
+      html += `<span style="color:#94a3b8;font-size:12px;margin-left:8px;">共 ${pg.total} 条，${pg.totalPages} 页</span>`;
+      pagEl.innerHTML = html;
+    }
+
+    async function viewMatchReplay(gameId) {
+      try {
+        const res = await fetch('/api/games/replay/' + gameId);
+        const data = await res.json();
+        if (!data.success) { showToast(data.message || '回放不存在', 'error'); return; }
+        const g = data.data;
+        const typeName = gameTypeNames[g.gameType] || g.gameType;
+        const resultText = g.winner ? (g.winner === g.player1 ? g.player1Nickname + ' 胜' : g.player2Nickname + ' 胜') : (g.result === 'draw' ? '平局' : g.result || '未知');
+        showModal('对局回放 - ' + gameId, `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;color:#e2e8f0;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">游戏ID</label>
+              <input type="text" class="form-input" value="${g.gameId}" readonly>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">类型</label>
+              <input type="text" class="form-input" value="${typeName}" readonly>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">玩家1</label>
+              <input type="text" class="form-input" value="${g.player1Nickname || g.player1}" readonly>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">玩家2</label>
+              <input type="text" class="form-input" value="${g.player2Nickname || g.player2}" readonly>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">结果</label>
+              <input type="text" class="form-input" value="${resultText}" readonly>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">步数</label>
+              <input type="text" class="form-input" value="${Array.isArray(g.moves) ? g.moves.length : 0}" readonly>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">开始时间</label>
+              <input type="text" class="form-input" value="${formatTime(g.startTime)}" readonly>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">时长</label>
+              <input type="text" class="form-input" value="${formatDuration(g.duration)}" readonly>
+            </div>
+          </div>
+          <div class="form-group" style="margin-top:12px;">
+            <label class="form-label">走子记录（共${Array.isArray(g.moves) ? g.moves.length : 0}步）</label>
+            <div style="max-height:200px;overflow-y:auto;background:rgba(0,0,0,0.3);border-radius:6px;padding:8px;font-family:monospace;font-size:11px;color:#94a3b8;">
+              ${Array.isArray(g.moves) && g.moves.length > 0 ? g.moves.slice(0, 50).map((m, i) =>
+          `<div>[${i + 1}] P${m.color || m.player || '?'}: ${JSON.stringify(m.position || m)}</div>`
+        ).join('') + (g.moves.length > 50 ? '<div style="color:#64748b;margin-top:4px;">... 仅显示前50步</div>' : '') : '<div style="color:#64748b;">无走子记录</div>'}
+            </div>
+          </div>
+        `, [{ text: '关闭', class: 'btn-secondary', action: closeModal }]);
+      } catch (e) {
+        showToast('加载回放失败: ' + e.message, 'error');
+      }
+    }
+
     function viewUserDetail(accountId) {
       socket.emit('get_user_detail', { accountId });
     }
@@ -5569,7 +5911,10 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `admin-export-${new Date().toISOString().slice(0, 10)}.json`;
+      const d = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      const localDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      a.download = `admin-export-${localDate}.json`;
       a.click();
       URL.revokeObjectURL(url);
 

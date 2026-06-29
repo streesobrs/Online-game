@@ -29,9 +29,22 @@ function getTimestamp() {
   return `${hours}:${minutes}:${seconds}.${milliseconds}`;
 }
 
-// 获取ISO格式的时间（用于文件存储）
+// 获取ISO格式的本地时间（用于文件存储，带时区偏移）
 function getFileTimestamp() {
-  return new Date().toISOString();
+  const date = new Date();
+  const pad = (n, len = 2) => String(n).padStart(len, '0');
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  const seconds = pad(date.getSeconds());
+  const ms = pad(date.getMilliseconds(), 3);
+  const tzOffset = -date.getTimezoneOffset();
+  const tzSign = tzOffset >= 0 ? '+' : '-';
+  const tzH = pad(Math.floor(Math.abs(tzOffset) / 60));
+  const tzM = pad(Math.abs(tzOffset) % 60);
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}${tzSign}${tzH}:${tzM}`;
 }
 
 // 获取今天的日志文件名
