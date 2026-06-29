@@ -26,6 +26,7 @@ const AIManager = require('./modules/AIManager');
 const ThemeManager = require('./modules/ThemeManager');
 const FeedbackManager = require('./modules/FeedbackManager');
 const ShopManager = require('./modules/ShopManager');
+const OperationLogger = require('./modules/OperationLogger');
 const UpdateManager = require('./modules/UpdateManager');
 
 // 初始化Express应用
@@ -803,6 +804,20 @@ app.get('/api/admin/games', authenticateToken, async (req, res) => {
   }
 });
 
+// 管理员：获取操作日志列表（分页+筛选）
+app.get('/api/admin/operation-logs', authenticateToken, async (req, res) => {
+  try {
+    const { userId, username, action, category, targetId, startDate, endDate, page = 1, pageSize = 50 } = req.query;
+    const result = await operationLogger.queryLogs({
+      userId, username, action, category, targetId, startDate, endDate, page, pageSize
+    });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    logger.error('获取操作日志失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取操作日志失败' });
+  }
+});
+
 // ========== 反馈相关API ==========
 
 // 获取反馈列表
@@ -1560,7 +1575,9 @@ app.post('/api/mails/:accountId/cleanup', async (req, res) => {
 
 // 初始化管理器
 const versionManager = new VersionManager();
+const operationLogger = new OperationLogger();
 const accountManager = new AccountManager(io);
+accountManager.operationLogger = operationLogger;
 // 后台加载节假日数据
 AccountManager.initHolidays().catch(err => logger.warn('节假日初始化失败', { error: err.message }));
 // 启动时迁移邮件和背包数据到独立存储

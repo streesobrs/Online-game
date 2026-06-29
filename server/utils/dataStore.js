@@ -16,7 +16,8 @@ class DataStore {
       'currencyTransactions': 'currency_transactions', // 星钻交易记录按用户ID拆分存储
       'expTransactions': 'exp_transactions', // 经验变动记录按用户ID拆分存储
       'mails': 'mails', // 邮件记录按用户ID拆分存储
-      'inventories': 'inventories' // 背包资源按用户ID拆分存储
+      'inventories': 'inventories', // 背包资源按用户ID拆分存储
+      'operationLogs': 'operation_logs' // 操作日志按用户ID拆分存储
     };
 
     // 普通集合的目录映射
@@ -326,7 +327,7 @@ class DataStore {
       await fs.writeFile(tmpPath, JSON.stringify(writeItem, null, 2), 'utf8');
       await this.atomicRename(tmpPath, filePath);
 
-      logger.info('数据已保存到文件', { collection, id, path: filePath });
+      logger.debug('数据已保存到文件', { collection, id, path: filePath });
 
       // 更新缓存
       const cacheKey = `${collection}:${id}`;

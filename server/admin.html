@@ -1677,6 +1677,10 @@
           <span class="nav-icon">🏆</span>
           <span class="nav-text">对局管理</span>
         </div>
+        <div class="nav-item" onclick="switchView('logs')">
+          <span class="nav-icon">📋</span>
+          <span class="nav-text">操作日志</span>
+        </div>
         <div class="nav-item" onclick="switchView('chat')">
           <span class="nav-icon">💬</span>
           <span class="nav-text">聊天管理</span>
@@ -1693,7 +1697,7 @@
           <span class="nav-icon">🔄</span>
           <span class="nav-text">系统更新</span>
         </div>
-        <div class="nav-item" onclick="switchView('logs')">
+        <div class="nav-item" onclick="switchView('realtime')">
           <span class="nav-icon">📋</span>
           <span class="nav-text">实时日志</span>
         </div>
@@ -2070,6 +2074,83 @@
           </div>
         </section>
 
+        <!-- 操作日志 -->
+        <section id="view-logs" class="content-section">
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px;">
+            <div class="stat-card" style="padding:16px;">
+              <div class="stat-label" style="font-size:12px;color:#94a3b8;">总记录数</div>
+              <div class="stat-value" id="oplogs-total"
+                style="font-size:24px;font-weight:700;color:#e2e8f0;margin-top:4px;">-</div>
+            </div>
+            <div class="stat-card" style="padding:16px;">
+              <div class="stat-label" style="font-size:12px;color:#94a3b8;">今日记录</div>
+              <div class="stat-value" id="oplogs-today"
+                style="font-size:24px;font-weight:700;color:#60a5fa;margin-top:4px;">-</div>
+            </div>
+          </div>
+
+          <div class="data-card">
+            <div class="card-header">
+              <span class="card-title">📋 操作日志</span>
+              <div class="card-tools">
+                <input type="text" id="oplogs-search" class="search-input" placeholder="搜索用户/目标" style="width:180px;"
+                  onkeyup="if(event.key==='Enter')loadOperationLogs(1)">
+                <select id="oplogs-category" class="filter-select" onchange="loadOperationLogs(1)">
+                  <option value="">全部分类</option>
+                  <option value="item">道具</option>
+                  <option value="currency">星钻</option>
+                  <option value="cosmetic">外观</option>
+                  <option value="vip">会员</option>
+                  <option value="exp">经验</option>
+                  <option value="account">账号</option>
+                  <option value="pack">礼包</option>
+                  <option value="achievement">成就</option>
+                  <option value="admin">管理</option>
+                </select>
+                <select id="oplogs-action" class="filter-select" onchange="loadOperationLogs(1)">
+                  <option value="">全部操作</option>
+                  <option value="item_use">道具使用</option>
+                  <option value="item_purchase">道具购买</option>
+                  <option value="currency_add">星钻增加</option>
+                  <option value="currency_spend">星钻消费</option>
+                  <option value="cosmetic_equip">外观装备</option>
+                  <option value="pack_open">开启礼包</option>
+                  <option value="login">登录</option>
+                  <option value="level_up">等级提升</option>
+                </select>
+                <button class="action-btn btn-secondary" onclick="loadOperationLogs(1)"
+                  style="padding:6px 14px;font-size:12px;">🔄 刷新</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>时间</th>
+                    <th>用户</th>
+                    <th>分类</th>
+                    <th>操作</th>
+                    <th>目标</th>
+                    <th>数量</th>
+                    <th>详情</th>
+                  </tr>
+                </thead>
+                <tbody id="oplogs-body">
+                  <tr>
+                    <td colspan="7">
+                      <div class="empty-state">
+                        <div class="empty-icon">⏳</div>加载中...
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="oplogs-pagination"
+              style="display:flex;justify-content:center;align-items:center;gap:8px;padding:12px 0;"></div>
+          </div>
+        </section>
+
         <!-- 账号管理 -->
         <section id="view-accounts" class="content-section">
           <div class="data-card">
@@ -2387,7 +2468,7 @@
         </section>
 
         <!-- 实时日志 -->
-        <section id="view-logs" class="content-section">
+        <section id="view-realtime" class="content-section">
           <div class="data-card" style="height:calc(100vh - 140px); display:flex; flex-direction:column;">
             <div class="card-header" style="flex-shrink:0;">
               <span class="card-title">📋 实时日志监控</span>
@@ -3327,11 +3408,12 @@
         users: '用户管理',
         games: '游戏管理',
         matches: '对局管理',
+        logs: '操作日志',
         chat: '聊天管理',
         accounts: '账号管理',
         system: '系统设置',
         update: '系统更新',
-        logs: '实时日志',
+        realtime: '实时日志',
         feedbacks: '反馈管理',
         mail: '邮件系统',
         'exp-records': '经验值获取记录',
@@ -3354,7 +3436,8 @@
       if (view === 'system') { loadSystemStats(); loadSystemSettings(); }
       if (view === 'update') { bindUpdateSocketEvents(); loadUpdateStatus(); }
       if (view === 'matches') { loadLiveMatches(); loadMatchHistory(1); }
-      if (view === 'logs') openLogView();
+      if (view === 'logs') { loadOperationLogs(1); }
+      if (view === 'realtime') openLogView();
       if (view === 'exp-records') loadExpRecords();
       if (view === 'coin-records') loadCoinRecords();
       if (view === 'mail-records') loadMailRecords();
@@ -5448,6 +5531,117 @@
       } catch (e) {
         showToast('加载回放失败: ' + e.message, 'error');
       }
+    }
+
+    // ==================== 操作日志 ====================
+    let opLogPage = 1;
+    let opLogPageSize = 50;
+
+    const opActionNames = {
+      item_use: '道具使用', item_purchase: '道具购买', pack_open: '开启礼包',
+      currency_add: '星钻增加', currency_spend: '星钻消费',
+      cosmetic_equip: '外观装备', cosmetic_unequip: '外观卸下',
+      vip_purchase: '会员购买', vip_renew: '会员续费',
+      exp_change: '经验变动', level_up: '等级提升',
+      login: '登录', logout: '登出',
+      achievement_unlock: '成就解锁',
+      chat: '聊天', report: '举报',
+      admin_grant: '管理员发放', admin_modify: '管理员修改'
+    };
+
+    const opCategoryColors = {
+      item: '#60a5fa', currency: '#fbbf24', cosmetic: '#c084fc',
+      vip: '#f97316', exp: '#22c55e', account: '#94a3b8',
+      pack: '#14b8a6', achievement: '#8b5cf6', chat: '#06b6d4',
+      moderation: '#ef4444', admin: '#ec4899'
+    };
+
+    async function loadOperationLogs(page = 1) {
+      opLogPage = page;
+      const tbody = document.getElementById('oplogs-body');
+      const pagEl = document.getElementById('oplogs-pagination');
+      tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">⏳</div>加载中...</div></td></tr>';
+
+      try {
+        const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+        const keyword = document.getElementById('oplogs-search')?.value || '';
+        const category = document.getElementById('oplogs-category')?.value || '';
+        const action = document.getElementById('oplogs-action')?.value || '';
+        const params = new URLSearchParams({ page, pageSize: opLogPageSize });
+        if (keyword) params.set('username', keyword);
+        if (category) params.set('category', category);
+        if (action) params.set('action', action);
+        const res = await fetch('/api/admin/operation-logs?' + params, { headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        if (!data.success) {
+          tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">❌</div>${data.message || '加载失败'}</div></td></tr>`;
+          return;
+        }
+
+        const list = data.data || [];
+        const stats = data.stats || {};
+        document.getElementById('oplogs-total').textContent = stats.total || 0;
+        document.getElementById('oplogs-today').textContent = stats.today || 0;
+
+        if (list.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📭</div>暂无操作日志</div></td></tr>';
+          pagEl.innerHTML = '';
+          return;
+        }
+
+        tbody.innerHTML = list.map(log => {
+          const actionName = opActionNames[log.action] || log.action;
+          const catColor = opCategoryColors[log.category] || '#94a3b8';
+          const amountClass = log.amount > 0 ? 'color:#22c55e;' : log.amount < 0 ? 'color:#f87171;' : '';
+          const detailsHtml = log.details && typeof log.details === 'object'
+            ? `<button class="table-btn table-btn-info" style="font-size:11px;padding:2px 6px;" onclick="showOpLogDetails(${JSON.stringify(log.details).replace(/"/g, '&quot;')})">详情</button>`
+            : '';
+          return `<tr>
+            <td>${formatTime(log.timestamp)}</td>
+            <td><span style="font-weight:500;">${log.username || log.userId || '-'}</span></td>
+            <td><span style="color:${catColor};font-size:11px;">${log.category}</span></td>
+            <td>${actionName}</td>
+            <td>${log.targetName || log.targetId || '-'}</td>
+            <td style="${amountClass}">${log.amount > 0 ? '+' : ''}${log.amount}</td>
+            <td>${detailsHtml}</td>
+          </tr>`;
+        }).join('');
+
+        renderOpLogPagination(data.pagination);
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">❌</div>加载失败: ' + e.message + '</div></td></tr>';
+      }
+    }
+
+    function renderOpLogPagination(pg) {
+      const pagEl = document.getElementById('oplogs-pagination');
+      if (!pg || pg.totalPages <= 1) { pagEl.innerHTML = ''; return; }
+      let html = '';
+      html += `<button class="action-btn btn-secondary" style="padding:4px 10px;font-size:12px;" ${pg.page <= 1 ? 'disabled' : ''} onclick="loadOperationLogs(${pg.page - 1})">上一页</button>`;
+      const maxBtn = 7;
+      let startP = Math.max(1, pg.page - 3);
+      let endP = Math.min(pg.totalPages, startP + maxBtn - 1);
+      if (endP - startP < maxBtn - 1) startP = Math.max(1, endP - maxBtn + 1);
+      for (let i = startP; i <= endP; i++) {
+        const active = i === pg.page;
+        html += `<button class="action-btn ${active ? 'btn-primary' : 'btn-secondary'}" style="padding:4px 10px;font-size:12px;" onclick="loadOperationLogs(${i})">${i}</button>`;
+      }
+      html += `<button class="action-btn btn-secondary" style="padding:4px 10px;font-size:12px;" ${pg.page >= pg.totalPages ? 'disabled' : ''} onclick="loadOperationLogs(${pg.page + 1})">下一页</button>`;
+      html += `<span style="color:#94a3b8;font-size:12px;margin-left:8px;">共 ${pg.total} 条，${pg.totalPages} 页</span>`;
+      pagEl.innerHTML = html;
+    }
+
+    function showOpLogDetails(details) {
+      let html = '<div style="font-size:13px;color:#e2e8f0;">';
+      for (const [key, val] of Object.entries(details)) {
+        if (typeof val === 'object') {
+          html += `<div style="margin:4px 0;"><span style="color:#94a3b8;">${key}:</span> <pre style="margin:0;font-size:11px;color:#60a5fa;">${JSON.stringify(val, null, 2)}</pre></div>`;
+        } else {
+          html += `<div style="margin:4px 0;"><span style="color:#94a3b8;">${key}:</span> <span>${val}</span></div>`;
+        }
+      }
+      html += '</div>';
+      showModal('操作详情', html, [{ text: '关闭', class: 'btn-secondary', action: closeModal }]);
     }
 
     function viewUserDetail(accountId) {

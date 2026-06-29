@@ -2113,6 +2113,10 @@ class AccountManager {
       await dataStore.writeOne('currencyTransactions', accountId, transactionRecords);
       logger.info('添加星钻', { accountId, amount, reason, balance: newBalance });
 
+      if (this.operationLogger) {
+        this.operationLogger.getCurrencyAdd(accountId, account?.account?.nickname || account?.account?.username || '', amount, reason, { source });
+      }
+
       return { success: true, balance: newBalance, added: amount };
     } catch (err) {
       logger.error('添加星钻失败', { accountId, error: err.message });
@@ -2153,6 +2157,10 @@ class AccountManager {
 
       await dataStore.writeOne('currencyTransactions', accountId, transactionRecords);
       logger.info('使用星钻', { accountId, amount, reason, balance: newBalance });
+
+      if (this.operationLogger) {
+        this.operationLogger.getCurrencySpend(accountId, account?.account?.nickname || account?.account?.username || '', amount, reason);
+      }
 
       return { success: true, balance: newBalance, used: amount };
     } catch (err) {
@@ -2915,6 +2923,20 @@ class AccountManager {
     this._consumeItem(invStore, itemId, count);
 
     await this._saveInventoryStore(userId, invStore);
+
+    if (result.success && this.operationLogger) {
+      let itemName = itemId;
+      if (shopManager) {
+        const itemInfo = shopManager.findItem(itemId);
+        itemName = itemInfo?.name || itemId;
+      }
+      const logDetails = {
+        message: result.message,
+        expGained: expToAdd > 0 ? expToAdd : undefined
+      };
+      this.operationLogger.getItemUse(userId, account?.account?.nickname || account?.account?.username || '', itemId, itemName, count, logDetails);
+    }
+
     return result;
   }
 
@@ -3037,6 +3059,11 @@ class AccountManager {
     }
 
     await this._saveAccount(userId, account);
+
+    if (this.operationLogger) {
+      this.operationLogger.getCosmeticEquip(userId, account?.account?.nickname || account?.account?.username || '', category, cosmeticId, cosmeticId || '');
+    }
+
     return { success: true };
   }
 
