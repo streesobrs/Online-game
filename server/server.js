@@ -807,9 +807,10 @@ app.get('/api/admin/games', authenticateToken, async (req, res) => {
 // 管理员：获取操作日志列表（分页+筛选）
 app.get('/api/admin/operation-logs', authenticateToken, async (req, res) => {
   try {
-    const { userId, username, action, category, targetId, startDate, endDate, page = 1, pageSize = 50 } = req.query;
+    const { userId, username, action, category, targetId, startDate, endDate, page = 1, pageSize = 50, includeTrace = 'false' } = req.query;
     const result = await operationLogger.queryLogs({
-      userId, username, action, category, targetId, startDate, endDate, page, pageSize
+      userId, username, action, category, targetId, startDate, endDate, page, pageSize,
+      includeTrace: includeTrace === 'true'
     });
     res.json({ success: true, ...result });
   } catch (err) {
@@ -1587,15 +1588,21 @@ AccountManager.migrateAll().then(result => {
   }
 }).catch(err => logger.warn('邮件和背包数据迁移失败', { error: err.message }));
 const userManager = new UserManager(accountManager);
+userManager.operationLogger = operationLogger;
 const achievementManager = new AchievementManager(accountManager, userManager);
+achievementManager.operationLogger = operationLogger;
 // 启动时同步勋章数据
 achievementManager.syncAllBadges().catch(err => logger.warn('勋章数据同步失败', { error: err.message }));
 const aiManager = new AIManager();
 const gameManager = new GameManager(userManager, accountManager, achievementManager, aiManager);
+gameManager.operationLogger = operationLogger;
 const chatManager = new ChatManager(userManager, gameManager, accountManager);
+chatManager.operationLogger = operationLogger;
 const adminManager = new AdminManager(userManager, gameManager, chatManager, accountManager, io);
+adminManager.operationLogger = operationLogger;
 const feedbackManager = FeedbackManager;
 const shopManager = new ShopManager();
+shopManager.operationLogger = operationLogger;
 // 注入accountManager到FeedbackManager用于实时查询昵称
 feedbackManager.accountManager = accountManager;
 
@@ -1782,6 +1789,33 @@ io.on('connection', (socket) => {
     return true;
   }
 
+  // 获取当前登录用户信息的辅助函数
+  function getSocketUser() {
+    const session = userManager.getUserBySocketId(socket.id);
+    if (!session || !session.accountId) return null;
+    return {
+      userId: session.accountId,
+      username: session.nickname || session.accountData?.account?.nickname || session.accountData?.account?.username || ''
+    };
+  }
+
+  // Socket 事件全量追踪日志（排除高频噪音事件）
+  const TRACE_EXCLUDE_EVENTS = new Set([
+    'snake_update', 'snake_food_update', 'user_status',
+    'disconnect', 'error'
+  ]);
+
+  async function logSocketEvent(eventName, data, extraDetails = {}) {
+    if (TRACE_EXCLUDE_EVENTS.has(eventName)) return;
+    const user = getSocketUser();
+    if (!user) return;
+    try {
+      await operationLogger.logSocketEvent(user.userId, user.username, eventName, data, extraDetails);
+    } catch (err) {
+      // 静默失败，不影响主流程
+    }
+  }
+
   // 处理客户端连接事件（包含版本号和token）
   socket.on('client_connect', async (data) => {
     logger.info('收到客户端连接请求', {
@@ -1905,6 +1939,7 @@ io.on('connection', (socket) => {
     if (result.success) {
       const account = result.data.account;
       const permissions = config.permissions.guest;
+      const accountId = result.data.account.account.id;
 
       socket.emit('login_result', {
         success: true,
@@ -1917,8 +1952,13 @@ io.on('connection', (socket) => {
         }
       });
 
+      // 记录操作日志
+      if (operationLogger) {
+        operationLogger.getLogin(accountId, account.account?.nickname || account.account?.username || '', socket.handshake?.address || '');
+      }
+
       // 广播用户上线
-      userManager.broadcastUserStatus(result.data.account.account.id, 'online', io);
+      userManager.broadcastUserStatus(accountId, 'online', io);
     } else {
       socket.emit('login_result', result);
     }
@@ -1938,6 +1978,7 @@ io.on('connection', (socket) => {
     if (result.success) {
       const account = result.data.account;
       const permissions = config.permissions[account.account?.type] || config.permissions.registered;
+      const accountId = result.data.account.account.id;
 
       socket.emit('login_result', {
         success: true,
@@ -1950,8 +1991,13 @@ io.on('connection', (socket) => {
         }
       });
 
+      // 记录操作日志
+      if (operationLogger) {
+        operationLogger.getLogin(accountId, account.account?.nickname || account.account?.username || '', socket.handshake?.address || '');
+      }
+
       // 广播用户上线
-      userManager.broadcastUserStatus(result.data.account.account.id, 'online', io);
+      userManager.broadcastUserStatus(accountId, 'online', io);
     } else {
       socket.emit('login_result', result);
     }
@@ -2022,6 +2068,20 @@ io.on('connection', (socket) => {
       userManager.broadcastUserStatus(newAccountId, 'online', io);
     }
 
+    // 记录操作日志（注册成功时）
+    if (result.success && operationLogger) {
+      const registeredId = guestAccountId || result.id;
+      const nickname = result.nickname || userSession?.nickname || '';
+      operationLogger.log({
+        userId: registeredId,
+        username: nickname,
+        action: 'register',
+        category: 'account',
+        targetName: username,
+        details: { upgraded: !!guestAccountId }
+      });
+    }
+
     socket.emit('account_action_result', {
       action: 'register',
       ...result
@@ -2078,6 +2138,11 @@ io.on('connection', (socket) => {
           }
         }
 
+        // 记录操作日志
+        if (operationLogger) {
+          operationLogger.getLogin(newAccountId, userSession?.nickname || username, socket.handshake?.address || '');
+        }
+
         logger.info('账号登录成功', {
           socketId: socket.id,
           accountId: newAccountId,
@@ -2097,6 +2162,11 @@ io.on('connection', (socket) => {
     if (userSession && userSession.accountData) {
       const account = userSession.accountData;
       const permissions = config.permissions[account.account?.type] || config.permissions.guest;
+
+      // 记录操作日志
+      if (operationLogger) {
+        operationLogger.getLogin(userSession.accountId, userSession.nickname || '', socket.handshake?.address || '');
+      }
 
       const result = {
         success: true,
@@ -3276,6 +3346,39 @@ io.on('connection', (socket) => {
     logger.error('Socket错误', { socketId: socket.id, error: err.message });
   });
 
+  // ========== 全量操作追踪中间件 ==========
+  // 自动记录所有 Socket 事件（排除高频噪音），用于异常排查和路径回放
+  const TRACE_ACTIONS = new Set([
+    // 游戏操作
+    'move', 'ai_move', 'game_result', 'ai_game_result', 'reset', 'reset_confirm', 'reset_reject',
+    'match_request', 'cancel_match', 'challenge_request', 'challenge_response',
+    'return_lobby', 'undo_request', 'undo_response', 'request_hint', 'game_use_item',
+    'ai_game_start',
+    // 观战
+    'spectate_join', 'spectate_leave', 'get_spectate_list',
+    // 账号
+    'client_connect', 'account_login', 'guest_login', 'account_register',
+    'account_update_profile', 'account_change_password', 'account_set_password',
+    'account_reset_password',
+    // 贪吃蛇
+    'snake_game_start', 'snake_game_end', 'snake_sync_highscore', 'snake_request_full_state',
+    // 聊天
+    'chat_global', 'chat_game', 'chat_private',
+    // 反馈
+    'submit_feedback', 'vote_feedback', 'add_comment', 'reply_comment', 'like_comment', 'delete_comment'
+  ]);
+
+  socket.use(([event, ...args], next) => {
+    if (TRACE_ACTIONS.has(event)) {
+      const user = getSocketUser();
+      if (user) {
+        const data = args[0] || {};
+        operationLogger.logSocketEvent(user.userId, user.username, event, data).catch(() => { });
+      }
+    }
+    next();
+  });
+
   // ========== 断开连接 ==========
 
   socket.on('disconnect', (reason) => {
@@ -3788,6 +3891,31 @@ adminNamespace.on('connection', (socket) => {
     } catch (err) {
       socket.emit('update_error', { message: err.message });
     }
+  });
+
+  // ========== 管理员操作追踪中间件 ==========
+  const TRACE_ADMIN_EVENTS = new Set([
+    'admin_account_login', 'admin_user_token_login',
+    'kick_user', 'end_game', 'broadcast', 'reset_game',
+    'update_config', 'maintenance_mode', 'maintenance_schedule',
+    'mute_user', 'unmute_user', 'delete_account',
+    'modify_user_exp', 'grant_starcoins', 'grant_exp', 'grant_items',
+    'send_mail_to_user', 'send_mail_batch', 'send_mail_all',
+    'add_user_achievement', 'remove_user_achievement', 'reset_user_achievements',
+    'cleanup_data',
+    'update_backup_db', 'update_restore_backup', 'update_apply_update',
+    'update_upload_package', 'update_set_channel', 'update_delete_backup'
+  ]);
+
+  socket.use(([event, ...args], next) => {
+    if (TRACE_ADMIN_EVENTS.has(event)) {
+      const adminInfo = adminManager.adminSockets.get(socket.id);
+      if (adminInfo) {
+        const data = args[0] || {};
+        operationLogger.logSocketEvent(adminInfo.accountId || '', adminInfo.username || '管理员', event, data, { category: 'admin' }).catch(() => { });
+      }
+    }
+    next();
   });
 
   // 断开连接

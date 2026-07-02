@@ -1591,8 +1591,20 @@ class AccountManager {
       if (level > oldLevel) {
         levelUpCurrency = (level - oldLevel) * config.exp.levelUpCoinReward; // 每升1级奖励星钻
         await this.addCurrency(id, levelUpCurrency, `从${oldLevel}级升到${level}级奖励`, 'level_up');
+
+        // 记录升级操作日志
+        if (this.operationLogger) {
+          const username = account?.account?.nickname || account?.account?.username || '';
+          this.operationLogger.getLevelUp(id, username, oldLevel, level, { source });
+        }
       }
       await this.checkLevelRewards(id);
+
+      // 记录经验值变化操作日志
+      if (this.operationLogger && finalExp > 0) {
+        const username = account?.account?.nickname || account?.account?.username || '';
+        this.operationLogger.getExpChange(id, username, finalExp, source, { oldLevel, newLevel: level, totalExp: newTotalExp });
+      }
 
       // 记录经验变动
       try {

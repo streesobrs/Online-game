@@ -9,6 +9,7 @@ const dataStore = require('../utils/dataStore');
 class UserManager {
   constructor(accountManager = null) {
     this.accountManager = accountManager;
+    this.operationLogger = null;
     // Socket连接管理：socketId -> accountId
     this.socketToAccount = new Map();
     // 在线用户管理：accountId -> 用户会话数据
@@ -370,6 +371,11 @@ class UserManager {
     logger.userAction(accountId, '断开连接', {
       onlineDuration: Date.now() - userSession.connectedAt
     });
+
+    // 记录操作日志
+    if (this.operationLogger) {
+      this.operationLogger.getLogout(accountId, userSession.nickname || '', { onlineDuration: Date.now() - userSession.connectedAt });
+    }
 
     // 标记为断开状态，但保留会话数据（给重连留宽限期）
     userSession.disconnectedAt = Date.now();

@@ -10,6 +10,7 @@ class GameManager {
     this.accountManager = accountManager;
     this.achievementManager = achievementManager;
     this.aiManager = aiManager;
+    this.operationLogger = null;
     this.waitingUsers = new Map(); // gameType -> Set(userId)
     this.challengeRequests = new Map(); // challengerId -> { challengedId, gameType, timestamp }
     this.games = new Map(); // gameId -> game对象
@@ -67,6 +68,17 @@ class GameManager {
 
     logger.matchEvent(user.accountId, '开始匹配', { gameType });
 
+    // 记录操作日志
+    if (this.operationLogger) {
+      this.operationLogger.log({
+        userId: user.accountId,
+        username: user.nickname || user.username,
+        action: 'match_start',
+        category: 'game',
+        targetName: gameType
+      });
+    }
+
     // 广播用户状态
     this.userManager.broadcastUserStatus(user.accountId, 'waiting', io);
 
@@ -123,6 +135,17 @@ class GameManager {
       user.lastActivity = Date.now();
 
       logger.matchEvent(user.accountId, '取消匹配', { gameType: user.gameType });
+
+      // 记录操作日志
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId: user.accountId,
+          username: user.nickname || user.username,
+          action: 'match_cancel',
+          category: 'game',
+          targetName: user.gameType
+        });
+      }
 
       // 广播用户状态
       this.userManager.broadcastUserStatus(user.accountId, 'online', io);
@@ -194,6 +217,19 @@ class GameManager {
       });
       io.to(socketId).emit('challenge_sent', { success: true, message: `已向 ${challenged.nickname} 发起挑战` });
       logger.info('挑战请求已发送', { challenger: challenger.accountId, challenged: challenged.accountId, gameType });
+
+      // 记录操作日志
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId: challenger.accountId,
+          username: challenger.nickname || challenger.username,
+          action: 'challenge_send',
+          category: 'game',
+          targetId: challenged.accountId,
+          targetName: challenged.nickname || challenged.username,
+          details: { gameType }
+        });
+      }
     } else {
       io.to(socketId).emit('error', { message: '挑战失败：对方已离线' });
       this.challengeRequests.delete(challenger.accountId); // 清理请求
@@ -239,6 +275,19 @@ class GameManager {
       io.to(challenged.socketId).emit('challenge_accepted', { from: challenger.accountId, fromNickname: challenger.nickname, game: challenge.gameType });
       io.to(challenger.socketId).emit('challenge_accepted', { to: challenged.accountId, toNickname: challenged.nickname, game: challenge.gameType });
       logger.info('挑战已接受，游戏开始', { challenger: challenger.accountId, challenged: challenged.accountId, gameType: challenge.gameType });
+
+      // 记录操作日志
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId: challenged.accountId,
+          username: challenged.nickname || challenged.username,
+          action: 'challenge_accept',
+          category: 'game',
+          targetId: challenger.accountId,
+          targetName: challenger.nickname || challenger.username,
+          details: { gameType: challenge.gameType }
+        });
+      }
     } else {
       // 通知挑战者被拒绝
       io.to(challenger.socketId).emit('challenge_rejected', {
@@ -248,6 +297,19 @@ class GameManager {
       });
       io.to(challenged.socketId).emit('challenge_rejected', { success: true, message: `已拒绝 ${challenger.nickname} 的挑战` });
       logger.info('挑战已拒绝', { challenger: challenger.accountId, challenged: challenged.accountId, gameType: challenge.gameType });
+
+      // 记录操作日志
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId: challenged.accountId,
+          username: challenged.nickname || challenged.username,
+          action: 'challenge_reject',
+          category: 'game',
+          targetId: challenger.accountId,
+          targetName: challenger.nickname || challenger.username,
+          details: { gameType: challenge.gameType }
+        });
+      }
     }
   }
 
@@ -322,6 +384,19 @@ class GameManager {
       player1: accountId1,
       player2: accountId2
     });
+
+    // 记录操作日志
+    if (this.operationLogger) {
+      this.operationLogger.log({
+        userId: accountId1,
+        username: user1.nickname || user1.username,
+        action: 'game_start',
+        category: 'game',
+        targetId: gameId,
+        targetName: gameType,
+        details: { player2: accountId2, player2Name: user2.nickname || user2.username }
+      });
+    }
 
     // 广播用户状态
     this.userManager.broadcastUserStatus(accountId1, 'playing', io);
@@ -508,7 +583,7 @@ class GameManager {
     let position;
     if (data.fromR !== undefined) {
       // 象棋：使用 fromR/fromC/toR/toC 格式
-      position = { fromR: data.fromR, fromC: data.fromC, toR: data.toR, toC: data.toC };
+      position = { fromR: data.fromR, fromC: data.fromC, toR: data.toR, toC: data.toC, piece: data.piece };
     } else if (data.position) {
       position = data.position;
     } else {
@@ -873,6 +948,22 @@ class GameManager {
       reason,
       duration: game.endTime - game.startTime
     });
+
+    // 记录操作日志
+    if (this.operationLogger) {
+      [game.player1, game.player2].forEach((pid, i) => {
+        const user = this.userManager.getUserByAccountId(pid);
+        this.operationLogger.log({
+          userId: pid,
+          username: user?.nickname || user?.username || '',
+          action: 'game_end',
+          category: 'game',
+          targetId: gameId,
+          targetName: game.gameType,
+          details: { result, winner, reason, player: i === 0 ? 'player1' : 'player2' }
+        });
+      });
+    }
 
     // 更新用户统计
     try {
@@ -1269,6 +1360,20 @@ class GameManager {
       result: gameResult
     });
 
+    // 记录操作日志
+    if (this.operationLogger) {
+      const game = this.games.get(user.game);
+      this.operationLogger.log({
+        userId: user.accountId,
+        username: user.nickname || user.username,
+        action: 'return_lobby',
+        category: 'game',
+        targetId: user.game,
+        targetName: game?.gameType || user.gameType,
+        details: { gameEnded, result: gameResult, reason }
+      });
+    }
+
     // 广播用户状态
     this.userManager.broadcastUserStatus(user.accountId, 'online', io);
 
@@ -1350,13 +1455,30 @@ class GameManager {
 
   // 添加观战者
   addSpectator(gameId, accountId, io) {
-    const game = this.games.get(gameId);
+    // 先查找 PvP 游戏
+    let game = this.games.get(gameId);
+    let isAI = false;
+
+    if (!game) {
+      // 查找 AI 游戏
+      for (const [uid, aiGame] of this.aiGames) {
+        if (aiGame.gameId === gameId) {
+          game = aiGame;
+          isAI = true;
+          break;
+        }
+      }
+    }
+
     if (!game) {
       return { success: false, message: '游戏不存在' };
     }
 
     // 不能观战自己的游戏
-    if (game.player1 === accountId || game.player2 === accountId) {
+    if (!isAI && (game.player1 === accountId || game.player2 === accountId)) {
+      return { success: false, message: '不能观战自己的游戏' };
+    }
+    if (isAI && game.accountId === accountId) {
       return { success: false, message: '不能观战自己的游戏' };
     }
 
@@ -1373,6 +1495,82 @@ class GameManager {
 
       logger.userAction(accountId, '开始观战', { gameId });
 
+      // 记录操作日志
+      if (this.operationLogger) {
+        const user = this.userManager.getUserByAccountId(accountId);
+        this.operationLogger.log({
+          userId: accountId,
+          username: user?.nickname || user?.username || '',
+          action: 'spectate_join',
+          category: 'game',
+          targetId: gameId,
+          targetName: game.gameType,
+          details: { isAI }
+        });
+      }
+
+      if (isAI) {
+        // AI 游戏：转换 moves 格式
+        const convertedMoves = (game.moves || []).map(move => {
+          if (game.gameType === 'chinese-chess') {
+            return {
+              fromR: move.position.fromR,
+              fromC: move.position.fromC,
+              toR: move.position.toR,
+              toC: move.position.toC,
+              color: move.color,
+              piece: move.position.piece || '?',
+              from: move.player,
+              timestamp: move.timestamp
+            };
+          }
+          return {
+            r: move.position.r,
+            c: move.position.c,
+            color: move.color,
+            from: move.player,
+            timestamp: move.timestamp
+          };
+        });
+
+        const user = this.userManager.getUserByAccountId(game.accountId);
+        return {
+          success: true,
+          game: {
+            gameId: game.gameId,
+            gameType: game.gameType,
+            player1: user?.nickname || user?.username || game.accountId,
+            player2: 'AI',
+            moves: convertedMoves,
+            currentPlayer: game.currentPlayer,
+            isAI: true
+          }
+        };
+      }
+
+      // PvP 游戏：转换 moves 格式
+      const convertedMoves = (game.moves || []).map(move => {
+        if (game.gameType === 'chinese-chess') {
+          return {
+            fromR: move.position.fromR,
+            fromC: move.position.fromC,
+            toR: move.position.toR,
+            toC: move.position.toC,
+            color: move.color,
+            piece: move.position.piece || '?',
+            from: move.player,
+            timestamp: move.timestamp
+          };
+        }
+        return {
+          r: move.position.r,
+          c: move.position.c,
+          color: move.color,
+          from: move.player,
+          timestamp: move.timestamp
+        };
+      });
+
       return {
         success: true,
         game: {
@@ -1380,7 +1578,7 @@ class GameManager {
           gameType: game.gameType,
           player1: game.player1Nickname,
           player2: game.player2Nickname,
-          moves: game.moves,
+          moves: convertedMoves,
           currentPlayer: game.currentPlayer
         }
       };
@@ -1394,14 +1592,29 @@ class GameManager {
     const spectators = this.spectators.get(gameId);
     if (spectators) {
       spectators.delete(accountId);
+    }
 
-      const user = this.userManager.getUserByAccountId(accountId);
-      if (user) {
-        user.status = 'online';
-        user.game = null;
-        this.userManager.broadcastUserStatus(accountId, 'online', io);
-      }
+    // 无论 spectators Set 是否存在，都清理用户状态
+    const user = this.userManager.getUserByAccountId(accountId);
+    if (user && user.game === gameId) {
+      user.status = 'online';
+      user.game = null;
+      this.userManager.broadcastUserStatus(accountId, 'online', io);
+    }
 
+    // 记录操作日志
+    if (this.operationLogger) {
+      this.operationLogger.log({
+        userId: accountId,
+        username: user?.nickname || user?.username || '',
+        action: 'spectate_leave',
+        category: 'game',
+        targetId: gameId,
+        details: { spectatorsLeft: !!(spectators && spectators.size > 0) }
+      });
+    }
+
+    if (spectators) {
       logger.userAction(accountId, '结束观战', { gameId });
     }
   }
@@ -1426,18 +1639,39 @@ class GameManager {
   // 获取可观战的游戏列表
   getSpectatableGames() {
     const games = [];
+
+    // PvP 游戏
     for (const [gameId, game] of this.games) {
       if (game.status === 'playing') {
         games.push({
           gameId: game.gameId,
           gameType: game.gameType,
-          player1: game.player1Nickname,
-          player2: game.player2Nickname,
+          player1: game.player1Nickname || '玩家1',
+          player2: game.player2Nickname || '玩家2',
           moveCount: game.moves.length,
-          spectatorCount: this.spectators.get(gameId)?.size || 0
+          spectatorCount: this.spectators.get(gameId)?.size || 0,
+          isAI: false
         });
       }
     }
+
+    // AI 游戏
+    for (const [accountId, aiGame] of this.aiGames) {
+      if (aiGame.status === 'playing') {
+        const user = this.userManager.getUserByAccountId(accountId);
+        const difficultyLabels = { easy: '简单', medium: '中等', hard: '困难' };
+        games.push({
+          gameId: aiGame.gameId,
+          gameType: aiGame.gameType,
+          player1: user?.nickname || user?.username || accountId,
+          player2: `🤖 AI (${difficultyLabels[aiGame.difficulty] || aiGame.difficulty})`,
+          moveCount: aiGame.moves.length,
+          spectatorCount: this.spectators.get(aiGame.gameId)?.size || 0,
+          isAI: true
+        });
+      }
+    }
+
     return games;
   }
 
@@ -1647,6 +1881,7 @@ class GameManager {
     const existingGame = this.aiGames.get(accountId);
     if (existingGame) {
       logger.info('删除已存在的AI游戏', { accountId, status: existingGame.status });
+      this.spectators.delete(existingGame.gameId);
       this.aiGames.delete(accountId);
     }
 
@@ -1670,6 +1905,9 @@ class GameManager {
     // 保存AI游戏
     this.aiGames.set(accountId, aiGame);
 
+    // 初始化观战者集合
+    this.spectators.set(aiGame.gameId, new Set());
+
     // 更新用户状态
     user.status = 'playing';
     user.game = 'ai';
@@ -1678,6 +1916,19 @@ class GameManager {
     this.userManager.broadcastUserStatus(accountId, 'playing', io);
 
     logger.aiGameEvent(accountId, '开始AI对战', { gameType, difficulty });
+
+    // 记录操作日志
+    if (this.operationLogger) {
+      this.operationLogger.log({
+        userId: accountId,
+        username: user.nickname || user.username,
+        action: 'ai_game_start',
+        category: 'game',
+        targetId: aiGame.gameId,
+        targetName: gameType,
+        details: { difficulty }
+      });
+    }
 
     // 发送游戏开始信息
     const userSocket = this.userManager.getSocketByAccountId(accountId);
@@ -1738,6 +1989,24 @@ class GameManager {
 
     // 更新用户活动时间
     user.lastActivity = Date.now();
+
+    // 广播玩家落子给观战者
+    const spectatorData = {
+      color: aiGame.currentPlayer,
+      from: accountId,
+      game: aiGame.gameType
+    };
+    if (aiGame.gameType === 'chinese-chess') {
+      spectatorData.fromR = position.fromR;
+      spectatorData.fromC = position.fromC;
+      spectatorData.toR = position.toR;
+      spectatorData.toC = position.toC;
+      spectatorData.piece = position.piece;
+    } else {
+      spectatorData.r = position.r;
+      spectatorData.c = position.c;
+    }
+    this.broadcastToSpectators(aiGame.gameId, 'move', spectatorData, io);
 
     // 检查游戏是否结束
     const gameOver = this.checkGameOver(aiGame.gameType, aiGame.board, aiGame.currentPlayer);
@@ -1801,6 +2070,9 @@ class GameManager {
         return;
       }
 
+      // 提前获取用户信息，供日志和活动时间更新使用
+      const user = this.userManager.getUserByAccountId(accountId);
+
       logger.info('🤖 AI 执行移动', { accountId, gameType: aiGame.gameType, move: aiMove });
 
       // 执行 AI 移动
@@ -1817,10 +2089,27 @@ class GameManager {
       aiGame.lastMoveTime = Date.now();
 
       // 更新用户活动时间
-      const user = this.userManager.getUserByAccountId(accountId);
       if (user) {
         user.lastActivity = Date.now();
       }
+
+      // 广播AI落子给观战者
+      const spectatorMoveData = {
+        color: aiGame.currentPlayer,
+        from: 'ai',
+        game: aiGame.gameType
+      };
+      if (aiGame.gameType === 'chinese-chess') {
+        spectatorMoveData.fromR = aiMove.fromR;
+        spectatorMoveData.fromC = aiMove.fromC;
+        spectatorMoveData.toR = aiMove.toR;
+        spectatorMoveData.toC = aiMove.toC;
+        spectatorMoveData.piece = aiMove.piece || aiGame.board[aiMove.fromR][aiMove.fromC];
+      } else {
+        spectatorMoveData.r = aiMove.r;
+        spectatorMoveData.c = aiMove.c;
+      }
+      this.broadcastToSpectators(aiGame.gameId, 'move', spectatorMoveData, io);
 
       // 检查游戏是否结束
       const gameOver = this.checkGameOver(aiGame.gameType, aiGame.board, aiGame.currentPlayer);
@@ -1875,9 +2164,34 @@ class GameManager {
     aiGame.duration = aiGame.endTime - aiGame.startTime;
     aiGame.result = result;
 
+    // 通知观战者游戏结束
+    const endData = {
+      winner: result === 'win' ? accountId : 'ai',
+      player1: accountId,
+      player2: 'ai',
+      result: result,
+      reason: result === 'win' ? 'win' : 'loss'
+    };
+    this.broadcastToSpectators(aiGame.gameId, 'game_ended', endData, io);
+    // 清理观战者数据
+    this.spectators.delete(aiGame.gameId);
+
     // 获取用户信息
     const user = this.userManager.getUserByAccountId(accountId);
     if (!user) return;
+
+    // 记录操作日志
+    if (this.operationLogger) {
+      this.operationLogger.log({
+        userId: accountId,
+        username: user.nickname || user.username || '',
+        action: 'ai_game_end',
+        category: 'game',
+        targetId: accountId,
+        targetName: aiGame.gameType,
+        details: { result, difficulty: aiGame.difficulty }
+      });
+    }
 
     // 保存AI游戏记录到 games.json
     try {
@@ -2568,6 +2882,19 @@ class GameManager {
 
     const socket = this.userManager.getSocketByAccountId(user.accountId);
     if (socket) socket.emit('undo_request_sent', { message: '已发送悔棋请求，等待对手回应' });
+
+    // 记录操作日志
+    if (this.operationLogger) {
+      this.operationLogger.log({
+        userId: user.accountId,
+        username: user.nickname || user.username,
+        action: 'undo_request',
+        category: 'game',
+        targetId: user.game,
+        targetName: game.gameType || game.gameType,
+        details: { opponentId, isAIGame: false }
+      });
+    }
   }
 
   // 处理悔棋回应
@@ -2593,6 +2920,19 @@ class GameManager {
       }
       const responderSocket = this.userManager.getSocketByAccountId(user.accountId);
       if (responderSocket) responderSocket.emit('undo_rejected', { message: '已拒绝悔棋请求' });
+
+      // 记录操作日志
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId: user.accountId,
+          username: user.nickname || user.username,
+          action: 'undo_reject',
+          category: 'game',
+          targetId: game.gameId,
+          targetName: game.gameType,
+          details: { requesterId }
+        });
+      }
       return;
     }
 
@@ -2626,6 +2966,19 @@ class GameManager {
         requesterSocket.emit('undo_deduct', { success: true });
         // 服务器端扣除悔棋次数
         await this.deductUndoCount(requesterId, requesterSocket);
+      }
+
+      // 记录操作日志
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId: requesterId,
+          username: '',
+          action: 'undo_accept',
+          category: 'game',
+          targetId: game.gameId,
+          targetName: game.gameType,
+          details: { acceptedBy: user.accountId }
+        });
       }
     }
   }
@@ -2723,6 +3076,18 @@ class GameManager {
 
       // 服务器端扣除悔棋次数
       await this.deductUndoCount(accountId, socket);
+
+      // 记录操作日志
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId: accountId,
+          username: '',
+          action: 'undo_ai',
+          category: 'game',
+          targetId: accountId,
+          targetName: aiGame.gameType
+        });
+      }
     }
   }
 

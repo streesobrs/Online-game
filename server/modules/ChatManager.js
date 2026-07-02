@@ -8,6 +8,7 @@ class ChatManager {
     this.userManager = userManager;
     this.gameManager = gameManager;
     this.accountManager = accountManager;
+    this.operationLogger = null;
     this.globalChatHistory = []; // 全局聊天记录
     this.gameChatHistory = new Map(); // gameId -> 聊天记录
     this.maxHistoryLength = config.chat.maxHistoryMessages; // 最大保存消息数
@@ -111,6 +112,11 @@ class ChatManager {
     });
 
     logger.chatEvent(user.accountId, '大厅', { messageLength: message.length });
+
+    // 记录操作日志
+    if (this.operationLogger) {
+      this.operationLogger.getChat(user.accountId, user.nickname || '', 'global', this.sanitizeMessage(message));
+    }
 
     // 更新聊天消息统计
     this.updateChatMessageCount(user.accountId);
@@ -232,7 +238,7 @@ class ChatManager {
         ...chatMessage
       }, io);
     } else {
-      // AI游戏，只发送给自己
+      // AI游戏，发送给自己和所有观战者
       const userSocket = this.userManager.getSocketByAccountId(user.accountId);
       if (userSocket) {
         userSocket.emit('chat_message', {
@@ -241,9 +247,21 @@ class ChatManager {
           ...chatMessage
         });
       }
+
+      // 发送给AI游戏的观战者
+      this.gameManager.broadcastToSpectators(targetGame.gameId, 'chat_message', {
+        scope: 'game',
+        gameId: targetGame.gameId,
+        ...chatMessage
+      }, io);
     }
 
     logger.chatEvent(user.accountId, '局内', { gameId: targetGame.gameId, messageLength: message.length });
+
+    // 记录操作日志
+    if (this.operationLogger) {
+      this.operationLogger.getChat(user.accountId, user.nickname || '', 'game', this.sanitizeMessage(message), { gameId: targetGame.gameId });
+    }
 
     // 更新聊天消息统计
     this.updateChatMessageCount(user.accountId);

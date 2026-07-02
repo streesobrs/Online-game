@@ -7,6 +7,7 @@ class AchievementManager {
   constructor(accountManager = null, userManager = null) {
     this.accountManager = accountManager;
     this.userManager = userManager;
+    this.operationLogger = null;
     this.achievements = this.loadAchievements();
   }
 
@@ -663,6 +664,15 @@ class AchievementManager {
     if (unlockedAchievements.length > 0) {
       await dataStore.update('accounts', id, { achievements: currentAchievements });
       logger.info('成就解锁', { id, achievements: unlockedAchievements.map(a => a.id) });
+
+      // 记录操作日志
+      if (this.operationLogger) {
+        const account = await this.accountManager.getAccount(id);
+        const username = account?.account?.nickname || account?.account?.username || '';
+        for (const achievement of unlockedAchievements) {
+          this.operationLogger.getAchievementUnlock(id, username, achievement.id, achievement.name);
+        }
+      }
     }
 
     // 重新计算徽章数量并更新勋章列表

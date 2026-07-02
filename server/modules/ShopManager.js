@@ -4,6 +4,7 @@ const appConfig = require('../config');
 
 class ShopManager {
   constructor() {
+    this.operationLogger = null;
     this.dataDir = path.join(__dirname, '../config/shop');
     this.config = null;
     this.items = {};
@@ -318,6 +319,13 @@ class ShopManager {
       await this.deliverItem(userId, item, accountManager, itemMeta);
     }
 
+    // 记录操作日志
+    if (this.operationLogger) {
+      const account = await accountManager.getAccount(userId);
+      const username = account?.account?.nickname || account?.account?.username || '';
+      this.operationLogger.getItemPurchase(userId, username, item.id, item.name, quantity, totalPrice, { discount, unitPrice });
+    }
+
     return {
       success: true,
       message: discount > 0
@@ -372,6 +380,13 @@ class ShopManager {
         }
         rewards.push({ id: contentId, name: contentItem.name, icon: contentItem.icon, count });
       }
+    }
+
+    // 记录操作日志
+    if (this.operationLogger) {
+      const account = await accountManager.getAccount(userId);
+      const username = account?.account?.nickname || account?.account?.username || '';
+      this.operationLogger.getPackOpen(userId, username, pack.id, pack.name, rewards);
     }
 
     return { success: true, rewards, message: `开启${pack.name}成功！` };

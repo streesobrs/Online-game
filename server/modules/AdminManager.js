@@ -13,6 +13,7 @@ class AdminManager {
     this.chatManager = chatManager;
     this.accountManager = accountManager;
     this.io = io;
+    this.operationLogger = null;
     this.adminSockets = new Map();
     this.activeTokens = new Map();
     this.logBuffer = []; // 环形日志缓冲区
@@ -500,10 +501,24 @@ class AdminManager {
 
   // 踢出用户
   kickUser(socket, accountId, reason = '管理员操作') {
+    const adminInfo = this.adminSockets.get(socket.id);
     const success = this.userManager.kickUser(accountId, reason);
 
     if (success) {
       logger.info('管理员踢出用户', { adminSocket: socket.id, accountId, reason });
+
+      // 记录操作日志
+      if (this.operationLogger && adminInfo) {
+        this.operationLogger.getAdminAction(
+          adminInfo.accountId || '',
+          adminInfo.username || '管理员',
+          'kick_user',
+          accountId,
+          reason,
+          {}
+        );
+      }
+
       socket.emit('admin_action_result', {
         action: 'kick_user',
         success: true,
@@ -528,6 +543,19 @@ class AdminManager {
 
     if (success) {
       logger.info('管理员结束游戏', { adminSocket: socket.id, gameId });
+
+      // 记录操作日志
+      if (this.operationLogger && adminInfo) {
+        this.operationLogger.getAdminAction(
+          adminInfo.accountId || '',
+          adminInfo.username || '管理员',
+          'end_game',
+          gameId,
+          gameId,
+          {}
+        );
+      }
+
       socket.emit('admin_action_result', {
         action: 'end_game',
         success: true,
@@ -546,6 +574,7 @@ class AdminManager {
 
   // 广播消息
   broadcastMessage(socket, message, io) {
+    const adminInfo = this.adminSockets.get(socket.id);
     if (!message || message.trim().length === 0) {
       socket.emit('admin_action_result', {
         action: 'broadcast',
@@ -563,6 +592,18 @@ class AdminManager {
     });
 
     logger.info('管理员广播消息', { adminSocket: socket.id, message: message.trim() });
+
+    // 记录操作日志
+    if (this.operationLogger && adminInfo) {
+      this.operationLogger.getAdminAction(
+        adminInfo.accountId || '',
+        adminInfo.username || '管理员',
+        'broadcast',
+        '',
+        '',
+        { message: message.trim() }
+      );
+    }
 
     socket.emit('admin_action_result', {
       action: 'broadcast',
@@ -1320,6 +1361,19 @@ class AdminManager {
 
     if (success) {
       logger.info('管理员重置游戏', { adminSocket: socket.id, gameId });
+
+      // 记录操作日志
+      if (this.operationLogger && adminInfo) {
+        this.operationLogger.getAdminAction(
+          adminInfo.accountId || '',
+          adminInfo.username || '管理员',
+          'reset_game',
+          gameId,
+          gameId,
+          {}
+        );
+      }
+
       socket.emit('admin_action_result', {
         action: 'reset_game',
         success: true,

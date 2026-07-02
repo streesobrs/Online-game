@@ -3440,6 +3440,9 @@
     <button class="nav-btn" data-page="ai" onclick="showAIGame()">
       🤖 AI对战<sup class="shortcut-hint">G</sup>
     </button>
+    <button class="nav-btn" data-page="spectate" onclick="showSpectateList()">
+      👁️ 观战<sup class="shortcut-hint">V</sup>
+    </button>
     <button class="nav-btn" data-page="theme" onclick="showThemeModal()">
       🎨 主题<sup class="shortcut-hint">V</sup>
     </button>
@@ -3566,6 +3569,8 @@
     <button onclick="requestHint()" id="hint-btn" style="background:#2E86C1;display:none;">💡 提示</button>
     <button onclick="returnToLobby()" style="background:#f39c12;">🏠 返回大厅</button>
     <button onclick="showGameTips()" style="background:#9b59b6;">💡 游戏规则</button>
+    <button id="leave-spectate-btn" onclick="leaveSpectate()" style="background:#6366f1; display:none;">👁️
+      退出观战</button>
   </div>
 
   <!-- 状态显示区 -->
@@ -3713,6 +3718,28 @@
           </button>
           <button class="lobby-btn cancel-btn" onclick="returnToLobby()"
             style="grid-column: 1 / -1; background: #6c757d; padding: 12px; border-radius: 8px; border: none; color: white; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
+            🏠 返回大厅
+          </button>
+        </div>
+      </div>
+
+      <!-- 观战页面 -->
+      <div class="spectate-container" id="spectate-container"
+        style="display: none; width: 100%; max-width: 100%; min-width: 500px; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07); margin: 0 0 15px; box-sizing: border-box;">
+        <div class="lobby-title" style="font-size: 24px; text-align: center; margin-bottom: 15px; color: #2d3748;">
+          👁️ 观战
+        </div>
+        <div class="lobby-status" style="text-align: center; margin-bottom: 25px; font-size: 16px; color: #718096;">
+          选择进行中的对局，实时观看比赛
+        </div>
+        <div id="spectate-games-list">
+          <div style="text-align: center; padding: 40px; color: #a0aec0; font-size: 16px;">
+            ⏳ 加载中...
+          </div>
+        </div>
+        <div style="text-align: center; margin-top: 20px;">
+          <button class="lobby-btn cancel-btn" onclick="returnToLobby()"
+            style="background: #6c757d; padding: 12px 30px; border-radius: 8px; border: none; color: white; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
             🏠 返回大厅
           </button>
         </div>
@@ -3969,6 +3996,10 @@
     let matchedOpponentId = null;
     let userStatus = 'online';
     let onlineUsers = new Map();
+
+    // 观战相关变量
+    let isSpectating = false;
+    let spectateGameId = null;
 
     // 聊天频道相关变量
     let currentChatChannel = 'global';
@@ -5627,6 +5658,13 @@
         } else {
           handleBoardMove(data);
         }
+
+        // 观战模式下显示合适的落子信息
+        if (isSpectating) {
+          const colorName = data.color === 1 ? (currentGame === 'chinese-chess' ? '红方' : '黑棋') :
+            (currentGame === 'chinese-chess' ? '黑方' : '白棋');
+          updateStatus(`👁️ ${colorName}落子`);
+        }
       });
 
       socket.on('reset', (data) => {
@@ -5715,6 +5753,32 @@
         gameState.gameOver = true;
         // 清理对局数据，防止内存泄漏
         gameState.moveLog = [];
+
+        // 观战模式特殊处理
+        if (isSpectating) {
+          let endMsg;
+          if (data.player2 === 'ai') {
+            // AI 游戏
+            if (data.result === 'draw') {
+              endMsg = '🤝 游戏结束，平局！';
+            } else if (data.winner === data.player1) {
+              endMsg = '🎉 玩家获胜！';
+            } else {
+              endMsg = '🤖 AI 获胜！';
+            }
+          } else {
+            const winnerName = data.winner === data.player1 ? '红方' : '黑方';
+            endMsg = data.result === 'draw' ? '🤝 游戏结束，平局！' :
+              data.result === 'resign' ? `🏁 ${winnerName}获胜（对方认输）` :
+                data.reason ? `🛑 游戏结束：${data.reason}` : '🏁 游戏已结束';
+          }
+          showWinAlert(endMsg);
+          updateStatus(`👁️ ${endMsg}`);
+          gameStatusEl.textContent = '游戏结束';
+          gameStatusEl.className = 'info-value value-waiting';
+          setTimeout(() => leaveSpectate(), 3000);
+          return;
+        }
 
         let winMsg = '';
         if (data.result === 'win') {
@@ -6381,6 +6445,15 @@
         }
       });
 
+      // ========== 观战相关事件 ==========
+      socket.on('spectate_list', (data) => {
+        renderSpectateGames(data);
+      });
+
+      socket.on('spectate_joined', (data) => {
+        enterSpectateView(data);
+      });
+
       socket.on('leaderboard', (data) => {
         updateLeaderboard(data.leaderboard, currentLeaderboardGameType);
       });
@@ -7037,6 +7110,17 @@
 
     // ========== 棋种切换功能 ==========
     function switchGame(game) {
+      if (isSpectating) {
+        // 退出观战但不回到观战列表
+        if (spectateGameId) {
+          socket.emit('spectate_leave', { gameId: spectateGameId });
+        }
+        isSpectating = false;
+        spectateGameId = null;
+        document.getElementById('leave-spectate-btn').style.display = 'none';
+        document.getElementById('spectate-container').style.display = 'none';
+      }
+
       if (isMatching || matchedOpponentId) {
         updateStatus('❌ 匹配中或游戏中不能切换棋种');
         return;
@@ -8139,7 +8223,7 @@
         // AI对战，发送移动给服务器
         if (socket) {
           socket.emit('ai_move', {
-            position: { fromR: parseInt(fromR), fromC: parseInt(fromC), toR: toR, toC: toC }
+            position: { fromR: parseInt(fromR), fromC: parseInt(fromC), toR: toR, toC: toC, piece: piece.dataset.name }
           });
         }
       }
@@ -10504,6 +10588,12 @@
     }
 
     function returnToLobby() {
+      // 观战模式下直接退出观战
+      if (isSpectating) {
+        leaveSpectate();
+        return;
+      }
+
       // 如果在游戏中，需要确认
       if (gameState.isInGame && !gameState.gameOver) {
         showConfirmDialog('确定要返回大厅吗？当前对局将中断。', () => {
@@ -10608,6 +10698,9 @@
     }
 
     function showAchievements() {
+      if (isSpectating) {
+        leaveSpectate();
+      }
       // 更新导航按钮状态
       updateNavActiveState('achievements');
 
@@ -10651,6 +10744,9 @@
     }
 
     function showAIGame() {
+      if (isSpectating) {
+        leaveSpectate();
+      }
       // 更新导航按钮状态
       updateNavActiveState('ai');
 
@@ -10690,8 +10786,292 @@
       }, 10);
     }
 
+    // ==================== 观战系统 ====================
+
+    function showSpectateList() {
+      if (isSpectating) {
+        leaveSpectate();
+        return;
+      }
+
+      // 如果在游戏中，需要确认
+      if (gameState.isInGame && !gameState.gameOver) {
+        showConfirmDialog('观战将中断当前对局，是否继续？', () => {
+          _returnToLobby();
+          _showSpectateList();
+        });
+        return;
+      }
+
+      _returnToLobby();
+      _showSpectateList();
+    }
+
+    function _showSpectateList() {
+      updateNavActiveState('spectate');
+
+      // 恢复中间内容区域高度
+      const centerContainer = document.querySelector('.center-content-container');
+      if (centerContainer) {
+        centerContainer.style.minHeight = '';
+        centerContainer.style.alignItems = '';
+      }
+
+      // 隐藏其他页面
+      lobbyContainer.style.display = 'none';
+      infoContainer.style.display = 'none';
+      gameControls.style.display = 'none';
+      statusBox.style.display = 'none';
+      moveLogPanel.style.display = 'none';
+      document.getElementById('achievements-container').style.display = 'none';
+      document.getElementById('ai-game-container').style.display = 'none';
+      document.getElementById('leaderboard-page').style.display = 'none';
+      document.getElementById('theme-container').style.display = 'none';
+      document.getElementById('snake-game-container').style.display = 'none';
+      document.getElementById('spectate-container').style.display = 'none';
+
+      // 隐藏所有棋盘
+      document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
+        board.style.display = 'none';
+      });
+
+      // 显示观战页面
+      const spectateContainer = document.getElementById('spectate-container');
+      spectateContainer.style.opacity = '0';
+      spectateContainer.style.transform = 'translateY(20px)';
+      spectateContainer.style.display = 'block';
+
+      setTimeout(() => {
+        spectateContainer.style.opacity = '1';
+        spectateContainer.style.transform = 'translateY(0)';
+      }, 10);
+
+      loadSpectateGames();
+    }
+
+    function loadSpectateGames() {
+      document.getElementById('spectate-games-list').innerHTML =
+        '<div style="text-align: center; padding: 40px; color: #a0aec0; font-size: 16px;">⏳ 加载中...</div>';
+      socket.emit('get_spectate_list');
+    }
+
+    function renderSpectateGames(data) {
+      const container = document.getElementById('spectate-games-list');
+      const games = data.games || [];
+
+      if (games.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 60px 20px;">
+            <div style="font-size: 48px; margin-bottom: 16px;">🎮</div>
+            <div style="font-size: 18px; color: #a0aec0; margin-bottom: 8px;">暂无进行中的对局</div>
+            <div style="font-size: 14px; color: #cbd5e0;">当前没有可观的比赛，稍后再来看看吧</div>
+          </div>
+        `;
+        return;
+      }
+
+      const gameTypeNames = {
+        gobang: '🔴 五子棋',
+        go: '⚪ 围棋',
+        'chinese-chess': '🟥 象棋',
+        snake: '🐍 贪吃蛇'
+      };
+
+      container.innerHTML = `
+        <div style="display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
+          ${games.map(game => `
+            <div style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; transition: all 0.2s;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span style="font-size: 16px; font-weight: 600; color: #2d3748;">${gameTypeNames[game.gameType] || game.gameType}</span>
+                <span style="display: flex; gap: 6px;">
+                  ${game.isAI ? '<span style="font-size: 11px; background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 12px;">🤖 AI</span>' : ''}
+                  <span style="font-size: 12px; background: #ebf8ff; color: #3182ce; padding: 2px 8px; border-radius: 12px;">
+                    👁️ ${game.spectatorCount} 人
+                  </span>
+                </span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px;">
+                <span style="color: #2d3748;">🔴 ${game.player1}</span>
+                <span style="color: #a0aec0;">VS</span>
+                <span style="color: #718096;">⚪ ${game.player2}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 13px; color: #718096;">步数: ${game.moveCount}</span>
+                <button onclick="joinSpectate('${game.gameId}')"
+                  style="background: #6366f1; color: white; border: none; padding: 8px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+                  👁️ 观战
+                </button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function joinSpectate(gameId) {
+      // 观战贪吃蛇暂不支持
+      socket.emit('spectate_join', { gameId });
+    }
+
+    function leaveSpectate() {
+      if (spectateGameId) {
+        socket.emit('spectate_leave', { gameId: spectateGameId });
+      }
+      isSpectating = false;
+      spectateGameId = null;
+
+      // 隐藏退出观战按钮
+      document.getElementById('leave-spectate-btn').style.display = 'none';
+
+      // 回到观战列表
+      _showSpectateList();
+    }
+
+    // 显示观战中的游戏视图
+    function enterSpectateView(gameData) {
+      isSpectating = true;
+      spectateGameId = gameData.gameId;
+
+      // 根据游戏类型切换到对应棋种
+      if (gameData.gameType === 'gobang' || gameData.gameType === 'go' || gameData.gameType === 'chinese-chess') {
+        currentGame = gameData.gameType;
+      } else {
+        showToast('暂不支持观战该类型的游戏', 'error');
+        leaveSpectate();
+        return;
+      }
+
+      // 更新导航按钮状态
+      updateNavActiveState(currentGame);
+
+      // 隐藏观战列表
+      document.getElementById('spectate-container').style.display = 'none';
+
+      // 显示棋盘
+      infoContainer.style.display = 'flex';
+      gameControls.style.display = 'flex';
+      statusBox.style.display = 'block';
+      moveLogPanel.style.display = 'block';
+
+      if (currentGame === 'gobang') {
+        gobangBoard.style.display = 'grid';
+      } else if (currentGame === 'go') {
+        goBoard.style.display = 'grid';
+      } else if (currentGame === 'chinese-chess') {
+        chessBoard.style.display = 'block';
+      }
+
+      // 初始化棋盘和游戏状态
+      initGameBoard();
+      gameState.isInGame = true;
+      gameState.gameOver = false;
+      gameState.moveCount = 0;
+      gameState.moveLog = [];
+      gameState.moveTimestamps = [];
+      gameState.turn = 1;
+
+      // 更新信息面板
+      roleEl.textContent = '观战者';
+      myColorEl.textContent = '--';
+      gameStatusEl.textContent = '观战中';
+      gameStatusEl.className = 'info-value value-connected';
+
+      // 显示玩家信息
+      document.getElementById('current-game').textContent =
+        gameData.gameType === 'gobang' ? '五子棋' :
+          gameData.gameType === 'go' ? '围棋' : '象棋';
+
+      // 显示对方昵称
+      const opponentInfoEl = document.getElementById('opponent-info');
+      if (opponentInfoEl) {
+        opponentInfoEl.style.display = 'flex';
+        if (gameData.isAI) {
+          document.getElementById('opponent-nickname').textContent =
+            `${gameData.player1} VS 🤖 AI`;
+        } else {
+          document.getElementById('opponent-nickname').textContent =
+            `${gameData.player1} VS ${gameData.player2}`;
+        }
+      }
+
+      // 显示退出观战按钮
+      document.getElementById('leave-spectate-btn').style.display = 'inline-block';
+
+      // 回放已有落子
+      if (gameData.moves && gameData.moves.length > 0) {
+        replayMoves(gameData.moves);
+      }
+
+      updateStatus(`👁️ 正在观战 ${gameData.player1} VS ${gameData.isAI ? '🤖 AI' : gameData.player2}`);
+    }
+
+    // 回放已有落子
+    function replayMoves(moves) {
+      for (const move of moves) {
+        if (currentGame === 'chinese-chess') {
+          // 象棋落子
+          const chessPieces = window.chessPieces || {};
+          const fromCell = document.querySelector(`.chess-intersection[data-r="${move.fromR}"][data-c="${move.fromC}"]`);
+          const toCell = document.querySelector(`.chess-intersection[data-r="${move.toR}"][data-c="${move.toC}"]`);
+
+          if (fromCell && toCell) {
+            // 移动棋子
+            const piece = fromCell.querySelector('.chess-piece');
+            if (piece) {
+              if (move.captured) {
+                const captured = toCell.querySelector('.chess-piece');
+                if (captured) captured.remove();
+              }
+              toCell.innerHTML = '';
+              toCell.appendChild(piece.cloneNode(true));
+              fromCell.innerHTML = '';
+            }
+          }
+
+          // 更新游戏状态
+          gameState.moveCount++;
+          gameState.moveLog.push({
+            color: move.color || 0,
+            fromR: move.fromR,
+            fromC: move.fromC,
+            toR: move.toR,
+            toC: move.toC,
+            piece: move.piece,
+            isOpponent: true
+          });
+          gameState.moveTimestamps.push(move.timestamp || Date.now());
+
+          // 更新棋盘状态
+          if (typeof window.updateChessBoardState === 'function') {
+            window.updateChessBoardState(move);
+          }
+        } else {
+          // 五子棋/围棋落子
+          if (gameState.board && gameState.board[move.r] && gameState.board[move.r][move.c] !== undefined) {
+            gameState.board[move.r][move.c] = move.color;
+            gameState.moveCount++;
+            gameState.turn = 3 - move.color;
+            gameState.moveLog.push({
+              color: move.color,
+              r: move.r,
+              c: move.c,
+              isOpponent: true
+            });
+            gameState.moveTimestamps.push(move.timestamp || Date.now());
+          }
+        }
+      }
+      renderBoard();
+      updateTurnDisplay();
+      updateMoveCount();
+      updateMoveLog();
+    }
+
     // 显示排行榜页面
     function showLeaderboard() {
+      if (isSpectating) {
+        leaveSpectate();
+      }
       // 更新导航按钮状态
       updateNavActiveState('leaderboard');
 
@@ -12861,6 +13241,9 @@
     let currentTheme = localStorage.getItem('selectedTheme') || 'default';
 
     function showThemeModal() {
+      if (isSpectating) {
+        leaveSpectate();
+      }
       // 更新导航按钮状态
       updateNavActiveState('theme');
 
