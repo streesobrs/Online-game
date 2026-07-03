@@ -724,6 +724,43 @@ class UpdateManager {
 
     walkDir(extractDir);
 
+    // 反向扫描：检测已安装文件中不在包里的 → 标记删除
+    const scanDeletions = (dir, basePath) => {
+      let entries;
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return; }
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        const relPath = basePath ? path.join(basePath, entry.name) : entry.name;
+        if (entry.isDirectory()) {
+          if (config.update.skipDirsInDiff.includes(entry.name)) continue;
+          scanDeletions(fullPath, relPath);
+        } else {
+          if (!this._isPathSafe(relPath)) continue;
+          // 额外检查：跳过 runtime 数据目录（如 server/data/、server/logs/ 等）
+          const parts = relPath.replace(/\\/g, '/').split('/');
+          if (parts.some(p => config.update.blockedPaths.includes(p))) continue;
+          const extractFilePath = path.join(extractDir, relPath);
+          if (!fs.existsSync(extractFilePath)) {
+            operations.push({ op: 'delete', relPath: relPath.replace(/\\/g, '/'), target: fullPath });
+          }
+        }
+      }
+    };
+    for (const allowedPath of config.update.allowedPaths) {
+      const installPath = path.join(this.storageRoot, allowedPath);
+      if (fs.existsSync(installPath) && !config.update.blockedPaths.includes(allowedPath)) {
+        const stat = fs.statSync(installPath);
+        if (stat.isDirectory()) {
+          scanDeletions(installPath, allowedPath);
+        } else {
+          const extractFilePath = path.join(extractDir, allowedPath);
+          if (!fs.existsSync(extractFilePath)) {
+            operations.push({ op: 'delete', relPath: allowedPath, target: installPath });
+          }
+        }
+      }
+    }
+
     if (this.manifest && this.manifest.files) {
       for (const fileInfo of this.manifest.files) {
         if (fileInfo.operation === 'delete') {
@@ -1009,7 +1046,9 @@ class UpdateManager {
       function waitExit(){
         try{process.kill(oldPid,0);setTimeout(waitExit,${config.update.restartPollIntervalMs})}
         catch(e){
-          log('旧进程已退出，执行 start.bat');
+          log('旧进程已退出，清理旧 CMD 窗口');
+          try{cp.execFileSync('taskkill',['/F','/FI','WINDOWTITLE eq Game Server','/T'],{stdio:'ignore',timeout:5000})}catch(e2){log('清理旧窗口完毕')}
+          log('清理完成，执行 start.bat');
           const child=cp.spawn('cmd.exe',['/c','start','""','/min',batPath],{detached:true,stdio:'ignore',cwd:cwd,windowsHide:true});
           child.unref();
           log('start.bat 已启动 PID='+child.pid);
