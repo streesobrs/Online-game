@@ -8229,14 +8229,17 @@
           listEl.innerHTML = data.backups.map(b => {
             // 生成操作类型统计
             const opCounts = {};
-            let hasDetail = false;
+            let hasFiles = false;
             if (b.filesByOp) {
               for (const [op, files] of Object.entries(b.filesByOp)) {
                 opCounts[op] = files.length;
-                if (files.length > 0) hasDetail = true;
+                if (files.length > 0) hasFiles = true;
               }
             }
-            const opSummaryHtml = hasDetail ? `
+            // 有文件变更或有任何元信息就显示详情按钮
+            const hasMeta = hasFiles || !!b.updateId || !!b.backupTime || !!b.toVersion || !!b.fromVersion;
+            const hasDetail = hasMeta;
+            const opSummaryHtml = hasFiles ? `
               <div class="backup-op-summary">
                 ${opCounts.update ? `<span class="backup-op-badge badge-update">✏️ 更新 ${opCounts.update}</span>` : ''}
                 ${opCounts.delete ? `<span class="backup-op-badge badge-delete">🗑 删除 ${opCounts.delete}</span>` : ''}
@@ -8254,23 +8257,28 @@
               <div class="backup-detail" id="backup-detail-${b.id}">
                 <!-- Diff 摘要头 -->
                 <div class="backup-diff-header">
-                  <span style="color:#94a3b8;font-weight:500;font-size:13px;">📊 变更概览</span>
+                  <span style="color:#94a3b8;font-weight:500;font-size:13px;">📦 ${b.id}</span>
+                  ${hasFiles ? `
                   <span class="diff-stat"><span class="num mod">${opCounts.update || 0}</span><span class="label">修改</span></span>
                   <span class="diff-stat"><span class="num up">${opCounts.add || 0}</span><span class="label">新增</span></span>
                   <span class="diff-stat"><span class="num del">${opCounts.delete || 0}</span><span class="label">删除</span></span>
                   <span class="diff-stat" style="opacity:0.5;"><span class="num" style="font-size:14px;color:#94a3b8;">${totalChanges}</span><span class="label">总计</span></span>
+                  ` : `<span style="color:#64748b;font-size:12px;">此备份没有文件变更记录</span>`}
                   ${b.toVersion ? `<div class="diff-version"><span>${b.fromVersion}</span> → <span>${b.toVersion}</span></div>` : ''}
                 </div>
 
-                ${b.updateId ? `
+                ${b.updateId || b.backupTime || b.fromVersion ? `
                 <div class="backup-detail-section">
-                  <div class="backup-detail-label">📋 更新信息</div>
-                  <div class="backup-detail-row"><span class="label">更新 ID</span><span class="value">${b.updateId}</span></div>
+                  <div class="backup-detail-label">📋 备份信息</div>
+                  ${b.updateId ? `<div class="backup-detail-row"><span class="label">更新 ID</span><span class="value">${b.updateId}</span></div>` : ''}
+                  ${b.fromVersion && b.fromVersion !== 'unknown' ? `<div class="backup-detail-row"><span class="label">备份版本</span><span class="value">${b.fromVersion}</span></div>` : ''}
                   <div class="backup-detail-row"><span class="label">备份时间</span><span class="value">${b.backupTime || b.timestamp}</span></div>
                   ${b.toVersion ? `<div class="backup-detail-row"><span class="label">版本变更</span><span class="value">${b.fromVersion} → ${b.toVersion}</span></div>` : ''}
+                  ${b.reason && b.reason !== '更新到 ' + b.toVersion ? `<div class="backup-detail-row"><span class="label">备份原因</span><span class="value">${b.reason}</span></div>` : ''}
                 </div>
                 ` : ''}
 
+                ${hasFiles ? `
                 <!-- 文件变更 - Diff 分组 -->
                 <div class="backup-detail-section">
                   <div class="backup-detail-label">📄 文件变更明细 (${b.fileCount} 个文件)</div>
@@ -8299,6 +8307,7 @@
                     `}).join('')}
                   </div>
                 </div>
+                ` : ''}
               </div>
             ` : '';
 

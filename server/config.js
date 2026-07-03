@@ -376,10 +376,10 @@ module.exports = {
     maxFileCount: 2000,                             // 最大文件数量
     allowedPaths: [                                 // 允许更新的路径前缀
       'server', 'client', 'package.json', 'package-lock.json',
-      'version.json', 'start.bat', 'start.ps1'
+      'version.json', 'start.bat', 'start.ps1', 'package.bat', 'updater'
     ],
     blockedPaths: [                                 // 禁止更新的路径
-      'data', 'logs', 'update', 'config.js', '.env', 'updater'
+      'data', 'logs', 'update', 'config.js', '.env'
     ],
     backupDir: 'update/backup',                     // 备份目录
     tempDir: 'update/temp',                         // 临时解压目录

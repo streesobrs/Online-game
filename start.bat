@@ -58,7 +58,7 @@ npm start
 if errorlevel 1 (
     echo.
     echo Server startup failed!
-    pause
+    if not defined UPDATE_RESTART pause
 )
 
 endlocal
