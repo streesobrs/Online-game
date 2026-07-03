@@ -32,6 +32,9 @@ echo Removing runtime data and logs...
 if exist "temp-package\server\logs" rmdir /s /q "temp-package\server\logs"
 if exist "temp-package\data" rmdir /s /q "temp-package\data"
 
+echo Copying updater folder...
+xcopy "updater" "temp-package\updater\" /E /I /Y >nul
+
 echo Copying root files...
 copy "package.json" "temp-package\" >nul
 copy "start.bat" "temp-package\" >nul

@@ -396,7 +396,35 @@ module.exports = {
     autoRollbackCrashThreshold: 3,                  // 时间窗口内崩溃多少次触发自动回滚
     autoRollbackCrashWindowMs: 10 * 60 * 1000,     // 崩溃计数时间窗口（10分钟）
     requireSignature: false,                        // 是否要求数字签名（默认关闭，可后续开启）
-    chunkSize: 5 * 1024 * 1024                     // 分片上传大小 5MB
+    chunkSize: 5 * 1024 * 1024,                    // 分片上传大小 5MB
+
+    // ===== 以下为新增配置项（原硬编码值统一迁移至此） =====
+
+    // 更新流程超时控制
+    staleStateTimeout: 30 * 60 * 1000,             // 更新停滞状态超时（毫秒），超过此时间未完成的更新视为异常中断
+    staleLockTimeout: 2 * 60 * 60 * 1000,          // 锁文件过期超时（毫秒），超过此时间的旧锁将被清理
+
+    // 日志与历史
+    logTailMaxLength: 200,                          // 更新日志尾部队列最大条目数
+    publicHistoryLimit: 20,                         // 公开状态接口返回的历史记录最大条数
+    historyMaxEntries: 50,                          // 更新历史文件（update-history.json）最大保留数
+
+    // 随机ID生成
+    updateIdRandomBytes: 3,                         // 更新ID随机后缀字节数
+    extractDirRandomBytes: 3,                       // 临时解压目录随机名后缀字节数
+
+    // 重启与关闭延迟控制
+    restartPollIntervalMs: 500,                     // 重启时等待旧进程退出的轮询间隔（毫秒）
+    shutdownDelayMs: 2000,                          // 发送关闭信号后的等待延迟（毫秒），用于消息推送完成
+    processExitDelayMs: 1000,                       // 广播重启消息后到实际 process.exit 的延迟（毫秒）
+
+    // 解压与差异分析
+    skipDirsInDiff: ['node_modules'],               // 差异分析时跳过的目录名
+    expectedTopDirs: ['server', 'client'],          // 更新包预期顶级目录（用于自动扁平化检测）
+    expectedTopFiles: ['package.json', 'start.bat', 'version.json'], // 更新包预期顶级文件
+
+    // 校验进度
+    validateProgressDenominator: 50                 // 校验阶段进度计算基数（越大进度增长越慢）
   },
 
   // ========== 数据存储配置 ==========

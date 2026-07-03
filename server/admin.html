@@ -1641,6 +1641,314 @@
     .backup-actions {
       display: flex;
       gap: 6px;
+      align-items: center;
+    }
+
+    .backup-detail-toggle {
+      cursor: pointer;
+      background: none;
+      border: none;
+      color: #64748b;
+      font-size: 14px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .backup-detail-toggle:hover {
+      background: #475569;
+      color: #e2e8f0;
+    }
+
+    .backup-detail {
+      display: none;
+      margin-top: 10px;
+      padding: 14px;
+      background: #0b1120;
+      border-radius: 8px;
+      font-size: 12px;
+      line-height: 1.6;
+      border: 1px solid #1e293b;
+    }
+
+    .backup-detail.open {
+      display: block;
+    }
+
+    /* ===== Diff 摘要头 ===== */
+    .backup-diff-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      background: #131c31;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      border: 1px solid #1e293b;
+      flex-wrap: wrap;
+    }
+
+    .backup-diff-header .diff-stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .backup-diff-header .diff-stat .num {
+      font-size: 16px;
+    }
+
+    .backup-diff-header .diff-stat .num.up {
+      color: #34d399;
+    }
+
+    .backup-diff-header .diff-stat .num.mod {
+      color: #60a5fa;
+    }
+
+    .backup-diff-header .diff-stat .num.del {
+      color: #f87171;
+    }
+
+    .backup-diff-header .diff-stat .label {
+      color: #64748b;
+      font-weight: 400;
+    }
+
+    .backup-diff-header .diff-version {
+      margin-left: auto;
+      font-size: 11px;
+      color: #64748b;
+    }
+
+    .backup-diff-header .diff-version span {
+      color: #94a3b8;
+      font-weight: 500;
+    }
+
+    /* ===== 更新信息行 ===== */
+    .backup-detail-section {
+      margin-bottom: 12px;
+    }
+
+    .backup-detail-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .backup-detail-label {
+      color: #64748b;
+      font-size: 10px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      font-weight: 600;
+    }
+
+    .backup-detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 8px;
+      background: rgba(30, 41, 59, 0.4);
+      border-radius: 4px;
+      margin-bottom: 3px;
+    }
+
+    .backup-detail-row .label {
+      color: #94a3b8;
+    }
+
+    .backup-detail-row .value {
+      color: #e2e8f0;
+      font-weight: 500;
+    }
+
+    /* ===== 文件变更组 (Diff 风格) ===== */
+    .backup-file-groups {
+      max-height: 400px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .backup-file-group {
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid #1e293b;
+    }
+
+    .backup-file-group-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .backup-file-group-header .count {
+      margin-left: auto;
+      font-size: 11px;
+      font-weight: 400;
+      opacity: 0.7;
+    }
+
+    .backup-file-group.group-update .backup-file-group-header {
+      background: rgba(59, 130, 246, 0.1);
+      color: #60a5fa;
+    }
+
+    .backup-file-group.group-delete .backup-file-group-header {
+      background: rgba(239, 68, 68, 0.1);
+      color: #f87171;
+    }
+
+    .backup-file-group.group-add .backup-file-group-header {
+      background: rgba(34, 197, 94, 0.1);
+      color: #34d399;
+    }
+
+    .backup-file-group-body {
+      background: #0f172a;
+    }
+
+    /* ===== 文件项 (代码 Diff 风格) ===== */
+    .backup-file-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 10px;
+      border-bottom: 1px solid rgba(30, 41, 59, 0.5);
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 11px;
+      transition: background 0.15s;
+      border-left: 3px solid transparent;
+    }
+
+    .backup-file-item:last-child {
+      border-bottom: none;
+    }
+
+    .backup-file-item:hover {
+      background: rgba(30, 41, 59, 0.6);
+    }
+
+    /* 左边界颜色 - diff 风格的修改/删除/新增指示 */
+    .backup-file-group.group-update .backup-file-item {
+      border-left-color: #3b82f6;
+    }
+
+    .backup-file-group.group-delete .backup-file-item {
+      border-left-color: #ef4444;
+    }
+
+    .backup-file-group.group-add .backup-file-item {
+      border-left-color: #22c55e;
+    }
+
+    .backup-file-op {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 700;
+      min-width: 32px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .backup-file-op.op-update {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+    }
+
+    .backup-file-op.op-delete {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+    }
+
+    .backup-file-op.op-add {
+      background: rgba(34, 197, 94, 0.2);
+      color: #34d399;
+    }
+
+    .backup-file-path {
+      color: #e2e8f0;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 500;
+    }
+
+    .backup-file-item:hover .backup-file-path {
+      color: #f8fafc;
+    }
+
+    .backup-file-size {
+      color: #64748b;
+      white-space: nowrap;
+      font-size: 10px;
+      flex-shrink: 0;
+    }
+
+    .backup-file-hash {
+      color: #475569;
+      font-size: 10px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    .backup-file-hash::before {
+      content: '#';
+      opacity: 0.5;
+    }
+
+    /* ===== 备份项摘要标签 ===== */
+    .backup-op-summary {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+      flex-wrap: wrap;
+    }
+
+    .backup-op-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 10px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .backup-op-badge.badge-update {
+      background: rgba(59, 130, 246, 0.12);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+
+    .backup-op-badge.badge-delete {
+      background: rgba(239, 68, 68, 0.12);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .backup-op-badge.badge-add {
+      background: rgba(34, 197, 94, 0.12);
+      color: #34d399;
+      border: 1px solid rgba(34, 197, 94, 0.2);
+    }
+
+    .backup-item.expanded {
+      background: #1e293b;
+      border: 1px solid #475569;
     }
   </style>
 </head>
@@ -7165,7 +7473,29 @@
         'log.adminBufferSize': '实时日志缓冲区大小',
         'log.adminMaxDisplay': '日志页面最大显示条数',
         'log.adminFileReadLines': '历史日志默认读取行数',
-        'log.adminFileReadMaxLines': '历史日志最大读取行数'
+        'log.adminFileReadMaxLines': '历史日志最大读取行数',
+        // 更新设置
+        'update.enabled': '自动更新开关',
+        'update.maxUploadSize': '更新包最大大小(字节)',
+        'update.maxExtractSize': '解压后最大大小(字节)',
+        'update.maxFileCount': '最大文件数量',
+        'update.maxBackups': '保留备份数',
+        'update.staleStateTimeout': '更新停滞超时(ms)',
+        'update.staleLockTimeout': '锁文件过期超时(ms)',
+        'update.logTailMaxLength': '日志尾部最大条目',
+        'update.historyMaxEntries': '更新历史保留数',
+        'update.shutdownDelayMs': '关闭延迟(ms)',
+        'update.processExitDelayMs': '进程退出延迟(ms)',
+        'update.restartPollIntervalMs': '重启轮询间隔(ms)',
+        'update.gracePeriodSeconds': '优雅关闭等待(秒)',
+        'update.restartTimeoutSeconds': '启动超时(秒)',
+        'update.healthCheckRetries': '健康检查重试次数',
+        'update.healthCheckIntervalMs': '健康检查间隔(ms)',
+        'update.rollbackOnStartupFailure': '启动失败自动回滚',
+        'update.autoRollbackCrashThreshold': '崩溃自动回滚阈值',
+        'update.autoRollbackCrashWindowMs': '崩溃统计窗口(ms)',
+        'update.requireSignature': '要求数字签名',
+        'update.chunkSize': '分片上传大小(字节)'
       };
       return labels[key] || key;
     }
@@ -7896,19 +8226,100 @@
         const countEl = document.getElementById('update-backup-count');
         if (data.success && data.backups.length > 0) {
           countEl.textContent = `(${data.backups.length}个)`;
-          listEl.innerHTML = data.backups.map(b => `
-            <div class="backup-item">
-              <div class="backup-info">
-                <span class="backup-version">${b.version}</span>
-                <span class="backup-meta">${b.timestamp} · 文件数: ${b.fileCount} · ${b.sizeFormatted}</span>
-                ${b.reason ? `<span class="backup-meta">原因: ${b.reason}</span>` : ''}
+          listEl.innerHTML = data.backups.map(b => {
+            // 生成操作类型统计
+            const opCounts = {};
+            let hasDetail = false;
+            if (b.filesByOp) {
+              for (const [op, files] of Object.entries(b.filesByOp)) {
+                opCounts[op] = files.length;
+                if (files.length > 0) hasDetail = true;
+              }
+            }
+            const opSummaryHtml = hasDetail ? `
+              <div class="backup-op-summary">
+                ${opCounts.update ? `<span class="backup-op-badge badge-update">✏️ 更新 ${opCounts.update}</span>` : ''}
+                ${opCounts.delete ? `<span class="backup-op-badge badge-delete">🗑 删除 ${opCounts.delete}</span>` : ''}
+                ${opCounts.add ? `<span class="backup-op-badge badge-add">➕ 新增 ${opCounts.add}</span>` : ''}
+              </div>
+            ` : '';
+
+            // 生成操作组的显示顺序和中文名
+            const opConfig = { update: { label: '修改', icon: '✏️', cls: 'group-update' }, delete: { label: '删除', icon: '🗑', cls: 'group-delete' }, add: { label: '新增', icon: '➕', cls: 'group-add' } };
+            const opOrder = ['update', 'add', 'delete'];
+            const totalChanges = Object.values(opCounts).reduce((a, b) => a + b, 0);
+
+            // 生成展开后的详细信息 (Diff 风格)
+            const detailHtml = hasDetail ? `
+              <div class="backup-detail" id="backup-detail-${b.id}">
+                <!-- Diff 摘要头 -->
+                <div class="backup-diff-header">
+                  <span style="color:#94a3b8;font-weight:500;font-size:13px;">📊 变更概览</span>
+                  <span class="diff-stat"><span class="num mod">${opCounts.update || 0}</span><span class="label">修改</span></span>
+                  <span class="diff-stat"><span class="num up">${opCounts.add || 0}</span><span class="label">新增</span></span>
+                  <span class="diff-stat"><span class="num del">${opCounts.delete || 0}</span><span class="label">删除</span></span>
+                  <span class="diff-stat" style="opacity:0.5;"><span class="num" style="font-size:14px;color:#94a3b8;">${totalChanges}</span><span class="label">总计</span></span>
+                  ${b.toVersion ? `<div class="diff-version"><span>${b.fromVersion}</span> → <span>${b.toVersion}</span></div>` : ''}
+                </div>
+
+                ${b.updateId ? `
+                <div class="backup-detail-section">
+                  <div class="backup-detail-label">📋 更新信息</div>
+                  <div class="backup-detail-row"><span class="label">更新 ID</span><span class="value">${b.updateId}</span></div>
+                  <div class="backup-detail-row"><span class="label">备份时间</span><span class="value">${b.backupTime || b.timestamp}</span></div>
+                  ${b.toVersion ? `<div class="backup-detail-row"><span class="label">版本变更</span><span class="value">${b.fromVersion} → ${b.toVersion}</span></div>` : ''}
+                </div>
+                ` : ''}
+
+                <!-- 文件变更 - Diff 分组 -->
+                <div class="backup-detail-section">
+                  <div class="backup-detail-label">📄 文件变更明细 (${b.fileCount} 个文件)</div>
+                  <div class="backup-file-groups">
+                    ${opOrder.map(op => {
+              const files = b.filesByOp[op];
+              if (!files || files.length === 0) return '';
+              const cfg = opConfig[op];
+              return `
+                    <div class="backup-file-group ${cfg.cls}">
+                      <div class="backup-file-group-header">
+                        ${cfg.icon} ${cfg.label}
+                        <span class="count">${files.length} 个文件</span>
+                      </div>
+                      <div class="backup-file-group-body">
+                        ${files.map(f => `
+                        <div class="backup-file-item">
+                          <span class="backup-file-op op-${op}">${op === 'update' ? 'M' : op === 'delete' ? 'D' : 'A'}</span>
+                          <span class="backup-file-path" title="${f.path}">${f.path}</span>
+                          <span class="backup-file-size">${f.sizeFormatted}</span>
+                          ${f.hash ? `<span class="backup-file-hash" title="${f.hashFull}">${f.hash}</span>` : ''}
+                        </div>
+                        `).join('')}
+                      </div>
+                    </div>
+                    `}).join('')}
+                  </div>
+                </div>
+              </div>
+            ` : '';
+
+            return `
+            <div class="backup-item${hasDetail ? ' has-detail' : ''}" id="backup-item-${b.id}">
+              <div style="flex:1; min-width:0;">
+                <div class="backup-info">
+                  <span class="backup-version">${b.version}</span>
+                  <span class="backup-meta">${b.timestamp} · 文件数: ${b.fileCount} · ${b.sizeFormatted}</span>
+                  ${b.reason ? `<span class="backup-meta">原因: ${b.reason}</span>` : ''}
+                  ${opSummaryHtml}
+                </div>
+                ${detailHtml}
               </div>
               <div class="backup-actions">
+                ${hasDetail ? `<button class="backup-detail-toggle" onclick="toggleBackupDetail('${b.id}')" title="查看详情">📋</button>` : ''}
                 <button class="action-btn btn-warning" style="padding:4px 10px;font-size:11px;" onclick="rollbackToBackup('${b.id}')">↩ 回滚</button>
                 <button class="action-btn btn-danger" style="padding:4px 10px;font-size:11px;" onclick="deleteBackup('${b.id}')">🗑</button>
               </div>
             </div>
-          `).join('');
+          `}).join('');
         } else {
           countEl.textContent = '';
           listEl.innerHTML = '<div style="color:#64748b;font-size:13px;text-align:center;padding:20px;">暂无备份</div>';
@@ -8031,6 +8442,14 @@
       } catch (e) {
         addUpdateLog('取消失败: ' + e.message, 'error');
       }
+    }
+
+    function toggleBackupDetail(backupId) {
+      const detail = document.getElementById('backup-detail-' + backupId);
+      const item = document.getElementById('backup-item-' + backupId);
+      if (!detail) return;
+      const isOpen = detail.classList.toggle('open');
+      if (item) item.classList.toggle('expanded', isOpen);
     }
 
     async function rollbackToBackup(backupId) {

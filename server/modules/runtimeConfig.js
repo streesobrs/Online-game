@@ -278,6 +278,19 @@ function getSettingCategories() {
     '日志管理': [
       'log.adminBufferSize', 'log.adminMaxDisplay',
       'log.adminFileReadLines', 'log.adminFileReadMaxLines'
+    ],
+    '更新设置': [
+      'update.enabled', 'update.maxUploadSize', 'update.maxExtractSize',
+      'update.maxFileCount', 'update.maxBackups',
+      'update.staleStateTimeout', 'update.staleLockTimeout',
+      'update.logTailMaxLength', 'update.historyMaxEntries',
+      'update.shutdownDelayMs', 'update.processExitDelayMs',
+      'update.restartPollIntervalMs',
+      'update.gracePeriodSeconds', 'update.restartTimeoutSeconds',
+      'update.healthCheckRetries', 'update.healthCheckIntervalMs',
+      'update.rollbackOnStartupFailure',
+      'update.autoRollbackCrashThreshold', 'update.autoRollbackCrashWindowMs',
+      'update.requireSignature', 'update.chunkSize'
     ]
   };
 }

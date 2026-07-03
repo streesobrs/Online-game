@@ -144,13 +144,37 @@ app.get('/api/update/backups', authenticateToken, (req, res) => {
     const list = backups.map(b => {
       const m = b.manifest || {};
       const sizeMB = (b.size / 1024 / 1024).toFixed(2);
+      // 按操作类型分组文件
+      const filesByOp = {};
+      if (m.files) {
+        for (const f of m.files) {
+          const op = f.operation || 'update';
+          if (!filesByOp[op]) filesByOp[op] = [];
+          filesByOp[op].push({
+            path: f.path,
+            operation: f.operation,
+            size: f.size,
+            sizeFormatted: f.size > 1024 ? (f.size / 1024).toFixed(1) + ' KB' : f.size + ' B',
+            hash: f.hash ? f.hash.substring(0, 12) + '...' : null,
+            hashFull: f.hash || null
+          });
+        }
+      }
       return {
         id: b.name,
+        fromVersion: m.fromVersion || 'unknown',
+        toVersion: m.toVersion || null,
         version: m.fromVersion || 'unknown',
         timestamp: new Date(b.mtime).toLocaleString('zh-CN'),
+        timestampISO: new Date(b.mtime).toISOString(),
+        backupTime: m.backupTime ? new Date(m.backupTime).toLocaleString('zh-CN') : null,
+        updateId: m.updateId || null,
         fileCount: m.files ? m.files.length : 0,
+        sizeRaw: b.size,
         sizeFormatted: sizeMB > 1 ? sizeMB + ' MB' : ((b.size / 1024).toFixed(1) + ' KB'),
-        reason: m.toVersion ? `更新到 ${m.toVersion}` : '手动备份'
+        reason: m.toVersion ? `更新到 ${m.toVersion}` : '手动备份',
+        filesByOp: filesByOp,
+        files: m.files || []
       };
     }).reverse();
     res.json({ success: true, backups: list });

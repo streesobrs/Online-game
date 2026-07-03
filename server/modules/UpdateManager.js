@@ -74,7 +74,7 @@ class UpdateManager {
   _cleanupStaleState() {
     if (this.status && this.status.status === 'in_progress') {
       const elapsed = Date.now() - (this.status.startTime || 0);
-      if (elapsed > 30 * 60 * 1000) {
+      if (elapsed > config.update.staleStateTimeout) {
         logger.warn('检测到停滞的更新状态，重置为失败', { updateId: this.status.updateId });
         this._failUpdate('检测到上次更新异常中断');
       }
@@ -82,7 +82,7 @@ class UpdateManager {
     try {
       if (fs.existsSync(this.paths.lockFile)) {
         const lockStat = fs.statSync(this.paths.lockFile);
-        if (Date.now() - lockStat.mtimeMs > 2 * 60 * 60 * 1000) {
+        if (Date.now() - lockStat.mtimeMs > config.update.staleLockTimeout) {
           fs.unlinkSync(this.paths.lockFile);
           logger.info('清理过期更新锁');
         }
@@ -134,7 +134,7 @@ class UpdateManager {
     };
     if (!this.status.logTail) this.status.logTail = [];
     this.status.logTail.push(entry);
-    if (this.status.logTail.length > 200) this.status.logTail.shift();
+    if (this.status.logTail.length > config.update.logTailMaxLength) this.status.logTail.shift();
 
     if (level === 'error') {
       logger.error(`[更新] ${message}`, details);
@@ -234,7 +234,7 @@ class UpdateManager {
     return {
       ...this.status,
       availableBackups: backups,
-      history: history.slice(0, 20),
+      history: history.slice(0, config.update.publicHistoryLimit),
       serverVersion: this.versionManager.getServerVersion(),
       isPkg: typeof process.pkg !== 'undefined'
     };
@@ -248,7 +248,7 @@ class UpdateManager {
   _generateUpdateId() {
     const now = new Date();
     const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
-    return `upd_${ts}_${crypto.randomBytes(3).toString('hex')}`;
+    return `upd_${ts}_${crypto.randomBytes(config.update.updateIdRandomBytes).toString('hex')}`;
   }
 
   async acquireLock() {
@@ -256,7 +256,7 @@ class UpdateManager {
     try {
       if (fs.existsSync(this.paths.lockFile)) {
         const lockStat = fs.statSync(this.paths.lockFile);
-        if (Date.now() - lockStat.mtimeMs < 2 * 60 * 60 * 1000) {
+        if (Date.now() - lockStat.mtimeMs < config.update.staleLockTimeout) {
           const lockData = JSON.parse(fs.readFileSync(this.paths.lockFile, 'utf8'));
           throw new Error(`更新已在进行中 (${lockData.updateId || '未知'})，请稍后重试`);
         }
@@ -510,7 +510,7 @@ class UpdateManager {
             compressedSize: entry.compressedSize
           });
 
-          this._updateProgress(PHASES.VALIDATE, Math.min(90, fileCount * 100 / Math.max(50, fileCount + 10)));
+          this._updateProgress(PHASES.VALIDATE, Math.min(90, fileCount * 100 / Math.max(config.update.validateProgressDenominator, fileCount + 10)));
           zipfile.readEntry();
         });
 
@@ -529,7 +529,7 @@ class UpdateManager {
   _extractPackage() {
     return new Promise((resolve, reject) => {
       this._setPhase(PHASES.EXTRACT, '解压更新包...');
-      const extractDir = path.join(this.paths.temp, `extract_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`);
+      const extractDir = path.join(this.paths.temp, `extract_${Date.now()}_${crypto.randomBytes(config.update.extractDirRandomBytes).toString('hex')}`);
       this.extractDir = extractDir;
       fs.mkdirSync(extractDir, { recursive: true });
 
@@ -699,7 +699,7 @@ class UpdateManager {
         const relPathUnix = relPath.replace(/\\/g, '/');
 
         if (entry.isDirectory()) {
-          if (entry.name === 'node_modules') continue;
+          if (config.update.skipDirsInDiff.includes(entry.name)) continue;
           walkDir(fullPath, relPath);
         } else {
           if (!this._isPathSafe(relPath)) {
@@ -962,7 +962,7 @@ class UpdateManager {
 
     setTimeout(() => {
       this._gracefulShutdown();
-    }, 2000);
+    }, config.update.shutdownDelayMs);
   }
 
   _triggerRestartPkg(flagContent) {
@@ -1007,13 +1007,13 @@ class UpdateManager {
       const log=msg=>{try{const d=path.join(cwd,'logs');fs.mkdirSync(d,{recursive:true});const dt=new Date();const p=n=>String(n).padStart(2,'0');const ts=dt.getFullYear()+'-'+p(dt.getMonth()+1)+'-'+p(dt.getDate())+'T'+p(dt.getHours())+':'+p(dt.getMinutes())+':'+p(dt.getSeconds())+'.'+String(dt.getMilliseconds()).padStart(3,'0');fs.appendFileSync(path.join(d,'update.log'),ts+' [restarter] '+msg+'\\n')}catch(e){}};
       log('等待旧进程 PID='+oldPid+' 退出...');
       function waitExit(){
-        try{process.kill(oldPid,0);setTimeout(waitExit,500)}
+        try{process.kill(oldPid,0);setTimeout(waitExit,${config.update.restartPollIntervalMs})}
         catch(e){
           log('旧进程已退出，执行 start.bat');
           const child=cp.spawn('cmd.exe',['/c','start','""','/min',batPath],{detached:true,stdio:'ignore',cwd:cwd,windowsHide:true});
           child.unref();
           log('start.bat 已启动 PID='+child.pid);
-          setTimeout(()=>process.exit(0),2000);
+          setTimeout(()=>process.exit(0),${config.update.processExitDelayMs});
         }
       }
       waitExit();
@@ -1052,7 +1052,7 @@ class UpdateManager {
     setTimeout(() => {
       logger.info('更新重启：进程退出');
       process.exit(0);
-    }, 1000);
+    }, config.update.processExitDelayMs);
   }
 
   _failUpdate(errorMsg) {
@@ -1175,7 +1175,7 @@ class UpdateManager {
       this.releaseLock();
       setTimeout(() => {
         this._gracefulShutdown();
-      }, 2000);
+      }, config.update.shutdownDelayMs);
     } catch (e) {
       this.releaseLock();
       throw e;
@@ -1199,7 +1199,7 @@ class UpdateManager {
         error: this.status.error,
         phases: this.status.phases
       });
-      if (history.length > 50) history.length = 50;
+      if (history.length > config.update.historyMaxEntries) history.length = config.update.historyMaxEntries;
       fs.writeFileSync(historyPath, JSON.stringify(history, null, 2), 'utf8');
     } catch (e) {
       logger.warn('保存更新历史失败', { error: e.message });
@@ -1293,8 +1293,8 @@ class UpdateManager {
       const entries = fs.readdirSync(extractDir, { withFileTypes: true });
       const dirs = entries.filter(e => e.isDirectory());
       const files = entries.filter(e => e.isFile());
-      const expectedTopDirs = ['server', 'client'];
-      const expectedTopFiles = ['package.json', 'start.bat', 'version.json'];
+      const expectedTopDirs = config.update.expectedTopDirs;
+      const expectedTopFiles = config.update.expectedTopFiles;
 
       let hasExpectedContent = false;
       for (const f of files) {
