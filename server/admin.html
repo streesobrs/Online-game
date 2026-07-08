@@ -1910,6 +1910,213 @@
       opacity: 0.5;
     }
 
+    /* ===== 行级 Diff 查看器 ===== */
+    .diff-viewer-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid #475569;
+      background: transparent;
+      color: #93c5fd;
+      cursor: pointer;
+      font-size: 10px;
+      font-family: inherit;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+
+    .diff-viewer-btn:hover {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: #3b82f6;
+      color: #60a5fa;
+    }
+
+    .diff-viewer-btn.loading {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    /* Diff 弹窗内容 */
+    .diff-viewer-container {
+      width: 100%;
+      max-width: 100%;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    }
+
+    .diff-viewer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: #0f172a;
+      border-radius: 8px 8px 0 0;
+      border-bottom: 1px solid #334155;
+      font-size: 13px;
+      color: #e2e8f0;
+    }
+
+    .diff-viewer-header .file-path {
+      font-weight: 600;
+      color: #93c5fd;
+    }
+
+    .diff-viewer-header .diff-stats {
+      display: flex;
+      gap: 12px;
+      font-size: 12px;
+    }
+
+    .diff-viewer-header .diff-stats .additions {
+      color: #4ade80;
+    }
+
+    .diff-viewer-header .diff-stats .deletions {
+      color: #f87171;
+    }
+
+    .diff-viewer-body {
+      background: #1e293b;
+      border-radius: 0 0 8px 8px;
+      max-height: 60vh;
+      overflow-y: auto;
+      overflow-x: auto;
+    }
+
+    .diff-viewer-body::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    .diff-viewer-body::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 3px;
+    }
+
+    .diff-viewer-body::-webkit-scrollbar-track {
+      background: #1e293b;
+    }
+
+    /* Diff 行 */
+    .diff-line {
+      display: flex;
+      min-height: 22px;
+      font-size: 12px;
+      line-height: 22px;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.3);
+    }
+
+    .diff-line:last-child {
+      border-bottom: none;
+    }
+
+    .diff-line .line-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      width: 40px;
+      padding: 0 8px;
+      color: #475569;
+      user-select: none;
+      flex-shrink: 0;
+      font-size: 11px;
+    }
+
+    .diff-line .line-num.old {
+      border-right: 1px solid #334155;
+    }
+
+    .diff-line .line-num.new {
+      border-right: 1px solid #334155;
+    }
+
+    .diff-line .line-content {
+      flex: 1;
+      padding: 0 12px;
+      white-space: pre;
+      overflow-x: auto;
+      min-width: 0;
+    }
+
+    .diff-line.add {
+      background: rgba(34, 197, 94, 0.12);
+    }
+
+    .diff-line.add .line-content::before {
+      content: '+';
+      color: #4ade80;
+      margin-right: 6px;
+      font-weight: 700;
+    }
+
+    .diff-line.remove {
+      background: rgba(239, 68, 68, 0.12);
+    }
+
+    .diff-line.remove .line-content::before {
+      content: '-';
+      color: #f87171;
+      margin-right: 6px;
+      font-weight: 700;
+    }
+
+    .diff-line.equal {
+      background: transparent;
+    }
+
+    .diff-line.equal .line-content::before {
+      content: ' ';
+      margin-right: 10px;
+    }
+
+    .diff-line.add:hover {
+      background: rgba(34, 197, 94, 0.2);
+    }
+
+    .diff-line.remove:hover {
+      background: rgba(239, 68, 68, 0.2);
+    }
+
+    .diff-viewer-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      color: #64748b;
+      font-size: 14px;
+      gap: 10px;
+    }
+
+    .diff-viewer-error {
+      padding: 30px;
+      text-align: center;
+      color: #f87171;
+      font-size: 13px;
+    }
+
+    .diff-viewer-empty {
+      padding: 30px;
+      text-align: center;
+      color: #64748b;
+      font-size: 13px;
+    }
+
+    /* Diff 弹窗使用全宽 */
+    .diff-viewer-modal .modal-box {
+      width: 90vw;
+      max-width: 1100px;
+    }
+
+    .diff-viewer-modal .modal-body {
+      padding: 0;
+      max-height: 75vh;
+      overflow: hidden;
+      background: #1e293b;
+      border-radius: 0 0 16px 16px;
+    }
+
     /* ===== 备份项摘要标签 ===== */
     .backup-op-summary {
       display: flex;
@@ -8300,6 +8507,7 @@
                           <span class="backup-file-path" title="${f.path}">${f.path}</span>
                           <span class="backup-file-size">${f.sizeFormatted}</span>
                           ${f.hash ? `<span class="backup-file-hash" title="${f.hashFull}">${f.hash}</span>` : ''}
+                          ${op !== 'add' ? `<button class="diff-viewer-btn" onclick="showFileDiff('${b.id.replace(/'/g, "\\'")}','${f.path.replace(/'/g, "\\'")}')">📄 Diff</button>` : ''}
                         </div>
                         `).join('')}
                       </div>
@@ -8496,6 +8704,167 @@
       } catch (e) {
         addUpdateLog('删除请求失败: ' + e.message, 'error');
       }
+    }
+
+    // ====== 行级 Diff 查看器 ======
+
+    async function showFileDiff(backupId, filePath) {
+      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+
+      // 先显示加载中的模态框
+      const loadingContent = `
+        <div class="diff-viewer-container">
+          <div class="diff-viewer-loading">
+            <span>⏳</span> 正在加载 Diff ...
+          </div>
+        </div>
+      `;
+      showModal(`📄 Diff: ${filePath}`, loadingContent, [{
+        text: '关闭',
+        class: 'btn-secondary',
+        action: () => document.getElementById('modal-container').innerHTML = ''
+      }]);
+      // 为模态框添加全宽样式
+      const modalContainer = document.getElementById('modal-container');
+      const modalBox = modalContainer.querySelector('.modal-box');
+      if (modalBox) {
+        modalContainer.classList.add('diff-viewer-modal');
+      }
+
+      try {
+        const res = await fetch(`/api/update/diff?backup=${encodeURIComponent(backupId)}&file=${encodeURIComponent(filePath)}`, { headers });
+        const data = await res.json();
+
+        if (!data.success) {
+          showModal(`📄 Diff: ${filePath}`, `
+            <div class="diff-viewer-container">
+              <div class="diff-viewer-error">❌ ${escapeHtml(data.message || '获取 Diff 失败')}</div>
+            </div>
+          `, [{
+            text: '关闭',
+            class: 'btn-secondary',
+            action: () => document.getElementById('modal-container').innerHTML = ''
+          }]);
+          modalContainer.classList.add('diff-viewer-modal');
+          return;
+        }
+
+        // 渲染 Diff
+        const diffHtml = renderDiffContent(data);
+        showModal(`📄 Diff: ${filePath}`, diffHtml, [{
+          text: '关闭',
+          class: 'btn-secondary',
+          action: () => document.getElementById('modal-container').innerHTML = ''
+        }]);
+        modalContainer.classList.add('diff-viewer-modal');
+      } catch (e) {
+        showModal(`📄 Diff: ${filePath}`, `
+          <div class="diff-viewer-container">
+            <div class="diff-viewer-error">❌ 请求失败: ${escapeHtml(e.message)}</div>
+          </div>
+        `, [{
+          text: '关闭',
+          class: 'btn-secondary',
+          action: () => document.getElementById('modal-container').innerHTML = ''
+        }]);
+        modalContainer.classList.add('diff-viewer-modal');
+      }
+    }
+
+    function renderDiffContent(data) {
+      const stats = data.stats || { additions: 0, deletions: 0 };
+      const diff = data.diff || [];
+
+      if (diff.length === 0) {
+        return `
+          <div class="diff-viewer-container">
+            <div class="diff-viewer-empty">📭 文件内容相同，无差异</div>
+          </div>
+        `;
+      }
+
+      // 检查是否是 info 类型（大文件）
+      if (diff.length === 1 && diff[0].type === 'info') {
+        return `
+          <div class="diff-viewer-container">
+            <div class="diff-viewer-empty">⚠️ ${escapeHtml(diff[0].content)}</div>
+          </div>
+        `;
+      }
+
+      // 操作类型中文标识
+      const opLabels = { update: '修改', add: '新增', delete: '删除' };
+      const opLabel = opLabels[data.operation] || '未知';
+
+      // 构建 diff 行 HTML
+      let linesHtml = '';
+      let groupStart = 0;
+      let contextCounter = 0;
+      const MAX_CONTEXT_LINES = 3; // 上下文行数
+
+      // 先找出所有变更位置，用于上下文压缩
+      const changePositions = [];
+      diff.forEach((line, idx) => {
+        if (line.type === 'add' || line.type === 'remove') {
+          changePositions.push(idx);
+        }
+      });
+
+      if (changePositions.length === 0) {
+        // 没有变更（理论上不会到这里）
+        return `<div class="diff-viewer-empty">📭 无差异</div>`;
+      }
+
+      // 构建显示区域：每个变更点前后保留上下文
+      const showRanges = [];
+      for (const pos of changePositions) {
+        const start = Math.max(0, pos - MAX_CONTEXT_LINES);
+        const end = Math.min(diff.length - 1, pos + MAX_CONTEXT_LINES);
+        if (showRanges.length === 0) {
+          showRanges.push({ start, end });
+        } else {
+          const last = showRanges[showRanges.length - 1];
+          if (start <= last.end + 1) {
+            last.end = end;
+          } else {
+            showRanges.push({ start, end });
+          }
+        }
+      }
+
+      // 渲染每个范围
+      for (let r = 0; r < showRanges.length; r++) {
+        const range = showRanges[r];
+        if (r > 0) {
+          // 省略标记
+          linesHtml += `<div class="diff-line equal" style="color:#475569;justify-content:center;font-size:11px;border-bottom:1px solid rgba(51,65,85,0.5);background:#0f172a;">⋯ ${diff[range.start - 1]?.oldLine || ''} ~ ${diff[range.start]?.newLine || ''} ⋯</div>`;
+        }
+        for (let i = range.start; i <= range.end; i++) {
+          const line = diff[i];
+          const lineCls = line.type === 'add' ? 'add' : line.type === 'remove' ? 'remove' : 'equal';
+          const oldNum = line.oldLine ? `<span class="line-num old">${line.oldLine}</span>` : '<span class="line-num old"></span>';
+          const newNum = line.newLine ? `<span class="line-num new">${line.newLine}</span>` : '<span class="line-num new"></span>';
+          const content = escapeHtml(line.content || '');
+          linesHtml += `<div class="diff-line ${lineCls}">${oldNum}${newNum}<span class="line-content">${content}</span></div>`;
+        }
+      }
+
+      return `
+        <div class="diff-viewer-container">
+          <div class="diff-viewer-header">
+            <span class="file-path">${escapeHtml(data.newPath || data.oldPath || '')}</span>
+            <div class="diff-stats">
+              <span class="additions">+${stats.additions}</span>
+              <span class="deletions">-${stats.deletions}</span>
+              <span style="color:#64748b;">${opLabel}</span>
+            </div>
+          </div>
+          <div class="diff-viewer-body">
+            ${linesHtml}
+          </div>
+        </div>
+      `;
     }
   </script>
 

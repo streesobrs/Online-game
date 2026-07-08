@@ -270,108 +270,313 @@
       border: 1px solid #45b7d1;
     }
 
-    /* 排行榜 */
+    /* ========== 排行榜（全新设计） ========== */
     .leaderboard-container {
       width: 100%;
       background: #f8f9fa;
-      padding: 8px;
-      border-radius: 7px;
-      margin-top: 6px;
+      border-radius: 12px;
+      overflow: hidden;
     }
 
-    .leaderboard-title {
-      font-size: 12px;
-      color: #2d3748;
-      margin-bottom: 6px;
-      font-weight: bold;
+    .leaderboard-header-stats {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .leaderboard-header-stats .lb-total {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .leaderboard-header-stats .lb-total strong {
+      font-size: 16px;
+      opacity: 1;
+    }
+
+    .leaderboard-search-box {
+      display: flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      padding: 4px 10px;
+      gap: 6px;
+    }
+
+    .leaderboard-search-box input {
+      background: transparent;
+      border: none;
+      color: white;
+      outline: none;
+      font-size: 13px;
+      width: 120px;
+    }
+
+    .leaderboard-search-box input::placeholder {
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .leaderboard-search-box .search-icon {
+      font-size: 14px;
+      cursor: pointer;
     }
 
     .leaderboard-list {
-      max-height: 100px;
+      max-height: 720px;
       overflow-y: auto;
+      padding: 8px 10px;
+    }
+
+    .leaderboard-list::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .leaderboard-list::-webkit-scrollbar-thumb {
+      background: #cbd5e0;
+      border-radius: 3px;
     }
 
     .leaderboard-item {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      padding: 5px 8px;
-      background: #e3f2fd;
-      color: #2d3748;
-      border-radius: 12px;
-      font-size: 11px;
-      margin-bottom: 4px;
+      padding: 10px 12px;
+      background: white;
+      border-radius: 10px;
+      margin-bottom: 6px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      transition: transform 0.15s, box-shadow 0.15s;
+      cursor: default;
+      gap: 10px;
+    }
+
+    .leaderboard-item:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
     }
 
     .leaderboard-item.top-1 {
-      background: #fff3cd;
+      background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%);
       border: 1px solid #ffeaa7;
     }
 
     .leaderboard-item.top-2 {
-      background: #e8eaf6;
+      background: linear-gradient(135deg, #f5f7ff 0%, #e8eaf6 100%);
       border: 1px solid #c5cae9;
     }
 
     .leaderboard-item.top-3 {
-      background: #f3e5f5;
+      background: linear-gradient(135deg, #fef5f0 0%, #f3e5f5 100%);
       border: 1px solid #e1bee7;
     }
 
-    .leaderboard-left {
-      display: flex;
-      align-items: center;
-      gap: 6px;
+    .leaderboard-item.is-me {
+      border: 2px solid #667eea !important;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
     }
 
-    .leaderboard-rank {
-      width: 20px;
-      height: 20px;
+    .leaderboard-rank-col {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      flex-shrink: 0;
+    }
+
+    .leaderboard-rank-medal {
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .leaderboard-rank-num {
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: bold;
-      font-size: 10px;
-      background: #4a5568;
+      font-weight: 700;
+      font-size: 12px;
+      background: #a0aec0;
       color: white;
     }
 
-    .leaderboard-item.top-1 .leaderboard-rank {
+    .leaderboard-item.top-1 .leaderboard-rank-num {
       background: #ffc107;
     }
 
-    .leaderboard-item.top-2 .leaderboard-rank {
+    .leaderboard-item.top-2 .leaderboard-rank-num {
       background: #6c757d;
     }
 
-    .leaderboard-item.top-3 .leaderboard-rank {
+    .leaderboard-item.top-3 .leaderboard-rank-num {
       background: #d69e2e;
     }
 
-    .leaderboard-name {
-      font-size: 11px;
-      font-weight: 500;
-      color: #2d3748;
+    .leaderboard-player-info {
+      flex: 1;
+      min-width: 0;
     }
 
-    .leaderboard-level {
-      font-size: 10px;
+    .leaderboard-player-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #2d3748;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .leaderboard-player-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 2px;
+      font-size: 11px;
       color: #718096;
     }
 
-    .leaderboard-stats {
-      text-align: right;
+    .leaderboard-lv-badge {
+      display: inline-block;
+      padding: 0 6px;
+      background: #e2e8f0;
+      border-radius: 4px;
+      font-weight: 600;
       font-size: 10px;
+      color: #4a5568;
     }
 
-    .leaderboard-wins {
+    .leaderboard-streak-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 0 6px;
+      background: #fed7d7;
+      border-radius: 4px;
+      font-weight: 600;
+      font-size: 10px;
+      color: #e53e3e;
+    }
+
+    .leaderboard-player-detail {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .leaderboard-stat-item {
+      text-align: center;
+      min-width: 40px;
+    }
+
+    .leaderboard-stat-value {
+      font-size: 14px;
+      font-weight: 700;
+      color: #2d3748;
+    }
+
+    .leaderboard-stat-label {
+      font-size: 9px;
+      color: #a0aec0;
+      margin-top: 1px;
+    }
+
+    .leaderboard-stat-value.win {
       color: #38a169;
-      font-weight: bold;
     }
 
-    .leaderboard-winrate {
-      color: #4299e1;
+    .leaderboard-stat-value.lose {
+      color: #e53e3e;
+    }
+
+    .leaderboard-stat-value.draw {
+      color: #a0aec0;
+    }
+
+    .leaderboard-winrate-col {
+      width: 70px;
+      flex-shrink: 0;
+    }
+
+    .leaderboard-winrate-text {
+      font-size: 13px;
+      font-weight: 700;
+      color: #2d3748;
+      text-align: center;
+      margin-bottom: 3px;
+    }
+
+    .leaderboard-winrate-bar-bg {
+      width: 100%;
+      height: 4px;
+      background: #e2e8f0;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .leaderboard-winrate-bar {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.5s ease;
+    }
+
+    .leaderboard-winrate-bar.high {
+      background: linear-gradient(90deg, #38a169, #68d391);
+    }
+
+    .leaderboard-winrate-bar.mid {
+      background: linear-gradient(90deg, #d69e2e, #f6e05e);
+    }
+
+    .leaderboard-winrate-bar.low {
+      background: linear-gradient(90deg, #e53e3e, #fc8181);
+    }
+
+    .leaderboard-empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: #a0aec0;
+      font-size: 14px;
+    }
+
+    /* 自己的排名浮层 */
+    .leaderboard-self-row {
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: #ebf4ff;
+      border-radius: 10px;
+      border: 1px dashed #667eea;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: default;
+    }
+
+    .leaderboard-self-row .self-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #667eea;
+      padding: 2px 8px;
+      background: rgba(102, 126, 234, 0.1);
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    .leaderboard-self-row .self-rank {
+      font-weight: 700;
+      color: #2d3748;
+      font-size: 14px;
+    }
+
+    /* 无搜索结果 */
+    .leaderboard-no-result {
+      text-align: center;
+      padding: 30px;
+      color: #a0aec0;
     }
 
 
@@ -3610,40 +3815,49 @@
         <div id="achContent">加载中...</div>
       </div>
 
-      <!-- 排行榜页面 -->
+      <!-- 排行榜页面（全新设计） -->
       <div class="leaderboard-page" id="leaderboard-page"
         style="display: none; width: 100%; max-width: 100%; min-width: 500px; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07); margin: 0 0 15px; box-sizing: border-box;">
-        <div class="lobby-title" style="font-size: 24px; margin-bottom: 15px;">📊 排行榜</div>
+        <div class="lobby-title" style="font-size: 24px; margin-bottom: 15px;">🏆 排行榜</div>
         <div class="lobby-status" style="font-size: 16px; margin-bottom: 25px;">
-          查看玩家排名和战绩！
+          查看全服玩家排名与战绩
         </div>
         <div class="leaderboard-controls"
           style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; justify-content: center;">
           <button class="lobby-btn" onclick="loadLeaderboard('all')"
-            style="background: #3498db; color: white; padding: 10px 16px; border-radius: 16px; font-size: 14px;">📋
+            style="background: #667eea; color: white; padding: 10px 20px; border-radius: 20px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(102,126,234,0.3);">📋
             总榜</button>
           <button class="lobby-btn" onclick="loadLeaderboard('gobang')"
-            style="background: #e74c3c; color: white; padding: 10px 16px; border-radius: 16px; font-size: 14px;">🔴
+            style="background: #e74c3c; color: white; padding: 10px 20px; border-radius: 20px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(231,76,60,0.3);">🔴
             五子棋</button>
           <button class="lobby-btn" onclick="loadLeaderboard('go')"
-            style="background: #27ae60; color: white; padding: 10px 16px; border-radius: 16px; font-size: 14px;">⚪
+            style="background: #27ae60; color: white; padding: 10px 20px; border-radius: 20px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(39,174,96,0.3);">⚪
             围棋</button>
           <button class="lobby-btn" onclick="loadLeaderboard('chinese-chess')"
-            style="background: #f39c12; color: white; padding: 10px 16px; border-radius: 16px; font-size: 14px;">🟥
+            style="background: #f39c12; color: white; padding: 10px 20px; border-radius: 20px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(243,156,18,0.3);">🟥
             象棋</button>
           <button class="lobby-btn" onclick="loadLeaderboard('snake')"
-            style="background: #9b59b6; color: white; padding: 10px 16px; border-radius: 16px; font-size: 14px;">🐍
+            style="background: #9b59b6; color: white; padding: 10px 20px; border-radius: 20px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(155,89,182,0.3);">🐍
             贪吃蛇</button>
           <button class="lobby-btn cancel-btn" onclick="returnToLobby()"
-            style="background: #6c757d; color: white; padding: 10px 16px; border-radius: 16px; font-size: 14px; margin-left: auto;">🏠
+            style="background: #6c757d; color: white; padding: 10px 20px; border-radius: 20px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; margin-left: auto;">🏠
             返回大厅</button>
         </div>
-        <div class="leaderboard-container"
-          style="width: 100%; background: #f8f9fa; border-radius: 8px; overflow: hidden;">
-          <div class="leaderboard-list" id="leaderboard-list"
-            style="padding: 20px; max-height: 600px; overflow-y: auto;">
-            加载中...
+        <div class="leaderboard-container">
+          <div class="leaderboard-header-stats">
+            <span class="lb-total">👥 参与玩家 <strong id="lb-player-count">-</strong></span>
+            <div class="leaderboard-search-box">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="leaderboard-search-input" placeholder="搜索玩家昵称..." oninput="filterLeaderboard()">
+              <span class="search-icon"
+                onclick="document.getElementById('leaderboard-search-input').value='';filterLeaderboard()"
+                style="font-size:12px;opacity:0.7;">✕</span>
+            </div>
           </div>
+          <div class="leaderboard-list" id="leaderboard-list">
+            <div class="leaderboard-empty">🏆 加载中...</div>
+          </div>
+          <div id="leaderboard-self-container"></div>
         </div>
       </div>
 
@@ -5544,7 +5758,7 @@
         }
 
         // 获取排行榜
-        socket.emit('get_leaderboard', { limit: 10 });
+        socket.emit('get_leaderboard', { limit: 20, gameType: 'all' });
 
         // 检查是否有待播放的回放
         checkReplayOnLoad();
@@ -5816,7 +6030,7 @@
         }
 
         setTimeout(() => {
-          socket.emit('get_leaderboard', { limit: 10 });
+          socket.emit('get_leaderboard', { limit: 20, gameType: 'all' });
         }, 500);
       });
 
@@ -6458,6 +6672,10 @@
         updateLeaderboard(data.leaderboard, currentLeaderboardGameType);
       });
 
+      socket.on('my_rank', (data) => {
+        showSelfRankCard(data);
+      });
+
       socket.on('game_history', (data) => {
         updateGameHistory(data.history);
       });
@@ -6602,73 +6820,194 @@
       showToast('📬 收到新邮件：' + (data.mail.title || '新邮件'), 'success');
     });
 
-    // 更新排行榜显示
+    // ========== 排行榜系统（全新） ==========
     // 当前排行榜选中的游戏类型
     let currentLeaderboardGameType = 'all';
+    // 当前排行榜完整数据（用于搜索过滤）
+    let _leaderboardFullData = [];
 
+    // 渲染单个排行榜玩家卡片
+    function renderLeaderboardItem(player, gameType) {
+      const isTop3 = player.rank <= 3;
+      const rankClass = isTop3 ? `top-${player.rank}` : '';
+      const name = escapeHtml(player.name || player.username || '未知玩家');
+      const isSnake = gameType === 'snake';
+      const medal = player.rank === 1 ? '🥇' : player.rank === 2 ? '🥈' : player.rank === 3 ? '🥉' : '';
+      const winrateCls = player.winrateNum >= 60 ? 'high' : player.winrateNum >= 40 ? 'mid' : 'low';
+
+      // 判断是否是当前登录玩家
+      const isMe = currentAccount && (
+        currentAccount.account?.id === player.id ||
+        currentAccount.id === player.id ||
+        currentAccount.account?.username === player.username
+      );
+
+      // 胜/负/平
+      const statHtml = isSnake ? `
+        <div class="leaderboard-stat-item">
+          <div class="leaderboard-stat-value">${player.score || 0}</div>
+          <div class="leaderboard-stat-label">最高分</div>
+        </div>
+      ` : `
+        <div class="leaderboard-stat-item">
+          <div class="leaderboard-stat-value win">${player.wins || 0}</div>
+          <div class="leaderboard-stat-label">胜</div>
+        </div>
+        <div class="leaderboard-stat-item">
+          <div class="leaderboard-stat-value lose">${player.losses || 0}</div>
+          <div class="leaderboard-stat-label">负</div>
+        </div>
+        <div class="leaderboard-stat-item">
+          <div class="leaderboard-stat-value draw">${player.draws || 0}</div>
+          <div class="leaderboard-stat-label">平</div>
+        </div>
+      `;
+
+      // 连胜标识
+      let streakHtml = '';
+      if (!isSnake && player.streak && player.streak > 2) {
+        streakHtml = `<span class="leaderboard-streak-badge">🔥 ${player.streak}连胜</span>`;
+      }
+
+      // 最大连胜
+      let maxStreakHtml = '';
+      if (!isSnake && player.maxStreak && player.maxStreak > 0) {
+        maxStreakHtml = `<span style="font-size:10px;color:#a0aec0;">最高${player.maxStreak}连胜</span>`;
+      }
+
+      const totalForRate = (player.wins || 0) + (player.losses || 0) + (player.draws || 0);
+
+      return `
+        <div class="leaderboard-item ${rankClass} ${isMe ? 'is-me' : ''}">
+          <div class="leaderboard-rank-col">
+            ${isTop3
+          ? `<span class="leaderboard-rank-medal">${medal}</span>`
+          : `<span class="leaderboard-rank-num">${player.rank}</span>`
+        }
+          </div>
+          <div class="leaderboard-player-info">
+            <div class="leaderboard-player-name">${name}</div>
+            <div class="leaderboard-player-meta">
+              <span class="leaderboard-lv-badge">Lv.${player.level || 1}</span>
+              <span>🏟️ ${player.totalGames || 0}局</span>
+              ${streakHtml}
+              ${maxStreakHtml ? '· ' + maxStreakHtml : ''}
+            </div>
+          </div>
+          <div class="leaderboard-player-detail">
+            ${statHtml}
+          </div>
+          ${!isSnake && totalForRate > 0 ? `
+          <div class="leaderboard-winrate-col">
+            <div class="leaderboard-winrate-text">${player.winrate || '0%'}</div>
+            <div class="leaderboard-winrate-bar-bg">
+              <div class="leaderboard-winrate-bar ${winrateCls}" style="width:${Math.min(player.winrateNum || 0, 100)}%"></div>
+            </div>
+          </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    // 更新排行榜显示
     function updateLeaderboard(leaderboard, gameType) {
+      _leaderboardFullData = leaderboard || [];
       const list = document.getElementById('leaderboard-list');
       if (!list) return;
 
+      const playerCount = document.getElementById('lb-player-count');
+      if (playerCount) {
+        playerCount.textContent = _leaderboardFullData.length;
+      }
+
       if (!leaderboard || leaderboard.length === 0) {
-        list.innerHTML = '<div style="color: #718096; font-size: 12px;">暂无数据</div>';
+        list.innerHTML = '<div class="leaderboard-empty">📭 暂无排行数据</div>';
+        document.getElementById('leaderboard-self-container').innerHTML = '';
         return;
       }
 
-      list.innerHTML = leaderboard.map(player => {
-        const rankClass = player.rank <= 3 ? `top-${player.rank}` : '';
-        const name = escapeHtml(player.name || player.username || '未知玩家');
-        const isSnake = gameType === 'snake';
-        return `
-          <div class="leaderboard-item ${rankClass}">
-            <div class="leaderboard-left">
-              <div class="leaderboard-rank">#${player.rank}</div>
-              <div>
-                <div class="leaderboard-name">${name}</div>
-                <div class="leaderboard-level">Lv.${player.level || 1}</div>
-              </div>
-            </div>
-            <div class="leaderboard-stats">
-              ${isSnake ?
-            `<div class="leaderboard-wins">${player.score || 0}分</div>
-                     <div class="leaderboard-winrate">最高分数</div>` :
-            `<div class="leaderboard-wins">${player.wins || 0}胜</div>
-                     <div class="leaderboard-winrate">胜率 ${player.winrate || '0%'}</div>`
-          }
-            </div>
-          </div>
-        `;
-      }).join('');
-      applyThemeToLeaderboard();
+      // 渲染所有条目
+      list.innerHTML = leaderboard.map(player => renderLeaderboardItem(player, gameType)).join('');
+
+      // 显示自己的排名（如果不在前20名内）
+      renderSelfRank(leaderboard, gameType);
     }
 
-    function applyThemeToLeaderboard() {
-      if (!leaderboardList) return;
-      const theme = themes[currentTheme];
-      const leaderboardItems = leaderboardList.querySelectorAll('.leaderboard-item');
-      leaderboardItems.forEach(item => {
-        item.style.background = theme.uiColors.leaderboardItemBg;
-        const rankEl = item.querySelector('.leaderboard-rank');
-        if (rankEl) {
-          rankEl.style.color = theme.uiColors.rankColor;
+    // 渲染当前玩家自己的排名
+    function renderSelfRank(leaderboard, gameType) {
+      const container = document.getElementById('leaderboard-self-container');
+      if (!container || !currentAccount) {
+        if (container) container.innerHTML = '';
+        return;
+      }
+
+      const myId = currentAccount.account?.id || currentAccount.id;
+      const myUsername = currentAccount.account?.username;
+
+      // 检查是否已在列表中
+      const alreadyInList = leaderboard.some(p => p.id === myId || p.username === myUsername);
+      if (alreadyInList) {
+        container.innerHTML = '';
+        return;
+      }
+
+      // 自己的排名不在前20，从服务器获取自己的排名数据
+      socket.emit('get_my_rank', { gameType: gameType });
+    }
+
+    // 显示自己的排名卡片（由 socket 事件触发）
+    function showSelfRankCard(data) {
+      const container = document.getElementById('leaderboard-self-container');
+      if (!container || !data) {
+        if (container) container.innerHTML = '';
+        return;
+      }
+
+      if (!data.inTopList) {
+        const player = data.player;
+        if (!player) {
+          container.innerHTML = '';
+          return;
         }
-        const nameEl = item.querySelector('.leaderboard-name');
-        if (nameEl) {
-          nameEl.style.color = theme.uiColors.nameColor;
-        }
-        const levelEl = item.querySelector('.leaderboard-level');
-        if (levelEl) {
-          levelEl.style.color = theme.uiColors.levelColor;
-        }
-        const winsEl = item.querySelector('.leaderboard-wins');
-        if (winsEl) {
-          winsEl.style.color = theme.uiColors.winsColor;
-        }
-        const winrateEl = item.querySelector('.leaderboard-winrate');
-        if (winrateEl) {
-          winrateEl.style.color = theme.uiColors.winrateColor;
-        }
+        const name = escapeHtml(player.name || '未知');
+        container.innerHTML = `
+          <div class="leaderboard-self-row">
+            <span class="self-label">我的排名</span>
+            <span class="self-rank">#${player.rank}</span>
+            <span style="font-size:13px;font-weight:600;color:#2d3748;">${name}</span>
+            <span class="leaderboard-lv-badge">Lv.${player.level || 1}</span>
+            <span style="font-size:12px;color:#718096;margin-left:auto;">🏟️ ${player.totalGames || 0}局 · ${player.winrate || '0%'}</span>
+          </div>
+        `;
+      } else {
+        container.innerHTML = '';
+      }
+    }
+
+    // 搜索过滤排行榜
+    function filterLeaderboard() {
+      const input = document.getElementById('leaderboard-search-input');
+      if (!input) return;
+      const query = input.value.trim().toLowerCase();
+      const list = document.getElementById('leaderboard-list');
+      if (!list) return;
+
+      if (!query) {
+        // 无搜索关键词，显示全部
+        list.innerHTML = _leaderboardFullData.map(player => renderLeaderboardItem(player, currentLeaderboardGameType)).join('');
+        return;
+      }
+
+      const filtered = _leaderboardFullData.filter(player => {
+        const name = (player.name || player.username || '').toLowerCase();
+        return name.includes(query);
       });
+
+      if (filtered.length === 0) {
+        list.innerHTML = '<div class="leaderboard-no-result">🔍 未找到匹配的玩家</div>';
+      } else {
+        list.innerHTML = filtered.map(player => renderLeaderboardItem(player, currentLeaderboardGameType)).join('');
+      }
     }
 
     // 显示系统广播
@@ -11116,38 +11455,31 @@
 
     // 加载排行榜数据
     function loadLeaderboard(gameType) {
-      // 更新按钮选中状态
+      // 更新按钮选中状态 - 使用透明度来指示选中
       document.querySelectorAll('.leaderboard-controls .lobby-btn').forEach(btn => {
-        btn.style.backgroundColor = '';
-        btn.style.fontWeight = 'normal';
+        btn.style.opacity = '0.6';
+        btn.style.transform = 'scale(0.95)';
       });
 
-      // 为当前选中的按钮添加样式
-      if (gameType === 'all') {
-        document.querySelector('button[onclick="loadLeaderboard(\'all\')"]').style.backgroundColor = '#3498db';
-        document.querySelector('button[onclick="loadLeaderboard(\'all\')"]').style.fontWeight = 'bold';
-      } else if (gameType === 'gobang') {
-        document.querySelector('button[onclick="loadLeaderboard(\'gobang\')"]').style.backgroundColor = '#e74c3c';
-        document.querySelector('button[onclick="loadLeaderboard(\'gobang\')"]').style.fontWeight = 'bold';
-      } else if (gameType === 'go') {
-        document.querySelector('button[onclick="loadLeaderboard(\'go\')"]').style.backgroundColor = '#27ae60';
-        document.querySelector('button[onclick="loadLeaderboard(\'go\')"]').style.fontWeight = 'bold';
-      } else if (gameType === 'chinese-chess') {
-        document.querySelector('button[onclick="loadLeaderboard(\'chinese-chess\')"]').style.backgroundColor = '#f39c12';
-        document.querySelector('button[onclick="loadLeaderboard(\'chinese-chess\')"]').style.fontWeight = 'bold';
-      } else if (gameType === 'snake') {
-        document.querySelector('button[onclick="loadLeaderboard(\'snake\')"]').style.backgroundColor = '#9b59b6';
-        document.querySelector('button[onclick="loadLeaderboard(\'snake\')"]').style.fontWeight = 'bold';
+      // 为当前选中的按钮添加高亮
+      const activeBtn = document.querySelector(`button[onclick="loadLeaderboard('${gameType}')"]`);
+      if (activeBtn) {
+        activeBtn.style.opacity = '1';
+        activeBtn.style.transform = 'scale(1.05)';
       }
 
       // 保存当前选中的游戏类型，供 updateLeaderboard 使用
       currentLeaderboardGameType = gameType;
 
+      // 清空搜索框
+      const searchInput = document.getElementById('leaderboard-search-input');
+      if (searchInput) searchInput.value = '';
+
       const leaderboardList = document.getElementById('leaderboard-list');
-      leaderboardList.innerHTML = '加载中...';
+      leaderboardList.innerHTML = '<div class="leaderboard-empty">🏆 加载中...</div>';
 
       // 从服务器获取排行榜数据（由 socket.on('leaderboard') 统一处理响应）
-      socket.emit('get_leaderboard', { limit: 10, gameType: gameType });
+      socket.emit('get_leaderboard', { limit: 20, gameType: gameType });
     }
 
     // 选择游戏类型
@@ -13640,7 +13972,7 @@
         });
       }
 
-      // 更新排行榜UI元素样式
+      // 更新排行榜UI元素样式（新设计）
       if (leaderboardContainer) {
         leaderboardContainer.style.background = theme.uiColors.leaderboardBg;
       }
@@ -13650,26 +13982,26 @@
       if (leaderboardList) {
         const leaderboardItems = leaderboardList.querySelectorAll('.leaderboard-item');
         leaderboardItems.forEach(item => {
-          item.style.background = theme.uiColors.leaderboardItemBg;
-          const rankEl = item.querySelector('.leaderboard-rank');
-          if (rankEl) {
-            rankEl.style.color = theme.uiColors.rankColor;
+          if (!item.classList.contains('top-1') && !item.classList.contains('top-2') && !item.classList.contains('top-3')) {
+            item.style.background = theme.uiColors.leaderboardItemBg;
           }
-          const nameEl = item.querySelector('.leaderboard-name');
+          const nameEl = item.querySelector('.leaderboard-player-name');
           if (nameEl) {
             nameEl.style.color = theme.uiColors.nameColor;
           }
-          const levelEl = item.querySelector('.leaderboard-level');
-          if (levelEl) {
-            levelEl.style.color = theme.uiColors.levelColor;
+          const metaEl = item.querySelector('.leaderboard-player-meta');
+          if (metaEl) {
+            metaEl.style.color = theme.uiColors.levelColor;
           }
-          const winsEl = item.querySelector('.leaderboard-wins');
-          if (winsEl) {
-            winsEl.style.color = theme.uiColors.winsColor;
-          }
-          const winrateEl = item.querySelector('.leaderboard-winrate');
-          if (winrateEl) {
-            winrateEl.style.color = theme.uiColors.winrateColor;
+          const statValues = item.querySelectorAll('.leaderboard-stat-value');
+          statValues.forEach(el => {
+            if (!el.classList.contains('win') && !el.classList.contains('lose') && !el.classList.contains('draw')) {
+              el.style.color = theme.uiColors.winsColor;
+            }
+          });
+          const winrateText = item.querySelector('.leaderboard-winrate-text');
+          if (winrateText) {
+            winrateText.style.color = theme.uiColors.winrateColor;
           }
         });
       }

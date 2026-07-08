@@ -184,6 +184,22 @@ app.get('/api/update/backups', authenticateToken, (req, res) => {
   }
 });
 
+// 获取文件行级 diff
+app.get('/api/update/diff', authenticateToken, (req, res) => {
+  try {
+    const backup = req.query.backup;
+    const file = req.query.file;
+    if (!backup || !file) {
+      return res.status(400).json({ success: false, message: '缺少参数 backup 或 file' });
+    }
+    const result = updateManager.getFileDiff(backup, file);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    logger.error('获取文件 diff 失败', { error: err.message });
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 app.post('/api/update/upload', authenticateToken, express.raw({
   limit: config.update.maxUploadSize,
   type: ['application/zip', 'application/octet-stream', 'application/x-zip-compressed']
@@ -2403,10 +2419,37 @@ io.on('connection', (socket) => {
 
   // 获取排行榜
   socket.on('get_leaderboard', async (data) => {
-    const limit = data?.limit || 10;
+    const limit = data?.limit || 20;
     const gameType = data?.gameType || null;
     const leaderboard = await userManager.getLeaderboard(limit, gameType);
     socket.emit('leaderboard', { leaderboard });
+  });
+
+  // 获取当前玩家自己的排名（不在前20时显示）
+  socket.on('get_my_rank', async (data) => {
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (!userSession || !userSession.accountId) {
+      socket.emit('my_rank', { inTopList: true });
+      return;
+    }
+    const gameType = data?.gameType || 'all';
+    // 获取完整榜单（不限量）来判断排名
+    const fullLeaderboard = await userManager.getLeaderboard(1000, gameType);
+    const myIdx = fullLeaderboard.findIndex(p => p.id === userSession.accountId);
+    if (myIdx === -1) {
+      socket.emit('my_rank', { inTopList: true });
+      return;
+    }
+    const myRank = myIdx + 1;
+    const inTopList = myRank <= 20;
+    if (inTopList) {
+      socket.emit('my_rank', { inTopList: true });
+    } else {
+      socket.emit('my_rank', {
+        inTopList: false,
+        player: fullLeaderboard[myIdx]
+      });
+    }
   });
 
   // ========== 反馈相关事件 ==========

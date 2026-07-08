@@ -448,7 +448,7 @@ class AccountManager {
   }
 
   // 获取排行榜
-  async getLeaderboard(limit = 10, gameType = 'all') {
+  async getLeaderboard(limit = 20, gameType = 'all') {
     try {
       const accounts = await this.getAllAccounts();
 
@@ -464,44 +464,65 @@ class AccountManager {
         }
       }
 
+      // 获取游戏类型的辅助函数
+      const getGameStats = (account, type) => {
+        if (!type || type === 'all') {
+          // 总榜：所有游戏合计
+          const games = account.games || {};
+          let totalWins = 0, totalLosses = 0, totalDraws = 0, totalGames = 0;
+          let maxStreakOverall = 0;
+          Object.values(games).forEach(g => {
+            totalWins += g.wins || 0;
+            totalLosses += g.losses || 0;
+            totalDraws += g.draws || 0;
+            totalGames += g.totalGames || 0;
+            if ((g.maxStreak || 0) > maxStreakOverall) maxStreakOverall = g.maxStreak;
+          });
+          // 总榜连胜 = 最后玩过的游戏类型的连胜
+          const lastGameType = Object.keys(games).reverse().find(k => games[k]?.lastPlayedAt);
+          const streak = lastGameType ? (games[lastGameType]?.streak || 0) : 0;
+          return { wins: totalWins, losses: totalLosses, draws: totalDraws, totalGames, streak, maxStreak: maxStreakOverall };
+        }
+        if (type === 'snake') {
+          const g = account.games?.snake || {};
+          const score = account.stats?.snakeGames?.highScore || g.highScore || 0;
+          return { wins: 0, losses: 0, draws: 0, totalGames: g.totalGames || 0, streak: 0, maxStreak: 0, score };
+        }
+        const g = account.games?.[type] || {};
+        const wins = g.wins || 0;
+        const losses = g.losses || 0;
+        const draws = g.draws || 0;
+        const totalGames = g.totalGames || 0;
+        return { wins, losses, draws, totalGames, streak: g.streak || 0, maxStreak: g.maxStreak || 0, score: 0 };
+      };
+
+      // 计算排序分数
+      const getSortScore = (account, type) => {
+        if (!type || type === 'all') {
+          return Object.values(account.games || {}).reduce((sum, g) => sum + (g.wins || 0), 0);
+        }
+        if (type === 'snake') {
+          return account.stats?.snakeGames?.highScore || account.games?.snake?.highScore || 0;
+        }
+        return account.games?.[type]?.wins || 0;
+      };
+
       return uniqueAccounts
         .sort((a, b) => {
-          let scoreA, scoreB;
-          if (gameType && gameType !== 'all') {
-            if (gameType === 'snake') {
-              // 贪吃蛇排行榜：基于最高分数
-              scoreA = a.stats?.snakeGames?.highScore || a.games?.snake?.highScore || 0;
-              scoreB = b.stats?.snakeGames?.highScore || b.games?.snake?.highScore || 0;
-            } else {
-              // 其他游戏类型的排行榜：基于获胜次数
-              scoreA = a.games?.[gameType]?.wins || 0;
-              scoreB = b.games?.[gameType]?.wins || 0;
-            }
-          } else {
-            // 总榜：计算所有游戏类型的获胜次数总和
-            scoreA = Object.values(a.games || {}).reduce((sum, game) => sum + (game.wins || 0), 0);
-            scoreB = Object.values(b.games || {}).reduce((sum, game) => sum + (game.wins || 0), 0);
-          }
-          return scoreB - scoreA;
+          const scoreA = getSortScore(a, gameType);
+          const scoreB = getSortScore(b, gameType);
+          if (scoreB !== scoreA) return scoreB - scoreA;
+          // 分数相同时按等级排序
+          const lvA = a.account?.profile?.level || 1;
+          const lvB = b.account?.profile?.level || 1;
+          return lvB - lvA;
         })
         .slice(0, limit)
         .map((account, index) => {
-          let wins, score;
-          if (gameType && gameType !== 'all') {
-            if (gameType === 'snake') {
-              score = account.stats?.snakeGames?.highScore || account.games?.snake?.highScore || 0;
-              wins = 0;
-            } else {
-              wins = account.games?.[gameType]?.wins || 0;
-              score = 0;
-            }
-          } else {
-            wins = Object.values(account.games || {}).reduce((sum, game) => sum + (game.wins || 0), 0);
-            score = 0;
-          }
-
-          const totalGames = Object.values(account.games || {}).reduce((sum, game) => sum + (game.totalGames || 0), 0);
+          const stats = getGameStats(account, gameType);
           const name = account.account?.nickname || account.account?.username || `玩家${account.account?.id?.substr(0, 4) || '0000'}`;
+          const total = stats.totalGames || stats.wins + stats.losses + stats.draws;
+          const winrateNum = total > 0 ? Math.round((stats.wins / total) * 100) : 0;
 
           return {
             rank: index + 1,
@@ -509,12 +530,16 @@ class AccountManager {
             username: account.account?.username,
             name: name,
             level: account.account?.profile?.level || 1,
-            wins: wins,
-            losses: account.stats?.totalLosses || 0,
-            draws: account.stats?.totalDraws || 0,
-            totalGames: totalGames,
-            score: score,
-            winrate: totalGames > 0 ? `${Math.round((wins / totalGames) * 100)}%` : '0%'
+            exp: account.account?.profile?.exp || 0,
+            wins: stats.wins,
+            losses: stats.losses,
+            draws: stats.draws,
+            totalGames: total,
+            streak: stats.streak,
+            maxStreak: stats.maxStreak,
+            score: stats.score || 0,
+            winrate: `${winrateNum}%`,
+            winrateNum: winrateNum
           };
         });
     } catch (err) {

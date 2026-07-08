@@ -1371,6 +1371,148 @@ class UpdateManager {
     fs.rmSync(backupPath, { recursive: true, force: true });
     this._pushLog('info', `已删除备份: ${backupName}`);
   }
+
+  /**
+   * 计算两个文本之间的行级 diff（基于 LCS 算法）
+   * @param {string} oldText - 旧文件内容
+   * @param {string} newText - 新文件内容
+   * @returns {Array} diff 结果数组
+   */
+  static computeDiff(oldText, newText) {
+    const oldLines = (oldText || '').replace(/\r\n/g, '\n').split('\n');
+    const newLines = (newText || '').replace(/\r\n/g, '\n').split('\n');
+
+    const m = oldLines.length;
+    const n = newLines.length;
+
+    // 大文件保护：超过 5000 行返回简化 diff
+    if (m > 5000 || n > 5000) {
+      return [{
+        type: 'info',
+        content: `文件过大（${m} 行 → ${n} 行），无法显示行级 diff`
+      }];
+    }
+
+    // 构建 LCS DP 表
+    const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        if (oldLines[i - 1] === newLines[j - 1]) {
+          dp[i][j] = dp[i - 1][j - 1] + 1;
+        } else if (dp[i - 1][j] >= dp[i][j - 1]) {
+          dp[i][j] = dp[i - 1][j];
+        } else {
+          dp[i][j] = dp[i][j - 1];
+        }
+      }
+    }
+
+    // 回溯获取编辑序列
+    const result = [];
+    let i = m, j = n;
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
+        result.push({ type: 'equal', content: oldLines[i - 1], oldLine: i, newLine: j });
+        i--; j--;
+      } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+        result.push({ type: 'add', content: newLines[j - 1], newLine: j });
+        j--;
+      } else if (i > 0) {
+        result.push({ type: 'remove', content: oldLines[i - 1], oldLine: i });
+        i--;
+      } else {
+        // 不应该到达这里，但防止死循环
+        break;
+      }
+    }
+
+    result.reverse();
+    return result;
+  }
+
+  /**
+   * 获取指定备份中某个文件的 diff
+   * @param {string} backupName - 备份名称
+   * @param {string} fileRelPath - 文件相对路径（使用 / 分隔）
+   * @returns {Object} diff 结果
+   */
+  getFileDiff(backupName, fileRelPath) {
+    const backupPath = path.join(this.paths.backup, backupName);
+    if (!fs.existsSync(backupPath)) {
+      throw new Error('备份不存在');
+    }
+
+    // 安全检查：防止路径穿越
+    const normalizedPath = path.normalize(fileRelPath).replace(/\\/g, '/');
+    if (normalizedPath.includes('..')) {
+      throw new Error('非法路径');
+    }
+
+    const oldFilePath = path.join(backupPath, normalizedPath);
+    const newFilePath = path.join(this.storageRoot, normalizedPath);
+
+    // 读取旧文件内容
+    let oldContent = '';
+    let oldExists = false;
+    if (fs.existsSync(oldFilePath)) {
+      try {
+        oldContent = fs.readFileSync(oldFilePath, 'utf8');
+        oldExists = true;
+      } catch (e) {
+        oldContent = `[二进制文件或无法读取]`;
+      }
+    }
+
+    // 读取新文件内容
+    let newContent = '';
+    let newExists = false;
+    if (fs.existsSync(newFilePath)) {
+      try {
+        newContent = fs.readFileSync(newFilePath, 'utf8');
+        newExists = true;
+      } catch (e) {
+        newContent = `[二进制文件或无法读取]`;
+      }
+    }
+
+    // 判断操作类型
+    let operation = 'update';
+    if (!oldExists && newExists) operation = 'add';
+    else if (oldExists && !newExists) operation = 'delete';
+
+    // 计算 diff（仅文本文件）
+    const isText = !oldContent.startsWith('[') || !newContent.startsWith('[');
+    let diff = [];
+    let stats = { additions: 0, deletions: 0 };
+
+    if (oldExists && newExists && isText) {
+      diff = UpdateManager.computeDiff(oldContent, newContent);
+      stats.additions = diff.filter(d => d.type === 'add').length;
+      stats.deletions = diff.filter(d => d.type === 'remove').length;
+    } else if (oldExists && !newExists) {
+      // 删除的文件
+      const lines = oldContent.split('\n');
+      diff = lines.map((line, idx) => ({ type: 'remove', content: line, oldLine: idx + 1 }));
+      stats.deletions = lines.length;
+    } else if (!oldExists && newExists) {
+      // 新增的文件
+      const lines = newContent.split('\n');
+      diff = lines.map((line, idx) => ({ type: 'add', content: line, newLine: idx + 1 }));
+      stats.additions = lines.length;
+    }
+
+    return {
+      operation,
+      oldPath: normalizedPath,
+      newPath: normalizedPath,
+      oldContent: oldContent.substring(0, 50000), // 截断防止过大响应
+      newContent: newContent.substring(0, 50000),
+      diff: diff,
+      stats: stats,
+      oldSize: oldContent.length,
+      newSize: newContent.length
+    };
+  }
 }
 
 module.exports = UpdateManager;
