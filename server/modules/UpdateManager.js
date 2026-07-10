@@ -6,6 +6,7 @@ const { execFile, spawn } = require('child_process');
 const config = require('../config');
 const logger = require('../utils/logger');
 const VersionManager = require('./VersionManager');
+const diff = require('diff');
 
 function getStorageRoot() {
   if (process.env.STORAGE_ROOT) {
@@ -1380,211 +1381,58 @@ class UpdateManager {
    * @returns {Array} diff 结果数组
    */
   static computeDiff(oldText, newText) {
-    const oldLines = (oldText || '').replace(/\r\n/g, '\n').split('\n');
-    const newLines = (newText || '').replace(/\r\n/g, '\n').split('\n');
-
     const result = [];
-    UpdateManager._myersDiffSegment(0, oldLines.length, 0, newLines.length, oldLines, newLines, result);
+    let oldLineNum = 0;
+    let newLineNum = 0;
+
+    try {
+      const diffResult = diff.diffLines(oldText || '', newText || '');
+
+      for (const part of diffResult) {
+        const lines = part.value.split('\n');
+        if (lines[lines.length - 1] === '') {
+          lines.pop();
+        }
+
+        for (const line of lines) {
+          if (part.added) {
+            newLineNum++;
+            result.push({ type: 'add', content: line, newLine: newLineNum });
+          } else if (part.removed) {
+            oldLineNum++;
+            result.push({ type: 'remove', content: line, oldLine: oldLineNum });
+          } else {
+            oldLineNum++;
+            newLineNum++;
+            result.push({ type: 'equal', content: line, oldLine: oldLineNum, newLine: newLineNum });
+          }
+        }
+      }
+    } catch (err) {
+      logger.error('diff 计算失败，回退到简单比对', { error: err.message });
+      const oldLines = (oldText || '').replace(/\r\n/g, '\n').split('\n');
+      const newLines = (newText || '').replace(/\r\n/g, '\n').split('\n');
+      const maxLen = Math.max(oldLines.length, newLines.length);
+      for (let i = 0; i < maxLen; i++) {
+        const oldLine = oldLines[i];
+        const newLine = newLines[i];
+        if (!oldLine) {
+          result.push({ type: 'add', content: newLine, newLine: i + 1 });
+        } else if (!newLine) {
+          result.push({ type: 'remove', content: oldLine, oldLine: i + 1 });
+        } else if (oldLine === newLine) {
+          result.push({ type: 'equal', content: oldLine, oldLine: i + 1, newLine: i + 1 });
+        } else {
+          result.push({ type: 'remove', content: oldLine, oldLine: i + 1 });
+          result.push({ type: 'add', content: newLine, newLine: i + 1 });
+        }
+      }
+    }
+
     return result;
   }
 
-  /**
-   * Myers 分治 diff - 迭代处理分段（避免栈溢出）
-   */
-  static _myersDiffSegment(oldStart, oldEnd, newStart, newEnd, oldLines, newLines, result) {
-    const queue = [{ os: oldStart, oe: oldEnd, ns: newStart, ne: newEnd }];
 
-    while (queue.length > 0) {
-      const { os, oe, ns, ne } = queue.shift();
-      const oldLen = oe - os;
-      const newLen = ne - ns;
-
-      if (oldLen === 0 && newLen === 0) continue;
-
-      if (oldLen === 0) {
-        for (let j = ns; j < ne; j++) {
-          result.push({ type: 'add', content: newLines[j], newLine: j + 1 });
-        }
-        continue;
-      }
-
-      if (newLen === 0) {
-        for (let i = os; i < oe; i++) {
-          result.push({ type: 'remove', content: oldLines[i], oldLine: i + 1 });
-        }
-        continue;
-      }
-
-      if (oldLen <= 100 && newLen <= 100) {
-        UpdateManager._lcsBacktrack(os, oe, ns, ne, oldLines, newLines, result);
-        continue;
-      }
-
-      const snake = UpdateManager._findMiddleSnake(os, oe, ns, ne, oldLines, newLines);
-
-      if (snake.d === 0) {
-        for (let i = os; i < oe; i++) {
-          const offset = i - os;
-          result.push({ type: 'equal', content: oldLines[i], oldLine: i + 1, newLine: ns + offset + 1 });
-        }
-        continue;
-      }
-
-      queue.unshift({ os: snake.x + snake.diagLen, oe, ns: snake.y + snake.diagLen, ne });
-
-      for (let i = 0; i < snake.diagLen; i++) {
-        const oIdx = snake.x + i;
-        const nIdx = snake.y + i;
-        result.push({ type: 'equal', content: oldLines[oIdx], oldLine: oIdx + 1, newLine: nIdx + 1 });
-      }
-
-      queue.unshift({ os, oe: snake.x, ns, ne: snake.y });
-    }
-  }
-
-  /**
-   * Myers 算法核心：寻找 middle snake（双向贪心搜索）
-   * 返回 { x, y, d, diagLen } 表示分割点和对角线长度
-   */
-  static _findMiddleSnake(oldStart, oldEnd, newStart, newEnd, oldLines, newLines) {
-    const oldLen = oldEnd - oldStart;
-    const newLen = newEnd - newStart;
-    const maxD = Math.ceil((oldLen + newLen) / 2);
-
-    // Forward V array: V[k] = x 位置 (k = x - y)
-    const Vf = new Array(2 * maxD + 2);
-    // Backward V array: V[k] = x 位置 (从终点反向，k = (x-oldLen) - (y-newLen))
-    const Vb = new Array(2 * maxD + 2);
-
-    const offset = maxD;
-    Vf[offset + 1] = oldStart;
-    Vb[offset + 1] = oldEnd;
-
-    const delta = oldLen - newLen;
-    // 保存蛇的信息：找到的第一个重叠就是 middle snake
-    let bestSnake = null;
-
-    for (let d = 0; d <= maxD; d++) {
-      // ---- 正向搜索 ----
-      for (let k = -d; k <= d; k += 2) {
-        const idx = k + offset;
-        const down = (k === -d || (k !== d && Vf[idx - 1] < Vf[idx + 1]));
-        let x = down ? Vf[idx + 1] : Vf[idx - 1] + 1;
-        let y = x - k;
-
-        // 沿对角线延伸
-        let diagLen = 0;
-        while (x < oldEnd && y < newEnd && oldLines[x] === newLines[y]) {
-          x++; y++; diagLen++;
-        }
-
-        Vf[idx] = x;
-
-        // 检查是否到达反向边界
-        if (delta % 2 !== 0) {
-          const bIdx = k - delta + offset;
-          if (bIdx >= 0 && bIdx < Vb.length && Vb[bIdx] !== undefined) {
-            if (x >= Vb[bIdx]) {
-              bestSnake = { x: Vf[idx] - diagLen, y: (Vf[idx] - k) - diagLen, d, diagLen };
-              return bestSnake;
-            }
-          }
-        }
-      }
-
-      // ---- 反向搜索 ----
-      for (let k = -d; k <= d; k += 2) {
-        const idx = k + offset;
-        const up = (k === -d || (k !== d && Vb[idx - 1] > Vb[idx + 1]));
-        let x = up ? Vb[idx + 1] : Vb[idx - 1] - 1;
-        let y = x - k - delta;
-
-        // 沿对角线反向延伸
-        let diagLen = 0;
-        while (x > oldStart && y > newStart && oldLines[x - 1] === newLines[y - 1]) {
-          x--; y--; diagLen++;
-        }
-
-        Vb[idx] = x;
-
-        // 检查是否到达正向边界
-        if (delta % 2 === 0) {
-          const fIdx = k + delta + offset;
-          if (fIdx >= 0 && fIdx < Vf.length && Vf[fIdx] !== undefined) {
-            if (x <= Vf[fIdx]) {
-              bestSnake = { x, y, d, diagLen };
-              return bestSnake;
-            }
-          }
-        }
-      }
-    }
-
-    // 恢复：完全相同
-    return { x: oldStart, y: newStart, d: 0, diagLen: oldLen };
-  }
-
-  /**
-   * 小段落的 LCS 回溯（≤100行时使用），避免递归开销
-   */
-  static _lcsBacktrack(oldStart, oldEnd, newStart, newEnd, oldLines, newLines, result) {
-    const m = oldEnd - oldStart;
-    const n = newEnd - newStart;
-
-    // 构建 DP 表（只需两行）
-    let prev = new Array(n + 1).fill(0);
-    let curr = new Array(n + 1).fill(0);
-
-    for (let i = 1; i <= m; i++) {
-      for (let j = 1; j <= n; j++) {
-        if (oldLines[oldStart + i - 1] === newLines[newStart + j - 1]) {
-          curr[j] = prev[j - 1] + 1;
-        } else if (prev[j] >= curr[j - 1]) {
-          curr[j] = prev[j];
-        } else {
-          curr[j] = curr[j - 1];
-        }
-      }
-      [prev, curr] = [curr, prev];
-    }
-
-    // 回溯
-    const temp = [];
-    let i = m, j = n;
-    while (i > 0 || j > 0) {
-      if (i > 0 && j > 0 && oldLines[oldStart + i - 1] === newLines[newStart + j - 1]) {
-        temp.push({
-          type: 'equal',
-          content: oldLines[oldStart + i - 1],
-          oldLine: oldStart + i,
-          newLine: newStart + j
-        });
-        i--; j--;
-      } else if (j > 0 && (i === 0 || prev[j - 1] >= prev[j])) {
-        // 注意：这里用 prev 来模拟回溯决策
-        // 实际上需要完整的 DP 表才能正确回溯，但小规模没问题
-        const addChoice = (i === 0) || (prev[j - 1] >= prev[j]);
-        if (addChoice) {
-          temp.push({ type: 'add', content: newLines[newStart + j - 1], newLine: newStart + j });
-          j--;
-        } else {
-          temp.push({ type: 'remove', content: oldLines[oldStart + i - 1], oldLine: oldStart + i });
-          i--;
-        }
-      } else if (i > 0) {
-        temp.push({ type: 'remove', content: oldLines[oldStart + i - 1], oldLine: oldStart + i });
-        i--;
-      } else {
-        temp.push({ type: 'add', content: newLines[newStart + j - 1], newLine: newStart + j });
-        j--;
-      }
-    }
-
-    // 反向并加入结果
-    for (let idx = temp.length - 1; idx >= 0; idx--) {
-      result.push(temp[idx]);
-    }
-  }
 
   /**
    * 获取指定备份中某个文件的 diff
