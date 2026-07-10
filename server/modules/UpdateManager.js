@@ -1389,58 +1389,57 @@ class UpdateManager {
   }
 
   /**
-   * Myers 分治 diff - 递归处理分段
+   * Myers 分治 diff - 迭代处理分段（避免栈溢出）
    */
   static _myersDiffSegment(oldStart, oldEnd, newStart, newEnd, oldLines, newLines, result) {
-    const oldLen = oldEnd - oldStart;
-    const newLen = newEnd - newStart;
+    const queue = [{ os: oldStart, oe: oldEnd, ns: newStart, ne: newEnd }];
 
-    // 空段处理
-    if (oldLen === 0 && newLen === 0) return;
-    if (oldLen === 0) {
-      // 全部新增
-      for (let j = newStart; j < newEnd; j++) {
-        result.push({ type: 'add', content: newLines[j], newLine: j + 1 });
+    while (queue.length > 0) {
+      const { os, oe, ns, ne } = queue.shift();
+      const oldLen = oe - os;
+      const newLen = ne - ns;
+
+      if (oldLen === 0 && newLen === 0) continue;
+
+      if (oldLen === 0) {
+        for (let j = ns; j < ne; j++) {
+          result.push({ type: 'add', content: newLines[j], newLine: j + 1 });
+        }
+        continue;
       }
-      return;
-    }
-    if (newLen === 0) {
-      // 全部删除
-      for (let i = oldStart; i < oldEnd; i++) {
-        result.push({ type: 'remove', content: oldLines[i], oldLine: i + 1 });
+
+      if (newLen === 0) {
+        for (let i = os; i < oe; i++) {
+          result.push({ type: 'remove', content: oldLines[i], oldLine: i + 1 });
+        }
+        continue;
       }
-      return;
-    }
 
-    // 小型段落到阈值以下直接用快速 LCS 回溯（避免递归开销）
-    if (oldLen <= 100 && newLen <= 100) {
-      UpdateManager._lcsBacktrack(oldStart, oldEnd, newStart, newEnd, oldLines, newLines, result);
-      return;
-    }
-
-    // 找到 middle snake
-    const snake = UpdateManager._findMiddleSnake(oldStart, oldEnd, newStart, newEnd, oldLines, newLines);
-
-    if (snake.d === 0) {
-      // 完全相同
-      for (let i = oldStart; i < oldEnd; i++) {
-        const offset = i - oldStart;
-        result.push({ type: 'equal', content: oldLines[i], oldLine: i + 1, newLine: newStart + offset + 1 });
+      if (oldLen <= 100 && newLen <= 100) {
+        UpdateManager._lcsBacktrack(os, oe, ns, ne, oldLines, newLines, result);
+        continue;
       }
-      return;
+
+      const snake = UpdateManager._findMiddleSnake(os, oe, ns, ne, oldLines, newLines);
+
+      if (snake.d === 0) {
+        for (let i = os; i < oe; i++) {
+          const offset = i - os;
+          result.push({ type: 'equal', content: oldLines[i], oldLine: i + 1, newLine: ns + offset + 1 });
+        }
+        continue;
+      }
+
+      queue.unshift({ os: snake.x + snake.diagLen, oe, ns: snake.y + snake.diagLen, ne });
+
+      for (let i = 0; i < snake.diagLen; i++) {
+        const oIdx = snake.x + i;
+        const nIdx = snake.y + i;
+        result.push({ type: 'equal', content: oldLines[oIdx], oldLine: oIdx + 1, newLine: nIdx + 1 });
+      }
+
+      queue.unshift({ os, oe: snake.x, ns, ne: snake.y });
     }
-
-    // 递归处理蛇的左半段和右半段
-    UpdateManager._myersDiffSegment(oldStart, snake.x, newStart, snake.y, oldLines, newLines, result);
-
-    // 蛇的对角线部分（相等的行）
-    for (let i = 0; i < snake.diagLen; i++) {
-      const oIdx = snake.x + i;
-      const nIdx = snake.y + i;
-      result.push({ type: 'equal', content: oldLines[oIdx], oldLine: oIdx + 1, newLine: nIdx + 1 });
-    }
-
-    UpdateManager._myersDiffSegment(snake.x + snake.diagLen, oldEnd, snake.y + snake.diagLen, newEnd, oldLines, newLines, result);
   }
 
   /**
