@@ -691,6 +691,20 @@ class AdminManager {
     }
   }
 
+  // 获取最近游戏（仪表盘用）
+  async getRecentGames(socket) {
+    try {
+      const games = await dataStore.read('games');
+      const recent = games
+        .sort((a, b) => (b.endTime || b.startTime || 0) - (a.endTime || a.startTime || 0))
+        .slice(0, 8);
+      socket.emit('admin_recent_games', { games: recent });
+    } catch (err) {
+      logger.error('获取最近游戏失败', { error: err.message });
+      socket.emit('admin_recent_games', { games: [] });
+    }
+  }
+
   // 系统配置管理
   getSystemConfig(socket) {
     socket.emit('admin_config', {

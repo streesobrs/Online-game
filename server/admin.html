@@ -706,6 +706,400 @@
       background: #64748b;
     }
 
+    /* ===== 数据概览 ===== */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .stat-card {
+      background: #1e293b;
+      border-radius: 14px;
+      padding: 20px;
+      border: 1px solid #334155;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .stat-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 800;
+      color: #f1f5f9;
+      line-height: 1.1;
+    }
+
+    .main-card {
+      background: #1e293b;
+      border-radius: 14px;
+      border: 1px solid #334155;
+      overflow: hidden;
+      grid-column: span 1;
+    }
+
+    .main-card-lg {
+      grid-column: span 2;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: rgba(15, 23, 42, 0.4);
+      border-bottom: 1px solid #334155;
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #e2e8f0;
+      margin: 0;
+    }
+
+    .card-subtitle {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .card-body {
+      padding: 20px;
+    }
+
+    .card-footer {
+      display: flex;
+      gap: 10px;
+      padding: 14px 20px;
+      background: rgba(15, 23, 42, 0.3);
+      border-top: 1px solid #334155;
+    }
+
+    .btn-refresh {
+      padding: 4px 12px;
+      border-radius: 6px;
+      border: 1px solid #475569;
+      background: transparent;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+
+    .btn-refresh:hover {
+      background: rgba(71, 85, 105, 0.3);
+      color: #e2e8f0;
+    }
+
+    .btn-action {
+      padding: 6px 16px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      background: rgba(30, 41, 59, 0.6);
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+
+    .btn-action:hover {
+      background: rgba(71, 85, 105, 0.4);
+      color: #e2e8f0;
+    }
+
+    .chart-svg {
+      width: 100%;
+      height: 240px;
+    }
+
+    .game-dist {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .game-dist .dash-game-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .game-dist .dash-game-icon {
+      font-size: 18px;
+      width: 28px;
+      text-align: center;
+    }
+
+    .game-dist .dash-game-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #e2e8f0;
+      width: 55px;
+    }
+
+    .game-dist .dash-game-bar-wrap {
+      flex: 1;
+      height: 10px;
+      background: #0f172a;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+
+    .game-dist .dash-game-bar {
+      height: 100%;
+      border-radius: 5px;
+      transition: width 0.5s ease;
+    }
+
+    .game-dist .dash-game-bar.gobang {
+      background: linear-gradient(90deg, #ef4444, #f87171);
+    }
+
+    .game-dist .dash-game-bar.go {
+      background: linear-gradient(90deg, #22c55e, #4ade80);
+    }
+
+    .game-dist .dash-game-bar.chinese-chess {
+      background: linear-gradient(90deg, #f59e0b, #fbbf24);
+    }
+
+    .game-dist .dash-game-bar.snake {
+      background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+    }
+
+    .game-dist .dash-game-count {
+      font-size: 13px;
+      font-weight: 600;
+      color: #94a3b8;
+      width: 45px;
+      text-align: right;
+    }
+
+    .sys-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .sys-item {
+      display: flex;
+      flex-direction: column;
+      padding: 12px 14px;
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 10px;
+    }
+
+    .sys-value {
+      font-size: 16px;
+      font-weight: 700;
+      color: #f1f5f9;
+    }
+
+    .sys-label {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    .recent-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .recent-list .dash-recent-game {
+      display: flex;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.2);
+      font-size: 13px;
+    }
+
+    .recent-list .dash-recent-game:last-child {
+      border-bottom: none;
+    }
+
+    .recent-list .dash-recent-game .game-icon {
+      width: 24px;
+      text-align: center;
+      flex-shrink: 0;
+      margin-right: 10px;
+    }
+
+    .recent-list .dash-recent-game .game-players {
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #e2e8f0;
+    }
+
+    .recent-list .dash-recent-game .game-result {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      flex-shrink: 0;
+      margin-left: 8px;
+    }
+
+    .recent-list .dash-recent-game .game-result.result-win {
+      background: rgba(34, 197, 94, 0.15);
+      color: #4ade80;
+    }
+
+    .recent-list .dash-recent-game .game-result.result-draw {
+      background: rgba(100, 116, 139, 0.2);
+      color: #94a3b8;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .status-label {
+      color: #94a3b8;
+      flex: 1;
+      font-size: 12px;
+    }
+
+    .status-value {
+      font-weight: 700;
+      color: #f1f5f9;
+      font-size: 13px;
+    }
+
+    .status-bar {
+      display: flex;
+      height: 12px;
+      border-radius: 6px;
+      overflow: hidden;
+      background: #0f172a;
+    }
+
+    .bar-seg {
+      transition: width 0.4s ease;
+      min-width: 0;
+    }
+
+    .online-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .online-list::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .online-list::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 3px;
+    }
+
+    .online-list .dash-user-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.15);
+    }
+
+    .online-list .dash-user-item:last-child {
+      border-bottom: none;
+    }
+
+    .online-list .dash-user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      background: rgba(30, 41, 59, 0.7);
+      margin-right: 12px;
+      flex-shrink: 0;
+    }
+
+    .online-list .dash-user-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .online-list .dash-user-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e2e8f0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .online-list .dash-user-meta {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    .online-list .dash-user-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .online-list .dash-user-right .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+    }
+
+    .qa-btn:hover {
+      background: #334155;
+      color: #e2e8f0;
+    }
+
     .preview-item {
       display: flex;
       justify-content: space-between;
@@ -2293,117 +2687,142 @@
       <div class="content-area">
         <!-- 数据概览 -->
         <section id="view-dashboard" class="content-section active">
-          <div class="stats-row">
-            <div class="stat-box">
-              <div class="stat-header">
-                <span class="stat-name">总用户数</span>
-                <div class="stat-icon-box stat-icon-blue">👥</div>
-              </div>
-              <div class="stat-number" id="stat-total-users">0</div>
-              <div class="stat-change">注册用户总数</div>
+          <div class="dashboard-grid">
+            <div class="stat-card">
+              <div class="stat-icon" style="background:rgba(59,130,246,0.12);color:#60a5fa;">👥</div>
+              <div class="stat-label">注册用户</div>
+              <div class="stat-value" id="stat-total-users">0</div>
             </div>
-            <div class="stat-box">
-              <div class="stat-header">
-                <span class="stat-name">在线用户</span>
-                <div class="stat-icon-box stat-icon-green">🟢</div>
-              </div>
-              <div class="stat-number" id="stat-online-users">0</div>
-              <div class="stat-change">当前在线</div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background:rgba(34,197,94,0.12);color:#4ade80;">🟢</div>
+              <div class="stat-label">当前在线</div>
+              <div class="stat-value" id="stat-online-users">0</div>
             </div>
-            <div class="stat-box">
-              <div class="stat-header">
-                <span class="stat-name">进行中游戏</span>
-                <div class="stat-icon-box stat-icon-purple">🎮</div>
-              </div>
-              <div class="stat-number" id="stat-active-games">0</div>
-              <div class="stat-change">活跃对局</div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background:rgba(139,92,246,0.12);color:#a78bfa;">🎮</div>
+              <div class="stat-label">活跃对局</div>
+              <div class="stat-value" id="stat-active-games">0</div>
             </div>
-            <div class="stat-box">
-              <div class="stat-header">
-                <span class="stat-name">今日活跃</span>
-                <div class="stat-icon-box stat-icon-orange">📅</div>
-              </div>
-              <div class="stat-number" id="stat-today-users">0</div>
-              <div class="stat-change">今日登录用户</div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background:rgba(245,158,11,0.12);color:#fbbf24;">📅</div>
+              <div class="stat-label">今日活跃</div>
+              <div class="stat-value" id="stat-today-users">0</div>
             </div>
-          </div>
 
-          <div class="quick-actions">
-            <button class="action-btn btn-primary" onclick="showBroadcastModal()">📢 广播消息</button>
-            <button class="action-btn btn-warning" id="btn-maintenance-on" onclick="enterMaintenanceMode()">🔧
-              维护模式</button>
-            <button class="action-btn btn-success" id="btn-maintenance-off" onclick="exitMaintenanceMode()">✅
-              退出维护</button>
-            <button class="action-btn btn-secondary" onclick="loadGameHistory()">📜 游戏历史</button>
-            <button class="action-btn btn-secondary" onclick="loadSystemConfig()">⚙️ 系统配置</button>
-            <button class="action-btn btn-secondary" onclick="loadChatHistory()">💬 聊天记录</button>
-            <button class="action-btn btn-danger" onclick="showCleanupModal()">🧹 清理数据</button>
-          </div>
-
-          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px;">
-            <div class="data-card">
+            <div class="main-card main-card-lg">
               <div class="card-header">
-                <span class="card-title">🏆 排行榜</span>
-                <div style="display: flex; gap: 6px;">
-                  <button class="action-btn btn-primary" onclick="showLeaderboardDetail()"
-                    style="padding: 6px 12px; font-size: 12px;">详情</button>
-                  <button class="action-btn btn-secondary" onclick="loadLeaderboard()"
-                    style="padding: 6px 12px; font-size: 12px;">刷新</button>
+                <h3 class="card-title">📈 用户在线趋势</h3>
+                <span class="card-subtitle">实时数据</span>
+              </div>
+              <div class="card-body">
+                <svg id="user-trend-chart" class="chart-svg" viewBox="0 0 600 280"
+                  preserveAspectRatio="xMidYMid meet"></svg>
+              </div>
+            </div>
+
+            <div class="main-card">
+              <div class="card-header">
+                <h3 class="card-title">🎮 游戏类型分布</h3>
+                <span class="card-subtitle">总计 <strong id="game-dist-total">0</strong> 局</span>
+              </div>
+              <div class="card-body">
+                <div id="game-distribution-container" class="game-dist"></div>
+              </div>
+            </div>
+
+            <div class="main-card">
+              <div class="card-header">
+                <h3 class="card-title">🖥️ 系统状态</h3>
+              </div>
+              <div class="card-body">
+                <div class="sys-grid">
+                  <div class="sys-item">
+                    <div class="sys-value" id="dash-uptime">--</div>
+                    <div class="sys-label">运行时间</div>
+                  </div>
+                  <div class="sys-item">
+                    <div class="sys-value" id="dash-memory">--</div>
+                    <div class="sys-label">内存使用</div>
+                  </div>
+                  <div class="sys-item">
+                    <div class="sys-value" id="dash-peak">--</div>
+                    <div class="sys-label">峰值在线</div>
+                  </div>
+                  <div class="sys-item">
+                    <div class="sys-value" id="dash-conn">--</div>
+                    <div class="sys-label">总连接数</div>
+                  </div>
                 </div>
               </div>
-              <div id="leaderboard-preview" class="card-preview"></div>
             </div>
 
-            <div class="data-card">
+            <div class="main-card">
               <div class="card-header">
-                <span class="card-title">👤 最近登录</span>
-                <div style="display: flex; gap: 6px;">
-                  <button class="action-btn btn-primary" onclick="showRecentLoginsDetail()"
-                    style="padding: 6px 12px; font-size: 12px;">详情</button>
-                  <button class="action-btn btn-secondary" onclick="loadRecentLogins()"
-                    style="padding: 6px 12px; font-size: 12px;">刷新</button>
-                </div>
+                <h3 class="card-title">⚡ 最近对局</h3>
+                <button class="btn-refresh" onclick="loadRecentGames()">刷新</button>
               </div>
-              <div id="recent-logins-preview" class="card-preview"></div>
+              <div class="card-body">
+                <div id="recent-games-preview" class="recent-list"></div>
+              </div>
             </div>
 
-            <div class="data-card">
+            <div class="main-card">
               <div class="card-header">
-                <span class="card-title">🎮 最近游戏</span>
-                <div style="display: flex; gap: 6px;">
-                  <button class="action-btn btn-primary" onclick="showRecentGamesDetail()"
-                    style="padding: 6px 12px; font-size: 12px;">详情</button>
-                  <button class="action-btn btn-secondary" onclick="loadRecentGames()"
-                    style="padding: 6px 12px; font-size: 12px;">刷新</button>
+                <h3 class="card-title">👤 在线状态</h3>
+                <span class="card-subtitle" id="online-count">0 人</span>
+              </div>
+              <div class="card-body">
+                <div class="status-grid">
+                  <div class="status-item">
+                    <span class="status-dot" style="background:#22c55e;"></span>
+                    <span class="status-label">在线</span>
+                    <span class="status-value" id="sb-online">0</span>
+                  </div>
+                  <div class="status-item">
+                    <span class="status-dot" style="background:#f59e0b;"></span>
+                    <span class="status-label">等待</span>
+                    <span class="status-value" id="sb-waiting">0</span>
+                  </div>
+                  <div class="status-item">
+                    <span class="status-dot" style="background:#3b82f6;"></span>
+                    <span class="status-label">游戏中</span>
+                    <span class="status-value" id="sb-playing">0</span>
+                  </div>
+                  <div class="status-item">
+                    <span class="status-dot" style="background:#8b5cf6;"></span>
+                    <span class="status-label">观战</span>
+                    <span class="status-value" id="sb-spectating">0</span>
+                  </div>
+                </div>
+                <div class="status-bar">
+                  <span class="bar-seg" id="seg-online" style="width:0%;background:#22c55e;"></span>
+                  <span class="bar-seg" id="seg-waiting" style="width:0%;background:#f59e0b;"></span>
+                  <span class="bar-seg" id="seg-playing" style="width:0%;background:#3b82f6;"></span>
+                  <span class="bar-seg" id="seg-spectating" style="width:0%;background:#8b5cf6;"></span>
                 </div>
               </div>
-              <div id="recent-games-preview" class="card-preview"></div>
             </div>
 
-            <div class="data-card">
+            <div class="main-card main-card-lg">
               <div class="card-header">
-                <span class="card-title">👥 在线用户</span>
-                <div style="display: flex; gap: 6px;">
-                  <button class="action-btn btn-primary" onclick="showOnlineUsersDetail()"
-                    style="padding: 6px 12px; font-size: 12px;">详情</button>
-                  <button class="action-btn btn-secondary" onclick="loadOnlineUsersDetail()"
-                    style="padding: 6px 12px; font-size: 12px;">刷新</button>
+                <h3 class="card-title">👥 在线用户</h3>
+                <div class="card-actions">
+                  <button class="btn-refresh" onclick="showOnlineUsersDetail()">详情</button>
+                  <button class="btn-refresh" onclick="loadOnlineUsersDetail()">刷新</button>
                 </div>
               </div>
-              <div id="online-users-detail-preview" class="card-preview"></div>
-            </div>
-
-            <div class="data-card">
-              <div class="card-header">
-                <span class="card-title">📈 游戏统计</span>
-                <div style="display: flex; gap: 6px;">
-                  <button class="action-btn btn-primary" onclick="showGameStatsDetail()"
-                    style="padding: 6px 12px; font-size: 12px;">详情</button>
-                  <button class="action-btn btn-secondary" onclick="loadGameStats()"
-                    style="padding: 6px 12px; font-size: 12px;">刷新</button>
-                </div>
+              <div class="card-body">
+                <div id="online-users-detail-preview" class="online-list"></div>
               </div>
-              <div id="game-stats-preview" class="card-preview"></div>
+              <div class="card-footer">
+                <button class="btn-action" onclick="showBroadcastModal()">📢 广播</button>
+                <button class="btn-action" id="qa-maintenance-on" onclick="enterMaintenanceMode()">🔧 维护</button>
+                <button class="btn-action" id="qa-maintenance-off" onclick="exitMaintenanceMode()"
+                  style="display:none;">✅ 退出</button>
+                <button class="btn-action" onclick="loadGameHistory()">📜 历史</button>
+                <button class="btn-action" onclick="loadSystemConfig()">⚙️ 配置</button>
+                <button class="btn-action" onclick="showCleanupModal()">🧹 清理</button>
+              </div>
             </div>
           </div>
         </section>
@@ -3657,12 +4076,11 @@
           if (currentView === 'matches') loadLiveMatches();
           if (currentView === 'accounts') renderAccounts();
           if (currentView === 'dashboard') {
-            renderLeaderboard();
-            renderRecentLogins();
+            renderUserBreakdown();
+            renderGameDistribution();
             renderRecentGames();
             renderOnlineUsersDetail();
-            renderGameStats();
-            renderSystemInfo(data.stats?.system);
+            loadRecentGames();
           }
         });
 
@@ -3677,6 +4095,10 @@
           if (currentView === 'dashboard') renderLeaderboard();
         });
         socket.on('admin_game_history', (data) => showGameHistoryModal(data.history || []));
+        socket.on('admin_recent_games', (data) => {
+          adminData.recentGames = data.games || [];
+          if (currentView === 'dashboard') renderRecentGames();
+        });
         socket.on('admin_config', (data) => showConfigModal(data.config || {}));
         socket.on('admin_user_detail', (data) => showUserDetailModal(data));
         socket.on('admin_chat_history', (data) => {
@@ -3693,7 +4115,13 @@
         });
         socket.on('admin_system_stats', (data) => {
           if (data) {
-            adminData.stats = { ...adminData.stats, ...data };
+            adminData.stats = { ...adminData.stats };
+            if (data.totalUsers !== undefined) adminData.stats.totalUsers = data.totalUsers;
+            if (data.onlineUsers !== undefined) adminData.stats.onlineUsers = data.onlineUsers;
+            if (data.activeGames !== undefined) adminData.stats.activeGames = data.activeGames;
+            if (data.todayUsers !== undefined) adminData.stats.todayUsers = data.todayUsers;
+            if (data.peakOnline !== undefined) adminData.stats.peakOnline = data.peakOnline;
+            if (data.totalConnections !== undefined) adminData.stats.totalConnections = data.totalConnections;
             renderStats();
           }
         });
@@ -3810,12 +4238,11 @@
           if (currentView === 'matches') loadLiveMatches();
           if (currentView === 'accounts') renderAccounts();
           if (currentView === 'dashboard') {
-            renderLeaderboard();
-            renderRecentLogins();
+            renderUserBreakdown();
+            renderGameDistribution();
             renderRecentGames();
             renderOnlineUsersDetail();
-            renderGameStats();
-            renderSystemInfo(data.stats?.system);
+            loadRecentGames();
           }
         });
 
@@ -3830,6 +4257,10 @@
           if (currentView === 'dashboard') renderLeaderboard();
         });
         socket.on('admin_game_history', (data) => showGameHistoryModal(data.history || []));
+        socket.on('admin_recent_games', (data) => {
+          adminData.recentGames = data.games || [];
+          if (currentView === 'dashboard') renderRecentGames();
+        });
         socket.on('admin_config', (data) => showConfigModal(data.config || {}));
         socket.on('admin_user_detail', (data) => showUserDetailModal(data));
         socket.on('admin_chat_history', (data) => {
@@ -3846,7 +4277,13 @@
         });
         socket.on('admin_system_stats', (data) => {
           if (data) {
-            adminData.stats = { ...adminData.stats, ...data };
+            adminData.stats = { ...adminData.stats };
+            if (data.totalUsers !== undefined) adminData.stats.totalUsers = data.totalUsers;
+            if (data.onlineUsers !== undefined) adminData.stats.onlineUsers = data.onlineUsers;
+            if (data.activeGames !== undefined) adminData.stats.activeGames = data.activeGames;
+            if (data.todayUsers !== undefined) adminData.stats.todayUsers = data.todayUsers;
+            if (data.peakOnline !== undefined) adminData.stats.peakOnline = data.peakOnline;
+            if (data.totalConnections !== undefined) adminData.stats.totalConnections = data.totalConnections;
             renderStats();
           }
         });
@@ -4062,11 +4499,11 @@
         if (currentView === 'matches') loadLiveMatches();
         if (currentView === 'accounts') renderAccounts();
         if (currentView === 'dashboard') {
-          renderLeaderboard();
-          renderRecentLogins();
+          renderUserBreakdown();
+          renderGameDistribution();
           renderRecentGames();
           renderOnlineUsersDetail();
-          renderGameStats();
+          loadRecentGames();
         }
       });
 
@@ -4096,6 +4533,10 @@
       // 游戏历史
       socket.on('admin_game_history', (data) => {
         showGameHistoryModal(data.history || []);
+      });
+      socket.on('admin_recent_games', (data) => {
+        adminData.recentGames = data.games || [];
+        if (currentView === 'dashboard') renderRecentGames();
       });
 
       // 系统配置
@@ -4132,12 +4573,34 @@
 
       // 系统统计
       socket.on('admin_system_stats', (data) => {
-        // 更新统计数据
         if (data) {
-          adminData.stats = { ...adminData.stats, ...data };
+          adminData.stats = { ...adminData.stats };
+          if (data.totalUsers !== undefined) {
+            adminData.stats.totalUsers = data.totalUsers;
+          }
+          if (data.onlineUsers !== undefined) {
+            adminData.stats.onlineUsers = data.onlineUsers;
+          }
+          if (data.activeGames !== undefined) {
+            adminData.stats.activeGames = data.activeGames;
+          }
+          if (data.todayUsers !== undefined) {
+            adminData.stats.todayUsers = data.todayUsers;
+          }
+          if (data.peakOnline !== undefined) {
+            adminData.stats.peakOnline = data.peakOnline;
+          }
+          if (data.totalConnections !== undefined) {
+            adminData.stats.totalConnections = data.totalConnections;
+          }
+          if (data.totalRegisteredUsers !== undefined) {
+            adminData.stats.totalRegisteredUsers = data.totalRegisteredUsers;
+          }
+          if (data.totalGamesPlayed !== undefined) {
+            adminData.stats.totalGamesPlayed = data.totalGamesPlayed;
+          }
           renderStats();
           renderSystemInfo(adminData.stats?.system);
-          // 更新维护状态UI
           if (data.maintenance) {
             updateMaintenanceUI(data.maintenance.enabled, data.maintenance);
           }
@@ -4758,8 +5221,7 @@
 
     // 加载最近游戏记录
     function loadRecentGames() {
-      renderRecentGames();
-      showToast('数据已刷新', 'success');
+      if (socket) socket.emit('get_recent_games');
     }
 
     // 加载在线用户详情
@@ -4908,27 +5370,98 @@
       const userStats = stats.users || {};
       const gameStats = stats.games || {};
 
-      // 仪表盘统计（若元素存在）
+      const online = userStats.online ?? stats.onlineUsers ?? 0;
+      const waiting = userStats.waiting ?? 0;
+      const playing = userStats.playing ?? 0;
+      const spectating = userStats.spectating ?? 0;
+      const registeredTotal = userStats.registeredTotal ?? stats.totalUsers ?? stats.totalRegisteredUsers ?? 0;
+      const todayActive = userStats.todayActive ?? stats.todayUsers ?? 0;
+      const activeGames = gameStats.active ?? stats.activeGames ?? 0;
+      const totalGamesPlayed = gameStats.totalPlayed ?? stats.totalGamesPlayed ?? 0;
+      const peakOnline = stats.peakOnline ?? 0;
+
       const setText = (id, val) => {
         const el = document.getElementById(id);
         if (el) el.textContent = (val !== undefined && val !== null) ? val : 0;
       };
 
-      // 总用户数 = 注册用户总数
-      setText('stat-total-users', userStats.registeredTotal ?? stats.totalUsers ?? 0);
-      // 在线用户
-      setText('stat-online-users', userStats.online ?? stats.onlineUsers ?? 0);
-      // 进行中游戏
-      setText('stat-active-games', gameStats.active ?? stats.activeGames ?? 0);
-      // 今日活跃
-      setText('stat-today-users', userStats.todayActive ?? stats.todayUsers ?? 0);
+      setText('stat-total-users', registeredTotal);
+      setText('stat-online-users', online);
+      setText('stat-active-games', activeGames);
+      setText('stat-today-users', todayActive);
 
-      // 系统设置页紧凑统计条
-      setText('stat-total-users-mini', userStats.registeredTotal ?? stats.totalUsers ?? 0);
-      setText('stat-online-users-mini', userStats.online ?? stats.onlineUsers ?? 0);
-      setText('stat-active-games-mini', gameStats.active ?? stats.activeGames ?? 0);
-      setText('stat-total-games-mini', gameStats.totalPlayed ?? stats.totalGames ?? gameStats.total ?? 0);
-      setText('stat-peak-online-mini', stats.peakOnline ?? 0);
+      setText('sb-online', online);
+      setText('sb-waiting', waiting);
+      setText('sb-playing', playing);
+      setText('sb-spectating', spectating);
+      setText('online-count', `${online} 人`);
+
+      const totalStatus = online + waiting + playing + spectating || 1;
+      const pct = v => Math.round((v / totalStatus) * 100);
+      const segOnline = document.getElementById('seg-online');
+      const segWaiting = document.getElementById('seg-waiting');
+      const segPlaying = document.getElementById('seg-playing');
+      const segSpectating = document.getElementById('seg-spectating');
+      if (segOnline) segOnline.style.width = `${pct(online)}%`;
+      if (segWaiting) segWaiting.style.width = `${pct(waiting)}%`;
+      if (segPlaying) segPlaying.style.width = `${pct(playing)}%`;
+      if (segSpectating) segSpectating.style.width = `${pct(spectating)}%`;
+
+      setText('stat-total-users-mini', registeredTotal);
+      setText('stat-online-users-mini', online);
+      setText('stat-active-games-mini', activeGames);
+      setText('stat-total-games-mini', totalGamesPlayed);
+      setText('stat-peak-online-mini', peakOnline);
+    }
+
+    // ========== 新概览渲染函数 ==========
+
+    function renderUserBreakdown() { } // 已合并到 renderSystemInfo
+
+    // 渲染游戏分布
+    function renderGameDistribution() {
+      const container = document.getElementById('game-distribution-container');
+      if (!container) return;
+      const games = adminData.games || [];
+
+      const typeKeys = ['gobang', 'chinese-chess', 'go', 'snake'];
+      const typeIcons = { gobang: '⚫', 'chinese-chess': '♟', go: '⚪', snake: '🐍' };
+      const typeLabels = { gobang: '五子棋', 'chinese-chess': '象棋', go: '围棋', snake: '贪吃蛇' };
+
+      const stats = {};
+      typeKeys.forEach(t => stats[t] = { total: 0, active: 0 });
+
+      games.forEach(g => {
+        if (stats[g.gameType]) {
+          stats[g.gameType].total++;
+          if (g.status === 'playing') stats[g.gameType].active++;
+        }
+      });
+
+      const totalAll = Object.values(stats).reduce((s, v) => s + v.total, 0);
+      const statsArray = Object.entries(stats).filter(([_, v]) => v.total > 0);
+
+      const totalBadge = document.getElementById('game-dist-total');
+      if (totalBadge) totalBadge.textContent = totalAll;
+
+      if (statsArray.length === 0) {
+        container.innerHTML = '<div style="text-align:center;padding:12px;color:#64748b;font-size:13px;">📊 暂无游戏数据</div>';
+        return;
+      }
+
+      container.innerHTML = statsArray.map(([type, data]) => {
+        const pct = totalAll > 0 ? Math.max(2, Math.round((data.total / totalAll) * 100)) : 0;
+        return `
+          <div class="dash-game-row">
+            <span class="dash-game-icon">${typeIcons[type] || '🎮'}</span>
+            <span class="dash-game-name">${typeLabels[type] || type}</span>
+            <div class="dash-game-bar-wrap">
+              <div class="dash-game-bar ${type}" style="width:${pct}%"></div>
+            </div>
+            <span class="dash-game-count">${data.total}</span>
+          </div>
+        `;
+      }).join('');
     }
 
     function renderOnlineUsers() {
@@ -5159,78 +5692,104 @@
       }).join('');
     }
 
-    // 渲染最近游戏记录 - 卡片预览
+    // 渲染最近游戏记录 - 新样式
     function renderRecentGames() {
       const previewEl = document.getElementById('recent-games-preview');
-      const games = adminData.games || [];
+      // 合并两个数据源：admin_update 推送的活跃游戏 + 从后端加载的已完成游戏
+      const liveGames = adminData.games || [];
+      const recentGames = adminData.recentGames || [];
+      const combined = [...liveGames, ...recentGames];
 
-      const recentGames = games
-        .filter(game => game.endTime)
-        .sort((a, b) => (b.endTime || 0) - (a.endTime || 0))
-        .slice(0, 5);
-
-      if (recentGames.length === 0) {
-        previewEl.innerHTML = '<div class="empty-state"><div class="empty-icon">🎯</div>暂无数据</div>';
+      if (combined.length === 0) {
+        previewEl.innerHTML = '<div style="text-align:center;padding:12px;color:#64748b;font-size:13px;">🎮 暂无游戏数据</div>';
         return;
       }
 
-      const gameIcons = { '五子棋': '⚫', '象棋': '♟', '围棋': '⚪', '国际象棋': '♔', '斗兽棋': '🐅' };
-      previewEl.innerHTML = recentGames.map(game => {
-        let result = '平局';
-        if (game.winner === 'player1') result = `${game.player1?.nickname?.substring(0, 6) || '玩家1'}胜`;
-        else if (game.winner === 'player2') result = `${game.player2?.nickname?.substring(0, 6) || '玩家2'}胜`;
+      // 去重 + 排序
+      const seen = new Set();
+      const unique = combined.filter(g => {
+        const key = g._id || g.id || '';
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      // 排序：优先按 endTime 降序，没有 endTime 的按 startTime/createdAt 降序
+      const sorted = unique
+        .sort((a, b) => {
+          const aTime = a.endTime || a.startTime || a.createdAt || 0;
+          const bTime = b.endTime || b.startTime || b.createdAt || 0;
+          return bTime - aTime;
+        })
+        .slice(0, 8);
+
+      const gameIcons = { gobang: '⚫', 'chinese-chess': '♟', go: '⚪', snake: '🐍' };
+
+      previewEl.innerHTML = sorted.map(game => {
+        const isEnded = !!game.endTime || game.status === 'ended';
+        let result = '';
+        let resultClass = '';
+
+        if (isEnded) {
+          if (game.winner === 'player1') { result = `${(game.player1Nickname || 'P1').substring(0, 6)}胜`; resultClass = 'result-win'; }
+          else if (game.winner === 'player2') { result = `${(game.player2Nickname || 'P2').substring(0, 6)}胜`; resultClass = 'result-win'; }
+          else if (game.winner === 'AI') { result = 'AI胜'; resultClass = 'result-win'; }
+          else { result = '平局'; resultClass = 'result-draw'; }
+        } else {
+          result = '进行中';
+          resultClass = 'result-draw';
+        }
+
+        const p1 = game.player1Nickname || (game.player1 === 'AI' ? 'AI' : (typeof game.player1 === 'object' ? game.player1?.nickname : game.player1 || '?'));
+        const p2 = game.player2Nickname || (game.player2 === 'AI' ? 'AI' : (typeof game.player2 === 'object' ? game.player2?.nickname : game.player2 || '?'));
 
         return `
-          <div class="preview-item">
-            <div class="preview-left">
-              <div class="preview-avatar">${gameIcons[game.gameType] || '🎮'}</div>
-              <div class="preview-info">
-                <div class="preview-title">${game.player1?.nickname?.substring(0, 8) || '-'} VS ${game.player2?.nickname?.substring(0, 8) || '-'}</div>
-                <div class="preview-subtitle">${game.gameType} · ${formatTime(game.endTime)}</div>
-              </div>
-            </div>
-            <div class="preview-right">
-              <span class="badge badge-info">${result}</span>
-            </div>
+          <div class="dash-recent-game">
+            <span class="game-icon">${gameIcons[game.gameType] || '🎮'}</span>
+            <span class="game-players" title="${p1} VS ${p2}">${p1} VS ${p2}</span>
+            <span class="game-result ${resultClass}">${result}</span>
           </div>
         `;
       }).join('');
     }
 
-    // 渲染在线用户详情 - 卡片预览
+    // 渲染在线用户 - 新样式
     function renderOnlineUsersDetail() {
       const previewEl = document.getElementById('online-users-detail-preview');
       const users = adminData.users || [];
 
       if (users.length === 0) {
-        previewEl.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div>暂无在线用户</div>';
+        previewEl.innerHTML = '<div class="dash-empty">👥 暂无在线用户</div>';
         return;
       }
 
-      const now = Date.now();
-      const avatars = ['😊', '😄', '🙂', '😎', '🤗'];
-      previewEl.innerHTML = users.slice(0, 5).map((user, i) => {
+      const avatars = ['😊', '😄', '🙂', '😎', '🤗', '😏', '😉', '🤔'];
+      previewEl.innerHTML = users.slice(0, 10).map((user, i) => {
         let statusText = '在线';
-        if (user.status === 'playing') statusText = '游戏中';
-        else if (user.status === 'waiting') statusText = '匹配中';
-        else if (user.status === 'spectating') statusText = '观战中';
+        let statusClass = 'badge-online';
+        if (user.status === 'playing') { statusText = '游戏中'; statusClass = 'badge-playing'; }
+        else if (user.status === 'waiting') { statusText = '匹配中'; statusClass = 'badge-waiting'; }
+        else if (user.status === 'spectating') { statusText = '观战中'; statusClass = 'badge-offline'; }
 
         const accountLevel = user.account?.profile?.level || 1;
-        const onlineSeconds = Math.floor((now - user.connectedAt) / 1000);
+        const onlineSeconds = Math.floor((Date.now() - (user.connectedAt || Date.now())) / 1000);
         const onlineMinutes = Math.floor(onlineSeconds / 60);
         let onlineDuration = onlineMinutes > 0 ? `${onlineMinutes}m` : `${onlineSeconds}s`;
+        if (onlineMinutes >= 60) {
+          const h = Math.floor(onlineMinutes / 60);
+          const m = onlineMinutes % 60;
+          onlineDuration = `${h}h${m}m`;
+        }
 
         return `
-          <div class="preview-item">
-            <div class="preview-left">
-              <div class="preview-avatar">${avatars[i % avatars.length]}</div>
-              <div class="preview-info">
-                <div class="preview-title">${user.nickname || '匿名'}</div>
-                <div class="preview-subtitle">Lv.${accountLevel} · ${onlineDuration}</div>
-              </div>
+          <div class="dash-user-item">
+            <div class="dash-user-avatar">${avatars[i % avatars.length]}</div>
+            <div class="dash-user-info">
+              <div class="dash-user-name">${user.nickname || '匿名'}</div>
+              <div class="dash-user-meta">Lv.${accountLevel} · ${onlineDuration}</div>
             </div>
-            <div class="preview-right">
-              <span class="badge ${user.status === 'playing' ? 'badge-playing' : user.status === 'waiting' ? 'badge-waiting' : 'badge-online'}">${statusText}</span>
+            <div class="dash-user-right">
+              <span class="badge ${statusClass}">${statusText}</span>
             </div>
           </div>
         `;
@@ -7017,18 +7576,114 @@
       const uptimeHours = Math.floor(uptimeMs / 3600000);
       const uptimeDays = Math.floor(uptimeHours / 24);
       let uptimeStr;
-      if (uptimeDays > 0) {
-        uptimeStr = `${uptimeDays}天${uptimeHours % 24}h`;
-      } else if (uptimeHours > 0) {
-        uptimeStr = `${uptimeHours}h${uptimeMin % 60}m`;
-      } else {
-        uptimeStr = `${Math.max(1, uptimeMin)}m`;
-      }
+      if (uptimeDays > 0) uptimeStr = `${uptimeDays}d${uptimeHours % 24}h`;
+      else if (uptimeHours > 0) uptimeStr = `${uptimeHours}h${uptimeMin % 60}m`;
+      else uptimeStr = `${Math.max(1, uptimeMin)}m`;
       const memory = Math.floor((system.memory?.heapUsed || 0) / 1024 / 1024);
+
       const elMiniUptime = document.getElementById('stat-uptime-mini');
       if (elMiniUptime) elMiniUptime.textContent = uptimeStr;
       const elMiniMemory = document.getElementById('stat-memory-mini');
       if (elMiniMemory) elMiniMemory.textContent = memory + 'MB';
+
+      // 系统状态卡片（右侧）
+      const elUptime = document.getElementById('dash-uptime');
+      if (elUptime) elUptime.textContent = uptimeStr;
+      const elMemory = document.getElementById('dash-memory');
+      if (elMemory) elMemory.textContent = memory + ' MB';
+
+      const stats = adminData.stats || {};
+      const elPeak = document.getElementById('dash-peak');
+      if (elPeak) elPeak.textContent = stats.peakOnline ?? '-';
+      const elConn = document.getElementById('dash-conn');
+      if (elConn) elConn.textContent = stats.totalConnections ?? '-';
+
+      // 绘制用户趋势图表
+      renderUserTrendChart(stats.users || {});
+
+      // 更新在线状态色条（已在 renderStats 中处理）
+    }
+
+    function renderUserTrendChart(userStats) {
+      const svg = document.getElementById('user-trend-chart');
+      if (!svg) return;
+
+      const width = 600, height = 280;
+      const padding = { top: 20, right: 20, bottom: 35, left: 45 };
+      const chartWidth = width - padding.left - padding.right;
+      const chartHeight = height - padding.top - padding.bottom;
+
+      const online = userStats.online || 0;
+      const waiting = userStats.waiting || 0;
+      const playing = userStats.playing || 0;
+      const spectating = userStats.spectating || 0;
+
+      const data = [
+        { label: '在线', value: online, color: '#22c55e' },
+        { label: '等待', value: waiting, color: '#f59e0b' },
+        { label: '游戏', value: playing, color: '#3b82f6' },
+        { label: '观战', value: spectating, color: '#8b5cf6' }
+      ];
+
+      const maxVal = Math.max(...data.map(d => d.value), 1);
+      const barWidth = chartWidth / data.length * 0.65;
+      const barGap = chartWidth / data.length * 0.35;
+      const startX = padding.left + barGap / 2;
+
+      let gridLines = '';
+      for (let i = 0; i <= 4; i++) {
+        const y = padding.top + (chartHeight / 4) * i;
+        gridLines += `<line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" stroke="#1e293b" stroke-width="1" stroke-dasharray="3,3"/>`;
+      }
+
+      let bars = '';
+      let labels = '';
+      let values = '';
+
+      data.forEach((d, i) => {
+        const x = startX + i * (barWidth + barGap);
+        const barHeight = (d.value / maxVal) * chartHeight;
+        const y = padding.top + chartHeight - barHeight;
+
+        bars += `
+          <rect x="${x}" y="${padding.top}" width="${barWidth}" height="${chartHeight}" fill="#1e293b" rx="3" ry="3"/>
+          <rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" fill="url(#grad${i})" rx="3" ry="3"/>
+        `;
+        labels += `<text x="${x + barWidth / 2}" y="${height - 12}" text-anchor="middle" fill="#64748b" font-size="12">${d.label}</text>`;
+        values += `<text x="${x + barWidth / 2}" y="${Math.max(y - 8, padding.top + 15)}" text-anchor="middle" fill="#f1f5f9" font-size="14" font-weight="700">${d.value}</text>`;
+      });
+
+      const defs = `
+        <defs>
+          <linearGradient id="grad0" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#4ade80"/>
+            <stop offset="100%" stop-color="#22c55e"/>
+          </linearGradient>
+          <linearGradient id="grad1" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#fbbf24"/>
+            <stop offset="100%" stop-color="#f59e0b"/>
+          </linearGradient>
+          <linearGradient id="grad2" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#60a5fa"/>
+            <stop offset="100%" stop-color="#3b82f6"/>
+          </linearGradient>
+          <linearGradient id="grad3" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#a78bfa"/>
+            <stop offset="100%" stop-color="#8b5cf6"/>
+          </linearGradient>
+        </defs>
+      `;
+
+      svg.innerHTML = `
+        <rect x="0" y="0" width="${width}" height="${height}" fill="none"/>
+        ${defs}
+        ${gridLines}
+        <line x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}" stroke="#334155" stroke-width="1"/>
+        <line x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}" stroke="#334155" stroke-width="1"/>
+        ${bars}
+        ${labels}
+        ${values}
+      `;
     }
 
     function filterAccounts() {

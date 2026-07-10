@@ -1626,21 +1626,36 @@ AccountManager.migrateAll().then(result => {
   if (result.migratedAccounts > 0) {
     logger.info('邮件和背包数据迁移完成', { migratedAccounts: result.migratedAccounts, mailCount: result.mailCount, inventoryItemCount: result.inventoryItemCount });
   }
-}).catch(err => logger.warn('邮件和背包数据迁移失败', { error: err.message }));
+}).catch(err => {
+  logger.warn('邮件和背包数据迁移失败', { error: err.message });
+});
 const userManager = new UserManager(accountManager);
 userManager.operationLogger = operationLogger;
+logger.info('用户管理器初始化完成');
+
 const achievementManager = new AchievementManager(accountManager, userManager);
 achievementManager.operationLogger = operationLogger;
 // 启动时同步勋章数据
 achievementManager.syncAllBadges().catch(err => logger.warn('勋章数据同步失败', { error: err.message }));
+logger.info('勋章系统初始化完成');
+
 const aiManager = new AIManager();
+logger.info('AI引擎初始化完成');
+
 const gameManager = new GameManager(userManager, accountManager, achievementManager, aiManager);
 gameManager.operationLogger = operationLogger;
+logger.info('游戏管理器初始化完成');
+
 const chatManager = new ChatManager(userManager, gameManager, accountManager);
 chatManager.operationLogger = operationLogger;
+logger.info('聊天系统初始化完成');
+
 const adminManager = new AdminManager(userManager, gameManager, chatManager, accountManager, io);
 adminManager.operationLogger = operationLogger;
+logger.info('后台管理系统初始化完成');
+
 const feedbackManager = FeedbackManager;
+logger.info('反馈系统初始化完成');
 const shopManager = new ShopManager();
 shopManager.operationLogger = operationLogger;
 // 注入accountManager到FeedbackManager用于实时查询昵称
@@ -3588,6 +3603,11 @@ adminNamespace.on('connection', (socket) => {
     adminManager.getGameHistory(socket, data);
   });
 
+  // 获取最近游戏（仪表盘用，仅最近8条）
+  socket.on('get_recent_games', () => {
+    adminManager.getRecentGames(socket);
+  });
+
   // 获取系统配置
   socket.on('get_config', () => {
     adminManager.getSystemConfig(socket);
@@ -4051,15 +4071,7 @@ scheduleDailyMailTrigger();
 const PORT = config.server.port;
 const HOST = config.server.host;
 
-server.listen(PORT, HOST, () => {
-  logger.info('服务器启动成功', {
-    port: PORT,
-    host: HOST,
-    env: config.server.env,
-    adminToken: config.admin.token.substring(0, 8) + '...'
-  });
-
-  // 获取本机IP地址
+server.listen(PORT, HOST, async () => {
   const os = require('os');
   const interfaces = os.networkInterfaces();
   const addresses = [];
@@ -4072,14 +4084,55 @@ server.listen(PORT, HOST, () => {
     }
   }
 
-  // 如果没有找到外部IP，使用localhost
   const displayHost = addresses.length > 0 ? addresses[0] : 'localhost';
+
+  let accountCount = 0;
+  let gameCount = 0;
+  let chatCount = 0;
+  let mailCount = 0;
+  let inventoryCount = 0;
+  try {
+    const accounts = await dataStore.read('accounts');
+    accountCount = accounts.length;
+    const games = await dataStore.read('games');
+    gameCount = games.length;
+    const chats = await dataStore.read('chats');
+    chatCount = chats.length;
+    const mails = await dataStore.read('mails');
+    mailCount = mails.length;
+    const inventory = await dataStore.read('inventory');
+    inventoryCount = inventory.length;
+  } catch (e) {
+    // 数据文件可能不存在
+  }
+
+  const memoryUsage = process.memoryUsage();
+  const memoryMB = Math.round(memoryUsage.rss / 1024 / 1024);
+  const heapMB = Math.round(memoryUsage.heapUsed / 1024 / 1024);
+
+  logger.info('服务器启动成功', {
+    port: PORT,
+    host: HOST,
+    env: config.server.env,
+    version: versionManager.getServerVersion(),
+    accounts: accountCount,
+    games: gameCount,
+    chats: chatCount,
+    mails: mailCount,
+    inventory: inventoryCount,
+    memoryMB: memoryMB,
+    heapMB: heapMB,
+    nodeVersion: process.version,
+    platform: process.platform
+  });
 
   console.log(`=================================`);
   console.log(`🎮 游戏服务器已启动`);
   console.log(`📍 地址: http://${displayHost}:${PORT}`);
   console.log(`🔧 管理后台: http://${displayHost}:${PORT}/admin`);
-  console.log(`� 管理员登录: 使用游戏大厅账号登录（需管理员权限）`);
+  console.log(`=================================`);
+  console.log(`📊 数据统计: ${accountCount} 账号 | ${gameCount} 对局 | ${chatCount} 聊天 | ${mailCount} 邮件`);
+  console.log(`💾 内存占用: ${memoryMB}MB (Heap: ${heapMB}MB)`);
   console.log(`=================================`);
 
   if (addresses.length > 1) {
