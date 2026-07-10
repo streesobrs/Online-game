@@ -1374,8 +1374,8 @@ class UpdateManager {
   }
 
   /**
-   * 计算两个文本之间的行级 diff（基于 Myers 分治算法）
-   * 时间复杂度 O((M+N)*D)，空间 O(M+N)，可处理数万行文件
+   * 计算文件内容的差异（行级）
+   * 使用 diff 包的优化实现，支持超大文件
    * @param {string} oldText - 旧文件内容
    * @param {string} newText - 新文件内容
    * @returns {Array} diff 结果数组
