@@ -3720,6 +3720,42 @@ adminNamespace.on('connection', (socket) => {
     adminManager.deleteAccount(socket, id);
   });
 
+  // 升级为管理员
+  socket.on('upgrade_to_admin', (data) => {
+    const { accountId } = data;
+    adminManager.upgradeToAdmin(socket, accountId);
+  });
+
+  // 降级管理员
+  socket.on('downgrade_from_admin', (data) => {
+    const { accountId } = data;
+    adminManager.downgradeFromAdmin(socket, accountId);
+  });
+
+  // 封禁账号
+  socket.on('ban_account', (data) => {
+    const { accountId, reason } = data;
+    adminManager.banAccount(socket, accountId, reason);
+  });
+
+  // 解封账号
+  socket.on('unban_account', (data) => {
+    const { accountId } = data;
+    adminManager.unbanAccount(socket, accountId);
+  });
+
+  // 重置密码
+  socket.on('reset_password', (data) => {
+    const { accountId, password } = data;
+    adminManager.resetPassword(socket, accountId, password);
+  });
+
+  // 创建账号
+  socket.on('create_account', (data) => {
+    const { username, password, nickname, isAdmin } = data;
+    adminManager.createAccount(socket, username, password, nickname, isAdmin);
+  });
+
   // 修改用户经验值
   socket.on('modify_user_exp', (data) => {
     const { id, operation, amount } = data;

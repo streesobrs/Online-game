@@ -1837,6 +1837,158 @@ class AccountManager {
     }
   }
 
+  // 管理员升级为管理员
+  async upgradeToAdmin(accountId) {
+    try {
+      const account = await dataStore.findOne('accounts', { 'account.id': accountId });
+      if (!account) {
+        return {
+          success: false,
+          message: '账号不存在'
+        };
+      }
+
+      if (account.account?.isAdmin) {
+        return {
+          success: false,
+          message: '该账号已经是管理员'
+        };
+      }
+
+      await dataStore.update('accounts', { 'account.id': accountId }, {
+        'account.isAdmin': true,
+        'account.updatedAt': Date.now()
+      });
+
+      logger.info('账号升级为管理员', { accountId, username: account.account?.username });
+      return {
+        success: true,
+        message: '升级成功'
+      };
+    } catch (err) {
+      logger.error('升级管理员失败', { accountId, error: err.message });
+      return {
+        success: false,
+        message: '操作失败'
+      };
+    }
+  }
+
+  // 管理员重置密码
+  async resetPasswordByAdmin(accountId, newPassword) {
+    try {
+      const account = await dataStore.findOne('accounts', { 'account.id': accountId });
+      if (!account) {
+        return {
+          success: false,
+          message: '账号不存在'
+        };
+      }
+
+      if (!this.validatePassword(newPassword)) {
+        return {
+          success: false,
+          message: '密码长度至少6位'
+        };
+      }
+
+      const newSalt = this.generateSalt();
+      const newHash = this.hashPassword(newPassword, newSalt);
+
+      await dataStore.update('accounts', { 'account.id': accountId }, {
+        'account.security': {
+          passwordSalt: newSalt,
+          passwordHash: newHash
+        },
+        'account.type': 'registered',
+        'account.updatedAt': Date.now()
+      });
+
+      logger.info('管理员重置账号密码', { accountId, username: account.account?.username });
+      return {
+        success: true,
+        message: '密码重置成功'
+      };
+    } catch (err) {
+      logger.error('重置密码失败', { accountId, error: err.message });
+      return {
+        success: false,
+        message: '操作失败'
+      };
+    }
+  }
+
+  // 管理员创建账号
+  async createAdminAccount(username, password, nickname, isAdmin = false) {
+    try {
+      if (!this.validateUsername(username)) {
+        return {
+          success: false,
+          message: '用户名格式不正确（3-20位字母数字下划线）'
+        };
+      }
+
+      if (!this.validatePassword(password)) {
+        return {
+          success: false,
+          message: '密码长度至少6位'
+        };
+      }
+
+      const existing = await dataStore.findOne('accounts', { 'account.username': username });
+      if (existing) {
+        return {
+          success: false,
+          message: '用户名已存在'
+        };
+      }
+
+      const salt = this.generateSalt();
+      const hash = this.hashPassword(password, salt);
+
+      const accountData = {
+        account: {
+          id: this.generateId(),
+          type: 'registered',
+          username: username,
+          nickname: nickname || username,
+          security: {
+            passwordSalt: salt,
+            passwordHash: hash
+          },
+          isAdmin: isAdmin,
+          isBanned: false,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          profile: {
+            level: 1,
+            exp: 0
+          },
+          stats: {
+            gameCount: 0,
+            winCount: 0,
+            loginCount: 0
+          }
+        }
+      };
+
+      await dataStore.insert('accounts', accountData);
+      logger.info('管理员创建账号', { username, nickname, isAdmin });
+
+      return {
+        success: true,
+        message: '账号创建成功',
+        accountId: accountData.account.id
+      };
+    } catch (err) {
+      logger.error('创建账号失败', { username, error: err.message });
+      return {
+        success: false,
+        message: '操作失败'
+      };
+    }
+  }
+
   // 管理员修改用户经验值
   async modifyUserExp(id, operation, amount) {
     try {

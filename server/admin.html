@@ -187,7 +187,7 @@
     }
 
     .nav-item.active {
-      background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+      background: #3b82f6;
       color: #fff;
     }
 
@@ -465,33 +465,214 @@
     }
 
     .btn-primary {
-      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      background: #3b82f6;
       color: #fff;
     }
 
     .btn-success {
-      background: linear-gradient(135deg, #22c55e, #16a34a);
+      background: #22c55e;
       color: #fff;
     }
 
     .btn-warning {
-      background: linear-gradient(135deg, #f59e0b, #d97706);
+      background: #f59e0b;
       color: #fff;
     }
 
     .btn-danger {
-      background: linear-gradient(135deg, #ef4444, #dc2626);
+      background: #ef4444;
       color: #fff;
     }
 
     .btn-secondary {
-      background: linear-gradient(135deg, #475569, #334155);
+      background: #475569;
       color: #e2e8f0;
     }
 
     .btn-info {
-      background: linear-gradient(135deg, #06b6d4, #0891b2);
+      background: #06b6d4;
       color: #fff;
+    }
+
+    .dropdown {
+      position: relative;
+      display: inline-block;
+    }
+
+    .dropdown-toggle {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #94a3b8;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      transition: all 0.2s;
+    }
+
+    .dropdown-toggle:hover,
+    .dropdown-toggle.active {
+      background: #334155;
+      color: #e2e8f0;
+    }
+
+    .dropdown-menu {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 100%;
+      margin-top: 4px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      min-width: 160px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      z-index: 1000;
+      padding: 4px 0;
+    }
+
+    .dropdown-menu.open {
+      display: block;
+    }
+
+    .dropdown-item {
+      display: block;
+      width: 100%;
+      padding: 8px 14px;
+      text-align: left;
+      background: none;
+      border: none;
+      color: #cbd5e1;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .dropdown-item:hover {
+      background: #334155;
+      color: #e2e8f0;
+    }
+
+    .dropdown-item.delete:hover {
+      background: #450a0a;
+      color: #ef4444;
+    }
+
+    .detail-stat-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 14px 12px;
+      text-align: center;
+    }
+
+    .detail-stat-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: #e2e8f0;
+    }
+
+    .detail-stat-label {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    .detail-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .detail-card-header {
+      padding: 12px 16px;
+      background: #0f172a;
+      font-size: 13px;
+      font-weight: 600;
+      color: #94a3b8;
+      border-bottom: 1px solid #334155;
+    }
+
+    .detail-grid {
+      padding: 14px 16px;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .detail-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+    }
+
+    .detail-label {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    .detail-value {
+      font-size: 13px;
+      color: #e2e8f0;
+      font-weight: 500;
+    }
+
+    .detail-btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: none;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .detail-btn-primary {
+      background: #3b82f6;
+      color: #fff;
+    }
+
+    .detail-btn-primary:hover {
+      background: #2563eb;
+    }
+
+    .detail-btn-success {
+      background: #22c55e;
+      color: #fff;
+    }
+
+    .detail-btn-success:hover {
+      background: #16a34a;
+    }
+
+    .detail-btn-warning {
+      background: #f59e0b;
+      color: #fff;
+    }
+
+    .detail-btn-warning:hover {
+      background: #d97706;
+    }
+
+    .detail-btn-danger {
+      background: #ef4444;
+      color: #fff;
+    }
+
+    .detail-btn-danger:hover {
+      background: #dc2626;
+    }
+
+    .detail-btn-secondary {
+      background: #475569;
+      color: #e2e8f0;
+    }
+
+    .detail-btn-secondary:hover {
+      background: #64748b;
     }
 
     .mail-tab-btn {
@@ -511,7 +692,7 @@
     }
 
     .mail-tab-btn.active {
-      background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+      background: #3b82f6;
       color: #fff;
       border-color: transparent;
     }
@@ -587,19 +768,21 @@
 
     th {
       text-align: left;
-      padding: 14px 24px;
-      font-size: 12px;
+      padding: 12px 16px;
+      font-size: 11px;
       font-weight: 600;
       color: #94a3b8;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       background: #0f172a;
+      white-space: nowrap;
     }
 
     td {
-      padding: 16px 24px;
+      padding: 14px 16px;
       border-bottom: 1px solid #334155;
-      font-size: 14px;
+      font-size: 13px;
+      vertical-align: middle;
     }
 
     tr:hover td {
@@ -3076,48 +3259,106 @@
 
         <!-- 账号管理 -->
         <section id="view-accounts" class="content-section">
+          <div class="summary-row">
+            <div class="summary-card">
+              <div class="summary-label">总账号数</div>
+              <div class="summary-value" id="acc-total">-</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-label">注册用户</div>
+              <div class="summary-value accent" id="acc-registered">-</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-label">游客账号</div>
+              <div class="summary-value" id="acc-guest">-</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-label">管理员</div>
+              <div class="summary-value" id="acc-admin">-</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-label">在线用户</div>
+              <div class="summary-value positive" id="acc-online">-</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-label">被封禁</div>
+              <div class="summary-value negative" id="acc-banned">-</div>
+            </div>
+          </div>
+
+          <div class="filter-row">
+            <label>搜索:</label>
+            <input type="text" id="account-search" class="search-input" placeholder="用户名/昵称/ID"
+              onkeyup="filterAccounts()">
+            <label>类型:</label>
+            <select id="account-type" class="filter-select" onchange="filterAccounts()">
+              <option value="all">全部类型</option>
+              <option value="registered">注册用户</option>
+              <option value="guest">游客</option>
+            </select>
+            <label>状态:</label>
+            <select id="account-status" class="filter-select" onchange="filterAccounts()">
+              <option value="all">全部状态</option>
+              <option value="online">在线</option>
+              <option value="offline">离线</option>
+              <option value="banned">已封禁</option>
+              <option value="muted">已禁言</option>
+            </select>
+            <label>角色:</label>
+            <select id="account-role" class="filter-select" onchange="filterAccounts()">
+              <option value="all">全部角色</option>
+              <option value="admin">管理员</option>
+              <option value="normal">普通用户</option>
+            </select>
+            <button class="btn btn-sm btn-secondary" onclick="loadAccounts()">🔄 刷新</button>
+          </div>
+
           <div class="data-card">
             <div class="card-header">
               <span class="card-title">🔐 账号列表</span>
               <div class="card-tools">
-                <input type="text" id="account-search" class="search-input" placeholder="搜索用户名/昵称"
-                  onkeyup="filterAccounts()">
-                <select id="account-type" class="filter-select" onchange="filterAccounts()">
-                  <option value="all">全部类型</option>
-                  <option value="registered">注册用户</option>
-                  <option value="guest">游客</option>
-                </select>
-                <button class="action-btn btn-secondary" onclick="loadAccounts()"
-                  style="padding: 8px 16px; font-size: 13px;">刷新</button>
+                <button class="action-btn btn-primary" onclick="showCreateAccountModal()">➕ 创建账号</button>
               </div>
             </div>
             <div class="table-wrap">
               <table>
                 <thead>
                   <tr>
-                    <th>ID</th>
+                    <th style="width:80px;">ID</th>
                     <th>用户名</th>
                     <th>昵称</th>
-                    <th>类型</th>
-                    <th>等级</th>
-                    <th>经验值</th>
-                    <th>成就数量</th>
-                    <th>游戏次数</th>
-                    <th>登录次数</th>
-                    <th>注册时间</th>
-                    <th>操作</th>
+                    <th style="width:70px;">类型</th>
+                    <th style="width:70px;">角色</th>
+                    <th style="width:70px;">状态</th>
+                    <th style="width:60px;">等级</th>
+                    <th style="width:120px;">最后登录</th>
+                    <th style="width:80px;">操作</th>
                   </tr>
                 </thead>
                 <tbody id="accounts-body">
                   <tr>
-                    <td colspan="11">
+                    <td colspan="9">
                       <div class="empty-state">
-                        <div class="empty-icon">🔑</div>暂无账号
+                        <div class="empty-icon">🔑</div>加载中...
                       </div>
                     </td>
                   </tr>
                 </tbody>
               </table>
+            </div>
+            <div id="accounts-pagination" class="pagination">
+              <div class="pagination-info">显示 0-0 条，共 0 条</div>
+              <div class="pagination-controls">
+                <button class="page-btn" disabled>上一页</button>
+                <button class="page-btn active">1</button>
+                <button class="page-btn" disabled>下一页</button>
+                <select class="page-size-select" onchange="accountsPageSizeChanged()">
+                  <option value="10">10条/页</option>
+                  <option value="20">20条/页</option>
+                  <option value="50">50条/页</option>
+                  <option value="100">100条/页</option>
+                </select>
+              </div>
             </div>
           </div>
         </section>
@@ -5550,45 +5791,192 @@
       }).join('');
     }
 
+    let accountsData = [];
+    let currentAccountsPage = 1;
+    let accountsPageSize = 20;
+
     function renderAccounts() {
       const tbody = document.getElementById('accounts-body');
-      const accounts = adminData.accounts || [];
+      accountsData = adminData.accounts || [];
 
-      if (accounts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="empty-icon">🔑</div>暂无账号</div></td></tr>';
+      updateAccountsStats();
+      renderAccountsTable();
+      renderAccountsPagination();
+    }
+
+    function updateAccountsStats() {
+      const total = accountsData.length;
+      const registered = accountsData.filter(a => a.account?.type === 'registered').length;
+      const guest = accountsData.filter(a => a.account?.type === 'guest').length;
+      const admin = accountsData.filter(a => a.account?.isAdmin).length;
+      const online = accountsData.filter(a => a.account?.online).length;
+      const banned = accountsData.filter(a => a.account?.isBanned).length;
+
+      const setText = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+      };
+      setText('acc-total', total);
+      setText('acc-registered', registered);
+      setText('acc-guest', guest);
+      setText('acc-admin', admin);
+      setText('acc-online', online);
+      setText('acc-banned', banned);
+    }
+
+    function filterAccounts() {
+      renderAccountsTable();
+      renderAccountsPagination();
+    }
+
+    function getFilteredAccounts() {
+      let filtered = [...accountsData];
+      const search = document.getElementById('account-search').value.toLowerCase();
+      const type = document.getElementById('account-type').value;
+      const status = document.getElementById('account-status').value;
+      const role = document.getElementById('account-role').value;
+
+      if (search) {
+        filtered = filtered.filter(a =>
+          (a.account?.username && a.account.username.toLowerCase().includes(search)) ||
+          (a.account?.nickname && a.account.nickname.toLowerCase().includes(search)) ||
+          (a.account?.id && a.account.id.toLowerCase().includes(search))
+        );
+      }
+
+      if (type !== 'all') {
+        filtered = filtered.filter(a => a.account?.type === type);
+      }
+
+      if (status === 'online') {
+        filtered = filtered.filter(a => a.account?.online);
+      } else if (status === 'offline') {
+        filtered = filtered.filter(a => !a.account?.online);
+      } else if (status === 'banned') {
+        filtered = filtered.filter(a => a.account?.isBanned);
+      }
+
+      if (role === 'admin') {
+        filtered = filtered.filter(a => a.account?.isAdmin);
+      } else if (role === 'normal') {
+        filtered = filtered.filter(a => !a.account?.isAdmin);
+      }
+
+      return filtered;
+    }
+
+    function renderAccountsTable() {
+      const tbody = document.getElementById('accounts-body');
+      const filtered = getFilteredAccounts();
+      const start = (currentAccountsPage - 1) * accountsPageSize;
+      const end = start + accountsPageSize;
+      const pageData = filtered.slice(start, end);
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">🔑</div>暂无账号</div></td></tr>';
         return;
       }
 
-      tbody.innerHTML = accounts.map(acc => {
+      if (pageData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">📄</div>当前页没有数据</div></td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = pageData.map(acc => {
         const typeClass = acc.account?.type === 'registered' ? 'badge-online' : 'badge-warning';
+        const roleClass = acc.account?.isAdmin ? 'badge-danger' : 'badge-info';
+        const onlineClass = acc.account?.online ? 'badge-online' : 'badge-offline';
+
         const level = acc.account?.profile?.level || 1;
-        const exp = acc.account?.profile?.exp || 0;
-        const achievementCount = acc.achievements?.length || 0;
-        const loginCount = acc.account?.activity?.loginCount || 0;
+        const statusText = acc.account?.isBanned ? '已封禁' : (acc.account?.online ? '在线' : '离线');
+        const statusBadge = acc.account?.isBanned ? 'badge-danger' : onlineClass;
+        const accId = acc.account?.id || acc.id;
+
+        let menuItems = '';
+        menuItems += `<button class="dropdown-item" onclick="viewAccountDetail('${accId}')">📋 详情</button>`;
+        if (!acc.account?.isAdmin) {
+          menuItems += `<button class="dropdown-item" onclick="upgradeToAdmin('${accId}')">🔱 设为管理员</button>`;
+        } else {
+          menuItems += `<button class="dropdown-item" onclick="downgradeFromAdmin('${accId}')">🔻 取消管理</button>`;
+        }
+        if (!acc.account?.isBanned) {
+          menuItems += `<button class="dropdown-item" onclick="banAccount('${accId}')">⛔ 封禁</button>`;
+        } else {
+          menuItems += `<button class="dropdown-item" onclick="unbanAccount('${accId}')">✅ 解封</button>`;
+        }
+        menuItems += `<button class="dropdown-item" onclick="showPasswordResetModal('${accId}')">🔑 重置密码</button>`;
+        menuItems += `<button class="dropdown-item" onclick="showExpManagement('${accId}')">📊 经验管理</button>`;
+        menuItems += `<button class="dropdown-item" onclick="showAchievementManagement('${accId}')">🏆 成就管理</button>`;
+        menuItems += `<button class="dropdown-item delete" onclick="deleteAccount('${accId}')">🗑️ 删除账号</button>`;
+
         return `
       <tr>
-        <td>${acc.account?.id || acc.id}</td>
-        <td>${acc.account?.username || '-'}</td>
+        <td style="font-family:monospace;font-size:11px;color:#94a3b8;">${accId?.substr(0, 8) || '-'}</td>
+        <td style="font-weight:500;">${acc.account?.username || '-'}</td>
         <td>${acc.account?.nickname || '-'}</td>
-        <td><span class="badge ${typeClass}">${acc.account?.type === 'registered' ? '注册用户' : '游客'}</span></td>
+        <td><span class="badge ${typeClass}">${acc.account?.type === 'registered' ? '注册' : '游客'}</span></td>
+        <td><span class="badge ${roleClass}">${acc.account?.isAdmin ? '管理员' : '普通'}</span></td>
+        <td><span class="badge ${statusBadge}">${statusText}</span></td>
         <td>Lv.${level}</td>
-        <td>${exp}</td>
-        <td>${achievementCount}</td>
-        <td>${acc.stats?.totalGames || 0}</td>
-        <td>${loginCount}</td>
-        <td>${formatTime(acc.account?.createdAt)}</td>
+        <td style="font-size:11px;color:#64748b;">${formatTime(acc.account?.lastLogin)}</td>
         <td>
-          <div class="table-actions">
-            <button class="table-btn table-btn-info" onclick="viewAccountDetail('${acc.account?.id || acc.id}')">查看</button>
-            <button class="table-btn table-btn-warning" onclick="resetPassword('${acc.account?.id || acc.id}')">重置密码</button>
-            <button class="table-btn table-btn-success" onclick="showExpManagement('${acc.account?.id || acc.id}')">经验</button>
-            <button class="table-btn table-btn-primary" onclick="showAchievementManagement('${acc.account?.id || acc.id}')">成就</button>
-            <button class="table-btn table-btn-danger" onclick="deleteAccount('${acc.account?.id || acc.id}')">删除</button>
+          <div class="dropdown" id="dropdown-${accId}">
+            <button class="dropdown-toggle" onclick="toggleDropdown(event, 'dropdown-${accId}')">⚙️</button>
+            <div class="dropdown-menu" id="dropdown-menu-${accId}">
+              ${menuItems}
+            </div>
           </div>
         </td>
       </tr>
     `;
       }).join('');
+    }
+
+    function renderAccountsPagination() {
+      const filtered = getFilteredAccounts();
+      const totalPages = Math.max(1, Math.ceil(filtered.length / accountsPageSize));
+      const pagination = document.getElementById('accounts-pagination');
+      const start = (currentAccountsPage - 1) * accountsPageSize + 1;
+      const end = Math.min(currentAccountsPage * accountsPageSize, filtered.length);
+
+      let html = `<div class="pagination-info">显示 ${start}-${end} 条，共 ${filtered.length} 条</div>`;
+      html += '<div class="pagination-controls">';
+      html += `<button class="page-btn" ${currentAccountsPage <= 1 ? 'disabled' : ''} onclick="goAccountsPage(${currentAccountsPage - 1})">上一页</button>`;
+
+      const maxPages = 5;
+      let startPage = Math.max(1, currentAccountsPage - Math.floor(maxPages / 2));
+      let endPage = Math.min(totalPages, startPage + maxPages - 1);
+      if (endPage - startPage + 1 < maxPages) {
+        startPage = Math.max(1, endPage - maxPages + 1);
+      }
+
+      for (let i = startPage; i <= endPage; i++) {
+        html += `<button class="page-btn ${i === currentAccountsPage ? 'active' : ''}" onclick="goAccountsPage(${i})">${i}</button>`;
+      }
+
+      html += `<button class="page-btn" ${currentAccountsPage >= totalPages ? 'disabled' : ''} onclick="goAccountsPage(${currentAccountsPage + 1})">下一页</button>`;
+      html += `<select class="page-size-select" onchange="accountsPageSizeChanged()">`;
+      [10, 20, 50, 100].forEach(size => {
+        html += `<option value="${size}" ${size === accountsPageSize ? 'selected' : ''}>${size}条/页</option>`;
+      });
+      html += '</select>';
+      html += '</div>';
+
+      pagination.innerHTML = html;
+    }
+
+    function goAccountsPage(page) {
+      currentAccountsPage = page;
+      renderAccountsTable();
+      renderAccountsPagination();
+    }
+
+    function accountsPageSizeChanged() {
+      const select = document.querySelector('#accounts-pagination .page-size-select');
+      accountsPageSize = parseInt(select.value);
+      currentAccountsPage = 1;
+      renderAccountsTable();
+      renderAccountsPagination();
     }
 
 
@@ -7034,10 +7422,161 @@
       });
     }
 
-    function resetPassword(accountId) {
-      if (!confirm(`确定要重置用户 ${accountId} 的密码吗？`)) return;
-      // 后端暂不支持此功能
-      showToast('密码重置功能暂未实现', 'info');
+    function upgradeToAdmin(accountId) {
+      if (!confirm('确定要将该用户升级为管理员吗？')) return;
+      socket.emit('upgrade_to_admin', { accountId });
+      socket.once('admin_action_result', (data) => {
+        if (data.success) {
+          showToast('升级成功', 'success');
+          loadAccounts();
+        } else {
+          showToast(data.message || '操作失败', 'error');
+        }
+      });
+    }
+
+    function downgradeFromAdmin(accountId) {
+      if (!confirm('确定要取消该用户的管理员权限吗？')) return;
+      socket.emit('downgrade_from_admin', { accountId });
+      socket.once('admin_action_result', (data) => {
+        if (data.success) {
+          showToast('已取消管理员权限', 'success');
+          loadAccounts();
+        } else {
+          showToast(data.message || '操作失败', 'error');
+        }
+      });
+    }
+
+    function banAccount(accountId) {
+      const reason = prompt('请输入封禁原因（可选）：');
+      socket.emit('ban_account', { accountId, reason: reason || '' });
+      socket.once('admin_action_result', (data) => {
+        if (data.success) {
+          showToast('账号已封禁', 'success');
+          loadAccounts();
+        } else {
+          showToast(data.message || '操作失败', 'error');
+        }
+      });
+    }
+
+    function unbanAccount(accountId) {
+      if (!confirm('确定要解封该账号吗？')) return;
+      socket.emit('unban_account', { accountId });
+      socket.once('admin_action_result', (data) => {
+        if (data.success) {
+          showToast('账号已解封', 'success');
+          loadAccounts();
+        } else {
+          showToast(data.message || '操作失败', 'error');
+        }
+      });
+    }
+
+    function showPasswordResetModal(accountId) {
+      showModal('重置密码', `
+        <div class="form-group">
+          <label class="form-label">新密码</label>
+          <input type="password" id="new-password" class="form-input" placeholder="输入新密码">
+        </div>
+        <div class="form-group">
+          <label class="form-label">确认密码</label>
+          <input type="password" id="new-password-confirm" class="form-input" placeholder="再次输入新密码">
+        </div>
+      `, [
+        { text: '取消', class: 'btn-secondary', action: closeModal },
+        {
+          text: '确认重置', class: 'btn-primary', action: () => {
+            const password = document.getElementById('new-password').value;
+            const confirm = document.getElementById('new-password-confirm').value;
+            if (!password) {
+              showToast('请输入密码', 'error');
+              return;
+            }
+            if (password !== confirm) {
+              showToast('两次密码不一致', 'error');
+              return;
+            }
+            socket.emit('reset_password', { accountId, password });
+            socket.once('admin_action_result', (data) => {
+              if (data.success) {
+                showToast('密码重置成功', 'success');
+                closeModal();
+              } else {
+                showToast(data.message || '操作失败', 'error');
+              }
+            });
+          }
+        }
+      ]);
+    }
+
+    function showCreateAccountModal() {
+      showModal('创建新账号', `
+        <div class="form-group">
+          <label class="form-label">用户名</label>
+          <input type="text" id="create-username" class="form-input" placeholder="用户名（3-20位，字母数字下划线）">
+        </div>
+        <div class="form-group">
+          <label class="form-label">昵称</label>
+          <input type="text" id="create-nickname" class="form-input" placeholder="昵称（可选）">
+        </div>
+        <div class="form-group">
+          <label class="form-label">密码</label>
+          <input type="password" id="create-password" class="form-input" placeholder="密码（至少6位）">
+        </div>
+        <div class="form-group">
+          <label class="form-label">确认密码</label>
+          <input type="password" id="create-password-confirm" class="form-input" placeholder="再次输入密码">
+        </div>
+        <div class="form-group">
+          <label class="toggle-switch">
+            <input type="checkbox" id="create-is-admin">
+            <span class="toggle-slider"></span>
+            <span class="toggle-label-text">设为管理员</span>
+          </label>
+        </div>
+      `, [
+        { text: '取消', class: 'btn-secondary', action: closeModal },
+        {
+          text: '创建账号', class: 'btn-primary', action: () => {
+            const username = document.getElementById('create-username').value;
+            const nickname = document.getElementById('create-nickname').value;
+            const password = document.getElementById('create-password').value;
+            const confirm = document.getElementById('create-password-confirm').value;
+            const isAdmin = document.getElementById('create-is-admin').checked;
+
+            if (!username) {
+              showToast('请输入用户名', 'error');
+              return;
+            }
+            if (!password) {
+              showToast('请输入密码', 'error');
+              return;
+            }
+            if (password !== confirm) {
+              showToast('两次密码不一致', 'error');
+              return;
+            }
+            if (password.length < 6) {
+              showToast('密码长度至少6位', 'error');
+              return;
+            }
+
+            socket.emit('create_account', { username, nickname: nickname || username, password, isAdmin });
+            socket.once('admin_action_result', (data) => {
+              if (data.success) {
+                showToast('账号创建成功', 'success');
+                closeModal();
+                loadAccounts();
+              } else {
+                showToast(data.message || '操作失败', 'error');
+              }
+            });
+          }
+        }
+      ]);
     }
 
     function deleteAccount(accountId) {
@@ -7045,6 +7584,7 @@
 
       socket.once('admin_action_result', (data) => {
         if (data.action === 'delete_account' && data.success) {
+          showToast('账号已删除', 'success');
           loadAccounts();
         }
       });
@@ -7269,141 +7809,182 @@
       }).join('');
     }
 
+    // ==================== 下拉菜单控制 ====================
+    function toggleDropdown(event, dropdownId) {
+      if (event) {
+        event.stopPropagation();
+      }
+      const dropdown = document.getElementById(dropdownId);
+      if (!dropdown) return;
+      const menu = dropdown.querySelector('.dropdown-menu');
+      const toggle = dropdown.querySelector('.dropdown-toggle');
+      if (!menu || !toggle) return;
+
+      const isOpen = menu.classList.contains('open');
+      closeAllDropdowns();
+      if (!isOpen) {
+        menu.classList.add('open');
+        toggle.classList.add('active');
+      }
+    }
+
+    function closeAllDropdowns() {
+      document.querySelectorAll('.dropdown-menu.open').forEach(menu => {
+        menu.classList.remove('open');
+      });
+      document.querySelectorAll('.dropdown-toggle.active').forEach(toggle => {
+        toggle.classList.remove('active');
+      });
+    }
+
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('.dropdown')) {
+        closeAllDropdowns();
+      }
+    });
+
+    document.addEventListener('click', function (e) {
+      if (e.target.closest('.dropdown-item')) {
+        closeAllDropdowns();
+      }
+    }, true);
+
     // ==================== 模态框内容显示函数 ====================
     function showAccountDetailModal(data) {
       const account = data.account || {};
       const user = data.user || null;
+      const isAdmin = account.isAdmin || false;
+      const isBanned = account.isBanned || false;
+      const level = account.profile?.level || 1;
+      const exp = account.profile?.exp || 0;
+      const accId = account.id;
 
-      let userHtml = '';
-      if (user) {
-        userHtml = `
-          <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #334155;">
-            <h3 style="margin-bottom: 15px; color: #60a5fa;">👤 在线用户信息</h3>
-            <div class="form-group">
-              <label class="form-label">用户ID</label>
-              <input type="text" class="form-input" value="${user.accountId}" readonly>
-            </div>
-            <div class="form-group">
-              <label class="form-label">状态</label>
-              <input type="text" class="form-input" value="${user.status || '-'}" readonly>
-            </div>
-            <div class="form-group">
-              <label class="form-label">IP地址</label>
-              <input type="text" class="form-input" value="${user.ip || '-'}" readonly>
-            </div>
-            <div class="form-group">
-              <label class="form-label">连接时间</label>
-              <input type="text" class="form-input" value="${formatTime(user.connectedAt)}" readonly>
-            </div>
-            <div class="form-group">
-              <label class="form-label">最后活动</label>
-              <input type="text" class="form-input" value="${formatTime(user.lastActivity)}" readonly>
-            </div>
-            ${user.muted ? `
-            <div class="form-group">
-              <label class="form-label">禁言信息</label>
-              <input type="text" class="form-input" value="${user.muteInfo?.reason || '无原因'} (剩余${user.muteInfo?.remainingMinutes || 0}分钟)" readonly style="color: #ef4444;">
-            </div>
-            ` : ''}
-          </div>
-        `;
-      } else {
-        userHtml = `
-          <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #334155;">
-            <div style="text-align: center; color: #64748b; padding: 20px;">
-              <div style="font-size: 48px; margin-bottom: 10px;">😴</div>
-              <div>用户当前离线</div>
-            </div>
-          </div>
-        `;
-      }
+      const stats = account.stats || {};
+      const achievementCount = account.achievements?.length || 0;
+      const loginCount = account.account?.activity?.loginCount || 0;
+
+      let statusBadges = [];
+      if (isAdmin) statusBadges.push('<span class="badge" style="background:rgba(245,158,11,0.2);color:#f59e0b;">管理员</span>');
+      if (isBanned) statusBadges.push('<span class="badge" style="background:rgba(239,68,68,0.2);color:#ef4444;">已封禁</span>');
+      if (account.account?.type === 'registered') statusBadges.push('<span class="badge" style="background:rgba(34,197,94,0.2);color:#22c55e;">注册用户</span>');
+      if (account.account?.type === 'guest') statusBadges.push('<span class="badge" style="background:rgba(148,163,184,0.2);color:#94a3b8;">游客</span>');
+      if (user) statusBadges.push('<span class="badge" style="background:rgba(59,130,246,0.2);color:#60a5fa;">在线</span>');
 
       showModal('账号详情', `
-        <div style="margin-bottom: 20px;">
-          <h3 style="margin-bottom: 15px; color: #60a5fa;">🔐 账号信息</h3>
-          <div class="form-group">
-            <label class="form-label">账号ID</label>
-            <input type="text" class="form-input" value="${account.id}" readonly>
-          </div>
-          <div class="form-group">
-            <label class="form-label">账号类型</label>
-            <input type="text" class="form-input" value="${account.type === 'registered' ? '注册用户' : '游客'}" readonly>
-          </div>
-          <div class="form-group">
-            <label class="form-label">用户名</label>
-            <input type="text" class="form-input" value="${account.username || '-'}" readonly>
-          </div>
-          <div class="form-group">
-            <label class="form-label">昵称</label>
-            <input type="text" class="form-input" value="${account.nickname || '-'}" readonly>
-          </div>
-          <div class="form-group">
-            <label class="form-label">等级</label>
-            <input type="text" class="form-input" value="Lv.${account.profile?.level || 1}" readonly>
-          </div>
-          <div class="form-group">
-            <label class="form-label">经验值</label>
-            <div style="display: flex; gap: 10px;">
-              <input type="text" class="form-input" value="${account.profile?.exp || 0}" readonly style="flex: 1;">
-              <button onclick="modifyExp('${account.id}', 'add', 100)" class="btn btn-sm btn-primary">+100</button>
-              <button onclick="modifyExp('${account.id}', 'add', 500)" class="btn btn-sm btn-primary">+500</button>
-              <button onclick="modifyExp('${account.id}', 'subtract', 100)" class="btn btn-sm btn-secondary">-100</button>
-              <button onclick="modifyExp('${account.id}', 'reset', 0)" class="btn btn-sm btn-danger">重置</button>
+        <div style="padding: 20px;">
+          <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px;">
+            <div style="width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #6366f1); display: flex; align-items: center; justify-content: center; font-size: 28px; color: white; font-weight: bold;">
+              ${(account.nickname || account.username || '?')[0].toUpperCase()}
+            </div>
+            <div style="flex: 1;">
+              <div style="font-size: 20px; font-weight: 600; color: #e2e8f0;">${account.nickname || account.username || '-'}</div>
+              <div style="font-size: 13px; color: #64748b; margin-top: 4px;">
+                ${account.username ? `@${account.username} | ` : ''}ID: ${accId?.substr(0, 8)}...
+              </div>
+              <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;">
+                ${statusBadges.join('')}
+              </div>
             </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">自定义经验值</label>
-            <div style="display: flex; gap: 10px;">
-              <input type="number" id="custom-exp-amount" class="form-input" value="100" style="flex: 1;">
-              <button onclick="modifyExp('${account.id}', 'add', parseInt(document.getElementById('custom-exp-amount').value))" class="btn btn-sm btn-primary">添加</button>
-              <button onclick="modifyExp('${account.id}', 'subtract', parseInt(document.getElementById('custom-exp-amount').value))" class="btn btn-sm btn-secondary">减少</button>
-              <button onclick="modifyExp('${account.id}', 'set', parseInt(document.getElementById('custom-exp-amount').value))" class="btn btn-sm btn-warning">设置</button>
+
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px;">
+            <div class="detail-stat-card">
+              <div class="detail-stat-value" style="color: #f59e0b;">Lv.${level}</div>
+              <div class="detail-stat-label">等级</div>
+            </div>
+            <div class="detail-stat-card">
+              <div class="detail-stat-value">${exp.toLocaleString()}</div>
+              <div class="detail-stat-label">经验值</div>
+            </div>
+            <div class="detail-stat-card">
+              <div class="detail-stat-value">${achievementCount}</div>
+              <div class="detail-stat-label">成就</div>
+            </div>
+            <div class="detail-stat-card">
+              <div class="detail-stat-value">${stats.totalGames || 0}</div>
+              <div class="detail-stat-label">游戏次数</div>
+            </div>
+            <div class="detail-stat-card">
+              <div class="detail-stat-value">${stats.wins || 0}</div>
+              <div class="detail-stat-label">胜利</div>
+            </div>
+            <div class="detail-stat-card">
+              <div class="detail-stat-value">${loginCount}</div>
+              <div class="detail-stat-label">登录次数</div>
             </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">注册时间</label>
-            <input type="text" class="form-input" value="${formatTime(account.createdAt)}" readonly>
-          </div>
-          <div class="form-group">
-            <label class="form-label">最后登录</label>
-            <input type="text" class="form-input" value="${formatTime(account.lastLogin)}" readonly>
-          </div>
-          <div class="form-group">
-            <label class="form-label">最后在线</label>
-            <input type="text" class="form-input" value="${formatTime(account.lastSeen)}" readonly>
-          </div>
-          ${account.stats ? `
-          <div class="form-group">
-            <label class="form-label">游戏统计</label>
-            <div style="background: #0f172a; padding: 12px; border-radius: 8px;">
-              <div style="display: flex; justify-content: space-around; text-align: center;">
-                <div><div style="font-size: 20px; font-weight: bold; color: #22c55e;">${account.stats.wins || 0}</div><div style="font-size: 12px; color: #64748b;">胜</div></div>
-                <div><div style="font-size: 20px; font-weight: bold; color: #ef4444;">${account.stats.losses || 0}</div><div style="font-size: 12px; color: #64748b;">负</div></div>
-                <div><div style="font-size: 20px; font-weight: bold; color: #64748b;">${account.stats.draws || 0}</div><div style="font-size: 12px; color: #64748b;">平</div></div>
+
+          <div class="detail-card">
+            <div class="detail-card-header">📅 时间信息</div>
+            <div class="detail-grid">
+              <div class="detail-item">
+                <span class="detail-label">注册时间</span>
+                <span class="detail-value">${formatTime(account.createdAt)}</span>
               </div>
-              <div style="margin-top: 10px; text-align: center; font-size: 12px; color: #64748b;">
-                总场次: ${account.stats.totalGames || 0} | 连胜: ${account.stats.streak || 0} | 最高连胜: ${account.stats.maxStreak || 0}
+              <div class="detail-item">
+                <span class="detail-label">最后登录</span>
+                <span class="detail-value">${formatTime(account.lastLogin)}</span>
               </div>
+              <div class="detail-item">
+                <span class="detail-label">最后在线</span>
+                <span class="detail-value">${formatTime(account.lastSeen)}</span>
+              </div>
+              ${isBanned ? `
+              <div class="detail-item">
+                <span class="detail-label">封禁原因</span>
+                <span class="detail-value" style="color: #ef4444;">${account.banReason || '无'}</span>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+
+          ${user ? `
+          <div class="detail-card" style="margin-top: 12px;">
+            <div class="detail-card-header">💻 当前在线状态</div>
+            <div class="detail-grid">
+              <div class="detail-item">
+                <span class="detail-label">状态</span>
+                <span class="detail-value">${user.status || '-'}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">IP地址</span>
+                <span class="detail-value">${user.ip || '-'}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">连接时间</span>
+                <span class="detail-value">${formatTime(user.connectedAt)}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">最后活动</span>
+                <span class="detail-value">${formatTime(user.lastActivity)}</span>
+              </div>
+              ${user.muted ? `
+              <div class="detail-item" style="grid-column: 1 / -1;">
+                <span class="detail-label">禁言信息</span>
+                <span class="detail-value" style="color: #ef4444;">${user.muteInfo?.reason || '无原因'} (剩余${user.muteInfo?.remainingMinutes || 0}分钟)</span>
+              </div>
+              ` : ''}
             </div>
           </div>
           ` : ''}
-          ${account.achievements ? `
-          <div class="form-group">
-            <label class="form-label">成就管理</label>
-            <div style="background: #0f172a; padding: 12px; border-radius: 8px;">
-              <div style="margin-bottom: 10px; text-align: center; font-size: 14px; color: #60a5fa;">
-                已解锁成就: ${account.achievements.length} 个
-              </div>
-              <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <button onclick="showAddAchievementModal('${account.id}')" class="btn btn-sm btn-primary">添加成就</button>
-                <button onclick="showRemoveAchievementModal('${account.id}')" class="btn btn-sm btn-secondary">移除成就</button>
-                <button onclick="resetAchievements('${account.id}')" class="btn btn-sm btn-danger">重置所有成就</button>
+
+          <div class="detail-card" style="margin-top: 12px;">
+            <div class="detail-card-header">⚙️ 账号操作</div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              ${!isBanned ? `<button onclick="banAccount('${accId}')" class="detail-btn detail-btn-danger">⛔ 封禁</button>` : `<button onclick="unbanAccount('${accId}')" class="detail-btn detail-btn-success">✅ 解封</button>`}
+              ${!isAdmin ? `<button onclick="upgradeToAdmin('${accId}')" class="detail-btn detail-btn-warning">🔱 设管理员</button>` : `<button onclick="downgradeFromAdmin('${accId}')" class="detail-btn detail-btn-secondary">🔻 取消管理</button>`}
+              <button onclick="showPasswordResetModal('${accId}')" class="detail-btn detail-btn-primary">🔑 重置密码</button>
+              <div class="dropdown" id="detail-more-${accId}">
+                <button class="detail-btn detail-btn-secondary" onclick="toggleDropdown(event, 'detail-more-${accId}')">更多 ▼</button>
+                <div class="dropdown-menu" id="detail-more-menu-${accId}">
+                  <button class="dropdown-item" onclick="showExpManagement('${accId}')">📊 经验管理</button>
+                  <button class="dropdown-item" onclick="showAchievementManagement('${accId}')">🏆 成就管理</button>
+                  <button class="dropdown-item delete" onclick="deleteAccount('${accId}')">🗑️ 删除账号</button>
+                </div>
               </div>
             </div>
           </div>
-          ` : ''}
         </div>
-        ${userHtml}
       `, [{ text: '关闭', class: 'btn-secondary', action: closeModal }]);
     }
 

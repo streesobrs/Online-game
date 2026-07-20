@@ -396,6 +396,24 @@ class AdminManager {
     if (this.accountManager) {
       try {
         accounts = await this.accountManager.getAllAccounts();
+
+        const onlineUserIds = new Set();
+        if (this.userManager) {
+          for (const user of this.userManager.getAllUsers()) {
+            if (user.socket && !user.disconnectedAt) {
+              onlineUserIds.add(user.accountId);
+            }
+          }
+        }
+
+        accounts = accounts.map(acc => ({
+          ...acc,
+          account: {
+            ...acc.account,
+            online: onlineUserIds.has(acc.account?.id)
+          }
+        }));
+
         registeredTotal = accounts.length;
         // 创建账号ID到账号对象的映射
         accounts.forEach(account => {
@@ -1418,7 +1436,189 @@ class AdminManager {
     }
 
     const accounts = await this.accountManager.getAllAccounts();
-    socket.emit('admin_accounts_list', { accounts });
+    const onlineUserIds = new Set();
+    if (this.userManager) {
+      for (const user of this.userManager.getAllUsers()) {
+        if (user.socket && !user.disconnectedAt) {
+          onlineUserIds.add(user.accountId);
+        }
+      }
+    }
+
+    const accountsWithStatus = accounts.map(acc => ({
+      ...acc,
+      account: {
+        ...acc.account,
+        online: onlineUserIds.has(acc.account?.id)
+      }
+    }));
+
+    socket.emit('admin_accounts_list', { accounts: accountsWithStatus });
+  }
+
+  // 升级为管理员
+  async upgradeToAdmin(socket, accountId) {
+    const result = await this.accountManager.upgradeToAdmin(accountId);
+    logger.info('管理员升级账号为管理员', { adminSocket: socket.id, accountId });
+    socket.emit('admin_action_result', {
+      action: 'upgrade_to_admin',
+      ...result
+    });
+    socket.emit('admin_accounts_updated', {});
+  }
+
+  // 降级管理员
+  async downgradeFromAdmin(socket, accountId) {
+    try {
+      const account = await dataStore.findOne('accounts', { 'account.id': accountId });
+      if (!account) {
+        socket.emit('admin_action_result', {
+          action: 'downgrade_from_admin',
+          success: false,
+          message: '账号不存在'
+        });
+        return;
+      }
+
+      if (!account.account?.isAdmin) {
+        socket.emit('admin_action_result', {
+          action: 'downgrade_from_admin',
+          success: false,
+          message: '该账号不是管理员'
+        });
+        return;
+      }
+
+      await dataStore.update('accounts', { 'account.id': accountId }, {
+        'account.isAdmin': false,
+        'account.updatedAt': Date.now()
+      });
+
+      logger.info('管理员取消账号管理员权限', { adminSocket: socket.id, accountId });
+      socket.emit('admin_action_result', {
+        action: 'downgrade_from_admin',
+        success: true,
+        message: '已取消管理员权限'
+      });
+      socket.emit('admin_accounts_updated', {});
+    } catch (err) {
+      logger.error('降级管理员失败', { accountId, error: err.message });
+      socket.emit('admin_action_result', {
+        action: 'downgrade_from_admin',
+        success: false,
+        message: '操作失败'
+      });
+    }
+  }
+
+  // 封禁账号
+  async banAccount(socket, accountId, reason = '') {
+    try {
+      const account = await dataStore.findOne('accounts', { 'account.id': accountId });
+      if (!account) {
+        socket.emit('admin_action_result', {
+          action: 'ban_account',
+          success: false,
+          message: '账号不存在'
+        });
+        return;
+      }
+
+      if (account.account?.isAdmin) {
+        socket.emit('admin_action_result', {
+          action: 'ban_account',
+          success: false,
+          message: '不能封禁管理员账号'
+        });
+        return;
+      }
+
+      await dataStore.update('accounts', { 'account.id': accountId }, {
+        'account.isBanned': true,
+        'account.banReason': reason,
+        'account.banTime': Date.now(),
+        'account.updatedAt': Date.now()
+      });
+
+      if (this.userManager) {
+        this.userManager.kickUser(accountId, reason || '账号被封禁');
+      }
+
+      logger.info('管理员封禁账号', { adminSocket: socket.id, accountId, reason });
+      socket.emit('admin_action_result', {
+        action: 'ban_account',
+        success: true,
+        message: '账号已封禁'
+      });
+      socket.emit('admin_accounts_updated', {});
+    } catch (err) {
+      logger.error('封禁账号失败', { accountId, error: err.message });
+      socket.emit('admin_action_result', {
+        action: 'ban_account',
+        success: false,
+        message: '操作失败'
+      });
+    }
+  }
+
+  // 解封账号
+  async unbanAccount(socket, accountId) {
+    try {
+      const account = await dataStore.findOne('accounts', { 'account.id': accountId });
+      if (!account) {
+        socket.emit('admin_action_result', {
+          action: 'unban_account',
+          success: false,
+          message: '账号不存在'
+        });
+        return;
+      }
+
+      await dataStore.update('accounts', { 'account.id': accountId }, {
+        'account.isBanned': false,
+        'account.banReason': null,
+        'account.banTime': null,
+        'account.updatedAt': Date.now()
+      });
+
+      logger.info('管理员解封账号', { adminSocket: socket.id, accountId });
+      socket.emit('admin_action_result', {
+        action: 'unban_account',
+        success: true,
+        message: '账号已解封'
+      });
+      socket.emit('admin_accounts_updated', {});
+    } catch (err) {
+      logger.error('解封账号失败', { accountId, error: err.message });
+      socket.emit('admin_action_result', {
+        action: 'unban_account',
+        success: false,
+        message: '操作失败'
+      });
+    }
+  }
+
+  // 重置密码
+  async resetPassword(socket, accountId, password) {
+    const result = await this.accountManager.resetPasswordByAdmin(accountId, password);
+    logger.info('管理员重置账号密码', { adminSocket: socket.id, accountId });
+    socket.emit('admin_action_result', {
+      action: 'reset_password',
+      ...result
+    });
+  }
+
+  // 创建账号
+  async createAccount(socket, username, password, nickname, isAdmin = false) {
+    const result = await this.accountManager.createAdminAccount(username, password, nickname, isAdmin);
+    logger.info('管理员创建账号', { adminSocket: socket.id, username, isAdmin });
+    socket.emit('admin_action_result', {
+      action: 'create_account',
+      ...result
+    });
+    if (result.success) {
+      socket.emit('admin_accounts_updated', {});
+    }
   }
 
   // 删除账号
