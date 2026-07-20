@@ -1465,6 +1465,7 @@ app.get('/api/profile/:accountId', async (req, res) => {
 
     // 获取游戏统计数据
     const games = account.games || {};
+
     let totalGames = 0;
     let totalWins = 0;
     let totalDraws = 0;
@@ -2733,8 +2734,8 @@ io.on('connection', (socket) => {
   // ========== 游戏相关事件 ==========
 
   // 游戏移动
-  socket.on('move', (data) => {
-    const success = gameManager.handleMove(socket.id, data, io);
+  socket.on('move', async (data) => {
+    const success = await gameManager.handleMove(socket.id, data, io);
     if (!success) {
       socket.emit('error', { message: '无效的移动' });
     }
@@ -2758,10 +2759,10 @@ io.on('connection', (socket) => {
   });
 
   // 游戏结果
-  socket.on('game_result', (data) => {
-    const success = gameManager.handleGameResult(socket.id, data, io);
+  socket.on('game_result', async (data) => {
+    const success = await gameManager.handleGameResult(socket.id, data, io);
     if (!success) {
-      socket.emit('error', { message: '无法结束游戏' });
+      socket.emit('error', { message: '无效的游戏结果' });
     }
   });
 

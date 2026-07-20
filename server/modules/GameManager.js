@@ -559,7 +559,7 @@ class GameManager {
   }
 
   // 处理游戏移动
-  handleMove(socketId, data, io) {
+  async handleMove(socketId, data, io) {
     const user = this.userManager.getUserBySocketId(socketId);
     if (!user || user.status !== 'playing') {
       return false;
@@ -600,7 +600,6 @@ class GameManager {
 
     game.moves.push(move);
     game.lastMoveTime = Date.now();
-    game.currentPlayer = game.currentPlayer === 1 ? 2 : 1;
 
     // 保存移动历史
     const moves = this.moveHistory.get(game.gameId);
@@ -610,6 +609,50 @@ class GameManager {
     if (game.board && game.gameType) {
       this.executeMove(game.gameType, game.board, position, move.color);
     }
+
+    // 检查游戏是否结束
+    const gameOver = this.checkGameOver(game.gameType, game.board, move.color);
+    if (gameOver) {
+      const winner = move.color === 1 ? game.player1 : game.player2;
+      await this.endGame(game.gameId, 'win', io, winner, 'checkmate');
+
+      this.userManager.updateUserActivity(user.accountId);
+
+      logger.gameEvent(game.gameId, '移动', {
+        player: user.accountId,
+        position: move.position,
+        isPlayer1: isPlayer1,
+        isPlayer2: isPlayer2,
+        gamePlayer1: game.player1,
+        gamePlayer2: game.player2
+      });
+
+      const opponentId = isPlayer1 ? game.player2 : game.player1;
+      const opponentSocket = this.userManager.getSocketByAccountId(opponentId);
+      logger.info('发送移动消息', {
+        from: user.accountId,
+        to: opponentId,
+        hasOpponentSocket: !!opponentSocket
+      });
+      if (opponentSocket) {
+        opponentSocket.emit('move', {
+          ...data,
+          from: user.accountId,
+          color: move.color
+        });
+      }
+
+      this.broadcastToSpectators(game.gameId, 'move', {
+        ...data,
+        from: user.accountId,
+        color: move.color
+      }, io);
+
+      return true;
+    }
+
+    // 切换回合
+    game.currentPlayer = game.currentPlayer === 1 ? 2 : 1;
 
     // 更新用户活动
     this.userManager.updateUserActivity(user.accountId);
@@ -884,7 +927,7 @@ class GameManager {
   }
 
   // 处理游戏结果
-  handleGameResult(socketId, data, io) {
+  async handleGameResult(socketId, data, io) {
     const user = this.userManager.getUserBySocketId(socketId);
     if (!user || user.status !== 'playing') {
       return false;
@@ -915,7 +958,7 @@ class GameManager {
     }
 
     // 结束游戏
-    this.endGame(game.gameId, result, io, winner, reason);
+    await this.endGame(game.gameId, result, io, winner, reason);
 
     return true;
   }
@@ -2710,7 +2753,11 @@ class GameManager {
   // 验证象棋移动
   isValidChessMove(board, position, player) {
     const { fromR, fromC, toR, toC } = position;
-    const piece = board[fromR][fromC];
+    const fr = parseInt(fromR);
+    const fc = parseInt(fromC);
+    const tr = parseInt(toR);
+    const tc = parseInt(toC);
+    const piece = board[fr][fc];
     if (!piece || piece === 0) return false;
 
     const color = this.getChessPieceColor(piece);
@@ -2718,16 +2765,16 @@ class GameManager {
     const playerColor = player === 1 ? 'r' : 'b';
     if (color !== playerColor) return false;
 
-    const validMoves = this.getChessRawMoves(board, fromR, fromC);
-    if (!validMoves.some(m => m.r === toR && m.c === toC)) return false;
+    const validMoves = this.getChessRawMoves(board, fr, fc);
+    if (!validMoves.some(m => m.r === tr && m.c === tc)) return false;
 
     // 模拟走棋，不能让自己的将被将军
-    const saved = board[toR][toC];
-    board[toR][toC] = piece;
-    board[fromR][fromC] = 0;
+    const saved = board[tr][tc];
+    board[tr][tc] = piece;
+    board[fr][fc] = 0;
     const stillCheck = this.isCheck(board, color);
-    board[fromR][fromC] = piece;
-    board[toR][toC] = saved;
+    board[fr][fc] = piece;
+    board[tr][tc] = saved;
 
     return !stillCheck;
   }

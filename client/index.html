@@ -7,6 +7,7 @@
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#667eea">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>多棋种联机大厅 🎮 - 五子棋/围棋/象棋/贪吃蛇</title>
   <style>
@@ -4169,7 +4170,7 @@
   <script src="replay-module.js"></script>
   <script>
     // 版本号 (语义化版本: MAJOR.MINOR.PATCH)
-    const CLIENT_VERSION = '1.5.0';
+    const CLIENT_VERSION = '1.6.0';
 
     // 全局游戏变量
     let currentGame = 'gobang'; // 当前选择的棋种：gobang, go, chess, snake
@@ -8551,8 +8552,8 @@
           game: currentGame,
           fromR: parseInt(fromR),
           fromC: parseInt(fromC),
-          toR: toR,
-          toC: toC,
+          toR: parseInt(toR),
+          toC: parseInt(toC),
           color: gameState.turn,
           piece: piece.dataset.name,
           to: matchedOpponentId,
@@ -8562,7 +8563,7 @@
         // AI对战，发送移动给服务器
         if (socket) {
           socket.emit('ai_move', {
-            position: { fromR: parseInt(fromR), fromC: parseInt(fromC), toR: toR, toC: toC, piece: piece.dataset.name }
+            position: { fromR: parseInt(fromR), fromC: parseInt(fromC), toR: parseInt(toR), toC: parseInt(toC), piece: piece.dataset.name }
           });
         }
       }
