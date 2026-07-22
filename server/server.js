@@ -527,8 +527,8 @@ app.post('/api/auth/verify', (req, res) => {
     return res.json({ success: false, message: '缺少Token' });
   }
 
-  // 验证token是否与配置中的adminToken匹配
-  if (token === config.adminToken) {
+  // 验证token是否与配置中的管理员Token匹配
+  if (token === config.admin.token || (adminManager && adminManager.verifyToken(token))) {
     res.json({ success: true, message: 'Token有效' });
   } else {
     res.json({ success: false, message: 'Token无效' });

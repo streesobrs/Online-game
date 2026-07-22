@@ -494,69 +494,52 @@
       color: #fff;
     }
 
-    .dropdown {
-      position: relative;
-      display: inline-block;
+
+
+    .action-group {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      flex-wrap: wrap;
     }
 
-    .dropdown-toggle {
-      background: #1e293b;
-      border: 1px solid #334155;
-      color: #94a3b8;
-      padding: 4px 8px;
+    .action-btn {
+      width: 28px;
+      height: 28px;
       border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-      line-height: 1;
-      transition: all 0.2s;
-    }
-
-    .dropdown-toggle:hover,
-    .dropdown-toggle.active {
-      background: #334155;
-      color: #e2e8f0;
-    }
-
-    .dropdown-menu {
-      display: none;
-      position: absolute;
-      right: 0;
-      top: 100%;
-      margin-top: 4px;
-      background: #1e293b;
       border: 1px solid #334155;
-      border-radius: 6px;
-      min-width: 160px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-      z-index: 1000;
-      padding: 4px 0;
-    }
-
-    .dropdown-menu.open {
-      display: block;
-    }
-
-    .dropdown-item {
-      display: block;
-      width: 100%;
-      padding: 8px 14px;
-      text-align: left;
-      background: none;
-      border: none;
-      color: #cbd5e1;
-      font-size: 12px;
+      background: #1e293b;
+      color: #94a3b8;
+      font-size: 14px;
       cursor: pointer;
-      transition: background 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
     }
 
-    .dropdown-item:hover {
+    .action-btn:hover {
       background: #334155;
       color: #e2e8f0;
+      border-color: #475569;
     }
 
-    .dropdown-item.delete:hover {
-      background: #450a0a;
+    .action-btn-success {
+      border-color: #22c55e;
+      color: #22c55e;
+    }
+
+    .action-btn-success:hover {
+      background: rgba(34, 197, 94, 0.15);
+    }
+
+    .action-btn-danger {
+      border-color: #ef4444;
       color: #ef4444;
+    }
+
+    .action-btn-danger:hover {
+      background: rgba(239, 68, 68, 0.15);
     }
 
     .detail-stat-card {
@@ -1381,8 +1364,10 @@
       width: 500px;
       max-width: 90vw;
       max-height: 90vh;
-      overflow: hidden;
+      overflow-y: auto;
+      overflow-x: visible;
       border: 1px solid #334155;
+      position: relative;
     }
 
     .modal-header {
@@ -5892,23 +5877,6 @@
         const statusBadge = acc.account?.isBanned ? 'badge-danger' : onlineClass;
         const accId = acc.account?.id || acc.id;
 
-        let menuItems = '';
-        menuItems += `<button class="dropdown-item" onclick="viewAccountDetail('${accId}')">📋 详情</button>`;
-        if (!acc.account?.isAdmin) {
-          menuItems += `<button class="dropdown-item" onclick="upgradeToAdmin('${accId}')">🔱 设为管理员</button>`;
-        } else {
-          menuItems += `<button class="dropdown-item" onclick="downgradeFromAdmin('${accId}')">🔻 取消管理</button>`;
-        }
-        if (!acc.account?.isBanned) {
-          menuItems += `<button class="dropdown-item" onclick="banAccount('${accId}')">⛔ 封禁</button>`;
-        } else {
-          menuItems += `<button class="dropdown-item" onclick="unbanAccount('${accId}')">✅ 解封</button>`;
-        }
-        menuItems += `<button class="dropdown-item" onclick="showPasswordResetModal('${accId}')">🔑 重置密码</button>`;
-        menuItems += `<button class="dropdown-item" onclick="showExpManagement('${accId}')">📊 经验管理</button>`;
-        menuItems += `<button class="dropdown-item" onclick="showAchievementManagement('${accId}')">🏆 成就管理</button>`;
-        menuItems += `<button class="dropdown-item delete" onclick="deleteAccount('${accId}')">🗑️ 删除账号</button>`;
-
         return `
       <tr>
         <td style="font-family:monospace;font-size:11px;color:#94a3b8;">${accId?.substr(0, 8) || '-'}</td>
@@ -5920,12 +5888,7 @@
         <td>Lv.${level}</td>
         <td style="font-size:11px;color:#64748b;">${formatTime(acc.account?.lastLogin)}</td>
         <td>
-          <div class="dropdown" id="dropdown-${accId}">
-            <button class="dropdown-toggle" onclick="toggleDropdown(event, 'dropdown-${accId}')">⚙️</button>
-            <div class="dropdown-menu" id="dropdown-menu-${accId}">
-              ${menuItems}
-            </div>
-          </div>
+          <button class="btn btn-sm btn-secondary" onclick="showAccountActions('${accId}', '${acc.account?.nickname || acc.account?.username || '-'}')">操作</button>
         </td>
       </tr>
     `;
@@ -7809,45 +7772,49 @@
       }).join('');
     }
 
-    // ==================== 下拉菜单控制 ====================
-    function toggleDropdown(event, dropdownId) {
-      if (event) {
-        event.stopPropagation();
-      }
-      const dropdown = document.getElementById(dropdownId);
-      if (!dropdown) return;
-      const menu = dropdown.querySelector('.dropdown-menu');
-      const toggle = dropdown.querySelector('.dropdown-toggle');
-      if (!menu || !toggle) return;
+    // ==================== 账号操作模态框 ====================
+    function showAccountActions(accountId, nickname) {
+      socket.emit('get_account_detail', { id: accountId });
+      socket.once('admin_account_detail', (data) => {
+        const account = data.account || {};
+        const isAdmin = account.isAdmin || false;
+        const isBanned = account.isBanned || false;
 
-      const isOpen = menu.classList.contains('open');
-      closeAllDropdowns();
-      if (!isOpen) {
-        menu.classList.add('open');
-        toggle.classList.add('active');
-      }
-    }
+        showModal(`${nickname} - 账号操作`, `
+          <div style="padding: 20px;">
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 24px;">
+              <div class="detail-stat-card">
+                <div class="detail-stat-value">${account.profile?.level || 1}</div>
+                <div class="detail-stat-label">等级</div>
+              </div>
+              <div class="detail-stat-card">
+                <div class="detail-stat-value">${account.profile?.exp || 0}</div>
+                <div class="detail-stat-label">经验值</div>
+              </div>
+            </div>
 
-    function closeAllDropdowns() {
-      document.querySelectorAll('.dropdown-menu.open').forEach(menu => {
-        menu.classList.remove('open');
+            <div class="detail-card">
+              <div class="detail-card-header">🔐 基础操作</div>
+              <div class="action-group" style="padding: 12px;">
+                <button onclick="viewAccountDetail('${accountId}')" class="detail-btn detail-btn-primary">📋 查看详情</button>
+                ${!isAdmin ? `<button onclick="upgradeToAdmin('${accountId}')" class="detail-btn detail-btn-warning">🔱 设管理员</button>` : `<button onclick="downgradeFromAdmin('${accountId}')" class="detail-btn detail-btn-secondary">🔻 取消管理</button>`}
+                ${!isBanned ? `<button onclick="banAccount('${accountId}')" class="detail-btn detail-btn-danger">⛔ 封禁</button>` : `<button onclick="unbanAccount('${accountId}')" class="detail-btn detail-btn-success">✅ 解封</button>`}
+              </div>
+            </div>
+
+            <div class="detail-card" style="margin-top: 12px;">
+              <div class="detail-card-header">⚙️ 高级操作</div>
+              <div class="action-group" style="padding: 12px;">
+                <button onclick="showPasswordResetModal('${accountId}')" class="detail-btn detail-btn-secondary">🔑 重置密码</button>
+                <button onclick="showExpManagement('${accountId}')" class="detail-btn detail-btn-secondary">📊 经验管理</button>
+                <button onclick="showAchievementManagement('${accountId}')" class="detail-btn detail-btn-secondary">🏆 成就管理</button>
+                <button onclick="deleteAccount('${accountId}')" class="detail-btn detail-btn-danger" style="background: #7f1d1d;">🗑️ 删除账号</button>
+              </div>
+            </div>
+          </div>
+        `, [{ text: '关闭', class: 'btn-secondary', action: closeModal }]);
       });
-      document.querySelectorAll('.dropdown-toggle.active').forEach(toggle => {
-        toggle.classList.remove('active');
-      });
     }
-
-    document.addEventListener('click', function (e) {
-      if (!e.target.closest('.dropdown')) {
-        closeAllDropdowns();
-      }
-    });
-
-    document.addEventListener('click', function (e) {
-      if (e.target.closest('.dropdown-item')) {
-        closeAllDropdowns();
-      }
-    }, true);
 
     // ==================== 模态框内容显示函数 ====================
     function showAccountDetailModal(data) {
@@ -7970,18 +7937,13 @@
 
           <div class="detail-card" style="margin-top: 12px;">
             <div class="detail-card-header">⚙️ 账号操作</div>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <div class="action-group">
               ${!isBanned ? `<button onclick="banAccount('${accId}')" class="detail-btn detail-btn-danger">⛔ 封禁</button>` : `<button onclick="unbanAccount('${accId}')" class="detail-btn detail-btn-success">✅ 解封</button>`}
               ${!isAdmin ? `<button onclick="upgradeToAdmin('${accId}')" class="detail-btn detail-btn-warning">🔱 设管理员</button>` : `<button onclick="downgradeFromAdmin('${accId}')" class="detail-btn detail-btn-secondary">🔻 取消管理</button>`}
               <button onclick="showPasswordResetModal('${accId}')" class="detail-btn detail-btn-primary">🔑 重置密码</button>
-              <div class="dropdown" id="detail-more-${accId}">
-                <button class="detail-btn detail-btn-secondary" onclick="toggleDropdown(event, 'detail-more-${accId}')">更多 ▼</button>
-                <div class="dropdown-menu" id="detail-more-menu-${accId}">
-                  <button class="dropdown-item" onclick="showExpManagement('${accId}')">📊 经验管理</button>
-                  <button class="dropdown-item" onclick="showAchievementManagement('${accId}')">🏆 成就管理</button>
-                  <button class="dropdown-item delete" onclick="deleteAccount('${accId}')">🗑️ 删除账号</button>
-                </div>
-              </div>
+              <button onclick="showExpManagement('${accId}')" class="detail-btn detail-btn-secondary">📊 经验管理</button>
+              <button onclick="showAchievementManagement('${accId}')" class="detail-btn detail-btn-secondary">🏆 成就管理</button>
+              <button onclick="deleteAccount('${accId}')" class="detail-btn detail-btn-danger" style="background: #7f1d1d;">🗑️ 删除账号</button>
             </div>
           </div>
         </div>

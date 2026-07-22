@@ -778,6 +778,11 @@
             font-weight: 600;
         }
 
+        .status-warning {
+            color: var(--warning-text, #d69e2e);
+            font-weight: 600;
+        }
+
         .time-info {
             color: var(--text-muted);
         }
@@ -1019,7 +1024,7 @@
                             method: 'GET',
                             path: '/admin',
                             name: '管理后台页面',
-                            description: '管理后台页面，用于管理用户、游戏和系统设置',
+                            description: '返回管理后台HTML页面，用于管理用户、游戏和系统设置',
                             params: [],
                             response: '{ /* 页面HTML */ }'
                         },
@@ -1027,7 +1032,7 @@
                             method: 'GET',
                             path: '/docs',
                             name: 'API文档页面',
-                            description: 'API文档页面，包含所有接口的详细说明',
+                            description: '返回API文档HTML页面，包含所有接口的详细说明',
                             params: [],
                             response: '{ /* 页面HTML */ }'
                         },
@@ -1035,7 +1040,7 @@
                             method: 'GET',
                             path: '/health',
                             name: '健康检查',
-                            description: '用于监控服务器状态的健康检查接口，返回服务器的运行状态、时间戳和运行时间。',
+                            description: '用于监控服务器状态的健康检查接口，返回服务器的运行状态、时间戳和运行时间',
                             params: [],
                             response: '{\n  "status": "ok",\n  "timestamp": 1713456789000,\n  "uptime": 3600000\n}'
                         },
@@ -1043,15 +1048,15 @@
                             method: 'GET',
                             path: '/version',
                             name: '版本信息',
-                            description: '返回服务器当前版本信息',
+                            description: '返回服务器当前版本号和构建号',
                             params: [],
-                            response: '{\n  "version": "1.2.0",\n  "build": 1780,\n  "timestamp": 1713456789000\n}'
+                            response: '{\n  "version": "1.3.0",\n  "build": 212,\n  "timestamp": 1713456789000\n}'
                         },
                         {
                             method: 'GET',
                             path: '/api/status',
                             name: '系统状态',
-                            description: '返回在线用户数、等待用户数等系统信息',
+                            description: '返回在线用户数、等待匹配数等实时系统信息',
                             params: [],
                             response: '{\n  "onlineUsers": 10,\n  "waitingUsers": 2,\n  "playingUsers": 5,\n  "totalConnections": 100,\n  "peakOnline": 15,\n  "timestamp": 1713456789000\n}'
                         }
@@ -1065,11 +1070,55 @@
                             method: 'POST',
                             path: '/api/auth/verify',
                             name: '验证管理Token',
-                            description: '验证管理Token是否有效',
+                            description: '验证管理员Token是否有效',
                             params: [
-                                { name: 'token', type: 'string', required: true, description: '管理Token' }
+                                { name: 'token', type: 'string', required: true, description: '管理员Token' }
                             ],
                             response: '{\n  "success": true,\n  "message": "Token有效"\n}'
+                        }
+                    ]
+                },
+                {
+                    name: '用户API',
+                    icon: 'fas fa-user-friends',
+                    items: [
+                        {
+                            method: 'GET',
+                            path: '/api/users/online',
+                            name: '获取在线用户',
+                            description: '获取当前在线的所有用户列表，包含昵称、游戏状态等信息',
+                            params: [],
+                            response: '{\n  "success": true,\n  "data": [\n    {\n      "userId": "user1",\n      "nickname": "玩家1",\n      "loginType": "account",\n      "gameType": "chess",\n      "status": "playing"\n    }\n  ],\n  "count": 1\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/users/search',
+                            name: '搜索用户',
+                            description: '根据关键词搜索在线用户',
+                            params: [
+                                { name: 'keyword', type: 'string', required: true, description: '搜索关键词' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": [],\n  "count": 0\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/profile/:accountId',
+                            name: '获取个人资料',
+                            description: '获取指定账号的完整个人资料，包含等级、成就、游戏统计、货币等信息',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": {\n    "account": {},\n    "stats": {},\n    "achievements": [],\n    "currency": {}\n  }\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/buffs/:userId',
+                            name: '获取用户Buff',
+                            description: '获取指定用户的活跃Buff列表',
+                            params: [
+                                { name: 'userId', type: 'string', required: true, description: '用户ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": []\n}'
                         }
                     ]
                 },
@@ -1081,18 +1130,48 @@
                             method: 'GET',
                             path: '/api/leaderboard',
                             name: '排行榜',
-                            description: '返回玩家排名信息',
+                            description: '返回玩家排名信息，支持按游戏类型筛选',
                             params: [
                                 { name: 'limit', type: 'number', required: false, default: '10', description: '返回数量' },
-                                { name: 'gameType', type: 'string', required: false, default: 'null', description: '游戏类型' }
+                                { name: 'gameType', type: 'string', required: false, default: 'all', description: '游戏类型' }
                             ],
                             response: '{\n  "success": true,\n  "data": [\n    {\n      "id": "user1",\n      "nickname": "玩家1",\n      "score": 1000,\n      "winrate": "80%"\n    }\n  ]\n}'
                         },
                         {
                             method: 'GET',
+                            path: '/api/games/history',
+                            name: '获取游戏历史',
+                            description: '获取用户的游戏历史记录，支持分页',
+                            params: [
+                                { name: 'userId', type: 'string', required: false, description: '用户ID' },
+                                { name: 'limit', type: 'number', required: false, default: '20', description: '返回数量' },
+                                { name: 'offset', type: 'number', required: false, default: '0', description: '偏移量' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": [],\n  "pagination": {\n    "limit": 20,\n    "offset": 0\n  }\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/games/replay/:id',
+                            name: '获取游戏回放',
+                            description: '获取指定游戏的完整回放数据',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '游戏ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": {\n    "gameId": "game1",\n    "moves": []\n  }\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/games/stats',
+                            name: '获取游戏统计',
+                            description: '获取游戏活跃对局数、在线用户数等统计信息',
+                            params: [],
+                            response: '{\n  "success": true,\n  "data": {\n    "activeGames": 5,\n    "onlineUsers": 10,\n    "timestamp": 1713456789000\n  }\n}'
+                        },
+                        {
+                            method: 'GET',
                             path: '/api/spectate/games',
                             name: '可观战游戏列表',
-                            description: '返回当前可观看的游戏',
+                            description: '返回当前可以观战的所有游戏列表',
                             params: [],
                             response: '{\n  "success": true,\n  "data": [\n    {\n      "gameId": "game1",\n      "gameType": "chess",\n      "players": ["玩家1", "玩家2"],\n      "status": "playing"\n    }\n  ]\n}'
                         }
@@ -1106,7 +1185,7 @@
                             method: 'GET',
                             path: '/api/themes',
                             name: '获取所有主题',
-                            description: '获取所有可用的棋盘主题',
+                            description: '获取所有可用的棋盘主题列表',
                             params: [],
                             response: '{\n  "success": true,\n  "data": [\n    {\n      "id": "default",\n      "name": "默认主题",\n      "description": "默认棋盘主题"\n    },\n    {\n      "id": "ocean",\n      "name": "海洋主题",\n      "description": "蓝色海洋风格"\n    }\n  ]\n}'
                         },
@@ -1114,7 +1193,7 @@
                             method: 'GET',
                             path: '/api/themes/:id',
                             name: '获取单个主题',
-                            description: '获取指定ID的主题详情',
+                            description: '获取指定ID的主题详情，包含颜色配置',
                             params: [
                                 { name: 'id', type: 'string', required: true, description: '主题ID' }
                             ],
@@ -1135,7 +1214,7 @@
                             method: 'PUT',
                             path: '/api/themes/:id',
                             name: '更新主题',
-                            description: '更新指定ID的主题（需管理员权限）',
+                            description: '更新指定ID的主题信息（需管理员权限）',
                             params: [
                                 { name: 'id', type: 'string', required: true, description: '主题ID' },
                                 { name: 'name', type: 'string', required: false, description: '主题名称' },
@@ -1160,6 +1239,104 @@
                             description: '重新加载所有主题配置（需管理员权限）',
                             params: [],
                             response: '{\n  "success": true,\n  "message": "主题重新加载成功"\n}'
+                        }
+                    ]
+                },
+                {
+                    name: '聊天API',
+                    icon: 'fas fa-comments',
+                    items: [
+                        {
+                            method: 'GET',
+                            path: '/api/chat/history',
+                            name: '获取聊天历史',
+                            description: '获取聊天历史记录，支持按范围筛选',
+                            params: [
+                                { name: 'scope', type: 'string', required: false, default: 'global', description: '范围：global/game' },
+                                { name: 'gameId', type: 'string', required: false, description: '游戏ID（scope为game时必填）' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": [],\n  "scope": "global",\n  "gameId": null\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/chat/broadcast',
+                            name: '广播消息',
+                            description: '向所有用户发送系统广播消息（需管理员权限）',
+                            params: [
+                                { name: 'message', type: 'string', required: true, description: '广播消息内容' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "广播发送成功"\n}'
+                        }
+                    ]
+                },
+                {
+                    name: '成就API',
+                    icon: 'fas fa-trophy',
+                    items: [
+                        {
+                            method: 'GET',
+                            path: '/api/achievements',
+                            name: '获取所有成就',
+                            description: '获取所有成就列表',
+                            params: [],
+                            response: '{\n  "success": true,\n  "data": [\n    {\n      "id": "first_win",\n      "name": "首胜",\n      "description": "赢得第一场游戏"\n    }\n  ],\n  "count": 1\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/achievements/:id',
+                            name: '获取成就详情',
+                            description: '获取指定成就的详细信息',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '成就ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": {\n    "id": "first_win",\n    "name": "首胜",\n    "description": "赢得第一场游戏",\n    "reward": 100\n  }\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/achievements/:id/award',
+                            name: '授予用户成就',
+                            description: '给指定用户添加成就（需管理员权限）',
+                            params: [
+                                { name: 'userId', type: 'string', required: true, description: '用户ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "成就添加成功"\n}'
+                        }
+                    ]
+                },
+                {
+                    name: '排行榜API',
+                    icon: 'fas fa-list-ol',
+                    items: [
+                        {
+                            method: 'GET',
+                            path: '/api/leaderboard/games',
+                            name: '按游戏类型获取排行榜',
+                            description: '根据游戏类型获取排行榜数据',
+                            params: [
+                                { name: 'type', type: 'string', required: false, default: 'all', description: '游戏类型' },
+                                { name: 'limit', type: 'number', required: false, default: '20', description: '返回数量' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": [],\n  "gameType": "all"\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/leaderboard/daily',
+                            name: '获取每日排行榜',
+                            description: '获取每日排行榜数据',
+                            params: [
+                                { name: 'limit', type: 'number', required: false, default: '20', description: '返回数量' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": [],\n  "period": "daily"\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/leaderboard/weekly',
+                            name: '获取周排行榜',
+                            description: '获取周排行榜数据',
+                            params: [
+                                { name: 'limit', type: 'number', required: false, default: '20', description: '返回数量' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": [],\n  "period": "weekly"\n}'
                         }
                     ]
                 },
@@ -1212,93 +1389,6 @@
                     ]
                 },
                 {
-                    name: '用户API',
-                    icon: 'fas fa-user-friends',
-                    items: [
-                        {
-                            method: 'GET',
-                            path: '/api/users/online',
-                            name: '获取在线用户',
-                            description: '获取当前在线的所有用户列表',
-                            params: [],
-                            response: '{\n  "success": true,\n  "data": [\n    {\n      "userId": "user1",\n      "nickname": "玩家1",\n      "loginType": "account",\n      "gameType": "chess",\n      "status": "playing"\n    }\n  ],\n  "count": 1\n}'
-                        },
-                        {
-                            method: 'GET',
-                            path: '/api/users/search',
-                            name: '搜索用户',
-                            description: '根据关键词搜索用户',
-                            params: [
-                                { name: 'keyword', type: 'string', required: true, description: '搜索关键词' }
-                            ],
-                            response: '{\n  "success": true,\n  "data": [],\n  "count": 0\n}'
-                        }
-                    ]
-                },
-                {
-                    name: '游戏扩展API',
-                    icon: 'fas fa-chess',
-                    items: [
-                        {
-                            method: 'GET',
-                            path: '/api/games/history',
-                            name: '获取游戏历史',
-                            description: '获取用户的游戏历史记录',
-                            params: [
-                                { name: 'userId', type: 'string', required: false, description: '用户ID' },
-                                { name: 'limit', type: 'number', required: false, default: '20', description: '返回数量' },
-                                { name: 'offset', type: 'number', required: false, default: '0', description: '偏移量' }
-                            ],
-                            response: '{\n  "success": true,\n  "data": [],\n  "pagination": {\n    "limit": 20,\n    "offset": 0\n  }\n}'
-                        },
-                        {
-                            method: 'GET',
-                            path: '/api/games/replay/:id',
-                            name: '获取游戏回放',
-                            description: '获取指定游戏的回放数据',
-                            params: [
-                                { name: 'id', type: 'string', required: true, description: '游戏ID' }
-                            ],
-                            response: '{\n  "success": true,\n  "data": {\n    "gameId": "game1",\n    "moves": []\n  }\n}'
-                        },
-                        {
-                            method: 'GET',
-                            path: '/api/games/stats',
-                            name: '获取游戏统计',
-                            description: '获取游戏统计数据',
-                            params: [],
-                            response: '{\n  "success": true,\n  "data": {\n    "activeGames": 5,\n    "onlineUsers": 10,\n    "timestamp": 1713456789000\n  }\n}'
-                        }
-                    ]
-                },
-                {
-                    name: '聊天API',
-                    icon: 'fas fa-comments',
-                    items: [
-                        {
-                            method: 'GET',
-                            path: '/api/chat/history',
-                            name: '获取聊天历史',
-                            description: '获取聊天历史记录',
-                            params: [
-                                { name: 'scope', type: 'string', required: false, default: 'global', description: '范围：global/game' },
-                                { name: 'gameId', type: 'string', required: false, description: '游戏ID（scope为game时必填）' }
-                            ],
-                            response: '{\n  "success": true,\n  "data": [],\n  "scope": "global",\n  "gameId": null\n}'
-                        },
-                        {
-                            method: 'POST',
-                            path: '/api/chat/broadcast',
-                            name: '广播消息',
-                            description: '向所有用户发送广播消息（需管理员权限）',
-                            params: [
-                                { name: 'message', type: 'string', required: true, description: '广播消息内容' }
-                            ],
-                            response: '{\n  "success": true,\n  "message": "广播发送成功"\n}'
-                        }
-                    ]
-                },
-                {
                     name: '系统管理API',
                     icon: 'fas fa-server',
                     items: [
@@ -1306,7 +1396,7 @@
                             method: 'GET',
                             path: '/api/system/logs',
                             name: '获取系统日志',
-                            description: '获取系统日志（需管理员权限）',
+                            description: '获取系统日志列表，支持按类型筛选（需管理员权限）',
                             params: [
                                 { name: 'type', type: 'string', required: false, description: '日志类型筛选' },
                                 { name: 'limit', type: 'number', required: false, default: '100', description: '返回数量' }
@@ -1335,73 +1425,485 @@
                     ]
                 },
                 {
-                    name: '成就API',
-                    icon: 'fas fa-trophy',
+                    name: '反馈系统API',
+                    icon: 'fas fa-bug',
                     items: [
                         {
                             method: 'GET',
-                            path: '/api/achievements',
-                            name: '获取所有成就',
-                            description: '获取所有成就列表',
+                            path: '/api/feedbacks',
+                            name: '获取反馈列表',
+                            description: '获取所有用户提交的反馈列表',
                             params: [],
-                            response: '{\n  "success": true,\n  "data": [\n    {\n      "id": "first_win",\n      "name": "首胜",\n      "description": "赢得第一场游戏"\n    }\n  ],\n  "count": 1\n}'
-                        },
-                        {
-                            method: 'GET',
-                            path: '/api/achievements/:id',
-                            name: '获取成就详情',
-                            description: '获取指定成就的详细信息',
-                            params: [
-                                { name: 'id', type: 'string', required: true, description: '成就ID' }
-                            ],
-                            response: '{\n  "success": true,\n  "data": {\n    "id": "first_win",\n    "name": "首胜",\n    "description": "赢得第一场游戏",\n    "reward": 100\n  }\n}'
+                            response: '{\n  "success": true,\n  "data": [],\n  "count": 0\n}'
                         },
                         {
                             method: 'POST',
-                            path: '/api/achievements/:id/award',
-                            name: '授予用户成就',
-                            description: '给用户添加成就（需管理员权限）',
+                            path: '/api/feedbacks',
+                            name: '提交反馈',
+                            description: '提交新的反馈或建议',
                             params: [
-                                { name: 'userId', type: 'string', required: true, description: '用户ID' }
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' },
+                                { name: 'nickname', type: 'string', required: true, description: '用户昵称' },
+                                { name: 'title', type: 'string', required: true, description: '反馈标题' },
+                                { name: 'content', type: 'string', required: true, description: '反馈内容' }
                             ],
-                            response: '{\n  "success": true,\n  "message": "成就添加成功"\n}'
+                            response: '{\n  "success": true,\n  "message": "反馈提交成功"\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/feedbacks/:id/vote',
+                            name: '投票反馈',
+                            description: '对反馈进行投票（支持/反对）',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '反馈ID' },
+                                { name: 'vote', type: 'string', required: true, description: '投票类型：up/down' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "投票成功"\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/feedbacks/:id/comments',
+                            name: '添加反馈评论',
+                            description: '对反馈添加评论',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '反馈ID' },
+                                { name: 'content', type: 'string', required: true, description: '评论内容' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "评论添加成功"\n}'
+                        },
+                        {
+                            method: 'PUT',
+                            path: '/api/feedbacks/:id/status',
+                            name: '更新反馈状态',
+                            description: '更新反馈处理状态（需管理员权限）',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '反馈ID' },
+                                { name: 'status', type: 'string', required: true, description: '状态：pending/processing/resolved/closed' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "状态更新成功"\n}'
                         }
                     ]
                 },
                 {
-                    name: '排行榜扩展API',
-                    icon: 'fas fa-list-ol',
+                    name: '商店/商城API',
+                    icon: 'fas fa-shopping-cart',
                     items: [
                         {
                             method: 'GET',
-                            path: '/api/leaderboard/games',
-                            name: '按游戏类型获取排行榜',
-                            description: '根据游戏类型获取排行榜',
+                            path: '/api/shop/data',
+                            name: '获取商店数据',
+                            description: '获取商店商品列表及用户已购买物品',
+                            params: [],
+                            response: '{\n  "success": true,\n  "data": {\n    "items": [],\n    "userItems": []\n  }\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/shop/buy',
+                            name: '购买物品',
+                            description: '购买商店中的物品',
                             params: [
-                                { name: 'type', type: 'string', required: false, default: 'all', description: '游戏类型' },
-                                { name: 'limit', type: 'number', required: false, default: '20', description: '返回数量' }
+                                { name: 'userId', type: 'string', required: true, description: '用户ID' },
+                                { name: 'itemId', type: 'string', required: true, description: '物品ID' },
+                                { name: 'quantity', type: 'number', required: true, description: '购买数量' }
                             ],
-                            response: '{\n  "success": true,\n  "data": [],\n  "gameType": "all"\n}'
+                            response: '{\n  "success": true,\n  "message": "购买成功"\n}'
                         },
                         {
                             method: 'GET',
-                            path: '/api/leaderboard/daily',
-                            name: '获取每日排行榜',
-                            description: '获取每日排行榜',
-                            params: [
-                                { name: 'limit', type: 'number', required: false, default: '20', description: '返回数量' }
-                            ],
-                            response: '{\n  "success": true,\n  "data": [],\n  "period": "daily"\n}'
+                            path: '/api/shop/inventory',
+                            name: '获取背包',
+                            description: '获取用户背包中的物品列表',
+                            params: [],
+                            response: '{\n  "success": true,\n  "data": []\n}'
                         },
                         {
                             method: 'GET',
-                            path: '/api/leaderboard/weekly',
-                            name: '获取周排行榜',
-                            description: '获取周排行榜',
+                            path: '/api/shop/cosmetics',
+                            name: '获取外观列表',
+                            description: '获取用户已购买的装扮外观',
+                            params: [],
+                            response: '{\n  "success": true,\n  "data": []\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/shop/cosmetics/equip',
+                            name: '装备外观',
+                            description: '装备或切换用户装扮外观',
                             params: [
-                                { name: 'limit', type: 'number', required: false, default: '20', description: '返回数量' }
+                                { name: 'userId', type: 'string', required: true, description: '用户ID' },
+                                { name: 'category', type: 'string', required: true, description: '外观分类' },
+                                { name: 'cosmeticId', type: 'string', required: true, description: '外观ID' }
                             ],
-                            response: '{\n  "success": true,\n  "data": [],\n  "period": "weekly"\n}'
+                            response: '{\n  "success": true,\n  "message": "装备成功"\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/shop/cosmetics/config',
+                            name: '获取外观配置',
+                            description: '获取所有外观配置信息',
+                            params: [],
+                            response: '{\n  "success": true,\n  "data": {}\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/shop/vip',
+                            name: '获取会员信息',
+                            description: '获取用户会员等级和权益信息',
+                            params: [],
+                            response: '{\n  "success": true,\n  "data": {\n    "level": 0,\n    "exp": 0\n  }\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/shop/use-item',
+                            name: '使用道具',
+                            description: '在游戏中使用背包中的道具',
+                            params: [
+                                { name: 'userId', type: 'string', required: true, description: '用户ID' },
+                                { name: 'itemId', type: 'string', required: true, description: '物品ID' },
+                                { name: 'quantity', type: 'number', required: false, default: '1', description: '使用数量' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "使用成功"\n}'
+                        }
+                    ]
+                },
+                {
+                    name: '更新系统API',
+                    icon: 'fas fa-cloud-upload-alt',
+                    items: [
+                        {
+                            method: 'GET',
+                            path: '/api/update/status',
+                            name: '获取更新状态',
+                            description: '获取当前系统更新状态（需管理员权限）',
+                            params: [],
+                            response: '{\n  "success": true,\n  "data": {\n    "isUpdating": false,\n    "currentVersion": "1.3.0",\n    "error": null\n  }\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/update/backups',
+                            name: '获取备份列表',
+                            description: '获取所有更新备份列表（需管理员权限）',
+                            params: [],
+                            response: '{\n  "success": true,\n  "data": []\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/update/diff',
+                            name: '查看文件差异',
+                            description: '获取备份中指定文件的修改差异（需管理员权限）',
+                            params: [
+                                { name: 'backupName', type: 'string', required: true, description: '备份名称' },
+                                { name: 'filename', type: 'string', required: true, description: '文件名' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": {\n    "diff": ""\n  }\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/update/upload',
+                            name: '上传更新包',
+                            description: '上传ZIP格式的更新包（需管理员权限）',
+                            params: [
+                                { name: 'file', type: 'file', required: true, description: 'ZIP更新包文件' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "上传成功"\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/update/start',
+                            name: '开始更新',
+                            description: '启动系统更新流程（需管理员权限）',
+                            params: [],
+                            response: '{\n  "success": true,\n  "message": "更新已启动"\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/update/cancel',
+                            name: '取消更新',
+                            description: '取消正在进行的更新（需管理员权限）',
+                            params: [],
+                            response: '{\n  "success": true,\n  "message": "更新已取消"\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/update/rollback',
+                            name: '回滚更新',
+                            description: '回滚到指定备份版本（需管理员权限）',
+                            params: [
+                                { name: 'backupName', type: 'string', required: true, description: '备份名称' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "回滚成功"\n}'
+                        },
+                        {
+                            method: 'DELETE',
+                            path: '/api/update/backup/:name',
+                            name: '删除备份',
+                            description: '删除指定名称的更新备份（需管理员权限）',
+                            params: [
+                                { name: 'name', type: 'string', required: true, description: '备份名称' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "备份已删除"\n}'
+                        }
+                    ]
+                },
+                {
+                    name: '管理员API',
+                    icon: 'fas fa-user-shield',
+                    items: [
+                        {
+                            method: 'GET',
+                            path: '/api/admin/games',
+                            name: '获取所有对局',
+                            description: '获取所有对局记录，支持分页和筛选（需管理员权限）',
+                            params: [
+                                { name: 'limit', type: 'number', required: false, default: '50', description: '返回数量' },
+                                { name: 'offset', type: 'number', required: false, default: '0', description: '偏移量' },
+                                { name: 'gameType', type: 'string', required: false, description: '游戏类型筛选' },
+                                { name: 'result', type: 'string', required: false, description: '结果筛选' },
+                                { name: 'keyword', type: 'string', required: false, description: '搜索关键词' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": [],\n  "pagination": {}\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/admin/operation-logs',
+                            name: '获取操作日志',
+                            description: '获取管理员操作日志，支持筛选和分页（需管理员权限）',
+                            params: [
+                                { name: 'limit', type: 'number', required: false, default: '50', description: '返回数量' },
+                                { name: 'offset', type: 'number', required: false, default: '0', description: '偏移量' },
+                                { name: 'username', type: 'string', required: false, description: '操作用户' },
+                                { name: 'action', type: 'string', required: false, description: '操作类型' },
+                                { name: 'category', type: 'string', required: false, description: '操作分类' },
+                                { name: 'startDate', type: 'string', required: false, description: '开始日期' },
+                                { name: 'endDate', type: 'string', required: false, description: '结束日期' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": [],\n  "pagination": {}\n}'
+                        }
+                    ]
+                },
+                {
+                    name: '头像管理API',
+                    icon: 'fas fa-user-circle',
+                    items: [
+                        {
+                            method: 'POST',
+                            path: '/api/avatar/upload',
+                            name: '上传头像',
+                            description: '上传自定义头像图片',
+                            params: [
+                                { name: 'file', type: 'file', required: true, description: '头像图片文件' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "上传成功",\n  "url": ""\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/avatar/delete',
+                            name: '删除头像',
+                            description: '删除已上传的自定义头像',
+                            params: [
+                                { name: 'avatarUrl', type: 'string', required: true, description: '头像URL' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "删除成功"\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/avatar/rename',
+                            name: '重命名头像',
+                            description: '重命名自定义头像',
+                            params: [
+                                { name: 'oldName', type: 'string', required: true, description: '原名称' },
+                                { name: 'newName', type: 'string', required: true, description: '新名称' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "重命名成功"\n}'
+                        }
+                    ]
+                },
+                {
+                    name: '货币/星钻API',
+                    icon: 'fas fa-coins',
+                    items: [
+                        {
+                            method: 'GET',
+                            path: '/api/currency/balance',
+                            name: '获取星钻余额',
+                            description: '获取当前登录用户的星钻余额',
+                            params: [],
+                            response: '{\n  "success": true,\n  "data": {\n    "balance": 1000\n  }\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/currency/:accountId',
+                            name: '获取指定星钻',
+                            description: '获取指定账号的星钻余额',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": {\n    "balance": 1000\n  }\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/currency/:accountId/transactions',
+                            name: '获取星钻记录',
+                            description: '获取指定账号的星钻交易记录',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": []\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/currency/:accountId/exp-transactions',
+                            name: '获取经验记录',
+                            description: '获取指定账号的经验交易记录',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": []\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/currency/compensate',
+                            name: '触发星钻补偿',
+                            description: '触发老玩家星钻补偿（仅执行一次）',
+                            params: [],
+                            response: '{\n  "success": true,\n  "message": "补偿已发放"\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/currency/:accountId/compensation',
+                            name: '查询补偿状态',
+                            description: '查询指定账号的星钻补偿状态',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": {\n    "compensated": true\n  }\n}'
+                        }
+                    ]
+                },
+                {
+                    name: '等级奖励API',
+                    icon: 'fas fa-star',
+                    items: [
+                        {
+                            method: 'GET',
+                            path: '/api/level-rewards/:accountId',
+                            name: '获取等级奖励',
+                            description: '获取指定账号可领取的等级奖励列表',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": []\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/level-rewards/:accountId/claim',
+                            name: '领取等级奖励',
+                            description: '领取所有可领取的等级奖励',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "领取成功"\n}'
+                        },
+                        {
+                            method: 'GET',
+                            path: '/api/event-multiplier',
+                            name: '获取经验倍率',
+                            description: '获取当前活动经验倍率信息',
+                            params: [],
+                            response: '{\n  "success": true,\n  "data": {\n    "multiplier": 1.0,\n    "eventName": null\n  }\n}'
+                        }
+                    ]
+                },
+                {
+                    name: '邮箱系统API',
+                    icon: 'fas fa-envelope',
+                    items: [
+                        {
+                            method: 'GET',
+                            path: '/api/mails/:accountId',
+                            name: '获取邮件列表',
+                            description: '获取指定账号的邮件列表',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "data": [],\n  "count": 0\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/mails/:accountId/claim/:mailId',
+                            name: '领取单封邮件',
+                            description: '领取指定邮件的附件奖励',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' },
+                                { name: 'mailId', type: 'string', required: true, description: '邮件ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "领取成功"\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/mails/:accountId/claim-all',
+                            name: '一键领取所有邮件',
+                            description: '领取指定账号所有邮件的附件奖励',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "全部领取成功"\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/mails/:accountId/read-all',
+                            name: '标记全部已读',
+                            description: '将所有邮件标记为已读',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "已全部标记为已读"\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/mails/:accountId/read/:mailId',
+                            name: '标记单封已读',
+                            description: '将指定邮件标记为已读',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' },
+                                { name: 'mailId', type: 'string', required: true, description: '邮件ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "已标记为已读"\n}'
+                        },
+                        {
+                            method: 'DELETE',
+                            path: '/api/mails/:accountId/:mailId',
+                            name: '删除邮件',
+                            description: '删除指定邮件',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' },
+                                { name: 'mailId', type: 'string', required: true, description: '邮件ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "删除成功"\n}'
+                        },
+                        {
+                            method: 'POST',
+                            path: '/api/mails/:accountId/cleanup',
+                            name: '清理已领取邮件',
+                            description: '清理所有已领取附件的邮件',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' }
+                            ],
+                            response: '{\n  "success": true,\n  "message": "清理成功"\n}'
+                        }
+                    ]
+                },
+                {
+                    name: '其他配置API',
+                    icon: 'fas fa-cogs',
+                    items: [
+                        {
+                            method: 'GET',
+                            path: '/api/config/levelExp',
+                            name: '获取等级经验配置',
+                            description: '获取游戏等级和经验值的配置数据',
+                            params: [],
+                            response: '{\n  "success": true,\n  "data": []\n}'
                         }
                     ]
                 },
@@ -1413,10 +1915,10 @@
                             method: 'SOCKET',
                             path: 'client_connect',
                             name: '客户端连接',
-                            description: '客户端建立连接时发送的初始事件',
+                            description: '客户端建立连接时发送的初始化事件，检查版本兼容性、处理自动登录和重连',
                             params: [
                                 { name: 'clientVersion', type: 'string', required: false, description: '客户端版本号' },
-                                { name: 'id', type: 'string', required: false, description: '账号ID（自动登录用）' }
+                                { name: 'token', type: 'string', required: false, description: '登录Token（自动登录用）' }
                             ],
                             response: '// 事件: version_check\n{\n  "compatible": true,\n  "message": "版本兼容"\n}'
                         },
@@ -1424,21 +1926,40 @@
                             method: 'SOCKET',
                             path: 'disconnect',
                             name: '断开连接',
-                            description: '客户端断开连接事件',
+                            description: '客户端断开连接事件，触发清理游戏等待队列、更新在线状态',
                             params: [],
                             response: '// 无响应'
                         }
                     ]
                 },
                 {
-                    name: 'Socket.IO - 账号',
+                    name: 'Socket.IO - 登录/账号',
                     icon: 'fas fa-user',
                     items: [
                         {
                             method: 'SOCKET',
+                            path: 'guest_login',
+                            name: '游客登录',
+                            description: '游客模式登录，创建临时游客账号',
+                            params: [],
+                            response: '// 事件: login_result\n{\n  "success": true,\n  "message": "游客登录成功",\n  "data": {\n    "account": {\n      "id": "guest1",\n      "nickname": "游客123"\n    },\n    "token": "token123"\n  }\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'account_login',
+                            name: '账号登录',
+                            description: '使用用户名和密码进行账号登录',
+                            params: [
+                                { name: 'username', type: 'string', required: true, description: '用户名' },
+                                { name: 'password', type: 'string', required: true, description: '密码' }
+                            ],
+                            response: '// 事件: login_result\n{\n  "success": true,\n  "message": "登录成功",\n  "data": {\n    "account": {\n      "id": "account1",\n      "username": "user1",\n      "nickname": "玩家1"\n    },\n    "token": "token123"\n  }\n}'
+                        },
+                        {
+                            method: 'SOCKET',
                             path: 'account_register',
                             name: '注册账号',
-                            description: '客户端发送注册账号请求',
+                            description: '注册新账号，支持游客升级为正式账号',
                             params: [
                                 { name: 'username', type: 'string', required: true, description: '用户名' },
                                 { name: 'password', type: 'string', required: true, description: '密码' },
@@ -1448,28 +1969,19 @@
                         },
                         {
                             method: 'SOCKET',
-                            path: 'guest_login',
-                            name: '游客登录',
-                            description: '游客模式登录',
-                            params: [],
-                            response: '// 事件: login_result\n{\n  "success": true,\n  "message": "游客登录成功",\n  "data": {\n    "account": {\n      "id": "guest1",\n      "nickname": "游客123"\n    },\n    "token": "token123"\n  }\n}'
-                        },
-                        {
-                            method: 'SOCKET',
-                            path: 'account_login',
-                            name: '账号登录',
-                            description: '客户端发送账号密码登录请求',
+                            path: 'get_account_by_token',
+                            name: '通过Token获取账号',
+                            description: '使用登录Token获取账号信息，同时创建/更新用户会话',
                             params: [
-                                { name: 'username', type: 'string', required: true, description: '用户名' },
-                                { name: 'password', type: 'string', required: true, description: '密码' }
+                                { name: 'token', type: 'string', required: true, description: '登录Token' }
                             ],
-                            response: '// 事件: login_result\n{\n  "success": true,\n  "message": "登录成功",\n  "data": {\n    "account": {\n      "id": "account1",\n      "username": "user1",\n      "nickname": "玩家1"\n    },\n    "token": "token123"\n  }\n}'
+                            response: '// 事件: account_info\n{\n  "success": true,\n  "data": {\n    "id": "account1",\n    "username": "user1",\n    "nickname": "玩家1"\n  }\n}'
                         },
                         {
                             method: 'SOCKET',
                             path: 'account_update_profile',
                             name: '更新账号资料',
-                            description: '更新账号昵称和资料',
+                            description: '更新账号昵称和个人资料',
                             params: [
                                 { name: 'id', type: 'string', required: true, description: '账号ID' },
                                 { name: 'nickname', type: 'string', required: false, description: '昵称' },
@@ -1481,7 +1993,7 @@
                             method: 'SOCKET',
                             path: 'account_change_password',
                             name: '修改密码',
-                            description: '修改账号密码',
+                            description: '修改账号密码，需提供旧密码验证',
                             params: [
                                 { name: 'id', type: 'string', required: true, description: '账号ID' },
                                 { name: 'oldPassword', type: 'string', required: true, description: '旧密码' },
@@ -1491,9 +2003,19 @@
                         },
                         {
                             method: 'SOCKET',
+                            path: 'account_set_password',
+                            name: '首次设置密码',
+                            description: '为无密码的游客账号首次设置密码',
+                            params: [
+                                { name: 'password', type: 'string', required: true, description: '新密码' }
+                            ],
+                            response: '// 事件: account_action_result\n{\n  "action": "set_password",\n  "success": true,\n  "message": "密码设置成功"\n}'
+                        },
+                        {
+                            method: 'SOCKET',
                             path: 'account_reset_password',
                             name: '重置密码',
-                            description: '找回密码/重置密码',
+                            description: '找回密码/重置账号密码（无需旧密码）',
                             params: [
                                 { name: 'username', type: 'string', required: true, description: '用户名' },
                                 { name: 'password', type: 'string', required: true, description: '新密码' }
@@ -1502,25 +2024,26 @@
                         },
                         {
                             method: 'SOCKET',
-                            path: 'get_account_by_token',
-                            name: '通过Token获取账号',
-                            description: '使用token获取账号信息',
+                            path: 'admin_upgrade_account',
+                            name: '升级为管理员',
+                            description: '使用升级密钥将普通账号提升为管理员',
                             params: [
-                                { name: 'token', type: 'string', required: true, description: '登录token' }
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' },
+                                { name: 'upgradeKey', type: 'string', required: true, description: '升级密钥' }
                             ],
-                            response: '// 事件: account_info\n{\n  "success": true,\n  "data": {\n    "id": "account1",\n    "username": "user1",\n    "nickname": "玩家1"\n  }\n}'
+                            response: '// 事件: admin_upgrade_result\n{\n  "success": true,\n  "message": "升级成功"\n}'
                         }
                     ]
                 },
                 {
-                    name: 'Socket.IO - 用户',
+                    name: 'Socket.IO - 用户/排行榜',
                     icon: 'fas fa-users',
                     items: [
                         {
                             method: 'SOCKET',
                             path: 'user_login',
                             name: '用户登录',
-                            description: '更新用户昵称',
+                            description: '更新用户昵称，建立用户会话',
                             params: [
                                 { name: 'nickname', type: 'string', required: true, description: '昵称' }
                             ],
@@ -1530,9 +2053,9 @@
                             method: 'SOCKET',
                             path: 'user_status',
                             name: '更新用户状态',
-                            description: '更新用户在线状态',
+                            description: '更新用户在线状态并广播给其他用户',
                             params: [
-                                { name: 'status', type: 'string', required: true, description: '状态' },
+                                { name: 'status', type: 'string', required: true, description: '状态：idle/playing' },
                                 { name: 'game', type: 'string', required: false, description: '游戏类型' }
                             ],
                             response: '// 无特定响应'
@@ -1550,9 +2073,19 @@
                         },
                         {
                             method: 'SOCKET',
+                            path: 'get_my_rank',
+                            name: '获取我的排名',
+                            description: '获取当前用户自己的排名（不在前20时返回具体排名）',
+                            params: [
+                                { name: 'gameType', type: 'string', required: false, description: '游戏类型' }
+                            ],
+                            response: '// 事件: my_rank\n{\n  "rank": 1,\n  "score": 1000\n}'
+                        },
+                        {
+                            method: 'SOCKET',
                             path: 'get_achievements',
                             name: '获取成就列表',
-                            description: '获取用户成就列表',
+                            description: '获取用户成就列表，聚合所有游戏类型的统计数据',
                             params: [],
                             response: '// 事件: achievements_list\n{\n  "categories": {},\n  "userAchievements": [],\n  "totalAchievements": 10\n}'
                         },
@@ -1560,7 +2093,7 @@
                             method: 'SOCKET',
                             path: 'get_game_history',
                             name: '获取游戏历史',
-                            description: '获取用户游戏历史记录',
+                            description: '获取当前用户的游戏历史记录',
                             params: [
                                 { name: 'limit', type: 'number', required: false, default: '10', description: '返回数量' }
                             ],
@@ -1570,11 +2103,51 @@
                             method: 'SOCKET',
                             path: 'get_game_replay',
                             name: '获取游戏回放',
-                            description: '获取指定游戏的回放数据',
+                            description: '获取指定游戏的详细回放数据',
                             params: [
                                 { name: 'gameId', type: 'string', required: true, description: '游戏ID' }
                             ],
                             response: '// 事件: game_replay\n{\n  "replay": {}\n}'
+                        }
+                    ]
+                },
+                {
+                    name: 'Socket.IO - 星钻/等级',
+                    icon: 'fas fa-gem',
+                    items: [
+                        {
+                            method: 'SOCKET',
+                            path: 'get_currency',
+                            name: '获取星钻信息',
+                            description: '获取当前用户的星钻余额信息',
+                            params: [],
+                            response: '// 事件: currency_info\n{\n  "balance": 1000,\n  "totalEarned": 5000\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_currency_transactions',
+                            name: '获取星钻记录',
+                            description: '获取星钻交易记录',
+                            params: [
+                                { name: 'limit', type: 'number', required: false, default: '50', description: '返回数量' }
+                            ],
+                            response: '// 事件: currency_transactions\n{\n  "transactions": []\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_level_rewards',
+                            name: '获取等级奖励',
+                            description: '获取可领取的等级奖励列表',
+                            params: [],
+                            response: '// 事件: level_rewards\n{\n  "rewards": []\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'claim_level_rewards',
+                            name: '领取等级奖励',
+                            description: '领取所有可用的等级奖励',
+                            params: [],
+                            response: '// 事件: level_rewards_claimed\n{\n  "success": true,\n  "rewards": []\n}'
                         }
                     ]
                 },
@@ -1586,7 +2159,7 @@
                             method: 'SOCKET',
                             path: 'match_request',
                             name: '匹配请求',
-                            description: '发起游戏匹配请求',
+                            description: '发起游戏匹配请求，进入匹配队列',
                             params: [
                                 { name: 'game', type: 'string', required: true, description: '游戏类型' }
                             ],
@@ -1596,7 +2169,7 @@
                             method: 'SOCKET',
                             path: 'challenge_request',
                             name: '挑战请求',
-                            description: '向特定用户发起挑战',
+                            description: '向特定用户发起对战挑战',
                             params: [
                                 { name: 'userId', type: 'string', required: true, description: '目标用户ID' },
                                 { name: 'gameType', type: 'string', required: true, description: '游戏类型' }
@@ -1607,7 +2180,7 @@
                             method: 'SOCKET',
                             path: 'challenge_response',
                             name: '挑战响应',
-                            description: '接受或拒绝挑战',
+                            description: '接受或拒绝收到的挑战',
                             params: [
                                 { name: 'accept', type: 'boolean', required: true, description: '是否接受' },
                                 { name: 'challengeId', type: 'string', required: true, description: '挑战ID' }
@@ -1618,7 +2191,7 @@
                             method: 'SOCKET',
                             path: 'cancel_match',
                             name: '取消匹配',
-                            description: '取消当前匹配请求',
+                            description: '取消当前的匹配请求',
                             params: [],
                             response: '// 无特定响应'
                         }
@@ -1631,10 +2204,20 @@
                         {
                             method: 'SOCKET',
                             path: 'move',
-                            name: '游戏移动',
-                            description: '发送游戏移动操作',
+                            name: '游戏落子/移动',
+                            description: '发送游戏中的落子或移动操作',
                             params: [
-                                { name: 'position', type: 'object', required: true, description: '位置信息' }
+                                { name: 'position', type: 'object', required: true, description: '位置信息（行列坐标）' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'game_result',
+                            name: '提交游戏结果',
+                            description: '提交游戏胜负结果',
+                            params: [
+                                { name: 'winner', type: 'string', required: true, description: '获胜者ID' }
                             ],
                             response: '// 无特定响应'
                         },
@@ -1642,7 +2225,7 @@
                             method: 'SOCKET',
                             path: 'reset',
                             name: '游戏重置请求',
-                            description: '请求重新开始游戏',
+                            description: '请求重新开始当前游戏',
                             params: [],
                             response: '// 无特定响应'
                         },
@@ -1650,7 +2233,7 @@
                             method: 'SOCKET',
                             path: 'reset_confirm',
                             name: '确认重置',
-                            description: '确认游戏重置',
+                            description: '同意对手的重置请求',
                             params: [
                                 { name: 'requestId', type: 'string', required: false, description: '请求ID' }
                             ],
@@ -1660,7 +2243,7 @@
                             method: 'SOCKET',
                             path: 'reset_reject',
                             name: '拒绝重置',
-                            description: '拒绝游戏重置',
+                            description: '拒绝对手的重置请求',
                             params: [
                                 { name: 'requestId', type: 'string', required: false, description: '请求ID' }
                             ],
@@ -1668,19 +2251,45 @@
                         },
                         {
                             method: 'SOCKET',
-                            path: 'game_result',
-                            name: '游戏结果',
-                            description: '提交游戏结果',
+                            path: 'return_lobby',
+                            name: '返回大厅',
+                            description: '退出当前游戏返回游戏大厅',
+                            params: [],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'game_use_item',
+                            name: '使用游戏道具',
+                            description: '在游戏中使用道具（如悔棋卡、提示卡）',
                             params: [
-                                { name: 'winner', type: 'string', required: true, description: '获胜者ID' }
+                                { name: 'itemId', type: 'string', required: true, description: '道具ID' }
+                            ],
+                            response: '// 事件: game_item_used\n{\n  "success": true,\n  "itemId": "item1"\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'undo_request',
+                            name: '请求悔棋',
+                            description: '向对手发送悔棋请求',
+                            params: [],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'undo_response',
+                            name: '回应悔棋',
+                            description: '回应对手的悔棋请求（同意/拒绝）',
+                            params: [
+                                { name: 'accepted', type: 'boolean', required: true, description: '是否同意悔棋' }
                             ],
                             response: '// 无特定响应'
                         },
                         {
                             method: 'SOCKET',
-                            path: 'return_lobby',
-                            name: '返回大厅',
-                            description: '退出游戏返回大厅',
+                            path: 'request_hint',
+                            name: '请求提示',
+                            description: '请求AI提示（消耗提示卡道具）',
                             params: [],
                             response: '// 无特定响应'
                         }
@@ -1694,20 +2303,20 @@
                             method: 'SOCKET',
                             path: 'ai_game_start',
                             name: '开始AI对战',
-                            description: '创建AI对战游戏',
+                            description: '创建与AI的对战游戏',
                             params: [
                                 { name: 'gameType', type: 'string', required: true, description: '游戏类型' },
-                                { name: 'difficulty', type: 'string', required: true, description: '难度' }
+                                { name: 'difficulty', type: 'string', required: true, description: '难度：easy/medium/hard' }
                             ],
                             response: '// 无特定响应'
                         },
                         {
                             method: 'SOCKET',
                             path: 'ai_move',
-                            name: 'AI对战移动',
-                            description: '在AI对战中进行移动',
+                            name: 'AI对战落子',
+                            description: '在AI对战中落子，服务器会触发AI自动回应',
                             params: [
-                                { name: 'position', type: 'object', required: true, description: '位置信息' }
+                                { name: 'position', type: 'object', required: true, description: '落子位置' }
                             ],
                             response: '// 无特定响应'
                         },
@@ -1715,12 +2324,12 @@
                             method: 'SOCKET',
                             path: 'ai_game_result',
                             name: 'AI游戏结果',
-                            description: '提交AI对战结果',
+                            description: '提交AI对战结果并保存记录',
                             params: [
-                                { name: 'result', type: 'string', required: true, description: '结果' },
+                                { name: 'result', type: 'string', required: true, description: '结果：win/lose/draw' },
                                 { name: 'gameType', type: 'string', required: true, description: '游戏类型' },
                                 { name: 'difficulty', type: 'string', required: true, description: '难度' },
-                                { name: 'duration', type: 'number', required: true, description: '时长' }
+                                { name: 'duration', type: 'number', required: true, description: '游戏时长（秒）' }
                             ],
                             response: '// 无特定响应'
                         }
@@ -1736,7 +2345,7 @@
                             name: '贪吃蛇游戏开始',
                             description: '开始贪吃蛇游戏',
                             params: [
-                                { name: 'gameType', type: 'string', required: true, description: '游戏类型' }
+                                { name: 'gameType', type: 'string', required: true, description: '游戏类型：single/multi' }
                             ],
                             response: '// 无特定响应'
                         },
@@ -1744,11 +2353,57 @@
                             method: 'SOCKET',
                             path: 'snake_game_end',
                             name: '贪吃蛇游戏结束',
-                            description: '结束贪吃蛇游戏',
+                            description: '结束贪吃蛇游戏，保存分数和记录',
                             params: [
-                                { name: 'score', type: 'number', required: true, description: '得分' },
+                                { name: 'score', type: 'number', required: true, description: '最终得分' },
                                 { name: 'gameType', type: 'string', required: true, description: '游戏类型' },
-                                { name: 'moveHistory', type: 'array', required: true, description: '移动历史' }
+                                { name: 'moveHistory', type: 'array', required: true, description: '移动历史记录' }
+                            ],
+                            response: '// 事件: exp_gained, account_updated'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'snake_update',
+                            name: '贪吃蛇状态更新',
+                            description: '双人对战时同步蛇的状态给对手',
+                            params: [
+                                { name: 'matchId', type: 'string', required: true, description: '对战ID' },
+                                { name: 'playerId', type: 'string', required: true, description: '玩家ID' },
+                                { name: 'snake', type: 'array', required: true, description: '蛇身坐标数组' },
+                                { name: 'direction', type: 'string', required: true, description: '移动方向' },
+                                { name: 'score', type: 'number', required: true, description: '当前得分' }
+                            ],
+                            response: '// 转发给对手'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'snake_food_update',
+                            name: '贪吃蛇食物更新',
+                            description: '双人对战时同步食物状态给对手',
+                            params: [
+                                { name: 'matchId', type: 'string', required: true, description: '对战ID' },
+                                { name: 'playerId', type: 'string', required: true, description: '玩家ID' },
+                                { name: 'foods', type: 'array', required: true, description: '食物坐标数组' }
+                            ],
+                            response: '// 转发给对手'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'snake_request_full_state',
+                            name: '请求贪吃蛇全量状态',
+                            description: '用于重连或同步时请求完整的游戏状态',
+                            params: [
+                                { name: 'matchId', type: 'string', required: true, description: '对战ID' }
+                            ],
+                            response: '// 事件: snake_full_state_sync'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'snake_sync_highscore',
+                            name: '同步最高分',
+                            description: '将客户端最高分同步到服务器',
+                            params: [
+                                { name: 'highScore', type: 'number', required: false, description: '本地最高分' }
                             ],
                             response: '// 无特定响应'
                         }
@@ -1761,8 +2416,8 @@
                         {
                             method: 'SOCKET',
                             path: 'spectate_join',
-                            name: '开始观战',
-                            description: '加入观战',
+                            name: '加入观战',
+                            description: '加入指定游戏进行观战',
                             params: [
                                 { name: 'gameId', type: 'string', required: true, description: '游戏ID' }
                             ],
@@ -1771,8 +2426,8 @@
                         {
                             method: 'SOCKET',
                             path: 'spectate_leave',
-                            name: '结束观战',
-                            description: '退出观战',
+                            name: '退出观战',
+                            description: '退出当前观战',
                             params: [],
                             response: '// 无特定响应'
                         },
@@ -1780,7 +2435,7 @@
                             method: 'SOCKET',
                             path: 'get_spectate_list',
                             name: '获取观战列表',
-                            description: '获取可观战的游戏列表',
+                            description: '获取当前可以观战的游戏列表',
                             params: [],
                             response: '// 事件: spectate_list\n{\n  "games": []\n}'
                         }
@@ -1794,7 +2449,7 @@
                             method: 'SOCKET',
                             path: 'chat_global',
                             name: '全局聊天',
-                            description: '发送全局聊天消息',
+                            description: '发送全局聊天消息给所有在线用户',
                             params: [
                                 { name: 'message', type: 'string', required: true, description: '消息内容' }
                             ],
@@ -1804,7 +2459,7 @@
                             method: 'SOCKET',
                             path: 'chat_game',
                             name: '游戏内聊天',
-                            description: '发送游戏内聊天消息',
+                            description: '发送当前游戏内的聊天消息',
                             params: [
                                 { name: 'message', type: 'string', required: true, description: '消息内容' }
                             ],
@@ -1814,7 +2469,7 @@
                             method: 'SOCKET',
                             path: 'chat_private',
                             name: '私聊',
-                            description: '发送私聊消息',
+                            description: '向指定用户发送私聊消息',
                             params: [
                                 { name: 'userId', type: 'string', required: true, description: '目标用户ID' },
                                 { name: 'message', type: 'string', required: true, description: '消息内容' }
@@ -1827,7 +2482,7 @@
                             name: '获取聊天历史',
                             description: '获取聊天历史记录',
                             params: [
-                                { name: 'scope', type: 'string', required: true, description: '范围' },
+                                { name: 'scope', type: 'string', required: true, description: '范围：global/game' },
                                 { name: 'gameId', type: 'string', required: false, description: '游戏ID' }
                             ],
                             response: '// 事件: chat_history\n{\n  "scope": "global",\n  "history": []\n}'
@@ -1835,37 +2490,120 @@
                     ]
                 },
                 {
-                    name: 'Socket.IO - 管理员',
+                    name: 'Socket.IO - 反馈系统',
+                    icon: 'fas fa-bug',
+                    items: [
+                        {
+                            method: 'SOCKET',
+                            path: 'get_feedbacks',
+                            name: '获取反馈列表',
+                            description: '获取所有用户提交的反馈列表',
+                            params: [],
+                            response: '// 事件: feedbacks_list\n{\n  "feedbacks": []\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'submit_feedback',
+                            name: '提交反馈',
+                            description: '提交新的反馈或建议（需登录）',
+                            params: [
+                                { name: 'type', type: 'string', required: true, description: '反馈类型' },
+                                { name: 'title', type: 'string', required: true, description: '反馈标题' },
+                                { name: 'content', type: 'string', required: true, description: '反馈内容' }
+                            ],
+                            response: '// 事件: feedback_submitted\n{\n  "success": true,\n  "feedback": {}\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'vote_feedback',
+                            name: '投票反馈',
+                            description: '对反馈进行投票（支持/反对）',
+                            params: [
+                                { name: 'feedbackId', type: 'string', required: true, description: '反馈ID' },
+                                { name: 'voteType', type: 'string', required: true, description: '投票类型：up/down' }
+                            ],
+                            response: '// 事件: feedback_voted\n{\n  "success": true\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'add_comment',
+                            name: '添加评论',
+                            description: '对反馈添加评论',
+                            params: [
+                                { name: 'feedbackId', type: 'string', required: true, description: '反馈ID' },
+                                { name: 'content', type: 'string', required: true, description: '评论内容' }
+                            ],
+                            response: '// 事件: comment_added\n{\n  "success": true,\n  "comment": {}\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'reply_comment',
+                            name: '回复评论',
+                            description: '对反馈评论进行楼中楼回复',
+                            params: [
+                                { name: 'feedbackId', type: 'string', required: true, description: '反馈ID' },
+                                { name: 'commentId', type: 'string', required: true, description: '评论ID' },
+                                { name: 'content', type: 'string', required: true, description: '回复内容' }
+                            ],
+                            response: '// 事件: comment_replied\n{\n  "success": true\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'like_comment',
+                            name: '点赞评论',
+                            description: '点赞反馈下的评论',
+                            params: [
+                                { name: 'feedbackId', type: 'string', required: true, description: '反馈ID' },
+                                { name: 'commentId', type: 'string', required: true, description: '评论ID' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'delete_comment',
+                            name: '删除评论',
+                            description: '删除自己的评论',
+                            params: [
+                                { name: 'feedbackId', type: 'string', required: true, description: '反馈ID' },
+                                { name: 'commentId', type: 'string', required: true, description: '评论ID' }
+                            ],
+                            response: '// 无特定响应'
+                        }
+                    ]
+                },
+                {
+                    name: 'Socket.IO - 管理员 (/admin)',
                     icon: 'fas fa-cog',
                     items: [
                         {
                             method: 'SOCKET',
+                            path: 'admin_account_login',
+                            name: '管理员登录',
+                            description: '管理员账号密码登录后台',
+                            params: [
+                                { name: 'username', type: 'string', required: true, description: '管理员用户名' },
+                                { name: 'password', type: 'string', required: true, description: '管理员密码' }
+                            ],
+                            response: '// 事件: admin_login_result\n{\n  "success": true,\n  "token": "adminToken"\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'admin_user_token_login',
+                            name: '用户Token登录后台',
+                            description: '通过用户Token自动登录管理后台（从游戏页面跳转）',
+                            params: [
+                                { name: 'userToken', type: 'string', required: true, description: '用户登录Token' }
+                            ],
+                            response: '// 事件: admin_login_result\n{\n  "success": true\n}'
+                        },
+                        {
+                            method: 'SOCKET',
                             path: 'kick_user',
                             name: '踢出用户',
-                            description: '踢出指定用户',
+                            description: '将指定用户踢出服务器',
                             params: [
-                                { name: 'userId', type: 'string', required: true, description: '用户ID' },
-                                { name: 'reason', type: 'string', required: false, description: '原因' }
-                            ],
-                            response: '// 无特定响应'
-                        },
-                        {
-                            method: 'SOCKET',
-                            path: 'end_game',
-                            name: '结束游戏',
-                            description: '强制结束指定游戏',
-                            params: [
-                                { name: 'gameId', type: 'string', required: true, description: '游戏ID' }
-                            ],
-                            response: '// 无特定响应'
-                        },
-                        {
-                            method: 'SOCKET',
-                            path: 'broadcast',
-                            name: '广播消息',
-                            description: '向所有用户发送广播',
-                            params: [
-                                { name: 'message', type: 'string', required: true, description: '消息内容' }
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' },
+                                { name: 'reason', type: 'string', required: false, description: '踢出原因' }
                             ],
                             response: '// 无特定响应'
                         },
@@ -1873,11 +2611,11 @@
                             method: 'SOCKET',
                             path: 'mute_user',
                             name: '禁言用户',
-                            description: '禁言指定用户',
+                            description: '禁言指定用户一段时间',
                             params: [
-                                { name: 'userId', type: 'string', required: true, description: '用户ID' },
-                                { name: 'duration', type: 'number', required: true, description: '时长' },
-                                { name: 'reason', type: 'string', required: false, description: '原因' }
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' },
+                                { name: 'duration', type: 'number', required: true, description: '禁言时长（分钟）' },
+                                { name: 'reason', type: 'string', required: false, description: '禁言原因' }
                             ],
                             response: '// 无特定响应'
                         },
@@ -1885,9 +2623,79 @@
                             method: 'SOCKET',
                             path: 'unmute_user',
                             name: '解除禁言',
-                            description: '解除用户禁言',
+                            description: '解除指定用户的禁言状态',
                             params: [
-                                { name: 'userId', type: 'string', required: true, description: '用户ID' }
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_user_detail',
+                            name: '获取用户详情',
+                            description: '获取指定用户的详细信息',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' }
+                            ],
+                            response: '// 事件: user_detail\n{\n  "account": {},\n  "stats": {}\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_user_game_history',
+                            name: '获取用户游戏历史',
+                            description: '获取指定用户的游戏历史记录',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' },
+                                { name: 'limit', type: 'number', required: false, default: '20', description: '返回数量' }
+                            ],
+                            response: '// 事件: user_game_history\n{\n  "history": []\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'send_user_message',
+                            name: '发送系统消息',
+                            description: '给指定用户发送系统消息',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' },
+                                { name: 'message', type: 'string', required: true, description: '消息内容' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'end_game',
+                            name: '强制结束游戏',
+                            description: '强制结束指定的游戏对局',
+                            params: [
+                                { name: 'gameId', type: 'string', required: true, description: '游戏ID' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'reset_game',
+                            name: '重置游戏',
+                            description: '重置指定的游戏对局',
+                            params: [
+                                { name: 'gameId', type: 'string', required: true, description: '游戏ID' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_recent_games',
+                            name: '获取最近游戏',
+                            description: '获取最近的游戏列表（仪表盘用，最近8条）',
+                            params: [],
+                            response: '// 事件: recent_games\n{\n  "games": []\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'broadcast',
+                            name: '全服广播',
+                            description: '向所有在线用户发送全服广播消息',
+                            params: [
+                                { name: 'message', type: 'string', required: true, description: '广播消息内容' }
                             ],
                             response: '// 无特定响应'
                         },
@@ -1903,7 +2711,7 @@
                             method: 'SOCKET',
                             path: 'get_account_detail',
                             name: '获取账号详情',
-                            description: '获取指定账号详情',
+                            description: '获取指定账号的详细信息',
                             params: [
                                 { name: 'id', type: 'string', required: true, description: '账号ID' }
                             ],
@@ -1913,7 +2721,7 @@
                             method: 'SOCKET',
                             path: 'delete_account',
                             name: '删除账号',
-                            description: '删除指定账号',
+                            description: '删除指定的用户账号',
                             params: [
                                 { name: 'id', type: 'string', required: true, description: '账号ID' }
                             ],
@@ -1921,34 +2729,478 @@
                         },
                         {
                             method: 'SOCKET',
-                            path: 'modify_user_exp',
-                            name: '修改用户经验',
-                            description: '修改用户经验值',
+                            path: 'upgrade_to_admin',
+                            name: '升级为管理员',
+                            description: '将指定账号升级为管理员',
                             params: [
-                                { name: 'id', type: 'string', required: true, description: '账号ID' },
-                                { name: 'operation', type: 'string', required: true, description: '操作类型' },
-                                { name: 'amount', type: 'number', required: true, description: '数量' }
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' }
                             ],
                             response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'downgrade_from_admin',
+                            name: '降级管理员',
+                            description: '取消指定账号的管理员权限',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'ban_account',
+                            name: '封禁账号',
+                            description: '封禁指定账号',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' },
+                                { name: 'reason', type: 'string', required: false, description: '封禁原因' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'unban_account',
+                            name: '解封账号',
+                            description: '解封指定账号',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'reset_password',
+                            name: '重置密码',
+                            description: '管理员重置指定账号的密码',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '账号ID' },
+                                { name: 'password', type: 'string', required: true, description: '新密码' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'create_account',
+                            name: '创建账号',
+                            description: '管理员创建新账号',
+                            params: [
+                                { name: 'username', type: 'string', required: true, description: '用户名' },
+                                { name: 'password', type: 'string', required: true, description: '密码' },
+                                { name: 'nickname', type: 'string', required: false, description: '昵称' },
+                                { name: 'isAdmin', type: 'boolean', required: false, default: 'false', description: '是否管理员' }
+                            ],
+                            response: '// 事件: account_created\n{\n  "success": true,\n  "account": {}\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'modify_user_exp',
+                            name: '修改用户经验',
+                            description: '修改指定用户的经验值（增减）',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '账号ID' },
+                                { name: 'operation', type: 'string', required: true, description: '操作：add/subtract' },
+                                { name: 'amount', type: 'number', required: true, description: '经验数量' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'add_user_achievement',
+                            name: '添加成就',
+                            description: '给指定用户添加成就',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '账号ID' },
+                                { name: 'achievementId', type: 'string', required: true, description: '成就ID' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'remove_user_achievement',
+                            name: '移除成就',
+                            description: '移除指定用户的成就',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '账号ID' },
+                                { name: 'achievementId', type: 'string', required: true, description: '成就ID' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'reset_user_achievements',
+                            name: '重置成就',
+                            description: '重置指定用户的所有成就',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '账号ID' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_level_exp_config',
+                            name: '获取等级配置',
+                            description: '获取等级经验配置数据',
+                            params: [],
+                            response: '// 事件: level_exp_config\n{\n  "levels": []\n}'
                         },
                         {
                             method: 'SOCKET',
                             path: 'maintenance_mode',
                             name: '维护模式',
-                            description: '设置维护模式',
+                            description: '开启或关闭服务器维护模式',
                             params: [
                                 { name: 'enabled', type: 'boolean', required: true, description: '是否启用' },
-                                { name: 'message', type: 'string', required: false, description: '维护消息' }
+                                { name: 'message', type: 'string', required: false, description: '维护提示消息' },
+                                { name: 'durationMinutes', type: 'number', required: false, description: '预计持续分钟' },
+                                { name: 'blockChat', type: 'boolean', required: false, description: '是否禁止聊天' },
+                                { name: 'kick', type: 'boolean', required: false, description: '是否踢出在线用户' }
                             ],
                             response: '// 无特定响应'
                         },
                         {
                             method: 'SOCKET',
+                            path: 'maintenance_schedule',
+                            name: '调度维护',
+                            description: '预告模式调度维护',
+                            params: [
+                                { name: 'enabled', type: 'boolean', required: true, description: '是否调度' },
+                                { name: 'message', type: 'string', required: false, description: '维护消息' },
+                                { name: 'startTime', type: 'number', required: false, description: '开始时间戳' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_maintenance_history',
+                            name: '获取维护历史',
+                            description: '获取系统维护历史记录',
+                            params: [],
+                            response: '// 事件: maintenance_history\n{\n  "history": []\n}'
+                        },
+                        {
+                            method: 'SOCKET',
                             path: 'get_system_stats',
                             name: '获取系统统计',
-                            description: '获取系统统计数据',
+                            description: '获取详细的系统统计数据',
                             params: [],
-                            response: '// 事件: system_stats\n{\n  "onlineUsers": 10,\n  "totalGames": 1000\n}'
+                            response: '// 事件: system_stats\n{\n  "onlineUsers": 10,\n  "totalGames": 1000,\n  "totalAccounts": 500\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_config',
+                            name: '获取系统配置',
+                            description: '获取当前系统配置',
+                            params: [],
+                            response: '// 事件: system_config\n{\n  "config": {}\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'update_config',
+                            name: '更新系统配置',
+                            description: '更新系统配置项',
+                            params: [
+                                { name: 'config', type: 'object', required: true, description: '配置数据' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'cleanup_data',
+                            name: '清理数据',
+                            description: '清理系统数据（如旧日志、过期数据）',
+                            params: [
+                                { name: 'type', type: 'string', required: true, description: '清理类型' },
+                                { name: 'before', type: 'number', required: false, description: '清理时间戳前' }
+                            ],
+                            response: '// 事件: cleanup_result\n{\n  "success": true\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_chat_history_admin',
+                            name: '获取聊天记录（管理）',
+                            description: '管理员获取聊天历史记录',
+                            params: [
+                                { name: 'scope', type: 'string', required: false, description: '范围' },
+                                { name: 'limit', type: 'number', required: false, default: '100', description: '返回数量' }
+                            ],
+                            response: '// 事件: chat_history_admin\n{\n  "history": []\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'send_mail_to_user',
+                            name: '发送邮件',
+                            description: '给指定用户发送系统邮件（可附带物品/星钻/经验）',
+                            params: [
+                                { name: 'accountId', type: 'string', required: true, description: '收件人账号ID' },
+                                { name: 'title', type: 'string', required: true, description: '邮件标题' },
+                                { name: 'content', type: 'string', required: true, description: '邮件内容' },
+                                { name: 'attachments', type: 'object', required: false, description: '附件奖励' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'send_mail_batch',
+                            name: '批量发送邮件',
+                            description: '批量发送邮件给多个用户',
+                            params: [
+                                { name: 'accountIds', type: 'array', required: true, description: '收件人ID数组' },
+                                { name: 'title', type: 'string', required: true, description: '邮件标题' },
+                                { name: 'content', type: 'string', required: true, description: '邮件内容' },
+                                { name: 'attachments', type: 'object', required: false, description: '附件奖励' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'send_mail_all',
+                            name: '全站发送邮件',
+                            description: '发送邮件给所有用户',
+                            params: [
+                                { name: 'title', type: 'string', required: true, description: '邮件标题' },
+                                { name: 'content', type: 'string', required: true, description: '邮件内容' },
+                                { name: 'attachments', type: 'object', required: false, description: '附件奖励' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'grant_starcoins',
+                            name: '发放星钻',
+                            description: '直接给用户发放星钻',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '账号ID' },
+                                { name: 'amount', type: 'number', required: true, description: '星钻数量' },
+                                { name: 'reason', type: 'string', required: false, description: '发放原因' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'grant_exp',
+                            name: '发放经验',
+                            description: '直接给用户发放经验值',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '账号ID' },
+                                { name: 'amount', type: 'number', required: true, description: '经验数量' },
+                                { name: 'reason', type: 'string', required: false, description: '发放原因' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'grant_items',
+                            name: '发放物品',
+                            description: '直接给用户发放游戏物品',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '账号ID' },
+                                { name: 'items', type: 'array', required: true, description: '物品列表' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_user_mails',
+                            name: '查看用户邮件',
+                            description: '查看指定用户的邮件列表',
+                            params: [
+                                { name: 'id', type: 'string', required: true, description: '账号ID' }
+                            ],
+                            response: '// 事件: user_mails\n{\n  "mails": []\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_items_list',
+                            name: '获取物品列表',
+                            description: '获取游戏中所有可用的物品列表',
+                            params: [],
+                            response: '// 事件: items_list\n{\n  "items": []\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_users_select_list',
+                            name: '获取用户选择列表',
+                            description: '获取用户选择列表（管理员界面下拉选择用）',
+                            params: [
+                                { name: 'keyword', type: 'string', required: false, description: '搜索关键词' }
+                            ],
+                            response: '// 事件: users_select_list\n{\n  "users": []\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_exp_records',
+                            name: '获取经验记录',
+                            description: '获取用户经验值获取记录',
+                            params: [
+                                { name: 'accountId', type: 'string', required: false, description: '账号ID' },
+                                { name: 'limit', type: 'number', required: false, default: '50', description: '返回数量' }
+                            ],
+                            response: '// 事件: exp_records\n{\n  "records": []\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_coin_records',
+                            name: '获取星钻记录',
+                            description: '获取用户星钻获取和消费记录',
+                            params: [
+                                { name: 'accountId', type: 'string', required: false, description: '账号ID' },
+                                { name: 'limit', type: 'number', required: false, default: '50', description: '返回数量' }
+                            ],
+                            response: '// 事件: coin_records\n{\n  "records": []\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_mail_records',
+                            name: '获取邮件记录',
+                            description: '获取邮件发送和领取记录',
+                            params: [
+                                { name: 'accountId', type: 'string', required: false, description: '账号ID' },
+                                { name: 'limit', type: 'number', required: false, default: '50', description: '返回数量' }
+                            ],
+                            response: '// 事件: mail_records\n{\n  "records": []\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_system_settings',
+                            name: '获取系统设置',
+                            description: '获取所有可编辑的系统设置',
+                            params: [],
+                            response: '// 事件: system_settings\n{\n  "settings": {}\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'update_system_setting',
+                            name: '更新系统设置',
+                            description: '更新单个系统设置项',
+                            params: [
+                                { name: 'key', type: 'string', required: true, description: '设置键名' },
+                                { name: 'value', type: 'object', required: true, description: '设置值' }
+                            ],
+                            response: '// 事件: setting_updated\n{\n  "success": true\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'reset_system_setting',
+                            name: '重置系统设置',
+                            description: '重置单个系统设置为默认值',
+                            params: [
+                                { name: 'key', type: 'string', required: true, description: '设置键名' }
+                            ],
+                            response: '// 事件: setting_reset\n{\n  "success": true\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'reset_all_settings',
+                            name: '重置所有设置',
+                            description: '重置所有系统设置为默认值',
+                            params: [],
+                            response: '// 事件: all_settings_reset\n{\n  "success": true\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'subscribe_logs',
+                            name: '订阅实时日志',
+                            description: '订阅服务器实时日志推送',
+                            params: [],
+                            response: '// 实时日志推送'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'unsubscribe_logs',
+                            name: '取消订阅日志',
+                            description: '取消订阅实时日志推送',
+                            params: [],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_log_files',
+                            name: '获取日志文件列表',
+                            description: '获取服务器日志文件列表',
+                            params: [],
+                            response: '// 事件: log_files\n{\n  "files": []\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'read_log_file',
+                            name: '读取日志文件',
+                            description: '读取指定日志文件的內容',
+                            params: [
+                                { name: 'filename', type: 'string', required: true, description: '日志文件名' },
+                                { name: 'lines', type: 'number', required: false, default: '200', description: '读取行数' }
+                            ],
+                            response: '// 事件: log_file_content\n{\n  "content": ""\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'get_update_status',
+                            name: '获取更新状态',
+                            description: '获取系统更新状态',
+                            params: [],
+                            response: '// 事件: update_status\n{\n  "isUpdating": false\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'update_start_upload',
+                            name: '开始上传更新包',
+                            description: '开始上传更新包文件',
+                            params: [
+                                { name: 'uploadId', type: 'string', required: true, description: '上传ID' },
+                                { name: 'filename', type: 'string', required: true, description: '文件名' },
+                                { name: 'size', type: 'number', required: true, description: '文件大小' },
+                                { name: 'hash', type: 'string', required: true, description: '文件哈希' }
+                            ],
+                            response: '// 事件: update_upload_ready\n{\n  "ready": true\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'update_upload_chunk',
+                            name: '上传更新包分片',
+                            description: '上传更新包文件的分片数据',
+                            params: [
+                                { name: 'chunk', type: 'object', required: true, description: '分片数据' },
+                                { name: 'index', type: 'number', required: true, description: '分片序号' },
+                                { name: 'total', type: 'number', required: true, description: '总分片数' },
+                                { name: 'uploadId', type: 'string', required: true, description: '上传ID' }
+                            ],
+                            response: '// 事件: update_upload_progress\n{\n  "progress": 50\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'update_start',
+                            name: '开始更新',
+                            description: '开始执行系统更新',
+                            params: [],
+                            response: '// 事件: update_started\n{\n  "success": true\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'update_cancel',
+                            name: '取消更新',
+                            description: '取消正在执行的更新',
+                            params: [],
+                            response: '// 事件: update_cancelled\n{\n  "success": true\n}'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'update_rollback',
+                            name: '回滚更新',
+                            description: '回滚到指定备份版本',
+                            params: [
+                                { name: 'backupName', type: 'string', required: true, description: '备份名称' }
+                            ],
+                            response: '// 无特定响应'
+                        },
+                        {
+                            method: 'SOCKET',
+                            path: 'update_delete_backup',
+                            name: '删除备份',
+                            description: '删除指定的更新备份',
+                            params: [
+                                { name: 'backupName', type: 'string', required: true, description: '备份名称' }
+                            ],
+                            response: '// 无特定响应'
                         }
                     ]
                 }
@@ -1962,6 +3214,10 @@
         let requestBody = '';
         let socket = null;
         let socketConnected = false;
+        let adminSocket = null;
+        let adminConnected = false;
+        let socketResponseResolve = null;
+        let socketResponseTimeout = null;
 
         function initApiTree() {
             const treeContainer = document.getElementById('api-tree');
@@ -1999,7 +3255,7 @@
                     apiItem.addEventListener('click', () => {
                         document.querySelectorAll('.api-item').forEach(el => el.classList.remove('active'));
                         apiItem.classList.add('active');
-                        currentApi = item;
+                        currentApi = Object.assign({}, item, { _categoryName: category.name });
                         requestParams = item.params ? item.params.map(p => ({ key: p.name, value: p.default || '', enabled: true })) : [];
                         requestHeaders = [{ key: 'Content-Type', value: 'application/json', enabled: true }];
                         requestBody = '';
@@ -2096,11 +3352,35 @@
         }
 
         function updateTestPanel(api) {
+            const adminCategories = [
+                'Socket.IO - 管理员 (/admin)',
+                '管理员API',
+                '账号管理API',
+                '系统管理API',
+                '更新系统API',
+                '商店/商城API',
+                '头像管理API',
+                '反馈系统API'
+            ];
+
             if (api.method === 'SOCKET') {
                 document.getElementById('method-select').value = 'SOCKET';
                 document.getElementById('url-input').value = `socket.io: ${api.path}`;
-                // 为Socket.IO事件添加模拟测试界面
                 switchTab('params');
+
+                // 自动连接Socket.IO
+                const active = getActiveSocket();
+                if (!active.connected || !active.socket) {
+                    const categoryName = api._categoryName || currentApi._categoryName || '';
+                    const ns = adminCategories.includes(categoryName) ? '/admin' : undefined;
+                    connectSocket(ns);
+                }
+
+                // 更新连接状态显示
+                const categoryName = api._categoryName || currentApi._categoryName || '';
+                updateSocketStatus(
+                    (adminCategories.includes(categoryName) ? adminConnected : socketConnected)
+                );
             } else {
                 document.getElementById('method-select').value = api.method;
                 document.getElementById('url-input').value = `http://localhost:8080${api.path.startsWith('/') ? api.path : '/' + api.path}`;
@@ -2334,53 +3614,108 @@
 
             // 处理Socket.IO事件
             if (method === 'SOCKET') {
-                if (!socketConnected) {
-                    const endTime = Date.now();
-                    const duration = endTime - startTime;
+                const active = getActiveSocket();
+                let targetSocket = active.socket;
+                let isConnected = active.connected;
+                const namespace = active.namespace;
 
-                    // 从当前API获取响应示例
-                    const responseExample = currentApi.response || '// 无响应';
-
+                // 未连接时自动连接
+                if (!isConnected || !targetSocket) {
                     testContent.innerHTML = `
                         <div class="response-panel">
                             <div class="response-info">
-                                <span class="status-success">模拟响应</span>
-                                <span class="time-info">${duration}ms</span>
-                                <div class="response-actions">
-                                    <button class="response-action-btn" onclick="copyCode(this)">
-                                        <i class="fas fa-copy"></i> 复制
-                                    </button>
-                                </div>
+                                <span class="status-warning">正在连接...</span>
+                                <span class="time-info">${Date.now() - startTime}ms</span>
                             </div>
                             <div class="code-wrapper">
                                 <div class="code-header">
                                     <div class="code-tabs">
-                                        <button class="code-tab active">Socket.IO 响应</button>
+                                        <button class="code-tab active">连接中</button>
                                     </div>
                                 </div>
                                 <div class="code-block">
-                                    <pre><code class="language-json">${escapeHtml(responseExample)}</code></pre>
+                                    <pre><code>正在连接到 Socket.IO${namespace === '/admin' ? ' (/admin)' : ''}...</code></pre>
                                 </div>
-                            </div>
-                            <div style="margin-top: 12px; padding: 12px; background-color: var(--bg-tertiary); border-radius: 6px; border: 1px solid var(--border-color); font-size: 12px; color: var(--text-secondary);">
-                                <strong style="color: var(--text-primary);">Socket.IO 测试提示:</strong><br>
-                                • 这是模拟响应，实际使用需要通过WebSocket连接<br>
-                                • 点击"连接 Socket"按钮建立真实连接<br>
-                                • 客户端需要使用 socket.emit('${currentApi.path}', { /* 参数 */ })<br>
-                                • 服务器会通过相应的事件返回数据
                             </div>
                         </div>
                     `;
-
                     if (typeof Prism !== 'undefined') {
                         Prism.highlightAll();
                     }
+
+                    const newSocket = connectSocket(namespace === '/admin' ? '/admin' : undefined);
+                    if (!newSocket) {
+                        testContent.innerHTML = `
+                            <div class="response-panel">
+                                <div class="response-info">
+                                    <span class="status-error">连接失败</span>
+                                    <span class="time-info">${Date.now() - startTime}ms</span>
+                                </div>
+                                <div class="code-wrapper">
+                                    <div class="code-header">
+                                        <div class="code-tabs">
+                                            <button class="code-tab active">Error</button>
+                                        </div>
+                                    </div>
+                                    <div class="code-block">
+                                        <pre><code>无法连接到服务器，请确保服务器正在运行</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        if (typeof Prism !== 'undefined') {
+                            Prism.highlightAll();
+                        }
+                        return;
+                    }
+
+                    // 等待连接成功后再发送
+                    const waitConnect = setInterval(() => {
+                        const check = getActiveSocket();
+                        if (check.connected && check.socket) {
+                            clearInterval(waitConnect);
+                            doSocketEmit(check.socket, startTime);
+                        }
+                    }, 200);
+
+                    // 10秒超时
+                    setTimeout(() => {
+                        clearInterval(waitConnect);
+                        const check = getActiveSocket();
+                        if (!check.connected) {
+                            testContent.innerHTML = `
+                                <div class="response-panel">
+                                    <div class="response-info">
+                                        <span class="status-error">连接超时</span>
+                                        <span class="time-info">${Date.now() - startTime}ms</span>
+                                    </div>
+                                    <div class="code-wrapper">
+                                        <div class="code-header">
+                                            <div class="code-tabs">
+                                                <button class="code-tab active">Error</button>
+                                            </div>
+                                        </div>
+                                        <div class="code-block">
+                                            <pre><code>连接超时，请检查服务器是否正在运行</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                            if (typeof Prism !== 'undefined') {
+                                Prism.highlightAll();
+                            }
+                        }
+                    }, 10000);
                     return;
                 }
 
-                // 真实的Socket.IO事件发送
+                doSocketEmit(targetSocket, startTime);
+                return;
+            }
+
+            // Socket.IO 真实发送函数
+            function doSocketEmit(targetSocket, startTime) {
                 try {
-                    // 构建参数对象
                     const params = {};
                     requestParams.forEach(p => {
                         if (p.enabled && p.key) {
@@ -2388,9 +3723,9 @@
                         }
                     });
 
-                    // 发送Socket.IO事件
-                    socket.emit(currentApi.path, params);
+                    targetSocket.emit(currentApi.path, params);
 
+                    const testContent = document.getElementById('test-content');
                     testContent.innerHTML = `
                         <div class="response-panel">
                             <div class="response-info">
@@ -2400,28 +3735,24 @@
                             <div class="code-wrapper">
                                 <div class="code-header">
                                     <div class="code-tabs">
-                                        <button class="code-tab active">Socket.IO 发送</button>
+                                        <button class="code-tab active">emit: ${currentApi.path}</button>
                                     </div>
                                 </div>
                                 <div class="code-block">
-                                    <pre><code class="language-json">{
-  "event": "${currentApi.path}",
-  "params": ${JSON.stringify(params, null, 2)}
-}</code></pre>
+                                    <pre><code class="language-json">${escapeHtml(JSON.stringify(params, null, 2))}</code></pre>
                                 </div>
                             </div>
                             <div style="margin-top: 12px; padding: 12px; background-color: var(--bg-tertiary); border-radius: 6px; border: 1px solid var(--border-color); font-size: 12px; color: var(--text-secondary);">
-                                <strong style="color: var(--text-primary);">等待响应...</strong><br>
-                                • 服务器响应会显示在下方
-                                • 请检查控制台查看详细日志
+                                <strong style="color: var(--text-primary);">等待服务器响应...</strong><br>
+                                • 收到事件后将自动显示在此处
                             </div>
                         </div>
                     `;
-
                     if (typeof Prism !== 'undefined') {
                         Prism.highlightAll();
                     }
                 } catch (error) {
+                    const testContent = document.getElementById('test-content');
                     testContent.innerHTML = `
                         <div class="response-panel">
                             <div class="response-info">
@@ -2440,17 +3771,13 @@
                             </div>
                         </div>
                     `;
+                    if (typeof Prism !== 'undefined') {
+                        Prism.highlightAll();
+                    }
                 }
-                return;
             }
 
             // 处理HTTP请求
-            const enabledParams = requestParams.filter(p => p.enabled && p.key);
-            if (enabledParams.length > 0) {
-                const queryString = enabledParams.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&');
-                url += (url.includes('?') ? '&' : '?') + queryString;
-            }
-
             const headers = {};
             requestHeaders.filter(h => h.enabled && h.key).forEach(h => {
                 headers[h.key] = h.value;
@@ -2464,6 +3791,24 @@
                 method: method,
                 headers: headers
             };
+
+            const enabledParams = requestParams.filter(p => p.enabled && p.key);
+
+            // POST/PUT：将 params 以 JSON body 发送（如果未手动填写 body）
+            if ((method === 'POST' || method === 'PUT') && enabledParams.length > 0 && !requestBody) {
+                const bodyObj = {};
+                enabledParams.forEach(p => {
+                    bodyObj[p.key] = p.value;
+                });
+                options.body = JSON.stringify(bodyObj);
+                if (!headers['Content-Type']) {
+                    headers['Content-Type'] = 'application/json';
+                }
+            } else if (enabledParams.length > 0) {
+                // GET/DELETE 或其他：params 作为 query string
+                const queryString = enabledParams.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&');
+                url += (url.includes('?') ? '&' : '?') + queryString;
+            }
 
             if (requestBody && (method === 'POST' || method === 'PUT')) {
                 options.body = requestBody;
@@ -2554,79 +3899,107 @@
             }
         }
 
-        function connectSocket() {
-            if (socket) {
+        function connectSocket(namespace) {
+            const isAdmin = namespace === '/admin';
+            const targetSocket = isAdmin ? adminSocket : socket;
+            const connected = isAdmin ? adminConnected : socketConnected;
+            const token = document.getElementById('token-input')?.value || '';
+            const socketUrl = 'http://localhost:8080' + (namespace || '');
+
+            // 如果是/admin命名空间且已有连接，先断开
+            if (isAdmin && adminSocket) {
+                adminSocket.disconnect();
+                adminSocket = null;
+                adminConnected = false;
+            }
+            // 如果不是/admin且已有连接，先断开
+            if (!isAdmin && socket) {
                 socket.disconnect();
+                socket = null;
+                socketConnected = false;
             }
 
-            const token = document.getElementById('token-input')?.value || '';
+            try {
+                const newSocket = io(socketUrl, {
+                    query: { token: token },
+                    transports: ['websocket', 'polling']
+                });
 
-            socket = io('http://localhost:8080', {
-                query: { token: token },
-                transports: ['websocket', 'polling']
-            });
+                newSocket.on('connect', () => {
+                    console.log(`Socket.IO${isAdmin ? ' (/admin)' : ''} 连接成功`);
+                    if (isAdmin) {
+                        adminConnected = true;
+                        updateSocketStatus(true);
+                    } else {
+                        socketConnected = true;
+                        updateSocketStatus(true);
+                    }
+                });
 
-            socket.on('connect', () => {
-                console.log('Socket.IO 连接成功');
-                socketConnected = true;
-                updateSocketStatus(true);
-            });
+                newSocket.on('disconnect', () => {
+                    console.log(`Socket.IO${isAdmin ? ' (/admin)' : ''} 连接断开`);
+                    if (isAdmin) {
+                        adminConnected = false;
+                        updateSocketStatus(false);
+                    } else {
+                        socketConnected = false;
+                        updateSocketStatus(false);
+                    }
+                });
 
-            socket.on('disconnect', () => {
-                console.log('Socket.IO 连接断开');
-                socketConnected = false;
+                newSocket.on('connect_error', (error) => {
+                    console.error(`Socket.IO${isAdmin ? ' (/admin)' : ''} 连接失败:`, error.message);
+                    if (isAdmin) {
+                        adminConnected = false;
+                        updateSocketStatus(false);
+                    } else {
+                        socketConnected = false;
+                        updateSocketStatus(false);
+                    }
+                });
+
+                // 通用监听 - 捕获所有服务器返回的事件
+                newSocket.onAny((event, ...args) => {
+                    const data = args[0] || {};
+                    console.log(`Socket.IO 收到事件 [${event}]:`, data);
+                    handleSocketResponse(event, data);
+                });
+
+                if (isAdmin) {
+                    adminSocket = newSocket;
+                } else {
+                    socket = newSocket;
+                }
+
+                return newSocket;
+            } catch (err) {
+                console.error('Socket.IO 创建失败:', err);
+                if (isAdmin) {
+                    adminConnected = false;
+                } else {
+                    socketConnected = false;
+                }
                 updateSocketStatus(false);
-            });
+                return null;
+            }
+        }
 
-            socket.on('error', (error) => {
-                console.error('Socket.IO 错误:', error);
-                socketConnected = false;
-                updateSocketStatus(false);
-            });
-
-            // 监听通用事件
-            socket.on('version_check', (data) => {
-                handleSocketResponse('version_check', data);
-            });
-            socket.on('login_result', (data) => {
-                handleSocketResponse('login_result', data);
-            });
-            socket.on('account_action_result', (data) => {
-                handleSocketResponse('account_action_result', data);
-            });
-            socket.on('account_info', (data) => {
-                handleSocketResponse('account_info', data);
-            });
-            socket.on('leaderboard', (data) => {
-                handleSocketResponse('leaderboard', data);
-            });
-            socket.on('achievements_list', (data) => {
-                handleSocketResponse('achievements_list', data);
-            });
-            socket.on('game_history', (data) => {
-                handleSocketResponse('game_history', data);
-            });
-            socket.on('game_replay', (data) => {
-                handleSocketResponse('game_replay', data);
-            });
-            socket.on('spectate_joined', (data) => {
-                handleSocketResponse('spectate_joined', data);
-            });
-            socket.on('spectate_list', (data) => {
-                handleSocketResponse('spectate_list', data);
-            });
-            socket.on('chat_history', (data) => {
-                handleSocketResponse('chat_history', data);
-            });
-            socket.on('accounts_list', (data) => {
-                handleSocketResponse('accounts_list', data);
-            });
-            socket.on('account_detail', (data) => {
-                handleSocketResponse('account_detail', data);
-            });
-            socket.on('system_stats', (data) => {
-                handleSocketResponse('system_stats', data);
-            });
+        function getActiveSocket() {
+            const adminCategories = [
+                'Socket.IO - 管理员 (/admin)',
+                '管理员API',
+                '账号管理API',
+                '系统管理API',
+                '更新系统API',
+                '商店/商城API',
+                '头像管理API',
+                '反馈系统API'
+            ];
+            const currentCategoryName = currentApi._categoryName || '';
+            if (adminCategories.includes(currentCategoryName)) {
+                return { socket: adminSocket, connected: adminConnected, namespace: '/admin' };
+            }
+            return { socket: socket, connected: socketConnected, namespace: 'main' };
         }
 
         function updateSocketStatus(connected) {
