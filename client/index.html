@@ -13575,6 +13575,13 @@
 
         if (result.success && result.data) {
           themes = { ...defaultThemes, ...result.data };
+
+          // 服务器主题加载完成后，重新应用当前选择的主题
+          // 解决页面加载时服务器主题尚未加载导致主题无法恢复的问题
+          const savedTheme = localStorage.getItem('selectedTheme');
+          if (savedTheme && themes[savedTheme]) {
+            applyTheme(savedTheme);
+          }
         }
       } catch (err) {
         console.warn('从服务器获取主题失败', { error: err.message });
@@ -13641,7 +13648,18 @@
 
     function applyTheme(themeKey) {
       currentTheme = themeKey;
-      const theme = themes[themeKey];
+      let theme = themes[themeKey];
+
+      // 主题不存在时回退到默认主题，避免后续访问属性崩溃
+      if (!theme) {
+        console.warn('主题尚未加载，回退到默认主题', { themeKey });
+        theme = themes['default'];
+        if (!theme) {
+          // 连默认主题都没有，直接退出（等服务器主题加载后再应用）
+          return;
+        }
+        currentTheme = 'default';
+      }
 
       // 移除之前的特效元素和面板
       document.querySelectorAll('.theme-effect, .theme-panel').forEach(el => el.remove());
