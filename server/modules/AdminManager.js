@@ -7,12 +7,13 @@ const fs = require('fs');
 const path = require('path');
 
 class AdminManager {
-  constructor(userManager, gameManager, chatManager, accountManager = null, io = null) {
+  constructor(userManager, gameManager, chatManager, accountManager = null, io = null, achievementManager = null) {
     this.userManager = userManager;
     this.gameManager = gameManager;
     this.chatManager = chatManager;
     this.accountManager = accountManager;
     this.io = io;
+    this.achievementManager = achievementManager;
     this.operationLogger = null;
     this.adminSockets = new Map();
     this.activeTokens = new Map();
@@ -1749,7 +1750,21 @@ class AdminManager {
     }
 
     const result = await this.accountManager.addUserAchievement(id, achievementId);
-    logger.info('管理员添加用户成就', { adminSocket: socket.id, id, achievementId });
+    if (result.success) {
+      logger.info('管理员添加用户成就', { adminSocket: socket.id, id, achievementId });
+      // 发放成就奖励（EXP等）
+      if (this.achievementManager) {
+        const achievement = this.achievementManager.getAchievement(achievementId);
+        if (achievement && achievement.reward) {
+          try {
+            await this.achievementManager.giveReward(id, achievement.reward);
+            result.message = `成就添加成功，已发放 ${achievement.reward.exp || 0} EXP 奖励`;
+          } catch (err) {
+            logger.error('发放成就奖励失败', { id, achievementId, error: err.message });
+          }
+        }
+      }
+    }
     socket.emit('admin_action_result', {
       action: 'add_user_achievement',
       ...result
@@ -1768,7 +1783,21 @@ class AdminManager {
     }
 
     const result = await this.accountManager.removeUserAchievement(id, achievementId);
-    logger.info('管理员移除用户成就', { adminSocket: socket.id, id, achievementId });
+    if (result.success) {
+      logger.info('管理员移除用户成就', { adminSocket: socket.id, id, achievementId });
+      // 回收成就奖励（扣除EXP）
+      if (this.achievementManager) {
+        const achievement = this.achievementManager.getAchievement(achievementId);
+        if (achievement && achievement.reward && achievement.reward.exp) {
+          try {
+            await this.accountManager.addExp(id, -achievement.reward.exp, false, 'admin_revoke_achievement');
+            result.message = `成就移除成功，已回收 ${achievement.reward.exp} EXP`;
+          } catch (err) {
+            logger.error('回收成就奖励失败', { id, achievementId, error: err.message });
+          }
+        }
+      }
+    }
     socket.emit('admin_action_result', {
       action: 'remove_user_achievement',
       ...result
@@ -1787,7 +1816,28 @@ class AdminManager {
     }
 
     const result = await this.accountManager.resetUserAchievements(id);
-    logger.info('管理员重置用户成就', { adminSocket: socket.id, id });
+    if (result.success) {
+      logger.info('管理员重置用户成就', { adminSocket: socket.id, id, count: result.removedAchievements?.length || 0 });
+      // 回收所有已解锁成就的奖励
+      if (this.achievementManager && result.removedAchievements && result.removedAchievements.length > 0) {
+        let totalRevokedExp = 0;
+        for (const achievementId of result.removedAchievements) {
+          const achievement = this.achievementManager.getAchievement(achievementId);
+          if (achievement && achievement.reward && achievement.reward.exp) {
+            totalRevokedExp += achievement.reward.exp;
+          }
+        }
+        if (totalRevokedExp > 0) {
+          try {
+            await this.accountManager.addExp(id, -totalRevokedExp, false, 'admin_revoke_achievement');
+            result.message = `成就重置成功，已回收 ${result.removedAchievements.length} 个成就共 ${totalRevokedExp} EXP`;
+          } catch (err) {
+            logger.error('批量回收成就奖励失败', { id, error: err.message });
+          }
+        }
+      }
+      delete result.removedAchievements;
+    }
     socket.emit('admin_action_result', {
       action: 'reset_user_achievements',
       ...result
@@ -2014,18 +2064,16 @@ class AdminManager {
   async getItemsList(socket) {
     logger.info('收到物品列表请求', { socketId: socket.id });
     try {
-      const itemsPath = path.join(__dirname, '..', 'config', 'shop', 'items.json');
-      const packsPath = path.join(__dirname, '..', 'config', 'shop', 'packs.json');
-      const cosmeticsPath = path.join(__dirname, '..', 'config', 'shop', 'cosmetics.json');
-      const vipPath = path.join(__dirname, '..', 'config', 'shop', 'vip.json');
+      // 通过 accountManager 的缓存方法读取配置，避免高并发下同步 IO 阻塞事件循环
+      const getCfg = (file) => this.accountManager?._getShopConfig(file) || null;
 
       const items = [];
       const packs = [];
       const cosmetics = [];
       const vipOptions = [];
 
-      if (fs.existsSync(itemsPath)) {
-        const itemsData = JSON.parse(fs.readFileSync(itemsPath, 'utf-8'));
+      const itemsData = getCfg('items.json');
+      if (itemsData) {
         for (const item of Object.values(itemsData)) {
           items.push({
             id: item.id,
@@ -2039,10 +2087,10 @@ class AdminManager {
           });
         }
       }
-      logger.info('读取物品列表', { itemsCount: items.length, itemsPath });
+      logger.info('读取物品列表', { itemsCount: items.length });
 
-      if (fs.existsSync(packsPath)) {
-        const packsData = JSON.parse(fs.readFileSync(packsPath, 'utf-8'));
+      const packsData = getCfg('packs.json');
+      if (packsData) {
         for (const pack of Object.values(packsData)) {
           packs.push({
             id: pack.id,
@@ -2057,10 +2105,10 @@ class AdminManager {
           });
         }
       }
-      logger.info('读取礼包列表', { packsCount: packs.length, packsPath });
+      logger.info('读取礼包列表', { packsCount: packs.length });
 
-      if (fs.existsSync(cosmeticsPath)) {
-        const cosmeticsData = JSON.parse(fs.readFileSync(cosmeticsPath, 'utf-8'));
+      const cosmeticsData = getCfg('cosmetics.json');
+      if (cosmeticsData) {
         const categories = ['frames', 'avatars', 'skins', 'backgrounds', 'titles'];
         for (const category of categories) {
           if (cosmeticsData[category]) {
@@ -2080,10 +2128,10 @@ class AdminManager {
           }
         }
       }
-      logger.info('读取外观列表', { cosmeticsCount: cosmetics.length, cosmeticsPath });
+      logger.info('读取外观列表', { cosmeticsCount: cosmetics.length });
 
-      if (fs.existsSync(vipPath)) {
-        const vipData = JSON.parse(fs.readFileSync(vipPath, 'utf-8'));
+      const vipData = getCfg('vip.json');
+      if (vipData) {
         for (const pkg of Object.values(vipData)) {
           if (pkg.category === 'vip') {
             vipOptions.push({
@@ -2099,7 +2147,7 @@ class AdminManager {
           }
         }
       }
-      logger.info('读取会员列表', { vipCount: vipOptions.length, vipPath });
+      logger.info('读取会员列表', { vipCount: vipOptions.length });
 
       logger.info('发送物品列表', { items: items.length, packs: packs.length, cosmetics: cosmetics.length, vip: vipOptions.length });
       socket.emit('admin_items_list', { items, packs, cosmetics, vip: vipOptions, success: true });

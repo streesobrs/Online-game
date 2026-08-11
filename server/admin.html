@@ -4208,6 +4208,10 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
+    // ==================== 调试日志（默认关闭，localStorage.ADMIN_DEBUG=1 开启）====================
+    const ADMIN_DEBUG = (() => { try { return localStorage.getItem('ADMIN_DEBUG') === '1'; } catch (e) { return false; } })();
+    function debugLog(...args) { if (ADMIN_DEBUG) console.log('[ADMIN DEBUG]', ...args); }
+
     // ==================== 全局变量 ====================
     let socket = null;
     let currentView = 'dashboard';
@@ -4236,14 +4240,14 @@
         });
 
         const onConnect = () => {
-          console.log('[DEBUG] 自动登录 socket 已连接');
+          debugLog('自动登录 socket 已连接');
           reconnectAttempts = 0;
           document.getElementById('login-page').classList.add('hidden');
           document.getElementById('admin-app').classList.remove('hidden');
           showToast('自动登录成功', 'success');
           loadDashboardData();
           loadServerVersion();
-          console.log('[DEBUG] 500ms 后调用 loadItemList');
+          debugLog('500ms 后调用 loadItemList');
           setTimeout(loadItemList, 500);
         };
 
@@ -4256,7 +4260,7 @@
         // 当 adminToken 过期时，socket.io 中间件会拒绝连接并触发 connect_error
         // 之前没有监听此事件导致连接静默失败，页面卡在登录界面
         socket.on('connect_error', (err) => {
-          console.error('[DEBUG] Admin socket 连接失败:', err.message);
+          debugLog('Admin socket 连接失败:', err.message);
           localStorage.removeItem('adminToken');
           // 如果存在 userToken，清除 adminToken 后刷新页面
           // 重新加载时会进入 savedUserToken 分支，使用 userToken 自动登录
@@ -4290,107 +4294,160 @@
           loadDashboardData();
         });
 
-        socket.on('admin_update', (data) => {
-          adminData.stats = data.stats || {};
-          adminData.users = data.users || [];
-          adminData.games = data.games || [];
-          if (data.accounts) adminData.accounts = data.accounts;
-          renderStats();
-          renderSystemInfo(adminData.stats?.system);
-          if (currentView === 'users') renderOnlineUsers();
-          if (currentView === 'games') renderGames();
-          if (currentView === 'matches') loadLiveMatches();
-          if (currentView === 'accounts') renderAccounts();
-          if (currentView === 'dashboard') {
-            renderUserBreakdown();
-            renderGameDistribution();
-            renderRecentGames();
-            renderOnlineUsersDetail();
-            loadRecentGames();
-          }
-        });
-
-        socket.on('admin_action_result', (data) => {
-          if (data.success) showToast(data.message || '操作成功', 'success');
-          else showToast(data.message || '操作失败', 'error');
-        });
-
-        socket.on('admin_accounts_updated', () => loadAccounts());
-        socket.on('admin_leaderboard', (data) => {
-          adminData.leaderboard = data.leaderboard || [];
-          if (currentView === 'dashboard') renderLeaderboard();
-        });
-        socket.on('admin_game_history', (data) => showGameHistoryModal(data.history || []));
-        socket.on('admin_recent_games', (data) => {
-          adminData.recentGames = data.games || [];
-          if (currentView === 'dashboard') renderRecentGames();
-        });
-        socket.on('admin_config', (data) => showConfigModal(data.config || {}));
-        socket.on('admin_user_detail', (data) => showUserDetailModal(data));
-        socket.on('admin_chat_history', (data) => {
-          adminData.chatMessages = data.history || [];
-          if (currentView === 'chat') renderChatMessages();
-        });
-        socket.on('admin_logs', (data) => showLogsModal(data.logs || []));
-        socket.on('admin_accounts_list', (data) => {
-          adminData.accounts = data.accounts || [];
-          if (currentView === 'accounts') renderAccounts();
-        });
-        socket.on('level_exp_config', (data) => {
-          adminData.levelExpConfig = data.levelExp || {};
-        });
-        socket.on('admin_system_stats', (data) => {
-          if (data) {
-            adminData.stats = { ...adminData.stats };
-            if (data.totalUsers !== undefined) adminData.stats.totalUsers = data.totalUsers;
-            if (data.onlineUsers !== undefined) adminData.stats.onlineUsers = data.onlineUsers;
-            if (data.activeGames !== undefined) adminData.stats.activeGames = data.activeGames;
-            if (data.todayUsers !== undefined) adminData.stats.todayUsers = data.todayUsers;
-            if (data.peakOnline !== undefined) adminData.stats.peakOnline = data.peakOnline;
-            if (data.totalConnections !== undefined) adminData.stats.totalConnections = data.totalConnections;
+        // 统一注册管理员 socket 监听器（消除三个登录路径的重复代码）
+        function setupAdminSocketListeners(socket) {
+          socket.on('admin_update', (data) => {
+            adminData.stats = data.stats || {};
+            adminData.users = data.users || [];
+            adminData.games = data.games || [];
+            if (data.accounts) {
+              adminData.accounts = data.accounts;
+            }
             renderStats();
-          }
-        });
-        socket.on('admin_items_list', (data) => {
-          console.log('[DEBUG] 收到 admin_items_list (自动登录):', data);
-          if (data.success) {
-            mailItemList = data.items || [];
-            mailPackList = data.packs || [];
-            mailCosmeticList = data.cosmetics || [];
-            mailVipList = data.vip || [];
-            renderMailItems(mailItemList);
-            renderMailPacks(mailPackList);
-            renderMailCosmetics(mailCosmeticList);
-            renderMailVip(mailVipList);
-            renderGrantItems(mailItemList);
-          }
-        });
-        socket.on('admin_users_select_list', (data) => {
-          if (data.success && pendingUserListId) {
-            renderUserList(data.users, pendingUserListId);
-          }
-        });
+            renderSystemInfo(adminData.stats?.system);
+            if (currentView === 'users') renderOnlineUsers();
+            if (currentView === 'games') renderGames();
+            if (currentView === 'matches') loadLiveMatches();
+            if (currentView === 'accounts') renderAccounts();
+            if (currentView === 'dashboard') {
+              renderUserBreakdown();
+              renderGameDistribution();
+              renderRecentGames();
+              renderOnlineUsersDetail();
+              loadRecentGames();
+            }
+          });
 
-        // 经验记录数据
-        socket.on('admin_exp_records', (data) => {
-          handleExpRecordsData(data);
-        });
+          // 操作结果反馈
+          socket.on('admin_action_result', (data) => {
+            if (data.success) {
+              showToast(data.message || '操作成功', 'success');
+              if (data.action === 'maintenance_mode') {
+                loadSystemStats();
+              }
+            } else {
+              showToast(data.message || '操作失败', 'error');
+            }
+          });
 
-        // 星钻记录数据
-        socket.on('admin_coin_records', (data) => {
-          handleCoinRecordsData(data);
-        });
+          // 账号列表更新事件
+          socket.on('admin_accounts_updated', () => {
+            loadAccounts();
+          });
 
-        // 邮件记录数据
-        socket.on('admin_mail_records', (data) => {
-          handleMailRecordsData(data);
-        });
+          // 排行榜数据
+          socket.on('admin_leaderboard', (data) => {
+            adminData.leaderboard = data.leaderboard || [];
+            if (currentView === 'dashboard') renderLeaderboard();
+          });
 
-        // 系统设置事件
-        bindSettingsSocketEvents();
+          // 游戏历史
+          socket.on('admin_game_history', (data) => {
+            showGameHistoryModal(data.history || []);
+          });
+          socket.on('admin_recent_games', (data) => {
+            adminData.recentGames = data.games || [];
+            if (currentView === 'dashboard') renderRecentGames();
+          });
+
+          // 系统配置
+          socket.on('admin_config', (data) => {
+            showConfigModal(data.config || {});
+          });
+
+          // 用户详情
+          socket.on('admin_user_detail', (data) => {
+            showUserDetailModal(data);
+          });
+
+          // 聊天记录
+          socket.on('admin_chat_history', (data) => {
+            adminData.chatMessages = data.history || [];
+            if (currentView === 'chat') renderChatMessages();
+          });
+
+          // 日志数据
+          socket.on('admin_logs', (data) => {
+            showLogsModal(data.logs || []);
+          });
+
+          // 账号列表
+          socket.on('admin_accounts_list', (data) => {
+            adminData.accounts = data.accounts || [];
+            if (currentView === 'accounts') renderAccounts();
+          });
+
+          // 等级经验配置
+          socket.on('level_exp_config', (data) => {
+            adminData.levelExpConfig = data.levelExp || {};
+          });
+
+          // 系统统计
+          socket.on('admin_system_stats', (data) => {
+            if (data) {
+              adminData.stats = { ...adminData.stats };
+              if (data.totalUsers !== undefined) adminData.stats.totalUsers = data.totalUsers;
+              if (data.onlineUsers !== undefined) adminData.stats.onlineUsers = data.onlineUsers;
+              if (data.activeGames !== undefined) adminData.stats.activeGames = data.activeGames;
+              if (data.todayUsers !== undefined) adminData.stats.todayUsers = data.todayUsers;
+              if (data.peakOnline !== undefined) adminData.stats.peakOnline = data.peakOnline;
+              if (data.totalConnections !== undefined) adminData.stats.totalConnections = data.totalConnections;
+              if (data.totalRegisteredUsers !== undefined) adminData.stats.totalRegisteredUsers = data.totalRegisteredUsers;
+              if (data.totalGamesPlayed !== undefined) adminData.stats.totalGamesPlayed = data.totalGamesPlayed;
+              renderStats();
+              renderSystemInfo(adminData.stats?.system);
+              if (data.maintenance) {
+                updateMaintenanceUI(data.maintenance.enabled, data.maintenance);
+              }
+            }
+          });
+
+          // 物品列表
+          socket.on('admin_items_list', (data) => {
+            debugLog('收到 admin_items_list:', data);
+            if (data.success) {
+              mailItemList = data.items || [];
+              mailPackList = data.packs || [];
+              mailCosmeticList = data.cosmetics || [];
+              mailVipList = data.vip || [];
+              renderMailItems(mailItemList);
+              renderMailPacks(mailPackList);
+              renderMailCosmetics(mailCosmeticList);
+              renderMailVip(mailVipList);
+              renderGrantItems(mailItemList);
+            }
+          });
+
+          // 用户选择列表
+          socket.on('admin_users_select_list', (data) => {
+            if (data.success && pendingUserListId) {
+              renderUserList(data.users, pendingUserListId);
+            }
+          });
+
+          // 经验记录数据
+          socket.on('admin_exp_records', (data) => {
+            handleExpRecordsData(data);
+          });
+
+          // 星钻记录数据
+          socket.on('admin_coin_records', (data) => {
+            handleCoinRecordsData(data);
+          });
+
+          // 邮件记录数据
+          socket.on('admin_mail_records', (data) => {
+            handleMailRecordsData(data);
+          });
+
+          // 系统设置事件
+          bindSettingsSocketEvents();
+        }
+
+        setupAdminSocketListeners(socket);
       } else if (savedUserToken) {
         // 没有 adminToken，但有 userToken，尝试通过用户 token 自动登录
-        console.log('[DEBUG] 检测到 userToken，尝试自动登录管理后台');
+        debugLog('检测到 userToken，尝试自动登录管理后台');
 
         socket = io('/admin', {
           reconnection: true,
@@ -4400,7 +4457,7 @@
 
         // 监听登录结果
         socket.once('admin_login_result', (data) => {
-          console.log('[DEBUG] 收到 admin_login_result (用户token自动登录):', data);
+          debugLog('收到 admin_login_result (用户token自动登录):', data);
           if (data.success) {
             localStorage.setItem('adminToken', data.token);
             document.getElementById('login-page').classList.add('hidden');
@@ -4411,7 +4468,7 @@
             setTimeout(loadItemList, 500);
           } else {
             // 登录失败，显示登录页面
-            console.log('[DEBUG] 用户token自动登录失败:', data.message);
+            debugLog('用户token自动登录失败:', data.message);
             showToast(data.message || '无法自动登录，请手动登录', 'warning');
             socket.disconnect();
             document.getElementById('login-page').classList.remove('hidden');
@@ -4421,7 +4478,7 @@
 
         // 连接成功后发送用户 token 登录请求
         const onConnectForUserToken = () => {
-          console.log('[DEBUG] socket已连接，发送 admin_user_token_login 请求');
+          debugLog('socket已连接，发送 admin_user_token_login 请求');
           socket.emit('admin_user_token_login', { userToken: savedUserToken });
         };
         socket.on('connect', onConnectForUserToken);
@@ -4452,107 +4509,10 @@
           loadDashboardData();
         });
 
-        socket.on('admin_update', (data) => {
-          adminData.stats = data.stats || {};
-          adminData.users = data.users || [];
-          adminData.games = data.games || [];
-          if (data.accounts) adminData.accounts = data.accounts;
-          renderStats();
-          renderSystemInfo(adminData.stats?.system);
-          if (currentView === 'users') renderOnlineUsers();
-          if (currentView === 'games') renderGames();
-          if (currentView === 'matches') loadLiveMatches();
-          if (currentView === 'accounts') renderAccounts();
-          if (currentView === 'dashboard') {
-            renderUserBreakdown();
-            renderGameDistribution();
-            renderRecentGames();
-            renderOnlineUsersDetail();
-            loadRecentGames();
-          }
-        });
-
-        socket.on('admin_action_result', (data) => {
-          if (data.success) showToast(data.message || '操作成功', 'success');
-          else showToast(data.message || '操作失败', 'error');
-        });
-
-        socket.on('admin_accounts_updated', () => loadAccounts());
-        socket.on('admin_leaderboard', (data) => {
-          adminData.leaderboard = data.leaderboard || [];
-          if (currentView === 'dashboard') renderLeaderboard();
-        });
-        socket.on('admin_game_history', (data) => showGameHistoryModal(data.history || []));
-        socket.on('admin_recent_games', (data) => {
-          adminData.recentGames = data.games || [];
-          if (currentView === 'dashboard') renderRecentGames();
-        });
-        socket.on('admin_config', (data) => showConfigModal(data.config || {}));
-        socket.on('admin_user_detail', (data) => showUserDetailModal(data));
-        socket.on('admin_chat_history', (data) => {
-          adminData.chatMessages = data.history || [];
-          if (currentView === 'chat') renderChatMessages();
-        });
-        socket.on('admin_logs', (data) => showLogsModal(data.logs || []));
-        socket.on('admin_accounts_list', (data) => {
-          adminData.accounts = data.accounts || [];
-          if (currentView === 'accounts') renderAccounts();
-        });
-        socket.on('level_exp_config', (data) => {
-          adminData.levelExpConfig = data.levelExp || {};
-        });
-        socket.on('admin_system_stats', (data) => {
-          if (data) {
-            adminData.stats = { ...adminData.stats };
-            if (data.totalUsers !== undefined) adminData.stats.totalUsers = data.totalUsers;
-            if (data.onlineUsers !== undefined) adminData.stats.onlineUsers = data.onlineUsers;
-            if (data.activeGames !== undefined) adminData.stats.activeGames = data.activeGames;
-            if (data.todayUsers !== undefined) adminData.stats.todayUsers = data.todayUsers;
-            if (data.peakOnline !== undefined) adminData.stats.peakOnline = data.peakOnline;
-            if (data.totalConnections !== undefined) adminData.stats.totalConnections = data.totalConnections;
-            renderStats();
-          }
-        });
-        socket.on('admin_items_list', (data) => {
-          console.log('[DEBUG] 收到 admin_items_list (用户token登录):', data);
-          if (data.success) {
-            mailItemList = data.items || [];
-            mailPackList = data.packs || [];
-            mailCosmeticList = data.cosmetics || [];
-            mailVipList = data.vip || [];
-            renderMailItems(mailItemList);
-            renderMailPacks(mailPackList);
-            renderMailCosmetics(mailCosmeticList);
-            renderMailVip(mailVipList);
-            renderGrantItems(mailItemList);
-          }
-        });
-        socket.on('admin_users_select_list', (data) => {
-          if (data.success && pendingUserListId) {
-            renderUserList(data.users, pendingUserListId);
-          }
-        });
-
-        // 经验记录数据
-        socket.on('admin_exp_records', (data) => {
-          handleExpRecordsData(data);
-        });
-
-        // 星钻记录数据
-        socket.on('admin_coin_records', (data) => {
-          handleCoinRecordsData(data);
-        });
-
-        // 邮件记录数据
-        socket.on('admin_mail_records', (data) => {
-          handleMailRecordsData(data);
-        });
-
-        // 系统设置事件
-        bindSettingsSocketEvents();
+        setupAdminSocketListeners(socket);
       } else {
         // 没有任何 token，显示登录页面
-        console.log('[DEBUG] 没有检测到token，显示登录页面');
+        debugLog('没有检测到token，显示登录页面');
       }
     });
 
@@ -4640,7 +4600,7 @@
 
       // 监听登录结果
       socket.once('admin_login_result', (data) => {
-        console.log('[DEBUG] 收到 admin_login_result:', data);
+        debugLog('收到 admin_login_result:', data);
         if (data.success) {
           localStorage.setItem('adminToken', data.token);
           document.getElementById('login-page').classList.add('hidden');
@@ -4648,7 +4608,7 @@
           showToast('登录成功', 'success');
           loadDashboardData();
           loadServerVersion();
-          console.log('[DEBUG] 500ms 后调用 loadItemList');
+          debugLog('500ms 后调用 loadItemList');
           setTimeout(loadItemList, 500);
         } else {
           // 登录失败
@@ -4708,171 +4668,8 @@
         document.getElementById('admin-app').classList.add('hidden');
       });
 
-      // 统一数据更新接口
-      socket.on('admin_update', (data) => {
-        adminData.stats = data.stats || {};
-        adminData.users = data.users || [];
-        adminData.games = data.games || [];
-        // 现在从 admin_update 中获取账号数据
-        if (data.accounts) {
-          adminData.accounts = data.accounts;
-        }
-
-        renderStats();
-        renderSystemInfo(adminData.stats?.system);
-        if (currentView === 'users') renderOnlineUsers();
-        if (currentView === 'games') renderGames();
-        if (currentView === 'matches') loadLiveMatches();
-        if (currentView === 'accounts') renderAccounts();
-        if (currentView === 'dashboard') {
-          renderUserBreakdown();
-          renderGameDistribution();
-          renderRecentGames();
-          renderOnlineUsersDetail();
-          loadRecentGames();
-        }
-      });
-
-      // 操作结果反馈
-      socket.on('admin_action_result', (data) => {
-        if (data.success) {
-          showToast(data.message || '操作成功', 'success');
-          if (data.action === 'maintenance_mode') {
-            loadSystemStats();
-          }
-        } else {
-          showToast(data.message || '操作失败', 'error');
-        }
-      });
-
-      // 账号列表更新事件
-      socket.on('admin_accounts_updated', () => {
-        loadAccounts();
-      });
-
-      // 排行榜数据
-      socket.on('admin_leaderboard', (data) => {
-        adminData.leaderboard = data.leaderboard || [];
-        if (currentView === 'dashboard') renderLeaderboard();
-      });
-
-      // 游戏历史
-      socket.on('admin_game_history', (data) => {
-        showGameHistoryModal(data.history || []);
-      });
-      socket.on('admin_recent_games', (data) => {
-        adminData.recentGames = data.games || [];
-        if (currentView === 'dashboard') renderRecentGames();
-      });
-
-      // 系统配置
-      socket.on('admin_config', (data) => {
-        showConfigModal(data.config || {});
-      });
-
-      // 用户详情
-      socket.on('admin_user_detail', (data) => {
-        showUserDetailModal(data);
-      });
-
-      // 聊天记录
-      socket.on('admin_chat_history', (data) => {
-        adminData.chatMessages = data.history || [];
-        if (currentView === 'chat') renderChatMessages();
-      });
-
-      // 日志数据
-      socket.on('admin_logs', (data) => {
-        showLogsModal(data.logs || []);
-      });
-
-      // 账号列表
-      socket.on('admin_accounts_list', (data) => {
-        adminData.accounts = data.accounts || [];
-        if (currentView === 'accounts') renderAccounts();
-      });
-
-      // 等级经验配置
-      socket.on('level_exp_config', (data) => {
-        adminData.levelExpConfig = data.levelExp || {};
-      });
-
-      // 系统统计
-      socket.on('admin_system_stats', (data) => {
-        if (data) {
-          adminData.stats = { ...adminData.stats };
-          if (data.totalUsers !== undefined) {
-            adminData.stats.totalUsers = data.totalUsers;
-          }
-          if (data.onlineUsers !== undefined) {
-            adminData.stats.onlineUsers = data.onlineUsers;
-          }
-          if (data.activeGames !== undefined) {
-            adminData.stats.activeGames = data.activeGames;
-          }
-          if (data.todayUsers !== undefined) {
-            adminData.stats.todayUsers = data.todayUsers;
-          }
-          if (data.peakOnline !== undefined) {
-            adminData.stats.peakOnline = data.peakOnline;
-          }
-          if (data.totalConnections !== undefined) {
-            adminData.stats.totalConnections = data.totalConnections;
-          }
-          if (data.totalRegisteredUsers !== undefined) {
-            adminData.stats.totalRegisteredUsers = data.totalRegisteredUsers;
-          }
-          if (data.totalGamesPlayed !== undefined) {
-            adminData.stats.totalGamesPlayed = data.totalGamesPlayed;
-          }
-          renderStats();
-          renderSystemInfo(adminData.stats?.system);
-          if (data.maintenance) {
-            updateMaintenanceUI(data.maintenance.enabled, data.maintenance);
-          }
-        }
-      });
-
-      // 物品列表
-      socket.on('admin_items_list', (data) => {
-        console.log('[DEBUG] 收到 admin_items_list (账号登录):', data);
-        if (data.success) {
-          mailItemList = data.items || [];
-          mailPackList = data.packs || [];
-          mailCosmeticList = data.cosmetics || [];
-          mailVipList = data.vip || [];
-          renderMailItems(mailItemList);
-          renderMailPacks(mailPackList);
-          renderMailCosmetics(mailCosmeticList);
-          renderMailVip(mailVipList);
-          renderGrantItems(mailItemList);
-        }
-      });
-
-      // 用户选择列表
-      socket.on('admin_users_select_list', (data) => {
-        if (data.success && pendingUserListId) {
-          renderUserList(data.users, pendingUserListId);
-        }
-      });
-
-      // 经验记录数据
-      socket.on('admin_exp_records', (data) => {
-        handleExpRecordsData(data);
-      });
-
-      // 星钻记录数据
-      socket.on('admin_coin_records', (data) => {
-        handleCoinRecordsData(data);
-      });
-
-      // 邮件记录数据
-      socket.on('admin_mail_records', (data) => {
-        handleMailRecordsData(data);
-      });
-
-      // 系统设置事件
-      bindSettingsSocketEvents();
+      // 统一注册管理员 socket 监听器
+      setupAdminSocketListeners(socket);
     }
 
     // ==================== 经验值记录模块 ====================
@@ -5405,13 +5202,13 @@
 
     // 加载服务器版本号
     function loadServerVersion() {
-      console.log('[DEBUG] loadServerVersion 被调用');
+      debugLog('loadServerVersion 被调用');
       fetch('/version')
         .then(response => response.json())
         .then(data => {
-          console.log('[DEBUG] 版本号数据:', data);
+          debugLog('版本号数据:', data);
           const elements = document.getElementById('server-version');
-          console.log('[DEBUG] 找到的版本号元素:', elements);
+          debugLog('找到的版本号元素:', elements);
           // 手动查找所有 id="server-version" 的元素（处理重复 id 的情况）
           const allElements = document.getElementsByTagName('span');
           for (let i = 0; i < allElements.length; i++) {
@@ -5879,16 +5676,16 @@
 
         return `
       <tr>
-        <td style="font-family:monospace;font-size:11px;color:#94a3b8;">${accId?.substr(0, 8) || '-'}</td>
-        <td style="font-weight:500;">${acc.account?.username || '-'}</td>
-        <td>${acc.account?.nickname || '-'}</td>
+        <td style="font-family:monospace;font-size:11px;color:#94a3b8;">${escapeHtml(accId?.substr(0, 8) || '-')}</td>
+        <td style="font-weight:500;">${escapeHtml(acc.account?.username || '-')}</td>
+        <td>${escapeHtml(acc.account?.nickname || '-')}</td>
         <td><span class="badge ${typeClass}">${acc.account?.type === 'registered' ? '注册' : '游客'}</span></td>
         <td><span class="badge ${roleClass}">${acc.account?.isAdmin ? '管理员' : '普通'}</span></td>
         <td><span class="badge ${statusBadge}">${statusText}</span></td>
         <td>Lv.${level}</td>
         <td style="font-size:11px;color:#64748b;">${formatTime(acc.account?.lastLogin)}</td>
         <td>
-          <button class="btn btn-sm btn-secondary" onclick="showAccountActions('${accId}', '${acc.account?.nickname || acc.account?.username || '-'}')">操作</button>
+          <button class="btn btn-sm btn-secondary" data-acc-id="${escapeHtml(accId || '')}" data-acc-name="${escapeHtml(acc.account?.nickname || acc.account?.username || '-')}" onclick="showAccountActions(this.dataset.accId, this.dataset.accName)">操作</button>
         </td>
       </tr>
     `;
@@ -7175,141 +6972,45 @@
       });
     }
 
-    // 显示添加成就模态框
-    function showAddAchievementModal(accountId) {
-      socket.emit('get_achievements_list');
-      socket.once('achievements_list', (data) => {
-        if (!data.categories) return;
-
-        let achievementsOptions = '';
-        for (const category of data.categories) {
-          achievementsOptions += `<optgroup label="${category.name}">`;
-          for (const achievement of category.achievements) {
-            achievementsOptions += `<option value="${achievement.id}">${achievement.name} (${achievement.reward} EXP)</option>`;
-          }
-          achievementsOptions += `</optgroup>`;
-        }
-
-        showModal('添加成就', `
-          <div class="form-group">
-            <label class="form-label">选择成就</label>
-            <select id="achievement-select" class="form-input" style="max-height: 300px;">
-              ${achievementsOptions}
-            </select>
-          </div>
-        `, [
-          { text: '取消', class: 'btn-secondary', action: closeModal },
-          {
-            text: '添加', class: 'btn-primary', action: () => {
-              const achievementId = document.getElementById('achievement-select').value;
-              if (!achievementId) {
-                showToast('请选择成就', 'error');
-                return;
-              }
-              addUserAchievement(accountId, achievementId);
-            }
-          }
-        ]);
-      });
-    }
-
-    // 显示移除成就模态框
-    function showRemoveAchievementModal(accountId) {
-      socket.emit('get_account_detail', { id: accountId });
-      socket.once('admin_account_detail', (data) => {
-        if (!data.account || !data.account.achievements) {
-          showToast('该用户没有成就', 'error');
-          return;
-        }
-
-        const achievements = data.account.achievements;
-        if (achievements.length === 0) {
-          showToast('该用户没有成就', 'error');
-          return;
-        }
-
-        socket.emit('get_achievements_list');
-        socket.once('achievements_list', (achievementData) => {
-          if (!achievementData.categories) return;
-
-          const achievementMap = {};
-          for (const category of achievementData.categories) {
-            for (const achievement of category.achievements) {
-              achievementMap[achievement.id] = achievement;
-            }
-          }
-
-          let achievementsOptions = '';
-          for (const achievementId of achievements) {
-            const achievement = achievementMap[achievementId];
-            if (achievement) {
-              achievementsOptions += `<option value="${achievement.id}">${achievement.name} (${achievement.reward} EXP)</option>`;
-            }
-          }
-
-          showModal('移除成就', `
-            <div class="form-group">
-              <label class="form-label">选择要移除的成就</label>
-              <select id="achievement-select" class="form-input" style="max-height: 300px;">
-                ${achievementsOptions}
-              </select>
-            </div>
-          `, [
-            { text: '取消', class: 'btn-secondary', action: closeModal },
-            {
-              text: '移除', class: 'btn-danger', action: () => {
-                const achievementId = document.getElementById('achievement-select').value;
-                if (!achievementId) {
-                  showToast('请选择成就', 'error');
-                  return;
-                }
-                removeUserAchievement(accountId, achievementId);
-              }
-            }
-          ]);
-        });
-      });
-    }
-
-    // 添加用户成就
+    // 添加用户成就（操作后刷新模态框）
     function addUserAchievement(accountId, achievementId) {
       socket.emit('add_user_achievement', { id: accountId, achievementId });
       socket.once('admin_action_result', (data) => {
-        if (data.action === 'add_user_achievement' && data.success) {
-          showToast('成就添加成功', 'success');
-          closeModal();
-          if (currentView === 'accounts') {
-            loadAccounts();
+        if (data.action === 'add_user_achievement') {
+          showToast(data.message || (data.success ? '成就添加成功' : '操作失败'), data.success ? 'success' : 'error');
+          if (data.success) {
+            showAchievementManagement(accountId);
+            if (currentView === 'accounts') loadAccounts();
           }
         }
       });
     }
 
-    // 移除用户成就
+    // 移除用户成就（操作后刷新模态框）
     function removeUserAchievement(accountId, achievementId) {
       socket.emit('remove_user_achievement', { id: accountId, achievementId });
       socket.once('admin_action_result', (data) => {
-        if (data.action === 'remove_user_achievement' && data.success) {
-          showToast('成就移除成功', 'success');
-          closeModal();
-          if (currentView === 'accounts') {
-            loadAccounts();
+        if (data.action === 'remove_user_achievement') {
+          showToast(data.message || (data.success ? '成就移除成功' : '操作失败'), data.success ? 'success' : 'error');
+          if (data.success) {
+            showAchievementManagement(accountId);
+            if (currentView === 'accounts') loadAccounts();
           }
         }
       });
     }
 
-    // 重置用户成就
+    // 重置用户所有成就（含奖励回收）
     function resetAchievements(accountId) {
-      if (!confirm('确定要重置该用户的所有成就吗？此操作不可恢复！')) return;
+      if (!confirm('确定要重置该用户的所有成就吗？已发放的EXP奖励将被回收，此操作不可恢复！')) return;
 
       socket.emit('reset_user_achievements', { id: accountId });
       socket.once('admin_action_result', (data) => {
-        if (data.action === 'reset_user_achievements' && data.success) {
-          showToast('成就重置成功', 'success');
-          closeModal();
-          if (currentView === 'accounts') {
-            loadAccounts();
+        if (data.action === 'reset_user_achievements') {
+          showToast(data.message || (data.success ? '成就重置成功' : '操作失败'), data.success ? 'success' : 'error');
+          if (data.success) {
+            closeModal();
+            if (currentView === 'accounts') loadAccounts();
           }
         }
       });
@@ -7351,31 +7052,118 @@
       });
     }
 
-    // 显示成就管理模态框
+    // 显示成就管理模态框（重新设计：列表展示 + 内联操作）
     function showAchievementManagement(accountId) {
+      // 并行获取账号详情和成就定义列表
+      let accountData = null;
+      let achievementsData = null;
+
+      const tryRender = () => {
+        if (accountData && achievementsData) {
+          renderAchievementManagementModal(accountId, accountData, achievementsData);
+        }
+      };
+
       socket.emit('get_account_detail', { id: accountId });
       socket.once('admin_account_detail', (data) => {
-        if (!data.account) return;
-
-        const account = data.account;
-        const achievements = account.achievements || [];
-
-        showModal('成就管理', `
-          <div class="form-group">
-            <label class="form-label">已解锁成就</label>
-            <div style="background: #0f172a; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
-              <div style="text-align: center; font-size: 14px; color: #60a5fa; margin-bottom: 10px;">
-                已解锁成就: ${achievements.length} 个
-              </div>
-              <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <button onclick="showAddAchievementModal('${accountId}')" class="btn btn-sm btn-primary">添加成就</button>
-                <button onclick="showRemoveAchievementModal('${accountId}')" class="btn btn-sm btn-secondary">移除成就</button>
-                <button onclick="resetAchievements('${accountId}')" class="btn btn-sm btn-danger">重置所有成就</button>
-              </div>
-            </div>
-          </div>
-        `, [{ text: '关闭', class: 'btn-secondary', action: closeModal }]);
+        accountData = data;
+        tryRender();
       });
+
+      socket.emit('get_achievements_list');
+      socket.once('achievements_list', (data) => {
+        achievementsData = data;
+        tryRender();
+      });
+    }
+
+    // 渲染成就管理模态框内容
+    function renderAchievementManagementModal(accountId, accountData, achievementsData) {
+      const account = accountData.account;
+      if (!account) {
+        showToast('账号不存在', 'error');
+        return;
+      }
+
+      const userAchievementIds = account.achievements || [];
+      // 构建成就映射
+      const achievementMap = {};
+      const allCategories = achievementsData.categories || [];
+      for (const category of allCategories) {
+        for (const achievement of category.achievements) {
+          achievementMap[achievement.id] = achievement;
+        }
+      }
+
+      // 已解锁成就列表
+      let unlockedHtml = '';
+      if (userAchievementIds.length === 0) {
+        unlockedHtml = '<div style="text-align:center;color:#64748b;padding:20px;">暂无已解锁成就</div>';
+      } else {
+        unlockedHtml = userAchievementIds.map(aid => {
+          const ach = achievementMap[aid];
+          if (!ach) {
+            return `<div style="padding:8px 12px;background:#0f172a;border-radius:6px;margin-bottom:6px;color:#94a3b8;">未知成就 #${escapeHtml(String(aid))}</div>`;
+          }
+          return `
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#0f172a;border-radius:6px;margin-bottom:6px;">
+              <div style="flex:1;min-width:0;">
+                <div style="font-weight:500;color:#e2e8f0;">${escapeHtml(ach.name)}</div>
+                <div style="font-size:12px;color:#64748b;">${escapeHtml(ach.description || '')}</div>
+              </div>
+              <div style="color:#60a5fa;font-size:12px;white-space:nowrap;">+${ach.reward?.exp || 0} EXP</div>
+              <button class="btn btn-sm btn-danger" data-acc-id="${escapeHtml(String(accountId))}" data-ach-id="${escapeHtml(String(aid))}" onclick="removeUserAchievement(this.dataset.accId, this.dataset.achId)">移除</button>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // 未解锁成就选项（用于添加下拉框）
+      const unlockedSet = new Set(userAchievementIds);
+      let addOptions = '';
+      let hasUnlocked = false;
+      for (const category of allCategories) {
+        let categoryOptions = '';
+        for (const achievement of category.achievements) {
+          if (!unlockedSet.has(achievement.id)) {
+            categoryOptions += `<option value="${achievement.id}">${escapeHtml(achievement.name)} (+${achievement.reward?.exp || 0} EXP)</option>`;
+            hasUnlocked = true;
+          }
+        }
+        if (categoryOptions) {
+          addOptions += `<optgroup label="${escapeHtml(category.name)}">${categoryOptions}</optgroup>`;
+        }
+      }
+
+      const addSectionHtml = hasUnlocked
+        ? `<div style="display:flex;gap:10px;margin-top:8px;">
+             <select id="achievement-add-select" class="form-input" style="flex:1;">
+               ${addOptions}
+             </select>
+             <button class="btn btn-sm btn-primary" data-acc-id="${escapeHtml(String(accountId))}" onclick="addUserAchievement(this.dataset.accId, document.getElementById('achievement-add-select').value)">添加</button>
+           </div>`
+        : '<div style="text-align:center;color:#64748b;padding:10px;">所有成就已解锁</div>';
+
+      const displayName = escapeHtml(account.profile?.nickname || account.username || '未知');
+      const modalButtons = [{ text: '关闭', class: 'btn-secondary', action: closeModal }];
+      if (userAchievementIds.length > 0) {
+        modalButtons.push({
+          text: '重置所有成就', class: 'btn-danger', action: () => resetAchievements(accountId)
+        });
+      }
+
+      showModal(`成就管理 - ${displayName}`, `
+        <div class="form-group">
+          <label class="form-label">已解锁成就（${userAchievementIds.length} 个）</label>
+          <div style="max-height:300px;overflow-y:auto;margin-bottom:15px;">
+            ${unlockedHtml}
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">添加成就</label>
+          ${addSectionHtml}
+        </div>
+      `, modalButtons);
     }
 
     function viewAccountDetail(accountId) {
@@ -8032,10 +7820,24 @@
     }
 
     function showConfigModal(config) {
+      // 动态获取版本号，确保与 version.json 一致
+      let versionText = '加载中...';
+      fetch('/version')
+        .then(r => r.json())
+        .then(d => {
+          versionText = `${d.version} (Build ${d.build})`;
+          const input = document.querySelector('#config-version-input');
+          if (input) input.value = versionText;
+        })
+        .catch(() => {
+          const input = document.querySelector('#config-version-input');
+          if (input) input.value = '获取失败';
+        });
+
       showModal('系统配置', `
         <div class="form-group">
           <label class="form-label">服务器版本</label>
-          <input type="text" class="form-input" value="${config.version || '1.0.0'}" readonly>
+          <input type="text" class="form-input" id="config-version-input" value="${versionText}" readonly>
         </div>
         <div class="form-group">
           <label class="form-label">维护模式</label>
@@ -8405,19 +8207,19 @@
     let mailActiveTab = 'items';
 
     function loadItemList() {
-      console.log('[DEBUG] loadItemList 被调用, socket:', socket, 'connected:', socket?.connected);
+      debugLog('loadItemList 被调用, socket:', socket, 'connected:', socket?.connected);
       if (socket) {
         socket.emit('get_items_list');
-        console.log('[DEBUG] 已发送 get_items_list 事件');
+        debugLog('已发送 get_items_list 事件');
       }
     }
 
     function renderMailItems(items) {
-      console.log('[DEBUG] renderMailItems, items:', items?.length);
+      debugLog('renderMailItems, items:', items?.length);
       const availableContainer = document.getElementById('mail-items-available');
       const gridContainer = document.getElementById('mail-items-grid');
       if (!availableContainer || !gridContainer) {
-        console.log('[DEBUG] renderMailItems 元素缺失:', { availableContainer: !!availableContainer, gridContainer: !!gridContainer });
+        debugLog('renderMailItems 元素缺失:', { availableContainer: !!availableContainer, gridContainer: !!gridContainer });
         return;
       }
 
@@ -9202,10 +9004,6 @@
         }
         return parts.length ? ' ' + parts.join(' ') : '';
       } catch { return ''; }
-    }
-
-    function escapeHtml(s) {
-      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
     function isLevelEnabled(level) {

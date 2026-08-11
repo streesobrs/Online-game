@@ -53,6 +53,27 @@ const io = socketIo(server, {
 
 // 中间件
 app.use(cors());
+
+// gzip 压缩中间件（优雅降级：未安装 compression 时跳过）
+try {
+  const compression = require('compression');
+  app.use(compression({ level: 6, threshold: 1024 }));
+} catch (e) {
+  logger.warn('未安装 compression 模块，响应未压缩。建议执行 npm install compression');
+}
+
+// 安全 HTTP 头中间件（优雅降级：未安装 helmet 时跳过）
+try {
+  const helmet = require('helmet');
+  app.use(helmet({
+    contentSecurityPolicy: false, // 关闭CSP避免破坏内联脚本（前端单文件架构）
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
+  }));
+} catch (e) {
+  logger.warn('未安装 helmet 模块，安全头未启用。建议执行 npm install helmet');
+}
+
 app.use(express.json({ limit: config.server.http.bodyLimit }));
 app.use(express.urlencoded({ extended: true, limit: config.server.http.bodyLimit }));
 
@@ -100,7 +121,7 @@ app.get('/health', (req, res) => {
     status: 'ok',
     timestamp: Date.now(),
     uptime: Date.now() - serverStartTime,
-    version: versionManager.getServerVersion()
+    version: config.version  // 完整版本号 (major.minor.patch.build)
   });
 });
 
@@ -509,13 +530,16 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-// 版本信息API
+// 版本信息API（统一从 config.versionData 获取）
 app.get('/version', (req, res) => {
-  const versionStr = versionManager.getServerVersion();
-  const parts = versionStr.split('.').map(Number);
+  const v = config.versionData;
   res.json({
-    version: `${parts[0]}.${parts[1]}.${parts[2]}`,
-    build: parts[3],
+    version: v.displayVersion,
+    fullVersion: v.version,
+    build: v.build,
+    major: v.major,
+    minor: v.minor,
+    patch: v.patch,
     timestamp: Date.now()
   });
 });
@@ -1651,7 +1675,7 @@ const chatManager = new ChatManager(userManager, gameManager, accountManager);
 chatManager.operationLogger = operationLogger;
 logger.info('聊天系统初始化完成');
 
-const adminManager = new AdminManager(userManager, gameManager, chatManager, accountManager, io);
+const adminManager = new AdminManager(userManager, gameManager, chatManager, accountManager, io, achievementManager);
 adminManager.operationLogger = operationLogger;
 logger.info('后台管理系统初始化完成');
 
@@ -3826,6 +3850,22 @@ adminNamespace.on('connection', (socket) => {
     adminManager.getItemsList(socket);
   });
 
+  // 获取成就列表（管理员用，返回所有成就定义供添加成就模态框使用）
+  socket.on('get_achievements_list', () => {
+    if (!adminManager.checkAdminAuth(socket)) {
+      socket.emit('achievements_list', { categories: [], error: '未授权' });
+      return;
+    }
+    try {
+      const categoriesObj = achievementManager.getAchievementsByCategory({});
+      const categories = Object.values(categoriesObj);
+      socket.emit('achievements_list', { categories });
+    } catch (err) {
+      logger.error('获取成就列表失败', { error: err.message });
+      socket.emit('achievements_list', { categories: [] });
+    }
+  });
+
   // 获取用户选择列表
   socket.on('get_users_select_list', (data) => {
     adminManager.getUsersForSelect(socket, data.keyword);
@@ -4231,11 +4271,16 @@ process.on('SIGINT', async () => {
 });
 
 // 未捕获异常处理
+// Node.js 官方建议：未捕获异常后进程状态不可预测，应记录日志后退出，
+// 由外部进程管理器（pm2/系统服务）负责重启。这里保留 3 秒写日志缓冲再退出。
+let isShuttingDown = false;
 process.on('uncaughtException', (err) => {
-  logger.error('未捕获的异常', { error: err.message, stack: err.stack });
-  // 不退出进程，让服务端继续运行。只记录详细错误日志便于排查。
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  logger.error('未捕获的异常，进程将退出', { error: err.message, stack: err.stack });
+  setTimeout(() => process.exit(1), 3000);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  logger.error('未处理的Promise拒绝', { reason, promise });
+  logger.error('未处理的Promise拒绝', { reason });
 });

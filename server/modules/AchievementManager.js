@@ -828,6 +828,11 @@ class AchievementManager {
     return this.achievements;
   }
 
+  // 获取单个成就定义
+  getAchievement(id) {
+    return this.achievements.find(a => a.id === id || a.id === Number(id));
+  }
+
   // 计算成就进度
   calculateAchievementProgress(achievement, stats) {
     switch (achievement.type) {

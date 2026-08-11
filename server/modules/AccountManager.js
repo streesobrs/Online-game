@@ -19,6 +19,29 @@ class AccountManager {
     this.io = io;
     // 加载等级经验配置
     this.levelExpConfig = this.loadLevelExpConfig();
+    // 商店配置缓存（避免请求路径上同步读文件阻塞事件循环）
+    // 结构: { [fileName]: { data, ts } }
+    this._shopConfigCache = {};
+    this._shopConfigTTL = 30000; // 30秒缓存，平衡新鲜度与性能
+  }
+
+  // 读取商店配置（带 TTL 缓存，避免高并发下阻塞事件循环）
+  _getShopConfig(fileName) {
+    const now = Date.now();
+    const cached = this._shopConfigCache[fileName];
+    if (cached && (now - cached.ts) < this._shopConfigTTL) {
+      return cached.data;
+    }
+    const filePath = path.join(__dirname, '..', 'config', 'shop', fileName);
+    if (!fs.existsSync(filePath)) return null;
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    this._shopConfigCache[fileName] = { data, ts: now };
+    return data;
+  }
+
+  // 清除商店配置缓存（配置变更后可手动调用）
+  invalidateShopConfigCache() {
+    this._shopConfigCache = {};
   }
 
   // 节假日名称→倍率映射
@@ -179,13 +202,26 @@ class AccountManager {
     return crypto.pbkdf2Sync(password, salt, this.iterations, this.keyLength, this.digest).toString('hex');
   }
 
-  // 验证密码
+  // 验证密码（使用常量时间比较，防止时序攻击）
   verifyPassword(password, salt, hash) {
     if (!salt || !hash) {
       return false;
     }
     const hashToVerify = this.hashPassword(password, salt);
-    return hashToVerify === hash;
+    try {
+      // 长度不同时也先做一次常量时间比较以保持时间恒定
+      const a = Buffer.from(hashToVerify, 'hex');
+      const b = Buffer.from(hash, 'hex');
+      if (a.length !== b.length) {
+        // 长度不一致直接返回 false，但仍做一次比较以避免长度泄漏
+        crypto.timingSafeEqual(a, a);
+        return false;
+      }
+      return crypto.timingSafeEqual(a, b);
+    } catch (err) {
+      logger.error('密码验证失败', { error: err.message });
+      return false;
+    }
   }
 
   // 生成用户ID
@@ -2141,6 +2177,35 @@ class AccountManager {
     }
   }
 
+  // 管理员重置用户所有成就
+  async resetUserAchievements(id) {
+    try {
+      const account = await dataStore.findOne('accounts', { 'account.id': id });
+      if (!account) {
+        return {
+          success: false,
+          message: '账号不存在'
+        };
+      }
+
+      const oldAchievements = this._normalizeAchievements(account.achievements || []);
+      await dataStore.update('accounts', { 'account.id': id }, { achievements: [], 'account.updatedAt': Date.now() });
+      logger.info('管理员重置用户所有成就', { id, count: oldAchievements.length });
+
+      return {
+        success: true,
+        message: '成就重置成功',
+        removedAchievements: oldAchievements
+      };
+    } catch (err) {
+      logger.error('重置用户成就失败', { id, error: err.message });
+      return {
+        success: false,
+        message: '重置失败，请稍后重试'
+      };
+    }
+  }
+
   // ========== 星钻货币系统 ==========
 
   // 货币名称配置
@@ -3657,12 +3722,10 @@ class AccountManager {
    */
   getAllCosmeticsConfig() {
     try {
-      const cosmeticsPath = path.join(__dirname, '..', 'config', 'shop', 'cosmetics.json');
-      if (!fs.existsSync(cosmeticsPath)) {
+      const data = this._getShopConfig('cosmetics.json');
+      if (!data) {
         return { success: false, message: '配置不存在' };
       }
-
-      const data = JSON.parse(fs.readFileSync(cosmeticsPath, 'utf-8'));
       return { success: true, cosmetics: data };
     } catch (err) {
       logger.error('获取外观配置失败', { error: err.message });
@@ -3685,10 +3748,9 @@ class AccountManager {
     let discountPercent = 0;
     let expBonus = vip.expBonus || 0;
     if (isActive && vip.type) {
-      const vipConfigPath = path.join(__dirname, '..', 'config', 'shop', 'vip.json');
       try {
-        if (fs.existsSync(vipConfigPath)) {
-          const vipConfig = JSON.parse(fs.readFileSync(vipConfigPath, 'utf8'));
+        const vipConfig = this._getShopConfig('vip.json');
+        if (vipConfig) {
           const cfg = vipConfig[vip.type];
           if (cfg) {
             discountPercent = cfg.discountPercent || 0;
@@ -3742,11 +3804,10 @@ class AccountManager {
     if (vip.lastDailyGiftDate === today) return; // 今天已发过
 
     // 读取每日奖励配置
-    const vipConfigPath = path.join(__dirname, '..', 'config', 'shop', 'vip.json');
     let vipConfig;
     try {
-      if (!fs.existsSync(vipConfigPath)) return;
-      vipConfig = JSON.parse(fs.readFileSync(vipConfigPath, 'utf8'));
+      vipConfig = this._getShopConfig('vip.json');
+      if (!vipConfig) return;
     } catch (e) { return; }
 
     const cfg = vipConfig[vip.type];
@@ -3792,13 +3853,12 @@ class AccountManager {
       const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
 
       // 读取VIP配置
-      const vipConfigPath = path.join(__dirname, '..', 'config', 'shop', 'vip.json');
       let vipConfig;
       try {
-        if (!fs.existsSync(vipConfigPath)) {
+        vipConfig = this._getShopConfig('vip.json');
+        if (!vipConfig) {
           return { success: true, sent: 0, total: 0, reason: 'vip config not found' };
         }
-        vipConfig = JSON.parse(fs.readFileSync(vipConfigPath, 'utf8'));
       } catch (e) {
         return { success: false, sent: 0, total: 0, reason: 'vip config read error' };
       }
@@ -3940,21 +4000,16 @@ class AccountManager {
       }
 
       // 从配置文件读取物品/礼包/外观信息，填充 name/icon
-      const itemsPath = path.join(__dirname, '..', 'config', 'shop', 'items.json');
-      const packsPath = path.join(__dirname, '..', 'config', 'shop', 'packs.json');
-      const cosmeticsPath = path.join(__dirname, '..', 'config', 'shop', 'cosmetics.json');
-      const vipPath = path.join(__dirname, '..', 'config', 'shop', 'vip.json');
-
       let itemsConfig = {};
       let packsConfig = {};
       let cosmeticsConfig = {};
       let vipConfig = {};
 
       try {
-        if (fs.existsSync(itemsPath)) itemsConfig = JSON.parse(fs.readFileSync(itemsPath, 'utf8'));
-        if (fs.existsSync(packsPath)) packsConfig = JSON.parse(fs.readFileSync(packsPath, 'utf8'));
-        if (fs.existsSync(cosmeticsPath)) cosmeticsConfig = JSON.parse(fs.readFileSync(cosmeticsPath, 'utf8'));
-        if (fs.existsSync(vipPath)) vipConfig = JSON.parse(fs.readFileSync(vipPath, 'utf8'));
+        itemsConfig = this._getShopConfig('items.json') || {};
+        packsConfig = this._getShopConfig('packs.json') || {};
+        cosmeticsConfig = this._getShopConfig('cosmetics.json') || {};
+        vipConfig = this._getShopConfig('vip.json') || {};
       } catch (e) { /* 忽略配置读取错误 */ }
 
       // 处理物品列表：填充 name/icon
@@ -4580,13 +4635,11 @@ class AccountManager {
       const invStore = await this._getInventoryStore(userId);
       if (!invStore.items) invStore.items = {};
 
-      const itemsPath = path.join(__dirname, '..', 'config', 'shop', 'items.json');
-      const packsPath = path.join(__dirname, '..', 'config', 'shop', 'packs.json');
       let itemsConfig = {};
       let packsConfig = {};
       try {
-        if (fs.existsSync(itemsPath)) itemsConfig = JSON.parse(fs.readFileSync(itemsPath, 'utf8'));
-        if (fs.existsSync(packsPath)) packsConfig = JSON.parse(fs.readFileSync(packsPath, 'utf8'));
+        itemsConfig = this._getShopConfig('items.json') || {};
+        packsConfig = this._getShopConfig('packs.json') || {};
       } catch (e) { /* 忽略 */ }
 
       for (const item of items) {

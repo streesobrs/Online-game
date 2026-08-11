@@ -1,10 +1,91 @@
 // AIManager.js - AI 管理模块
 const config = require('../config');
 const logger = require('../utils/logger');
+const { Worker } = require('worker_threads');
+const path = require('path');
 
 class AIManager {
   constructor() {
     this.difficultyLevels = ['easy', 'medium', 'hard'];
+    // AI 计算 worker（懒加载，避免阻塞主线程事件循环）
+    this._worker = null;
+    this._workerReady = false;
+    this._pendingCalls = new Map(); // id -> { resolve, reject }
+    this._callId = 0;
+    this._workerDisabled = false; // worker 创建失败时降级为同步
+  }
+
+  // 初始化 worker（懒加载）
+  _initWorker() {
+    if (this._worker || this._workerDisabled) return;
+    try {
+      this._worker = new Worker(path.join(__dirname, 'AIWorker.js'));
+      this._worker.on('message', (msg) => {
+        if (msg.type === 'ready') {
+          this._workerReady = true;
+          logger.info('AI 计算 worker 已就绪');
+          return;
+        }
+        const pending = this._pendingCalls.get(msg.id);
+        if (pending) {
+          this._pendingCalls.delete(msg.id);
+          if (msg.error) {
+            pending.reject(new Error(msg.error));
+          } else {
+            pending.resolve(msg.result);
+          }
+        }
+      });
+      this._worker.on('error', (err) => {
+        logger.error('AI worker 错误，降级为同步模式', { error: err.message });
+        // worker 异常时降级，所有 pending 调用转为同步执行
+        for (const [id, pending] of this._pendingCalls) {
+          pending.reject(new Error('worker 不可用'));
+        }
+        this._pendingCalls.clear();
+        this._workerDisabled = true;
+        try { this._worker.terminate(); } catch (e) { }
+        this._worker = null;
+      });
+    } catch (err) {
+      logger.warn('创建 AI worker 失败，降级为同步模式', { error: err.message });
+      this._workerDisabled = true;
+    }
+  }
+
+  // 通过 worker 异步调用 AI 方法（worker 不可用时降级为同步）
+  _callAsync(method, args) {
+    // 降级路径：直接同步调用
+    if (this._workerDisabled) {
+      try {
+        return Promise.resolve(this[method](...args));
+      } catch (err) {
+        return Promise.reject(err);
+      }
+    }
+    this._initWorker();
+    if (this._workerDisabled) {
+      try {
+        return Promise.resolve(this[method](...args));
+      } catch (err) {
+        return Promise.reject(err);
+      }
+    }
+    const id = ++this._callId;
+    return new Promise((resolve, reject) => {
+      this._pendingCalls.set(id, { resolve, reject });
+      this._worker.postMessage({ id, method, args });
+    });
+  }
+
+  // 异步版 getAIMove（不阻塞事件循环）
+  getAIMoveAsync(gameType, board, difficulty, currentPlayer) {
+    return this._callAsync('getAIMove', [gameType, board, difficulty, currentPlayer]);
+  }
+
+  // 异步版 getSmartHint（不阻塞事件循环）
+  getSmartHintAsync(gameType, board, currentPlayer) {
+    return this._callAsync('getSmartHint', [gameType, board, currentPlayer]);
   }
 
   // 获取 AI 移动
@@ -21,7 +102,7 @@ class AIManager {
           return null;
       }
     } catch (error) {
-      console.error('getAIMove 出错:', error.message, error.stack);
+      logger.error('getAIMove 出错', { error: error.message, stack: error.stack });
       return null;
     }
   }
@@ -50,7 +131,7 @@ class AIManager {
           return this.getGobangEasyMove(board, currentPlayer);
       }
     } catch (error) {
-      console.error('getGobangAIMove 出错:', error.message, error.stack);
+      logger.error('getGobangAIMove 出错', { error: error.message, stack: error.stack });
       return this.getGobangEasyMove(board, currentPlayer);
     }
   }
@@ -456,7 +537,7 @@ class AIManager {
       // 如果 Minimax 没有找到好棋，回退到中等难度
       return this.getGobangMediumMove(board, currentPlayer);
     } catch (error) {
-      console.error('getGobangHardMove 出错:', error.message, error.stack);
+      logger.error('getGobangHardMove 出错', { error: error.message, stack: error.stack });
       return this.getGobangMediumMove(board, currentPlayer);
     }
   }
@@ -590,7 +671,7 @@ class AIManager {
         return { score: bestScore, move: bestMove };
       }
     } catch (error) {
-      console.error('minimaxOptimized 出错:', error.message, error.stack);
+      logger.error('minimaxOptimized 出错', { error: error.message, stack: error.stack });
       return { score: 0, move: null };
     }
   }
@@ -2653,7 +2734,7 @@ class AIManager {
           return null;
       }
     } catch (error) {
-      console.error('getSmartHint 出错:', error.message);
+      logger.error('getSmartHint 出错', { error: error.message });
       return null;
     }
   }
@@ -2850,7 +2931,7 @@ class AIManager {
         };
       }
     } catch (e) {
-      console.error('getChessSmartHint 出错:', e.message);
+      logger.error('getChessSmartHint 出错', { error: e.message });
     }
 
     return null;
@@ -2890,7 +2971,7 @@ class AIManager {
         };
       }
     } catch (e) {
-      console.error('getGoSmartHint 出错:', e.message);
+      logger.error('getGoSmartHint 出错', { error: e.message });
     }
 
     return null;

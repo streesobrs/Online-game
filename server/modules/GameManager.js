@@ -2086,22 +2086,31 @@ class GameManager {
       thinkTime = Math.floor(Math.random() * 301) + 200; // 200-500ms
     }
     setTimeout(() => {
-      this.handleAIAutoMove(accountId, io);
+      this.handleAIAutoMove(accountId, io).catch(err => {
+        logger.error('handleAIAutoMove 异步执行失败', { accountId, error: err.message, stack: err.stack });
+        // 失败后将回合还给玩家，避免卡死
+        const ag = this.aiGames.get(accountId);
+        if (ag) {
+          ag.currentPlayer = 1;
+          const s = this.userManager.getSocketByAccountId(accountId);
+          if (s) s.emit('ai_move_result', { position: null, color: 2, currentPlayer: 1, error: 'AI 思考失败' });
+        }
+      });
     }, thinkTime);
 
     return true;
   }
 
   // AI 自动移动
-  handleAIAutoMove(accountId, io) {
+  async handleAIAutoMove(accountId, io) {
     const aiGame = this.aiGames.get(accountId);
     if (!aiGame || aiGame.status !== 'playing' || aiGame.currentPlayer !== 2) {
       return;
     }
 
     try {
-      // 获取 AI 移动
-      const aiMove = this.aiManager.getAIMove(
+      // 获取 AI 移动（通过 worker 线程异步执行，避免阻塞事件循环）
+      const aiMove = await this.aiManager.getAIMoveAsync(
         aiGame.gameType,
         aiGame.board,
         aiGame.difficulty,
@@ -3205,8 +3214,8 @@ class GameManager {
     const aiBoard = board.map(row => Array.isArray(row) ? [...row] : row);
 
     try {
-      // 使用智能提示系统 - 按战局优先级分析并返回说明
-      hintData = this.aiManager.getSmartHint(gameType, aiBoard, currentPlayer);
+      // 使用智能提示系统 - 通过 worker 线程异步计算，避免阻塞事件循环
+      hintData = await this.aiManager.getSmartHintAsync(gameType, aiBoard, currentPlayer);
 
       if (hintData && hintData.move) {
         const socket = this.userManager.getSocketByAccountId(user.accountId);

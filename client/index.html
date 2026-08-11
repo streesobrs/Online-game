@@ -34,6 +34,16 @@
       transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, opacity 0.2s ease;
     }
 
+    /* 页面切换容器：统一淡入过渡，避免切换闪烁 */
+    .achievements-container,
+    .ai-game-container,
+    .leaderboard-page,
+    .theme-container,
+    .spectate-container,
+    .snake-game-container {
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
 
 
     body {
@@ -4162,15 +4172,40 @@
 
   <!-- 版本信息 -->
   <div class="version-info">
-    多棋种联机大厅 v<span id="client-version-display">1.5.0</span>
+    多棋种联机大厅 v<span id="client-version-display">加载中...</span>
     <span id="server-version-display" style="margin-left: 10px; font-size: 12px; color: #666;"></span>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="replay-module.js"></script>
   <script>
-    // 版本号 (语义化版本: MAJOR.MINOR.PATCH)
-    const CLIENT_VERSION = '1.6.0';
+    // 版本号 (从服务端 version.json 动态获取)
+    let APP_VERSION = 'loading...';
+
+    // 从服务端加载版本号
+    async function loadAppVersion() {
+      try {
+        const response = await fetch('/version');
+        if (response.ok) {
+          const data = await response.json();
+          APP_VERSION = data.version || 'unknown';
+          const versionDisplay = document.getElementById('client-version-display');
+          if (versionDisplay) {
+            versionDisplay.textContent = APP_VERSION;
+          }
+          // 同时更新服务器版本显示
+          const serverVersionDisplay = document.getElementById('server-version-display');
+          if (serverVersionDisplay && data.build !== undefined) {
+            serverVersionDisplay.textContent = `(Build: ${data.build})`;
+          }
+        } else {
+          APP_VERSION = 'fetch_failed';
+        }
+      } catch (err) {
+        console.error('加载版本号失败:', err);
+        APP_VERSION = 'error';
+      }
+    }
 
     // 全局游戏变量
     let currentGame = 'gobang'; // 当前选择的棋种：gobang, go, chess, snake
@@ -5245,6 +5280,9 @@
 
     // ========== 初始化 ==========
     async function init() {
+      // 先加载版本号
+      await loadAppVersion();
+
       // 检查是否有保存的token，不主动发送请求（由client_connect统一处理自动登录）
       const hasToken = !!localStorage.getItem('userToken');
 
@@ -5263,10 +5301,7 @@
 
       // 初始化缓存
       moveLogEl.dataset.lastIndex = "-1";
-      // 更新客户端版本显示
-      if (clientVersionDisplay) {
-        clientVersionDisplay.textContent = CLIENT_VERSION;
-      }
+
       // 初始更新高级统计
       updateAdvancedStats();
       // 初始化当前棋种显示
@@ -5746,7 +5781,7 @@
         // 发送客户端连接请求（包含版本号和token）
         // 注意：init()函数会恢复currentAccount，所以这里可以获取到正确的token
         socket.emit('client_connect', {
-          clientVersion: CLIENT_VERSION,
+          clientVersion: APP_VERSION,
           token: localStorage.getItem('userToken') || 'none'
         });
 
@@ -7491,11 +7526,12 @@
         }
       }
 
-      // 隐藏成就、AI对战、主题页面
-      document.getElementById('achievements-container').style.display = 'none';
-      document.getElementById('ai-game-container').style.display = 'none';
-      document.getElementById('leaderboard-page').style.display = 'none';
-      document.getElementById('theme-container').style.display = 'none';
+      // 提前确定目标容器（贪吃蛇→snake-game-container，其他→lobbyContainer）
+      const switchTarget = game === 'snake'
+        ? document.getElementById('snake-game-container')
+        : lobbyContainer;
+      // 隐藏其他页面（跳过目标容器，避免闪烁）
+      hideAllPages(switchTarget);
 
       // 显示在线玩家面板（带动画）
       const onlineUsersPanelEl = document.getElementById('online-users-panel');
@@ -7503,11 +7539,11 @@
       onlineUsersPanelEl.style.transform = 'translateY(20px)';
       onlineUsersPanelEl.style.display = 'block';
 
-      // 添加动画效果
-      setTimeout(() => {
+      // 下一帧触发淡入
+      requestAnimationFrame(() => {
         onlineUsersPanelEl.style.opacity = '1';
         onlineUsersPanelEl.style.transform = 'translateY(0)';
-      }, 10);
+      });
 
       // 贪吃蛇游戏特殊处理
       if (game === 'snake') {
@@ -10944,6 +10980,31 @@
       _returnToLobby();
     }
 
+    // 统一隐藏所有页面容器和棋盘，避免导航切换时页面残留
+    // except: 跳过指定容器不隐藏（用于即将显示的目标页面，避免先隐藏再显示造成闪烁）
+    function hideAllPages(except) {
+      const containers = [
+        lobbyContainer,
+        infoContainer,
+        gameControls,
+        statusBox,
+        moveLogPanel,
+        document.getElementById('achievements-container'),
+        document.getElementById('ai-game-container'),
+        document.getElementById('leaderboard-page'),
+        document.getElementById('theme-container'),
+        document.getElementById('snake-game-container'),
+        document.getElementById('spectate-container')
+      ];
+      containers.forEach(c => {
+        if (c && c !== except) c.style.display = 'none';
+      });
+      // 隐藏所有棋盘
+      document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
+        board.style.display = 'none';
+      });
+    }
+
     function _returnToLobby() {
       const playAgainBtn = document.getElementById('play-again-btn');
       if (playAgainBtn) {
@@ -10959,16 +11020,19 @@
 
       // 检查是否从AI对战返回
       const isFromAI = gameState.difficulty !== null;
+      // 提前确定目标容器，传给 hideAllPages 避免先隐藏再显示造成闪烁
+      const targetContainer = isFromAI ? document.getElementById('ai-game-container') : lobbyContainer;
 
-      // 隐藏所有页面
-      lobbyContainer.style.display = isFromAI ? 'none' : 'flex';
-      infoContainer.style.display = 'none';
-      gameControls.style.display = 'none';
-      statusBox.style.display = 'none';
-      moveLogPanel.style.display = 'none';
+      // 隐藏其他页面（跳过目标容器）
+      hideAllPages(targetContainer);
       chatContainer.classList.remove('show');
-      document.getElementById('achievements-container').style.display = 'none';
-      document.getElementById('ai-game-container').style.display = isFromAI ? 'block' : 'none';
+
+      // 根据来源显示大厅或AI对战页面
+      if (isFromAI) {
+        targetContainer.style.display = 'block';
+      } else {
+        targetContainer.style.display = 'flex';
+      }
 
       // 显示在线玩家面板（带动画）
       if (!isFromAI) {
@@ -10977,17 +11041,12 @@
         onlineUsersPanelEl.style.transform = 'translateY(20px)';
         onlineUsersPanelEl.style.display = 'block';
 
-        // 添加动画效果
-        setTimeout(() => {
+        // 下一帧触发淡入
+        requestAnimationFrame(() => {
           onlineUsersPanelEl.style.opacity = '1';
           onlineUsersPanelEl.style.transform = 'translateY(0)';
-        }, 10);
+        });
       }
-
-      // 隐藏所有棋盘
-      document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
-        board.style.display = 'none';
-      });
 
       // 如果不是从AI对战返回，显示当前选中的棋种棋盘（空棋盘）
       if (!isFromAI) {
@@ -11044,21 +11103,10 @@
       // 更新导航按钮状态
       updateNavActiveState('achievements');
 
-      // 隐藏其他页面
-      lobbyContainer.style.display = 'none';
-      infoContainer.style.display = 'none';
-      gameControls.style.display = 'none';
-      statusBox.style.display = 'none';
-      moveLogPanel.style.display = 'none';
-      document.getElementById('ai-game-container').style.display = 'none';
-      document.getElementById('leaderboard-page').style.display = 'none';
-      document.getElementById('theme-container').style.display = 'none';
-      document.getElementById('snake-game-container').style.display = 'none';
-
-      // 隐藏所有棋盘
-      document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
-        board.style.display = 'none';
-      });
+      // 先获取目标容器
+      const achievementsContainer = document.getElementById('achievements-container');
+      // 隐藏其他页面（跳过目标容器，避免先隐藏再显示造成闪烁）
+      hideAllPages(achievementsContainer);
 
       // 让中间内容区域根据内容自适应高度（消除大片空白）
       const centerContainer = document.querySelector('.center-content-container');
@@ -11067,17 +11115,16 @@
         centerContainer.style.alignItems = 'flex-start';
       }
 
-      // 显示成就页面
-      const achievementsContainer = document.getElementById('achievements-container');
+      // 显示成就页面（淡入）
       achievementsContainer.style.opacity = '0';
       achievementsContainer.style.transform = 'translateY(20px)';
       achievementsContainer.style.display = 'block';
 
-      // 添加动画效果
-      setTimeout(() => {
+      // 下一帧触发淡入（由 CSS transition 平滑过渡，消除闪烁）
+      requestAnimationFrame(() => {
         achievementsContainer.style.opacity = '1';
         achievementsContainer.style.transform = 'translateY(0)';
-      }, 10);
+      });
 
       // 加载成就
       loadAchievements();
@@ -11097,33 +11144,21 @@
         centerContainer.style.alignItems = '';
       }
 
-      // 隐藏其他页面
-      lobbyContainer.style.display = 'none';
-      infoContainer.style.display = 'none';
-      gameControls.style.display = 'none';
-      statusBox.style.display = 'none';
-      moveLogPanel.style.display = 'none';
-      document.getElementById('achievements-container').style.display = 'none';
-      document.getElementById('leaderboard-page').style.display = 'none';
-      document.getElementById('theme-container').style.display = 'none';
-      document.getElementById('snake-game-container').style.display = 'none';
-
-      // 隐藏所有棋盘
-      document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
-        board.style.display = 'none';
-      });
-
-      // 显示AI对战页面
+      // 先获取目标容器
       const aiGameContainer = document.getElementById('ai-game-container');
+      // 隐藏其他页面（跳过目标容器，避免闪烁）
+      hideAllPages(aiGameContainer);
+
+      // 显示AI对战页面（淡入）
       aiGameContainer.style.opacity = '0';
       aiGameContainer.style.transform = 'translateY(20px)';
       aiGameContainer.style.display = 'block';
 
-      // 添加动画效果
-      setTimeout(() => {
+      // 下一帧触发淡入（由 CSS transition 平滑过渡）
+      requestAnimationFrame(() => {
         aiGameContainer.style.opacity = '1';
         aiGameContainer.style.transform = 'translateY(0)';
-      }, 10);
+      });
     }
 
     // ==================== 观战系统 ====================
@@ -11157,34 +11192,21 @@
         centerContainer.style.alignItems = '';
       }
 
-      // 隐藏其他页面
-      lobbyContainer.style.display = 'none';
-      infoContainer.style.display = 'none';
-      gameControls.style.display = 'none';
-      statusBox.style.display = 'none';
-      moveLogPanel.style.display = 'none';
-      document.getElementById('achievements-container').style.display = 'none';
-      document.getElementById('ai-game-container').style.display = 'none';
-      document.getElementById('leaderboard-page').style.display = 'none';
-      document.getElementById('theme-container').style.display = 'none';
-      document.getElementById('snake-game-container').style.display = 'none';
-      document.getElementById('spectate-container').style.display = 'none';
-
-      // 隐藏所有棋盘
-      document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
-        board.style.display = 'none';
-      });
-
-      // 显示观战页面
+      // 先获取目标容器
       const spectateContainer = document.getElementById('spectate-container');
+      // 隐藏其他页面（跳过目标容器，避免闪烁）
+      hideAllPages(spectateContainer);
+
+      // 显示观战页面（淡入）
       spectateContainer.style.opacity = '0';
       spectateContainer.style.transform = 'translateY(20px)';
       spectateContainer.style.display = 'block';
 
-      setTimeout(() => {
+      // 下一帧触发淡入（由 CSS transition 平滑过渡）
+      requestAnimationFrame(() => {
         spectateContainer.style.opacity = '1';
         spectateContainer.style.transform = 'translateY(0)';
-      }, 10);
+      });
 
       loadSpectateGames();
     }
@@ -11422,33 +11444,21 @@
         centerContainer.style.alignItems = '';
       }
 
-      // 隐藏其他页面
-      lobbyContainer.style.display = 'none';
-      infoContainer.style.display = 'none';
-      gameControls.style.display = 'none';
-      statusBox.style.display = 'none';
-      moveLogPanel.style.display = 'none';
-      document.getElementById('achievements-container').style.display = 'none';
-      document.getElementById('ai-game-container').style.display = 'none';
-      document.getElementById('theme-container').style.display = 'none';
-      document.getElementById('snake-game-container').style.display = 'none';
-
-      // 隐藏所有棋盘
-      document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
-        board.style.display = 'none';
-      });
-
-      // 显示排行榜页面
+      // 先获取目标容器
       const leaderboardPage = document.getElementById('leaderboard-page');
+      // 隐藏其他页面（跳过目标容器，避免闪烁）
+      hideAllPages(leaderboardPage);
+
+      // 显示排行榜页面（淡入）
       leaderboardPage.style.opacity = '0';
       leaderboardPage.style.transform = 'translateY(20px)';
       leaderboardPage.style.display = 'block';
 
-      // 添加动画效果
-      setTimeout(() => {
+      // 下一帧触发淡入（由 CSS transition 平滑过渡）
+      requestAnimationFrame(() => {
         leaderboardPage.style.opacity = '1';
         leaderboardPage.style.transform = 'translateY(0)';
-      }, 10);
+      });
 
       // 加载排行榜数据
       loadLeaderboard('all');
@@ -13580,32 +13590,21 @@
       // 更新导航按钮状态
       updateNavActiveState('theme');
 
-      // 隐藏其他页面
-      lobbyContainer.style.display = 'none';
-      infoContainer.style.display = 'none';
-      gameControls.style.display = 'none';
-      statusBox.style.display = 'none';
-      moveLogPanel.style.display = 'none';
-      document.getElementById('achievements-container').style.display = 'none';
-      document.getElementById('ai-game-container').style.display = 'none';
-      document.getElementById('leaderboard-page').style.display = 'none';
-
-      // 隐藏所有棋盘
-      document.querySelectorAll('.gobang-board, .go-board, .chess-board').forEach(board => {
-        board.style.display = 'none';
-      });
-
-      // 显示主题页面
+      // 先获取目标容器
       const themeContainer = document.getElementById('theme-container');
+      // 隐藏其他页面（跳过目标容器，避免闪烁）
+      hideAllPages(themeContainer);
+
+      // 显示主题页面（淡入）
       themeContainer.style.opacity = '0';
       themeContainer.style.transform = 'translateY(20px)';
       themeContainer.style.display = 'block';
 
-      // 添加动画效果
-      setTimeout(() => {
+      // 下一帧触发淡入（由 CSS transition 平滑过渡）
+      requestAnimationFrame(() => {
         themeContainer.style.opacity = '1';
         themeContainer.style.transform = 'translateY(0)';
-      }, 10);
+      });
 
       // 加载主题列表
       const themeListEl = document.getElementById('theme-list-container');

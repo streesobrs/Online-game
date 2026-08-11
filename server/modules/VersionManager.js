@@ -1,101 +1,53 @@
 // VersionManager.js - 版本管理模块
+// 版本数据源：server/version.json（通过 config 模块统一加载）
 const config = require('../config');
 const logger = require('../utils/logger');
-const fs = require('fs');
-const path = require('path');
 
 class VersionManager {
     constructor() {
-        // 加载版本配置
-        this.versionConfig = this.loadVersionConfig();
-        // 构建完整版本号
-        this.serverVersion = this.buildVersionString();
+        // 从 config 获取版本数据（唯一数据源）
+        this.reload();
+    }
+
+    // 从 config 重新加载版本数据
+    reload() {
+        const internals = config._versionInternals;
+        if (internals) {
+            internals.reload();
+        }
+        this.versionConfig = config.versionData;
+        this.serverVersion = config.versionData.version;
     }
 
     // 获取 version.json 的存储路径（兼容开发和打包环境）
+    // 仅供外部需要时使用，内部应通过 config 访问
     getVersionConfigPath() {
-        const isPkg = typeof process.pkg !== 'undefined';
-
-        if (isPkg) {
-            // pkg 打包环境：使用程序所在目录
-            return path.join(path.dirname(process.execPath), 'version.json');
-        } else {
-            // 开发环境：使用原始位置
-            return path.join(__dirname, '..', 'version.json');
-        }
+        return config._versionInternals.getVersionJsonPath();
     }
 
-    // 加载版本配置
-    loadVersionConfig() {
-        const versionConfigPath = this.getVersionConfigPath();
-
-        // 如果打包环境且文件不存在，先从打包的资源中复制一份
-        const isPkg = typeof process.pkg !== 'undefined';
-        if (isPkg && !fs.existsSync(versionConfigPath)) {
-            try {
-                const internalPath = path.join(__dirname, '..', 'version.json');
-                if (fs.existsSync(internalPath)) {
-                    const data = fs.readFileSync(internalPath, 'utf8');
-                    fs.writeFileSync(versionConfigPath, data, 'utf8');
-                    logger.info('已从打包资源复制 version.json 到程序目录');
-                }
-            } catch (err) {
-                logger.warn('复制 version.json 失败，将使用默认配置', { error: err.message });
-            }
-        }
-
-        try {
-            if (fs.existsSync(versionConfigPath)) {
-                const data = fs.readFileSync(versionConfigPath, 'utf8');
-                return JSON.parse(data);
-            } else {
-                // 默认配置
-                return {
-                    major: 1,
-                    minor: 3,
-                    patch: 0,
-                    build: 100
-                };
-            }
-        } catch (err) {
-            logger.error('加载版本配置失败', { error: err.message });
-            return {
-                major: 1,
-                minor: 3,
-                patch: 0,
-                build: 1780
-            };
-        }
-    }
-
-    // 保存版本配置
+    // 保存版本配置（代理到 config）
     saveVersionConfig() {
-        const versionConfigPath = this.getVersionConfigPath();
-        try {
-            fs.writeFileSync(versionConfigPath, JSON.stringify(this.versionConfig, null, 2), 'utf8');
-        } catch (err) {
-            logger.error('保存版本配置失败', { error: err.message });
-        }
+        // 版本变更通过 config._versionInternals 处理
+        // 此方法保留以兼容旧调用方
     }
 
     // 增加构建版本号
     incrementBuild() {
-        this.versionConfig.build += 1;
-        this.saveVersionConfig();
-        this.serverVersion = this.buildVersionString();
-        return this.serverVersion;
+        const newVersion = config._versionInternals.incrementBuild();
+        this.serverVersion = newVersion;
+        this.versionConfig = config.versionData;
+        logger.info('构建版本号已增加', { newVersion });
+        return newVersion;
     }
 
     // 构建版本字符串
     buildVersionString() {
-        const { major, minor, patch, build } = this.versionConfig;
-        return `${major}.${minor}.${patch}.${build}`;
+        return this.serverVersion;
     }
 
     // 获取对外显示的版本号（不含构建号）
     getDisplayVersion() {
-        const { major, minor, patch } = this.versionConfig;
-        return `${major}.${minor}.${patch}`;
+        return config.versionData.displayVersion;
     }
 
     // 解析版本号
@@ -151,14 +103,18 @@ class VersionManager {
         return this.serverVersion;
     }
 
+    // 获取完整版本数据
+    getVersionData() {
+        return config.versionData;
+    }
+
     // 更新版本号（手动更新）
     updateVersion(major, minor, patch) {
-        this.versionConfig.major = major || this.versionConfig.major;
-        this.versionConfig.minor = minor || this.versionConfig.minor;
-        this.versionConfig.patch = patch || this.versionConfig.patch;
-        this.saveVersionConfig();
-        this.serverVersion = this.buildVersionString();
-        return this.serverVersion;
+        const newVersion = config._versionInternals.updateVersion(major, minor, patch);
+        this.serverVersion = newVersion;
+        this.versionConfig = config.versionData;
+        logger.info('版本号已更新', { newVersion });
+        return newVersion;
     }
 }
 

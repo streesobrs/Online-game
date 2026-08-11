@@ -1,4 +1,72 @@
 const path = require('path');
+const fs = require('fs');
+
+// 默认版本号（当 version.json 不存在时使用）
+const DEFAULT_VERSION = { major: 1, minor: 0, patch: 0, build: 100 };
+
+// 获取 version.json 的存储路径（兼容开发和 pkg 打包环境）
+function getVersionJsonPath() {
+  const isPkg = typeof process.pkg !== 'undefined';
+  if (isPkg) {
+    return path.join(path.dirname(process.execPath), 'version.json');
+  }
+  return path.join(__dirname, 'version.json');
+}
+
+// 从 version.json 加载完整版本数据
+function loadVersionData() {
+  const versionPath = getVersionJsonPath();
+
+  // pkg 打包环境：如果外部没有 version.json，尝试从打包资源复制
+  const isPkg = typeof process.pkg !== 'undefined';
+  if (isPkg && !fs.existsSync(versionPath)) {
+    try {
+      const internalPath = path.join(__dirname, 'version.json');
+      if (fs.existsSync(internalPath)) {
+        const data = fs.readFileSync(internalPath, 'utf8');
+        fs.writeFileSync(versionPath, data, 'utf8');
+        console.info('已从打包资源复制 version.json 到程序目录');
+      }
+    } catch (err) {
+      console.warn('复制 version.json 失败:', err.message);
+    }
+  }
+
+  try {
+    if (fs.existsSync(versionPath)) {
+      const data = JSON.parse(fs.readFileSync(versionPath, 'utf8'));
+      return {
+        major: data.major || DEFAULT_VERSION.major,
+        minor: data.minor || DEFAULT_VERSION.minor,
+        patch: data.patch || DEFAULT_VERSION.patch,
+        build: data.build || DEFAULT_VERSION.build
+      };
+    }
+  } catch (err) {
+    console.warn('读取 version.json 失败，使用默认版本:', err.message);
+  }
+  return { ...DEFAULT_VERSION };
+}
+
+// 构建版本字符串
+function buildVersionString(v) {
+  return `${v.major}.${v.minor}.${v.patch}.${v.build}`;
+}
+
+// 保存版本数据到 version.json
+function saveVersionData(versionData) {
+  try {
+    const versionPath = getVersionJsonPath();
+    fs.writeFileSync(versionPath, JSON.stringify(versionData, null, 2), 'utf8');
+    return true;
+  } catch (err) {
+    console.error('保存 version.json 失败:', err.message);
+    return false;
+  }
+}
+
+// 加载并构建版本数据对象
+const _versionData = loadVersionData();
 
 function getStorageRoot() {
   if (process.env.STORAGE_ROOT) {
@@ -15,8 +83,41 @@ function getStorageRoot() {
 const storageRoot = getStorageRoot();
 
 module.exports = {
-  // 版本号 (语义化版本：MAJOR.MINOR.PATCH)
-  version: '1.6.0',
+  // 版本号相关（统一从 version.json 加载，作为项目唯一版本数据源）
+  version: buildVersionString(_versionData),  // 完整版本号: "major.minor.patch.build"
+  versionData: {                              // 完整版本数据对象
+    major: _versionData.major,
+    minor: _versionData.minor,
+    patch: _versionData.patch,
+    build: _versionData.build,
+    version: buildVersionString(_versionData),
+    displayVersion: `${_versionData.major}.${_versionData.minor}.${_versionData.patch}`
+  },
+
+  // 版本号操作方法（供 VersionManager 等模块使用）
+  _versionInternals: {
+    getVersionJsonPath,
+    loadVersionData,
+    saveVersionData,
+    buildVersionString,
+    DEFAULT_VERSION,
+    reload() {
+      Object.assign(_versionData, loadVersionData());
+      return _versionData;
+    },
+    incrementBuild() {
+      _versionData.build += 1;
+      saveVersionData(_versionData);
+      return buildVersionString(_versionData);
+    },
+    updateVersion(major, minor, patch) {
+      if (major !== undefined) _versionData.major = major;
+      if (minor !== undefined) _versionData.minor = minor;
+      if (patch !== undefined) _versionData.patch = patch;
+      saveVersionData(_versionData);
+      return buildVersionString(_versionData);
+    }
+  },
 
   // ========== 服务器基础配置 ==========
   server: {
