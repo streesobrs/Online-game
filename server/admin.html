@@ -503,7 +503,7 @@
       flex-wrap: wrap;
     }
 
-    .action-btn {
+    .action-icon-btn {
       width: 28px;
       height: 28px;
       border-radius: 4px;
@@ -516,29 +516,30 @@
       align-items: center;
       justify-content: center;
       transition: all 0.15s;
+      flex-shrink: 0;
     }
 
-    .action-btn:hover {
+    .action-icon-btn:hover {
       background: #334155;
       color: #e2e8f0;
       border-color: #475569;
     }
 
-    .action-btn-success {
+    .action-icon-btn-success {
       border-color: #22c55e;
       color: #22c55e;
     }
 
-    .action-btn-success:hover {
+    .action-icon-btn-success:hover {
       background: rgba(34, 197, 94, 0.15);
     }
 
-    .action-btn-danger {
+    .action-icon-btn-danger {
       border-color: #ef4444;
       color: #ef4444;
     }
 
-    .action-btn-danger:hover {
+    .action-icon-btn-danger:hover {
       background: rgba(239, 68, 68, 0.15);
     }
 
@@ -687,6 +688,7 @@
     .action-btn:hover {
       transform: translateY(-2px);
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+      filter: brightness(1.15);
     }
 
     /* 数据表格 */
@@ -2172,12 +2174,14 @@
 
     .backup-item {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
+      gap: 10px;
       padding: 10px;
       background: #1e293b;
       border-radius: 6px;
       font-size: 13px;
+      overflow: hidden;
     }
 
     .backup-item:hover {
@@ -2204,6 +2208,8 @@
       display: flex;
       gap: 6px;
       align-items: center;
+      flex-shrink: 0;
+      margin-top: 2px;
     }
 
     .backup-detail-toggle {
@@ -2231,6 +2237,7 @@
       font-size: 12px;
       line-height: 1.6;
       border: 1px solid #1e293b;
+      overflow: hidden;
     }
 
     .backup-detail.open {
@@ -2335,6 +2342,19 @@
       gap: 8px;
     }
 
+    .backup-file-groups::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .backup-file-groups::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .backup-file-groups::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 3px;
+    }
+
     .backup-file-group {
       border-radius: 6px;
       overflow: hidden;
@@ -2388,6 +2408,7 @@
       font-size: 11px;
       transition: background 0.15s;
       border-left: 3px solid transparent;
+      min-width: 0;
     }
 
     .backup-file-item:last-child {
@@ -2442,6 +2463,7 @@
     .backup-file-path {
       color: #e2e8f0;
       flex: 1;
+      min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -2718,6 +2740,7 @@
     .backup-item.expanded {
       background: #1e293b;
       border: 1px solid #475569;
+      align-items: flex-start;
     }
   </style>
 </head>
@@ -3608,7 +3631,7 @@
               <span class="card-title">💾 版本备份</span>
               <span style="font-size:12px; color:#64748b;" id="update-backup-count"></span>
             </div>
-            <div style="padding:12px;">
+            <div style="padding:12px; max-height: 600px; overflow-y: auto;">
               <div id="update-backup-list" style="display:flex; flex-direction:column; gap:6px;">
                 <div style="color:#64748b; font-size:13px; text-align:center; padding:20px;">加载中...</div>
               </div>
@@ -9529,7 +9552,7 @@
               <div class="backup-actions">
                 ${hasDetail ? `<button class="backup-detail-toggle" onclick="toggleBackupDetail('${b.id}')" title="查看详情">📋</button>` : ''}
                 <button class="action-btn btn-warning" style="padding:4px 10px;font-size:11px;" onclick="rollbackToBackup('${b.id}')">↩ 回滚</button>
-                <button class="action-btn btn-danger" style="padding:4px 10px;font-size:11px;" onclick="deleteBackup('${b.id}')">🗑</button>
+                <button class="action-icon-btn action-icon-btn-danger" title="删除备份" onclick="deleteBackup('${b.id}')">🗑</button>
               </div>
             </div>
           `}).join('');
