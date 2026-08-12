@@ -11,6 +11,256 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>多棋种联机大厅 🎮 - 五子棋/围棋/象棋/贪吃蛇</title>
   <style>
+    /* ===== 主题系统：默认主题 CSS 变量（default） =====
+       每个主题对应一个 CSS 文件（server/config/themes/<id>.css），
+       通过 body[data-theme="<id>"] 作用域覆盖下列变量即可换肤，
+       无需改动 JS 逻辑。 */
+    :root {
+      /* 全局 */
+      --theme-bg: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+      --theme-primary: #007bff;
+      --theme-secondary: #6c757d;
+      --theme-accent: #27ae60;
+
+      /* 大厅 UI */
+      --theme-container-bg: #ffffff;
+      --theme-title-color: #2c3e50;
+      --theme-status-color: #4a5568;
+      --theme-status-bg: #f7fafc;
+
+      /* 在线用户 */
+      --theme-users-bg: #f8f9fa;
+      --theme-users-title-color: #2d3748;
+      --theme-user-item-bg: #e3f2fd;
+      --theme-user-item-color: #2d3748;
+
+      /* 排行榜 */
+      --theme-leaderboard-bg: #f8f9fa;
+      --theme-leaderboard-title-color: #2d3748;
+      --theme-leaderboard-item-bg: #ffffff;
+      --theme-rank-color: #4a5568;
+      --theme-name-color: #2d3748;
+      --theme-level-color: #718096;
+      --theme-wins-color: #38a169;
+      --theme-winrate-color: #4299e1;
+
+      /* 棋盘 */
+      --theme-board-gobang: #bb9a7b;
+      --theme-board-go: #d4a76a;
+      --theme-board-chess: #f0d9b5;
+
+      /* 棋子 */
+      --theme-piece-gobang-black: #000;
+      --theme-piece-gobang-white: #fff;
+      --theme-piece-go-black: #000;
+      --theme-piece-go-white: #fff;
+      --theme-piece-chess-red: #c0392b;
+      --theme-piece-chess-black: #2c3e50;
+
+      /* 象棋交互态 */
+      --theme-chess-selected-shadow:
+        0 6px 16px rgba(0, 123, 255, 0.5),
+        0 0 20px rgba(0, 123, 255, 0.3),
+        inset 0 2px 4px rgba(255, 255, 255, 0.4);
+      --theme-chess-valid-bg: rgba(0, 123, 255, 0.25);
+
+      /* 导航栏 */
+      --theme-nav-bg: #ffffff;
+      --theme-nav-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+      --theme-nav-btn-bg: #f8f9fa;
+      --theme-nav-btn-bg-hover: #e9ecef;
+      --theme-nav-btn-color: #495057;
+      --theme-nav-btn-active-bg: var(--theme-primary);
+      --theme-nav-btn-active-hover-bg: #0056b3;
+      --theme-nav-btn-active-color: #ffffff;
+      --theme-shortcut-bg: #e9ecef;
+      --theme-shortcut-color: #6c757d;
+
+      /* 通用按钮 */
+      --theme-btn-primary-bg: #3498db;
+      --theme-btn-primary-bg-hover: #2980b9;
+      --theme-btn-primary-shadow: 0 3px 6px rgba(52, 152, 219, 0.2);
+      --theme-btn-primary-shadow-hover: 0 4px 8px rgba(52, 152, 219, 0.3);
+      --theme-btn-disabled-bg: #bdc3c7;
+      --theme-btn-danger-bg: #e74c3c;
+      --theme-btn-danger-bg-hover: #c0392b;
+      --theme-btn-warning-bg: #9c27b0;
+      --theme-btn-warning-bg-hover: #7b1fa2;
+      --theme-btn-cancel-bg-hover: #c0392b;
+      --theme-btn-match-bg-hover: #219653;
+
+      /* 挑战按钮 */
+      --theme-challenge-bg: #3498db;
+      --theme-challenge-bg-hover: #2980b9;
+
+      /* 面板边框 */
+      --theme-border-color: #e2e8f0;
+      --theme-border-color-dark: #8b6914;
+      --theme-panel-bg: #ffffff;
+      --theme-panel-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+
+      /* 信息/状态面板 */
+      --theme-info-title-color: #2c3e50;
+      --theme-info-title-border: #3498db;
+      --theme-info-content-color: #4a5568;
+      --theme-info-content-divider: #f0f0f0;
+      --theme-info-label-color: #718096;
+      --theme-info-value-color: #2d3748;
+      --theme-info-value-bg: #f7fafc;
+      --theme-status-border: #3498db;
+
+      /* 状态 value 配色 */
+      --theme-value-connected-color: #27ae60;
+      --theme-value-connected-bg: #e8f5e9;
+      --theme-value-waiting-color: #f39c12;
+      --theme-value-waiting-bg: #fff8e1;
+      --theme-value-black-color: #000;
+      --theme-value-black-bg: #f5f5f5;
+      --theme-value-white-color: #fff;
+      --theme-value-white-bg: #333;
+      --theme-value-turn-color: #3498db;
+      --theme-value-turn-bg: #e3f2fd;
+      --theme-value-danger-color: #e74c3c;
+      --theme-value-danger-bg: #ffebee;
+      --theme-value-normal-color: #9c27b0;
+      --theme-value-normal-bg: #f3e5f5;
+      --theme-value-red-color: #c0392b;
+      --theme-value-red-bg: #ffeaa7;
+      --theme-value-green-color: #27ae60;
+      --theme-value-green-bg: #d5f4e6;
+
+      /* 弹窗/模态 */
+      --theme-modal-overlay: rgba(0, 0, 0, 0.6);
+      --theme-modal-bg: #ffffff;
+      --theme-modal-title-color: #1a202c;
+
+      /* 账号栏 */
+      --theme-account-bar-bg: rgba(255, 255, 255, 0.98);
+      --theme-account-bar-border: rgba(226, 232, 240, 0.8);
+      --theme-account-nickname-color: #2d3748;
+      --theme-account-user-details-color: #4a5568;
+      --theme-account-avatar-gradient: linear-gradient(135deg, #667eea, #764ba2);
+      --theme-account-coin-gradient: linear-gradient(135deg, #667eea, #764ba2);
+      --theme-account-level-gradient: linear-gradient(135deg, #f39c12, #e74c3c);
+      --theme-account-exp-gradient: linear-gradient(135deg, #3498db, #2ecc71);
+
+      /* 聊天 */
+      --theme-chat-container-bg: #ffffff;
+      --theme-chat-msg-bg: #f7fafc;
+      --theme-chat-msg-self-bg: #e3f2fd;
+      --theme-chat-msg-other-bg: #f5f5f5;
+      --theme-chat-sender-color: #3498db;
+      --theme-chat-input-border: #dddddd;
+      --theme-chat-input-focus: #3498db;
+      --theme-chat-send-bg: #27ae60;
+      --theme-chat-send-bg-hover: #219653;
+      --theme-chat-channel-bg: #f7fafc;
+      --theme-chat-channel-border: #e2e8f0;
+      --theme-chat-channel-active-bg: #e3f2fd;
+      --theme-chat-channel-active-color: #1976d2;
+
+      /* 落子记录 */
+      --theme-move-log-list-bg: #f7fafc;
+      --theme-move-log-black-bg: #e8f5e9;
+      --theme-move-log-black-color: #000;
+      --theme-move-log-white-bg: #fdf2f8;
+      --theme-move-log-white-color: #333;
+      --theme-move-log-red-bg: #ffebee;
+      --theme-move-log-red-color: #c0392b;
+      --theme-move-log-green-bg: #e8f5e9;
+      --theme-move-log-green-color: #27ae60;
+
+      /* 统计/提示文本 */
+      --theme-tip-text-color: #7f8c8d;
+      --theme-stat-label-color: #718096;
+      --theme-stat-value-color: #2d3748;
+      --theme-stat-item-bg: #f7fafc;
+      --theme-stat-item-border: #9c27b0;
+
+      /* 胜利/广播横幅渐变 */
+      --theme-winner-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+      /* 提示弹窗 */
+      --theme-tip-popup-border: #007bff;
+
+      /* 滚动条 */
+      --theme-scrollbar-track: #f1f1f1;
+      --theme-scrollbar-thumb: #cbd5e0;
+      --theme-scrollbar-thumb-hover: #94a3b8;
+
+      /* 排行榜：等级徽章等 */
+      --theme-lv-badge-bg: #e2e8f0;
+      --theme-lv-badge-color: #4a5568;
+      --theme-streak-badge-bg: #fed7d7;
+      --theme-streak-badge-color: #e53e3e;
+      --theme-stat-label-color-2: #a0aec0;
+      --theme-stat-win-color: #38a169;
+      --theme-stat-lose-color: #e53e3e;
+      --theme-stat-draw-color: #a0aec0;
+      --theme-winrate-bar-bg: #e2e8f0;
+      --theme-winrate-bar-high: linear-gradient(90deg, #38a169, #68d391);
+      --theme-winrate-bar-mid: linear-gradient(90deg, #d69e2e, #f6e05e);
+      --theme-winrate-bar-low: linear-gradient(90deg, #e53e3e, #fc8181);
+      --theme-empty-color: #a0aec0;
+      --theme-self-row-bg: #ebf4ff;
+      --theme-self-row-border: #667eea;
+      --theme-self-label-bg: rgba(102, 126, 234, 0.1);
+      --theme-self-label-color: #667eea;
+      --theme-self-rank-color: #2d3748;
+
+      /* 在线用户状态徽章 */
+      --theme-user-waiting-bg: #fff8e1;
+      --theme-user-playing-bg: #e8f5e9;
+      --theme-user-gobang-border: #ff6b6b;
+      --theme-user-go-border: #4ecdc4;
+      --theme-user-chess-border: #45b7d1;
+
+      /* 贪吃蛇 */
+      --theme-snake-bg: #f8f9fa;
+      --theme-snake-info-bg: #ffffff;
+      --theme-snake-info-item-color: #495057;
+      --theme-snake-info-label-color: #6c757d;
+      --theme-snake-info-value-bg: #e3f2fd;
+      --theme-snake-info-value-color: #1976d2;
+      --theme-snake-canvas-bg: #263238;
+      --theme-snake-canvas-border: #37474f;
+      --theme-snake-start-bg: #4caf50;
+      --theme-snake-restart-bg: #2196f3;
+      --theme-snake-rules-bg: #ffffff;
+      --theme-snake-rules-color: #495057;
+      --theme-snake-rules-content-color: #6c757d;
+
+      /* Toast 提示 */
+      --theme-toast-error-bg: #fed7d7;
+      --theme-toast-error-color: #c53030;
+      --theme-toast-error-border: #e53e3e;
+      --theme-toast-success-bg: #c6f6d5;
+      --theme-toast-success-color: #276749;
+      --theme-toast-success-border: #38a169;
+      --theme-toast-warning-bg: #fef5e7;
+      --theme-toast-warning-color: #744210;
+      --theme-toast-warning-border: #d69e2e;
+
+      /* 登录模态 */
+      --theme-login-option-bg: #f7fafc;
+      --theme-login-option-border: #e2e8f0;
+      --theme-login-option-hover-border: #4299e1;
+      --theme-login-option-hover-bg: #ebf8ff;
+      --theme-login-option-active-bg: #bee3f8;
+      --theme-login-icon-bg: #e2e8f0;
+      --theme-login-title-color: #2d3748;
+      --theme-login-desc-color: #718096;
+      --theme-login-subtitle-color: #718096;
+
+      /* 帮助提示条 / 描述条 */
+      --theme-hint-description-color: #e67e22;
+      --theme-hint-description-bg: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%);
+      --theme-hint-description-border: #f1c40f;
+
+      /* 版本/滚动条文字 */
+      --theme-version-color: #94a3b8;
+    }
+
     /* 全局重置+基础样式 */
     * {
       box-sizing: border-box;
@@ -54,10 +304,15 @@
       padding: 20px;
       padding-top: 20px;
       min-height: 100vh;
+      background: var(--theme-bg);
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      transition: background 0.3s ease;
     }
 
     h2 {
-      color: #2d3748;
+      color: var(--theme-title-color);
       margin-bottom: 15px;
       font-size: 24px;
       text-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
@@ -76,10 +331,10 @@
       display: flex;
       gap: 10px;
       margin-bottom: 15px;
-      background: white;
+      background: var(--theme-nav-bg);
       padding: 8px 16px;
       border-radius: 10px;
-      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+      box-shadow: var(--theme-nav-shadow);
     }
 
     .nav-btn {
@@ -90,35 +345,35 @@
       font-weight: bold;
       font-size: 15px;
       transition: all 0.2s;
-      background: #f8f9fa;
-      color: #495057;
+      background: var(--theme-nav-btn-bg);
+      color: var(--theme-nav-btn-color);
       display: flex;
       align-items: center;
       gap: 6px;
     }
 
     .nav-btn:hover {
-      background: #e9ecef;
+      background: var(--theme-nav-btn-bg-hover);
       transform: translateY(-2px);
     }
 
     .nav-btn.active {
-      background: #007bff;
-      color: white;
+      background: var(--theme-nav-btn-active-bg);
+      color: var(--theme-nav-btn-active-color);
     }
 
     .nav-btn.active:hover {
-      background: #0056b3;
+      background: var(--theme-nav-btn-active-hover-bg);
     }
 
     /* 快捷键提示样式 */
     .shortcut-hint {
       font-size: 10px;
       font-weight: 600;
-      color: #6c757d;
+      color: var(--theme-shortcut-color);
       margin-left: 4px;
       padding: 2px 5px;
-      background: #e9ecef;
+      background: var(--theme-shortcut-bg);
       border-radius: 4px;
       vertical-align: super;
       min-width: 16px;
@@ -135,10 +390,10 @@
     .lobby-container {
       width: 100%;
       max-width: 600px;
-      background: white;
+      background: var(--theme-container-bg);
       padding: 15px;
       border-radius: 10px;
-      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+      box-shadow: var(--theme-panel-shadow);
       margin-bottom: 15px;
       display: flex;
       flex-direction: column;
@@ -147,7 +402,7 @@
 
     .lobby-title {
       font-size: 18px;
-      color: #2c3e50;
+      color: var(--theme-title-color);
       margin-bottom: 8px;
       display: flex;
       align-items: center;
@@ -156,10 +411,10 @@
 
     .lobby-status {
       font-size: 12px;
-      color: #4a5568;
+      color: var(--theme-status-color);
       margin-bottom: 12px;
       padding: 6px 12px;
-      background: #f7fafc;
+      background: var(--theme-status-bg);
       border-radius: 7px;
       text-align: center;
     }
@@ -181,34 +436,34 @@
     }
 
     .match-btn {
-      background: #27ae60;
+      background: var(--theme-accent);
       color: white;
     }
 
     .match-btn:hover {
-      background: #219653;
+      background: var(--theme-btn-match-bg-hover);
       transform: translateY(-2px);
     }
 
     .match-btn:disabled {
-      background: #bdc3c7;
+      background: var(--theme-btn-disabled-bg);
       cursor: not-allowed;
       transform: none;
     }
 
     .cancel-btn {
-      background: #e74c3c;
+      background: var(--theme-secondary);
       color: white;
     }
 
     .cancel-btn:hover {
-      background: #c0392b;
+      background: var(--theme-btn-cancel-bg-hover);
       transform: translateY(-2px);
     }
 
     .online-users {
       width: 100%;
-      background: #f8f9fa;
+      background: var(--theme-users-bg);
       padding: 8px;
       border-radius: 7px;
       margin-top: 6px;
@@ -216,7 +471,7 @@
 
     .online-users-title {
       font-size: 12px;
-      color: #2d3748;
+      color: var(--theme-users-title-color);
       margin-bottom: 6px;
       font-weight: bold;
     }
@@ -229,8 +484,8 @@
 
     .user-item {
       padding: 3px 8px;
-      background: #e3f2fd;
-      color: #2d3748;
+      background: var(--theme-user-item-bg);
+      color: var(--theme-user-item-color);
       border-radius: 12px;
       font-size: 11px;
       display: flex;
@@ -241,7 +496,7 @@
     }
 
     .challenge-btn {
-      background: #3498db;
+      background: var(--theme-challenge-bg);
       color: white;
       border: none;
       border-radius: 8px;
@@ -253,38 +508,38 @@
     }
 
     .challenge-btn:hover {
-      background: #2980b9;
+      background: var(--theme-challenge-bg-hover);
     }
 
     .challenge-btn:disabled {
-      background: #bdc3c7;
+      background: var(--theme-btn-disabled-bg);
       cursor: not-allowed;
     }
 
     .user-item.waiting {
-      background: #fff8e1;
+      background: var(--theme-user-waiting-bg);
     }
 
     .user-item.playing {
-      background: #e8f5e9;
+      background: var(--theme-user-playing-bg);
     }
 
     .user-item.gobang {
-      border: 1px solid #ff6b6b;
+      border: 1px solid var(--theme-user-gobang-border);
     }
 
     .user-item.go {
-      border: 1px solid #4ecdc4;
+      border: 1px solid var(--theme-user-go-border);
     }
 
     .user-item.chess {
-      border: 1px solid #45b7d1;
+      border: 1px solid var(--theme-user-chess-border);
     }
 
     /* ========== 排行榜（全新设计） ========== */
     .leaderboard-container {
       width: 100%;
-      background: #f8f9fa;
+      background: var(--theme-leaderboard-bg);
       border-radius: 12px;
       overflow: hidden;
     }
@@ -294,7 +549,7 @@
       justify-content: space-between;
       align-items: center;
       padding: 12px 16px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: var(--theme-winner-gradient);
       color: white;
     }
 
@@ -354,7 +609,7 @@
       display: flex;
       align-items: center;
       padding: 10px 12px;
-      background: white;
+      background: var(--theme-leaderboard-item-bg);
       border-radius: 10px;
       margin-bottom: 6px;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
@@ -435,7 +690,7 @@
     .leaderboard-player-name {
       font-size: 14px;
       font-weight: 600;
-      color: #2d3748;
+      color: var(--theme-name-color);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -447,17 +702,17 @@
       gap: 8px;
       margin-top: 2px;
       font-size: 11px;
-      color: #718096;
+      color: var(--theme-level-color);
     }
 
     .leaderboard-lv-badge {
       display: inline-block;
       padding: 0 6px;
-      background: #e2e8f0;
+      background: var(--theme-lv-badge-bg);
       border-radius: 4px;
       font-weight: 600;
       font-size: 10px;
-      color: #4a5568;
+      color: var(--theme-lv-badge-color);
     }
 
     .leaderboard-streak-badge {
@@ -465,11 +720,11 @@
       align-items: center;
       gap: 2px;
       padding: 0 6px;
-      background: #fed7d7;
+      background: var(--theme-streak-badge-bg);
       border-radius: 4px;
       font-weight: 600;
       font-size: 10px;
-      color: #e53e3e;
+      color: var(--theme-streak-badge-color);
     }
 
     .leaderboard-player-detail {
@@ -487,25 +742,25 @@
     .leaderboard-stat-value {
       font-size: 14px;
       font-weight: 700;
-      color: #2d3748;
+      color: var(--theme-wins-color);
     }
 
     .leaderboard-stat-label {
       font-size: 9px;
-      color: #a0aec0;
+      color: var(--theme-stat-label-color-2);
       margin-top: 1px;
     }
 
     .leaderboard-stat-value.win {
-      color: #38a169;
+      color: var(--theme-stat-win-color);
     }
 
     .leaderboard-stat-value.lose {
-      color: #e53e3e;
+      color: var(--theme-stat-lose-color);
     }
 
     .leaderboard-stat-value.draw {
-      color: #a0aec0;
+      color: var(--theme-stat-draw-color);
     }
 
     .leaderboard-winrate-col {
@@ -516,7 +771,7 @@
     .leaderboard-winrate-text {
       font-size: 13px;
       font-weight: 700;
-      color: #2d3748;
+      color: var(--theme-winrate-color);
       text-align: center;
       margin-bottom: 3px;
     }
@@ -524,7 +779,7 @@
     .leaderboard-winrate-bar-bg {
       width: 100%;
       height: 4px;
-      background: #e2e8f0;
+      background: var(--theme-winrate-bar-bg);
       border-radius: 2px;
       overflow: hidden;
     }
@@ -536,21 +791,21 @@
     }
 
     .leaderboard-winrate-bar.high {
-      background: linear-gradient(90deg, #38a169, #68d391);
+      background: var(--theme-winrate-bar-high);
     }
 
     .leaderboard-winrate-bar.mid {
-      background: linear-gradient(90deg, #d69e2e, #f6e05e);
+      background: var(--theme-winrate-bar-mid);
     }
 
     .leaderboard-winrate-bar.low {
-      background: linear-gradient(90deg, #e53e3e, #fc8181);
+      background: var(--theme-winrate-bar-low);
     }
 
     .leaderboard-empty {
       text-align: center;
       padding: 40px 20px;
-      color: #a0aec0;
+      color: var(--theme-empty-color);
       font-size: 14px;
     }
 
@@ -558,9 +813,9 @@
     .leaderboard-self-row {
       margin-top: 10px;
       padding: 10px 12px;
-      background: #ebf4ff;
+      background: var(--theme-self-row-bg);
       border-radius: 10px;
-      border: 1px dashed #667eea;
+      border: 1px dashed var(--theme-self-row-border);
       display: flex;
       align-items: center;
       gap: 10px;
@@ -570,16 +825,16 @@
     .leaderboard-self-row .self-label {
       font-size: 11px;
       font-weight: 600;
-      color: #667eea;
+      color: var(--theme-self-label-color);
       padding: 2px 8px;
-      background: rgba(102, 126, 234, 0.1);
+      background: var(--theme-self-label-bg);
       border-radius: 4px;
       flex-shrink: 0;
     }
 
     .leaderboard-self-row .self-rank {
       font-weight: 700;
-      color: #2d3748;
+      color: var(--theme-self-rank-color);
       font-size: 14px;
     }
 
@@ -587,12 +842,23 @@
     .leaderboard-no-result {
       text-align: center;
       padding: 30px;
-      color: #a0aec0;
+      color: var(--theme-empty-color);
     }
 
 
 
     /* 通用面板样式 */
+    .theme-panel {
+      padding: 14px 14px 12px 14px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: 0 0 18px rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      z-index: 9000;
+      backdrop-filter: blur(10px);
+      display: block;
+    }
+
     .panel-avatar {
       width: 60px;
       height: 60px;
@@ -615,11 +881,13 @@
       font-size: 16px;
       font-weight: bold;
       margin-bottom: 6px;
+      color: #2d3748;
     }
 
     .panel-desc {
       font-size: 12px;
       opacity: 0.9;
+      color: #4a5568;
     }
 
     #theme-bg {
@@ -655,34 +923,34 @@
     .info-panel {
       flex: 1;
       min-width: 260px;
-      background: white;
+      background: var(--theme-panel-bg);
       padding: 14px;
       border-radius: 10px;
-      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
-      border: 1px solid #e2e8f0;
+      box-shadow: var(--theme-panel-shadow);
+      border: 1px solid var(--theme-border-color);
     }
 
     .info-title {
       font-weight: bold;
-      color: #2c3e50;
+      color: var(--theme-info-title-color);
       margin-bottom: 10px;
       display: flex;
       align-items: center;
       gap: 6px;
       font-size: 16px;
       padding-bottom: 8px;
-      border-bottom: 2px solid #3498db;
+      border-bottom: 2px solid var(--theme-info-title-border);
     }
 
     .info-content {
-      color: #4a5568;
+      color: var(--theme-info-content-color);
       line-height: 1.6;
       margin-bottom: 6px;
       font-size: 14px;
       display: flex;
       justify-content: space-between;
       padding: 4px 0;
-      border-bottom: 1px dashed #f0f0f0;
+      border-bottom: 1px dashed var(--theme-info-content-divider);
     }
 
     .info-content:last-child {
@@ -690,64 +958,64 @@
     }
 
     .info-label {
-      color: #718096;
+      color: var(--theme-info-label-color);
       font-weight: 500;
     }
 
     .info-value {
-      color: #2d3748;
+      color: var(--theme-info-value-color);
       font-weight: bold;
       font-family: monospace;
       font-size: 16px;
       padding: 2px 8px;
       border-radius: 4px;
-      background: #f7fafc;
+      background: var(--theme-info-value-bg);
     }
 
     /* 状态值配色 */
     .value-connected {
-      color: #27ae60;
-      background: #e8f5e9;
+      color: var(--theme-value-connected-color);
+      background: var(--theme-value-connected-bg);
     }
 
     .value-waiting {
-      color: #f39c12;
-      background: #fff8e1;
+      color: var(--theme-value-waiting-color);
+      background: var(--theme-value-waiting-bg);
     }
 
     .value-black {
-      color: #000;
-      background: #f5f5f5;
+      color: var(--theme-value-black-color);
+      background: var(--theme-value-black-bg);
     }
 
     .value-white {
-      color: #fff;
-      background: #333;
+      color: var(--theme-value-white-color);
+      background: var(--theme-value-white-bg);
     }
 
     .value-turn {
-      color: #3498db;
-      background: #e3f2fd;
+      color: var(--theme-value-turn-color);
+      background: var(--theme-value-turn-bg);
     }
 
     .value-danger {
-      color: #e74c3c;
-      background: #ffebee;
+      color: var(--theme-value-danger-color);
+      background: var(--theme-value-danger-bg);
     }
 
     .value-normal {
-      color: #9c27b0;
-      background: #f3e5f5;
+      color: var(--theme-value-normal-color);
+      background: var(--theme-value-normal-bg);
     }
 
     .value-red {
-      color: #c0392b;
-      background: #ffeaa7;
+      color: var(--theme-value-red-color);
+      background: var(--theme-value-red-bg);
     }
 
     .value-green {
-      color: #27ae60;
-      background: #d5f4e6;
+      color: var(--theme-value-green-color);
+      background: var(--theme-value-green-bg);
     }
 
     /* 操作区 */
@@ -767,25 +1035,25 @@
       border: none;
       border-radius: 7px;
       cursor: pointer;
-      background: #3498db;
+      background: var(--theme-btn-primary-bg);
       color: white;
       font-weight: bold;
       font-size: 14px;
       transition: all 0.2s;
-      box-shadow: 0 3px 6px rgba(52, 152, 219, 0.2);
+      box-shadow: var(--theme-btn-primary-shadow);
       display: flex;
       align-items: center;
       gap: 6px;
     }
 
     button:hover {
-      background: #2980b9;
+      background: var(--theme-btn-primary-bg-hover);
       transform: translateY(-2px);
-      box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+      box-shadow: var(--theme-btn-primary-shadow-hover);
     }
 
     button:disabled {
-      background: #bdc3c7;
+      background: var(--theme-btn-disabled-bg);
       cursor: not-allowed;
       transform: none;
       box-shadow: none;
@@ -793,32 +1061,32 @@
     }
 
     .reset-btn {
-      background: #e74c3c;
+      background: var(--theme-btn-danger-bg);
     }
 
     .reset-btn:hover {
-      background: #c0392b;
+      background: var(--theme-btn-danger-bg-hover);
     }
 
     .stats-btn {
-      background: #9c27b0;
+      background: var(--theme-btn-warning-bg);
     }
 
     .stats-btn:hover {
-      background: #7b1fa2;
+      background: var(--theme-btn-warning-bg-hover);
     }
 
     /* 状态区 */
     .status-box {
-      background: white;
+      background: var(--theme-panel-bg);
       padding: 15px 20px;
       border-radius: 8px;
-      color: #2d3748;
+      color: var(--theme-info-value-color);
       margin-bottom: 20px;
       min-width: 400px;
       text-align: center;
-      border-left: 5px solid #3498db;
-      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06);
+      border-left: 5px solid var(--theme-status-border);
+      box-shadow: var(--theme-panel-shadow);
       font-size: 16px;
       font-weight: 500;
       display: none;
@@ -830,7 +1098,7 @@
       grid-template-columns: repeat(19, 36px);
       grid-template-rows: repeat(19, 36px);
       gap: 0;
-      background: linear-gradient(135deg, #e8c49a 0%, #d4a76a 50%, #c4956a 100%);
+      background: var(--theme-board-gobang);
       padding: 20px;
       border-radius: 12px;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.3);
@@ -963,6 +1231,7 @@
 
     .gobang-black {
       background: radial-gradient(circle at 35% 35%, #4a4a4a 0%, #1a1a1a 60%, #000000 100%);
+      background-color: var(--theme-piece-gobang-black);
       box-shadow:
         0 4px 12px rgba(0, 0, 0, 0.5),
         inset 0 2px 4px rgba(255, 255, 255, 0.15),
@@ -971,6 +1240,7 @@
 
     .gobang-white {
       background: radial-gradient(circle at 35% 35%, #ffffff 0%, #f0f0f0 60%, #d0d0d0 100%);
+      background-color: var(--theme-piece-gobang-white);
       border: 1px solid #c0c0c0;
       box-shadow:
         0 4px 12px rgba(0, 0, 0, 0.3),
@@ -984,7 +1254,7 @@
       grid-template-columns: repeat(21, 34px);
       grid-template-rows: repeat(21, 34px);
       gap: 0;
-      background: linear-gradient(135deg, #e5c085 0%, #d4a76a 50%, #c4955a 100%);
+      background: var(--theme-board-go);
       padding: 24px;
       border-radius: 12px;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.3);
@@ -1078,6 +1348,7 @@
 
     .go-black {
       background: radial-gradient(circle at 35% 35%, #3a3a3a 0%, #1a1a1a 60%, #000000 100%);
+      background-color: var(--theme-piece-go-black);
       box-shadow:
         0 4px 12px rgba(0, 0, 0, 0.5),
         inset 0 2px 4px rgba(255, 255, 255, 0.12),
@@ -1086,6 +1357,7 @@
 
     .go-white {
       background: radial-gradient(circle at 35% 35%, #ffffff 0%, #f5f5f5 60%, #e0e0e0 100%);
+      background-color: var(--theme-piece-go-white);
       border: 1px solid #c0c0c0;
       box-shadow:
         0 4px 12px rgba(0, 0, 0, 0.35),
@@ -1107,7 +1379,7 @@
     .chess-board {
       width: 360px;
       height: 400px;
-      background: linear-gradient(135deg, #f5d9a8 0%, #e8c488 50%, #d4b06a 100%);
+      background: var(--theme-board-chess);
       padding: 20px;
       border-radius: 12px;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.3);
@@ -1205,21 +1477,20 @@
 
     .chess-piece.selected {
       transform: scale(1.2);
-      box-shadow:
-        0 6px 16px rgba(0, 123, 255, 0.5),
-        0 0 20px rgba(0, 123, 255, 0.3),
-        inset 0 2px 4px rgba(255, 255, 255, 0.4);
+      box-shadow: var(--theme-chess-selected-shadow);
       z-index: 15;
     }
 
     .chess-red {
       background: radial-gradient(circle at 35% 35%, #ff7b7b 0%, #e04848 50%, #c0392b 100%);
+      background-color: var(--theme-piece-chess-red);
       color: white;
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
     }
 
     .chess-black {
       background: radial-gradient(circle at 35% 35%, #5d6d7e 0%, #3d4c53 50%, #2c3e50 100%);
+      background-color: var(--theme-piece-chess-black);
       color: white;
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
     }
@@ -1271,7 +1542,7 @@
     .snake-game-container {
       width: 100%;
       max-width: 1000px;
-      background: #f8f9fa;
+      background: var(--theme-snake-bg);
       padding: 24px;
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -1285,24 +1556,24 @@
       align-items: center;
       margin-bottom: 20px;
       padding: 12px;
-      background: #ffffff;
+      background: var(--theme-snake-info-bg);
       border-radius: 6px;
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-      border: 1px solid #e9ecef;
+      border: 1px solid var(--theme-border-color);
     }
 
     .snake-game-container .info-item {
       display: flex;
       align-items: center;
       gap: 8px;
-      color: #495057;
+      color: var(--theme-snake-info-item-color);
       font-weight: 600;
       font-size: 14px;
     }
 
     .snake-game-container .info-label {
       font-size: 14px;
-      color: #6c757d;
+      color: var(--theme-snake-info-label-color);
     }
 
     .snake-game-container .info-value {
@@ -1310,20 +1581,20 @@
       font-weight: 700;
       min-width: 50px;
       text-align: center;
-      background: #e3f2fd;
+      background: var(--theme-snake-info-value-bg);
       padding: 4px 12px;
       border-radius: 16px;
       border: 1px solid #bbdefb;
-      color: #1976d2;
+      color: var(--theme-snake-info-value-color);
     }
 
     #snake-canvas {
-      background: #263238;
+      background: var(--theme-snake-canvas-bg);
       border-radius: 6px;
       box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
       display: block;
       margin: 0 auto 20px;
-      border: 2px solid #37474f;
+      border: 2px solid var(--theme-snake-canvas-border);
     }
 
     .snake-game-container .game-controls {
@@ -1351,24 +1622,24 @@
     }
 
     #snake-start {
-      background: #4caf50;
+      background: var(--theme-snake-start-bg);
       color: white;
     }
 
     #snake-restart {
-      background: #2196f3;
+      background: var(--theme-snake-restart-bg);
       color: white;
     }
 
     .snake-game-container .game-rules {
       margin-top: 16px;
       padding: 16px;
-      background: #ffffff;
+      background: var(--theme-snake-rules-bg);
       border-radius: 6px;
-      color: #495057;
+      color: var(--theme-snake-rules-color);
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
       text-align: left;
-      border: 1px solid #e9ecef;
+      border: 1px solid var(--theme-border-color);
     }
 
     .snake-game-container .rules-title {
@@ -1376,14 +1647,14 @@
       font-weight: 700;
       margin-bottom: 12px;
       text-align: center;
-      color: #495057;
+      color: var(--theme-snake-rules-color);
     }
 
     .snake-game-container .rules-content {
       font-size: 14px;
       line-height: 1.6;
       white-space: pre-line;
-      color: #6c757d;
+      color: var(--theme-snake-rules-content-color);
     }
 
     /* 胜利提示 */
@@ -1392,7 +1663,7 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: var(--theme-winner-gradient);
       padding: 30px 45px;
       border-radius: 20px;
       box-shadow:
@@ -1463,10 +1734,10 @@
     .move-log-panel {
       width: 100%;
       max-width: 1000px;
-      background: white;
+      background: var(--theme-panel-bg);
       padding: 14px;
       border-radius: 10px;
-      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+      box-shadow: var(--theme-panel-shadow);
       margin-top: 0;
       display: none;
       /* 默认隐藏，匹配成功后显示 */
@@ -1475,7 +1746,7 @@
     .move-log-title {
       font-size: 15px;
       font-weight: bold;
-      color: #2c3e50;
+      color: var(--theme-info-title-color);
       margin-bottom: 8px;
       display: flex;
       align-items: center;
@@ -1486,7 +1757,7 @@
       max-height: 130px;
       overflow-y: auto;
       padding: 8px;
-      background: #f7fafc;
+      background: var(--theme-move-log-list-bg);
       border-radius: 7px;
       font-family: monospace;
       font-size: 13px;
@@ -1501,30 +1772,30 @@
     }
 
     .move-log-black {
-      background: #e8f5e9;
-      color: #000;
+      background: var(--theme-move-log-black-bg);
+      color: var(--theme-move-log-black-color);
     }
 
     .move-log-white {
-      background: #fdf2f8;
-      color: #333;
+      background: var(--theme-move-log-white-bg);
+      color: var(--theme-move-log-white-color);
     }
 
     .move-log-red {
-      background: #ffebee;
-      color: #c0392b;
+      background: var(--theme-move-log-red-bg);
+      color: var(--theme-move-log-red-color);
     }
 
     .move-log-green {
-      background: #e8f5e9;
-      color: #27ae60;
+      background: var(--theme-move-log-green-bg);
+      color: var(--theme-move-log-green-color);
     }
 
     /* 高级统计面板 */
     .advanced-stats {
       width: 100%;
       max-width: 1000px;
-      background: white;
+      background: var(--theme-panel-bg);
       padding: 20px;
       border-radius: 12px;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
@@ -1545,14 +1816,14 @@
 
     .stats-item {
       padding: 10px;
-      background: #f7fafc;
+      background: var(--theme-stat-item-bg);
       border-radius: 8px;
-      border-left: 3px solid #9c27b0;
+      border-left: 3px solid var(--theme-stat-item-border);
     }
 
     .stats-item-label {
       font-size: 14px;
-      color: #718096;
+      color: var(--theme-stat-label-color);
       margin-bottom: 5px;
     }
 
@@ -1560,18 +1831,18 @@
       font-size: 18px;
       font-weight: bold;
       font-family: monospace;
-      color: #2d3748;
+      color: var(--theme-stat-value-color);
     }
 
     /* 提示文本 */
     .tip-text {
-      color: #7f8c8d;
+      color: var(--theme-tip-text-color);
       font-size: 14px;
       margin-top: 20px;
       text-align: center;
       max-width: 1000px;
       line-height: 1.8;
-      background: white;
+      background: var(--theme-panel-bg);
       padding: 15px;
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
@@ -1709,9 +1980,9 @@
     .hint-description {
       display: block;
       font-size: 15px;
-      color: #e67e22;
-      background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%);
-      border: 1px solid #f1c40f;
+      color: var(--theme-hint-description-color);
+      background: var(--theme-hint-description-bg);
+      border: 1px solid var(--theme-hint-description-border);
       border-radius: 8px;
       padding: 10px 15px;
       margin-top: 10px 0;
@@ -1722,7 +1993,7 @@
 
     /* 版本信息样式 */
     .version-info {
-      color: #94a3b8;
+      color: var(--theme-version-color);
       font-size: 13px;
       margin-top: 10px;
       text-align: center;
@@ -1736,17 +2007,17 @@
     }
 
     ::-webkit-scrollbar-track {
-      background: #f1f1f1;
+      background: var(--theme-scrollbar-track);
       border-radius: 4px;
     }
 
     ::-webkit-scrollbar-thumb {
-      background: #cbd5e0;
+      background: var(--theme-scrollbar-thumb);
       border-radius: 4px;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-      background: #94a3b8;
+      background: var(--theme-scrollbar-thumb-hover);
     }
 
     /* 匹配动画 */
@@ -1798,11 +2069,11 @@
       position: fixed;
       top: 20px;
       right: 20px;
-      background: white;
+      background: var(--theme-panel-bg);
       padding: 15px 20px;
       border-radius: 8px;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-      border-left: 4px solid #007bff;
+      border-left: 4px solid var(--theme-tip-popup-border);
       max-width: 300px;
       z-index: 50;
       display: none;
@@ -1861,7 +2132,7 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(0, 0, 0, 0.6);
+      background: var(--theme-modal-overlay);
       display: none;
       justify-content: center;
       align-items: center;
@@ -1879,7 +2150,7 @@
       top: 20px;
       left: 50%;
       transform: translateX(-50%);
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: var(--theme-winner-gradient);
       color: white;
       padding: 15px 30px;
       border-radius: 12px;
@@ -2026,7 +2297,7 @@
 
     /* 在线玩家面板 */
     .online-users-panel {
-      background: white;
+      background: var(--theme-panel-bg);
       padding: 12px;
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -2044,8 +2315,8 @@
     /* 优化在线玩家项目样式 */
     .user-item {
       padding: 4px 8px;
-      background: #e3f2fd;
-      color: #2d3748;
+      background: var(--theme-user-item-bg);
+      color: var(--theme-user-item-color);
       border-radius: 12px;
       font-size: 11px;
       display: flex;
@@ -2061,27 +2332,27 @@
     }
 
     .user-item.waiting {
-      background: #fff8e1;
+      background: var(--theme-user-waiting-bg);
     }
 
     .user-item.playing {
-      background: #e8f5e9;
+      background: var(--theme-user-playing-bg);
     }
 
     .user-item.gobang {
-      border: 1px solid #ff6b6b;
+      border: 1px solid var(--theme-user-gobang-border);
     }
 
     .user-item.go {
-      border: 1px solid #4ecdc4;
+      border: 1px solid var(--theme-user-go-border);
     }
 
     .user-item.chess {
-      border: 1px solid #45b7d1;
+      border: 1px solid var(--theme-user-chess-border);
     }
 
     .challenge-btn {
-      background: #3498db;
+      background: var(--theme-challenge-bg);
       color: white;
       border: none;
       border-radius: 8px;
@@ -2093,11 +2364,11 @@
     }
 
     .challenge-btn:hover {
-      background: #2980b9;
+      background: var(--theme-challenge-bg-hover);
     }
 
     .challenge-btn:disabled {
-      background: #bdc3c7;
+      background: var(--theme-btn-disabled-bg);
       cursor: not-allowed;
     }
 
@@ -2128,10 +2399,10 @@
       width: 100%;
       max-width: none;
       margin: 0;
-      background: white;
+      background: var(--theme-chat-container-bg);
       padding: 14px;
       border-radius: 10px;
-      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+      box-shadow: var(--theme-panel-shadow);
       display: block;
     }
 
@@ -2139,7 +2410,7 @@
     .chat-messages {
       height: 170px;
       overflow-y: auto;
-      background: #f7fafc;
+      background: var(--theme-chat-msg-bg);
       border-radius: 7px;
       padding: 8px;
       margin-bottom: 8px;
@@ -2166,20 +2437,20 @@
     }
 
     .chat-message.self {
-      background: #e3f2fd;
+      background: var(--theme-chat-msg-self-bg);
       margin-left: auto;
       text-align: right;
     }
 
     .chat-message.other {
-      background: #f5f5f5;
+      background: var(--theme-chat-msg-other-bg);
       margin-right: auto;
       text-align: left;
     }
 
     .chat-sender {
       font-weight: bold;
-      color: #3498db;
+      color: var(--theme-chat-sender-color);
       font-size: 12px;
       margin-bottom: 4px;
       display: flex;
@@ -2196,8 +2467,8 @@
     }
 
     .chat-scope.global {
-      background: #e3f2fd;
-      color: #1976d2;
+      background: var(--theme-chat-msg-self-bg);
+      color: var(--theme-chat-channel-active-color);
     }
 
     .chat-scope.game {
@@ -2214,8 +2485,8 @@
     .chat-channel-btn {
       flex: 1;
       padding: 6px 10px;
-      border: 2px solid #e2e8f0;
-      background: #f7fafc;
+      border: 2px solid var(--theme-chat-channel-border);
+      background: var(--theme-chat-channel-bg);
       border-radius: 7px;
       cursor: pointer;
       font-size: 12px;
@@ -2229,9 +2500,9 @@
     }
 
     .chat-channel-btn.active {
-      border-color: #3498db;
-      background: #e3f2fd;
-      color: #1976d2;
+      border-color: var(--theme-chat-input-focus);
+      background: var(--theme-chat-channel-active-bg);
+      color: var(--theme-chat-channel-active-color);
       font-weight: bold;
     }
 
@@ -2248,7 +2519,7 @@
     .chat-input {
       flex: 1;
       padding: 10px;
-      border: 1px solid #ddd;
+      border: 1px solid var(--theme-chat-input-border);
       border-radius: 7px;
       font-size: 13px;
       transition: border-color 0.2s;
@@ -2256,12 +2527,12 @@
 
     .chat-input:focus {
       outline: none;
-      border-color: #3498db;
+      border-color: var(--theme-chat-input-focus);
     }
 
     .chat-send-btn {
       padding: 10px 20px;
-      background: #27ae60;
+      background: var(--theme-chat-send-bg);
       color: white;
       border: none;
       border-radius: 7px;
@@ -2271,7 +2542,7 @@
     }
 
     .chat-send-btn:hover {
-      background: #219653;
+      background: var(--theme-chat-send-bg-hover);
       transform: translateY(-2px);
     }
 
@@ -2479,14 +2750,14 @@
       position: fixed;
       top: 20px;
       right: 20px;
-      background: #fed7d7;
-      color: #c53030;
+      background: var(--theme-toast-error-bg);
+      color: var(--theme-toast-error-color);
       padding: 12px 16px;
       border-radius: 8px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
       z-index: 10000;
       max-width: 400px;
-      border-left: 4px solid #e53e3e;
+      border-left: 4px solid var(--theme-toast-error-border);
       animation: slideInRight 0.3s ease;
     }
 
@@ -2494,14 +2765,14 @@
       position: fixed;
       top: 20px;
       right: 20px;
-      background: #c6f6d5;
-      color: #276749;
+      background: var(--theme-toast-success-bg);
+      color: var(--theme-toast-success-color);
       padding: 12px 16px;
       border-radius: 8px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
       z-index: 10000;
       max-width: 400px;
-      border-left: 4px solid #38a169;
+      border-left: 4px solid var(--theme-toast-success-border);
       animation: slideInRight 0.3s ease;
     }
 
@@ -2509,14 +2780,14 @@
       position: fixed;
       top: 20px;
       right: 20px;
-      background: #fef5e7;
-      color: #744210;
+      background: var(--theme-toast-warning-bg);
+      color: var(--theme-toast-warning-color);
       padding: 12px 16px;
       border-radius: 8px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
       z-index: 10000;
       max-width: 400px;
-      border-left: 4px solid #d69e2e;
+      border-left: 4px solid var(--theme-toast-warning-border);
       animation: slideInRight 0.3s ease;
     }
 
@@ -2574,7 +2845,7 @@
       justify-content: space-between;
       gap: 12px;
       padding: 8px 14px;
-      background: rgba(255, 255, 255, 0.98);
+      background: var(--theme-account-bar-bg);
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
       border-radius: 10px;
@@ -2583,7 +2854,7 @@
       height: 48px;
       min-height: 48px;
       max-height: 48px;
-      border: 1px solid rgba(226, 232, 240, 0.8);
+      border: 1px solid var(--theme-account-bar-border);
       transition: all 0.45s cubic-bezier(0.4, 0, 0.2, 1);
       box-sizing: border-box;
       overflow: visible;
@@ -2689,7 +2960,7 @@
 
     .account-avatar {
       font-size: 24px;
-      background: linear-gradient(135deg, #667eea, #764ba2);
+      background: var(--theme-account-avatar-gradient);
       width: 36px;
       height: 36px;
       border-radius: 50%;
@@ -2710,7 +2981,7 @@
 
     .account-nickname {
       font-weight: bold;
-      color: #2d3748;
+      color: var(--theme-account-nickname-color);
       font-size: 14px;
       white-space: nowrap;
     }
@@ -2723,7 +2994,7 @@
     }
 
     .account-starcoins {
-      background: linear-gradient(135deg, #667eea, #764ba2);
+      background: var(--theme-account-coin-gradient);
       color: white;
       padding: 3px 8px;
       border-radius: 10px;
@@ -2748,7 +3019,7 @@
     }
 
     .account-level {
-      background: linear-gradient(135deg, #f39c12, #e74c3c);
+      background: var(--theme-account-level-gradient);
       color: white;
       padding: 3px 8px;
       border-radius: 10px;
@@ -2758,7 +3029,7 @@
     }
 
     .account-exp {
-      background: linear-gradient(135deg, #3498db, #2ecc71);
+      background: var(--theme-account-exp-gradient);
       color: white;
       padding: 3px 8px;
       border-radius: 10px;
@@ -2774,7 +3045,7 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0, 0, 0, 0.8);
+      background: var(--theme-modal-overlay);
       display: flex;
       justify-content: center;
       align-items: center;
@@ -2784,7 +3055,7 @@
     }
 
     .auto-login-content {
-      background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+      background: var(--theme-modal-bg);
       border-radius: 20px;
       padding: 50px 40px 40px;
       max-width: 520px;
@@ -2800,8 +3071,8 @@
       font-size: 32px;
       font-weight: 800;
       margin-bottom: 15px;
-      color: #1a202c;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: var(--theme-modal-title-color);
+      background: var(--theme-winner-gradient);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
@@ -2809,7 +3080,7 @@
 
     .auto-login-subtitle {
       font-size: 16px;
-      color: #718096;
+      color: var(--theme-login-subtitle-color);
       margin-bottom: 35px;
       line-height: 1.6;
       font-weight: 500;
@@ -2824,9 +3095,9 @@
 
     .login-option {
       padding: 15px 20px;
-      border: 2px solid #e2e8f0;
+      border: 2px solid var(--theme-login-option-border);
       border-radius: 10px;
-      background: #f7fafc;
+      background: var(--theme-login-option-bg);
       cursor: pointer;
       transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
       display: flex;
@@ -2835,14 +3106,14 @@
     }
 
     .login-option:hover {
-      border-color: #4299e1;
-      background: #ebf8ff;
+      border-color: var(--theme-login-option-hover-border);
+      background: var(--theme-login-option-hover-bg);
       transform: translateY(-2px);
     }
 
     .login-option.active {
-      border-color: #4299e1;
-      background: #bee3f8;
+      border-color: var(--theme-login-option-hover-border);
+      background: var(--theme-login-option-active-bg);
     }
 
     .login-icon {
@@ -2853,7 +3124,7 @@
       align-items: center;
       justify-content: center;
       border-radius: 50%;
-      background: #e2e8f0;
+      background: var(--theme-login-icon-bg);
     }
 
     .login-text {
@@ -2864,13 +3135,13 @@
     .login-title {
       font-weight: bold;
       font-size: 16px;
-      color: #2d3748;
+      color: var(--theme-login-title-color);
       margin-bottom: 5px;
     }
 
     .login-desc {
       font-size: 14px;
-      color: #718096;
+      color: var(--theme-login-desc-color);
     }
 
     /* 自动登录按钮样式 */
@@ -2919,7 +3190,7 @@
     }
 
     .auto-login-btn.btn-primary {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: var(--theme-winner-gradient);
       color: white;
     }
 
@@ -7520,10 +7791,6 @@
       const activeBtn = document.querySelector(`[data-game="${game}"]`);
       if (activeBtn) {
         activeBtn.classList.add('active');
-        // 如果有主题，应用主题颜色
-        if (currentTheme && themes[currentTheme]) {
-          activeBtn.style.background = themes[currentTheme].primaryColor;
-        }
       }
 
       // 提前确定目标容器（贪吃蛇→snake-game-container，其他→lobbyContainer）
@@ -7597,10 +7864,6 @@
       const activeBtn = document.querySelector(`[data-page="${page}"]`);
       if (activeBtn) {
         activeBtn.classList.add('active');
-        // 如果有主题，应用主题颜色
-        if (currentTheme && themes[currentTheme]) {
-          activeBtn.style.background = themes[currentTheme].primaryColor;
-        }
       }
     }
 
@@ -8231,20 +8494,8 @@
 
       gameState.selectedPiece = piece;
 
-      // 保存原始样式
-      piece.dataset.originalBoxShadow = piece.style.boxShadow || '';
-      piece.dataset.originalFilter = piece.style.filter || '';
-
-      // 添加选中状态
+      // 添加选中状态（样式由 CSS class 控制，主题通过 CSS 变量覆盖）
       piece.classList.add('selected');
-
-      // 主题特殊处理
-      const theme = themes[currentTheme];
-      const pieceEffects = theme.effects?.pieces;
-      if (pieceEffects) {
-        piece.style.boxShadow = pieceEffects.shadow || '';
-        piece.style.filter = pieceEffects.filter || '';
-      }
 
       // 计算有效移动位置
       gameState.validMoves = calculateChessMoves(r, c, piece.dataset.name, piece.dataset.color);
@@ -8253,14 +8504,7 @@
       gameState.validMoves.forEach(pos => {
         const cell = document.querySelector(`.chess-intersection[data-r="${pos.r}"][data-c="${pos.c}"]`);
         if (cell) {
-          // 根据主题配置设置颜色
-          const theme = themes[currentTheme];
-          const cellEffects = theme.effects?.cells;
-          if (cellEffects) {
-            cell.style.backgroundColor = cellEffects.background || 'rgba(0,123,255,0.25)';
-          } else {
-            cell.style.backgroundColor = 'rgba(0,123,255,0.25)';
-          }
+          cell.style.backgroundColor = 'var(--theme-chess-valid-bg)';
           cell.style.borderRadius = '50%';
         }
       });
@@ -8268,18 +8512,6 @@
 
     function clearChessSelection() {
       if (gameState.selectedPiece) {
-        // 恢复原始样式
-        if (gameState.selectedPiece.dataset.originalBoxShadow !== undefined) {
-          const theme = themes[currentTheme];
-          const pieceEffects = theme.effects?.pieces;
-          if (pieceEffects) {
-            gameState.selectedPiece.style.boxShadow = pieceEffects.shadow || '';
-            gameState.selectedPiece.style.filter = pieceEffects.filter || '';
-          } else {
-            gameState.selectedPiece.style.boxShadow = gameState.selectedPiece.dataset.originalBoxShadow;
-            gameState.selectedPiece.style.filter = gameState.selectedPiece.dataset.originalFilter;
-          }
-        }
         gameState.selectedPiece.classList.remove('selected');
         gameState.selectedPiece = null;
       }
@@ -10771,17 +11003,6 @@
         </div>`;
       });
       userList.innerHTML = html;
-      applyThemeToUserList();
-    }
-
-    function applyThemeToUserList() {
-      if (!userList) return;
-      const theme = themes[currentTheme];
-      const userItems = userList.querySelectorAll('.user-item');
-      userItems.forEach(item => {
-        item.style.background = theme.uiColors.userItemBg;
-        item.style.color = theme.uiColors.userItemColor;
-      });
     }
 
     function sendChallenge(opponentId) {
@@ -13522,45 +13743,16 @@
 
     // ========== 主题系统 ==========
 
-    // 本地默认主题（始终保留）
+    // 本地默认主题（始终保留，仅元数据；样式由 index.html 的 :root CSS 变量定义）
     const defaultThemes = {
       'default': {
         name: '默认',
+        description: '简洁明亮的默认主题',
         background: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
         primaryColor: '#007bff',
         secondaryColor: '#6c757d',
         accentColor: '#27ae60',
-        boardBackground: {
-          gobang: '#bb9a7b',
-          go: '#d4a76a',
-          'chinese-chess': '#f0d9b5'
-        },
-        pieceColor: {
-          gobangBlack: '#000',
-          gobangWhite: '#fff',
-          goBlack: '#000',
-          goWhite: '#fff',
-          chessRed: '#c0392b',
-          chessBlack: '#2c3e50'
-        },
-        uiColors: {
-          containerBg: '#ffffff',
-          titleColor: '#2c3e50',
-          statusColor: '#4a5568',
-          statusBg: '#f7fafc',
-          usersBg: '#f8f9fa',
-          usersTitleColor: '#2d3748',
-          userItemBg: '#e3f2fd',
-          userItemColor: '#2d3748',
-          leaderboardBg: '#f8f9fa',
-          leaderboardTitleColor: '#2d3748',
-          leaderboardItemBg: '#ffffff',
-          rankColor: '#4a5568',
-          nameColor: '#2d3748',
-          levelColor: '#718096',
-          winsColor: '#38a169',
-          winrateColor: '#4299e1'
-        }
+        cssUrl: ''
       }
     };
 
@@ -13619,10 +13811,13 @@
 
       for (const themeKey in themes) {
         const theme = themes[themeKey];
+        // 元数据字段可能缺失，提供兜底值用于卡片预览
+        const previewBg = theme.background || (themeKey === 'default' ? 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)');
+        const previewColor = theme.primaryColor || '#007bff';
         const themeItem = document.createElement('div');
         themeItem.className = 'theme-item';
-        themeItem.style.background = theme.background;
-        themeItem.style.border = `3px solid ${currentTheme === themeKey ? theme.primaryColor : 'transparent'}`;
+        themeItem.style.background = previewBg;
+        themeItem.style.border = `3px solid ${currentTheme === themeKey ? previewColor : 'transparent'}`;
         themeItem.style.borderRadius = '8px';
         themeItem.style.padding = '15px';
         themeItem.style.cursor = 'pointer';
@@ -13636,7 +13831,7 @@
 
         themeItem.innerHTML = `
           <div style="font-weight: bold; color: ${textColor}; margin-bottom: 10px; font-size: 16px;">${theme.name}</div>
-          <div style="width: 100%; height: 80px; background: ${theme.primaryColor}; border-radius: 4px; margin-bottom: 10px;"></div>
+          <div style="width: 100%; height: 80px; background: ${previewColor}; border-radius: 4px; margin-bottom: 10px;"></div>
           <div style="font-size: 12px; color: ${textColor}; opacity: 0.8; margin-bottom: 8px;">${description}</div>
           <div style="font-size: 12px; color: ${textColor}; opacity: 0.9;">${currentTheme === themeKey ? '✓ 当前主题' : '点击切换'}</div>
         `;
@@ -13650,7 +13845,7 @@
       currentTheme = themeKey;
       let theme = themes[themeKey];
 
-      // 主题不存在时回退到默认主题，避免后续访问属性崩溃
+      // 主题不存在时回退到默认主题
       if (!theme) {
         console.warn('主题尚未加载，回退到默认主题', { themeKey });
         theme = themes['default'];
@@ -13661,229 +13856,14 @@
         currentTheme = 'default';
       }
 
-      // 移除之前的特效元素和面板
-      document.querySelectorAll('.theme-effect, .theme-panel').forEach(el => el.remove());
-      document.body.style.background = theme.background;
+      // 1. 设置 data-theme 属性，触发 CSS 变量作用域换肤（样式由各主题 CSS 文件定义）
+      document.body.dataset.theme = currentTheme;
 
-      if (themeBg) {
-        themeBg.classList.remove('visible');
-        themeBg.style.backgroundImage = '';
-        themeBg.style.transform = 'translateY(0px)';
-      }
+      // 2. 动态加载主题 CSS 文件（异步，已缓存则直接应用）
+      applyThemeCss(theme.cssUrl);
 
-      // 重置棋盘类名
-      gobangBoard.className = 'gobang-board';
-
-      // 重置棋盘样式
-      gobangBoard.style.border = '';
-      gobangBoard.style.boxShadow = '';
-      gobangBoard.style.animation = '';
-      gobangBoard.style.backgroundImage = '';
-
-      // 重置所有棋子样式
-      document.querySelectorAll('.gobang-black, .gobang-white, .go-black, .go-white, .chess-red, .chess-black').forEach(piece => {
-        piece.style.background = '';
-        piece.style.boxShadow = '';
-        piece.style.filter = '';
-      });
-
-      // 重置所有格子样式
-      document.querySelectorAll('.gobang-cell, .go-cell, .chess-intersection').forEach(cell => {
-        cell.style.background = '';
-        cell.style.boxShadow = '';
-      });
-
-      // 重置所有按钮样式
-      document.querySelectorAll('.nav-btn, .match-btn, .cancel-btn, .lobby-btn').forEach(btn => {
-        btn.style.background = '';
-        btn.style.boxShadow = '';
-        btn.style.border = '';
-      });
-
-      // 重置所有文字样式
-      document.querySelectorAll('h1, h2, h3').forEach(el => {
-        el.style.color = '';
-        el.style.textShadow = '';
-      });
-
-      // 移除主题动画样式
-      const themeAnimations = document.getElementById('theme-animations');
-      if (themeAnimations) {
-        themeAnimations.remove();
-      }
-
-      // 应用全局效果
-      if (theme.effects && theme.effects.global) {
-        const globalEffects = theme.effects.global;
-
-        // 应用文本阴影
-        if (globalEffects.textShadow) {
-          document.querySelectorAll('h1, h2, h3, .nav-btn, .lobby-btn').forEach(el => {
-            el.style.textShadow = globalEffects.textShadow;
-          });
-        } else {
-          document.querySelectorAll('h1, h2, h3, .nav-btn, .lobby-btn').forEach(el => {
-            el.style.textShadow = '';
-          });
-        }
-
-        // 应用按钮效果
-        if (globalEffects.buttonShadow || globalEffects.buttonBorder) {
-          document.querySelectorAll('.nav-btn, .match-btn, .cancel-btn, .lobby-btn').forEach(btn => {
-            btn.style.boxShadow = globalEffects.buttonShadow || '';
-            btn.style.border = globalEffects.buttonBorder || '';
-          });
-        } else {
-          document.querySelectorAll('.nav-btn, .match-btn, .cancel-btn, .lobby-btn').forEach(btn => {
-            btn.style.boxShadow = '';
-            btn.style.border = '';
-          });
-        }
-      } else {
-        // 重置全局效果
-        document.querySelectorAll('h1, h2, h3, .nav-btn, .lobby-btn').forEach(el => {
-          el.style.textShadow = '';
-        });
-        document.querySelectorAll('.nav-btn, .match-btn, .cancel-btn, .lobby-btn').forEach(btn => {
-          btn.style.boxShadow = '';
-          btn.style.border = '';
-        });
-      }
-
-      // 应用棋盘效果
-      if (theme.effects && theme.effects.board) {
-        const boardEffects = theme.effects.board;
-
-        // 添加棋盘类名
-        if (boardEffects.className) {
-          gobangBoard.classList.add(boardEffects.className);
-        }
-
-        // 应用棋盘样式
-        if (boardEffects.style) {
-          const boardStyle = boardEffects.style;
-          gobangBoard.style.border = boardStyle.border || '';
-          gobangBoard.style.boxShadow = boardStyle.boxShadow || '';
-          gobangBoard.style.animation = boardStyle.animation || '';
-        }
-
-        // 添加全局发光效果
-        if (boardEffects.glowEffect) {
-          const glowEffect = document.createElement('div');
-          glowEffect.className = 'theme-effect board-glow';
-          const glowStyle = boardEffects.glowStyle || {};
-          const primaryColor = theme.primaryColor || '#00d4ff';
-          const secondaryColor = theme.secondaryColor || '#ff00ff';
-
-          glowEffect.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: ${glowStyle.background || `radial-gradient(circle at 20% 50%, ${primaryColor} 0%, transparent 50%), radial-gradient(circle at 80% 20%, ${secondaryColor} 0%, transparent 50%)`};
-            pointer-events: none;
-            z-index: 9998;
-            mix-blend-mode: screen;
-            opacity: ${glowStyle.opacity || 0.2};
-          `;
-          document.body.appendChild(glowEffect);
-        }
-      }
-
-      // 应用动画
-      if (theme.effects && theme.effects.animations) {
-        const animations = theme.effects.animations;
-
-        // 创建霓虹脉冲动画
-        if (animations.neonPulse) {
-          const neonPulse = animations.neonPulse;
-          const styleElement = document.createElement('style');
-          styleElement.id = 'theme-animations';
-          styleElement.textContent = `
-            @keyframes neon-pulse {
-              0% { opacity: ${neonPulse.keyframes[0].opacity}; box-shadow: ${neonPulse.keyframes[0].boxShadow}; }
-              50% { opacity: ${neonPulse.keyframes[1].opacity}; box-shadow: ${neonPulse.keyframes[1].boxShadow}; }
-              100% { opacity: ${neonPulse.keyframes[2].opacity}; box-shadow: ${neonPulse.keyframes[2].boxShadow}; }
-            }
-          `;
-          document.head.appendChild(styleElement);
-        }
-      }
-
-      // 应用UI元素样式
-      if (theme.uiColors) {
-        const uiColors = theme.uiColors;
-
-        // 应用按钮样式
-        if (uiColors.buttons) {
-          const buttons = uiColors.buttons;
-
-          if (buttons.active) {
-            document.querySelectorAll('.nav-btn.active').forEach(btn => {
-              btn.style.background = buttons.active.background || '';
-              btn.style.boxShadow = buttons.active.boxShadow || '';
-              btn.style.border = buttons.active.border || '';
-            });
-          }
-
-          if (buttons.match) {
-            document.querySelectorAll('.match-btn').forEach(btn => {
-              btn.style.background = buttons.match.background || '';
-              btn.style.boxShadow = buttons.match.boxShadow || '';
-              btn.style.border = buttons.match.border || '';
-            });
-          }
-
-          if (buttons.cancel) {
-            document.querySelectorAll('.cancel-btn').forEach(btn => {
-              btn.style.background = buttons.cancel.background || '';
-              btn.style.boxShadow = buttons.cancel.boxShadow || '';
-              btn.style.border = buttons.cancel.border || '';
-            });
-          }
-
-          if (buttons.lobby) {
-            document.querySelectorAll('.lobby-btn').forEach(btn => {
-              btn.style.boxShadow = buttons.lobby.boxShadow || '';
-            });
-          }
-        }
-
-        // 应用文字样式
-        if (uiColors.text) {
-          const text = uiColors.text;
-
-          if (text.h1) {
-            document.querySelectorAll('h1').forEach(h1 => {
-              h1.style.color = text.h1.color || '';
-              h1.style.textShadow = text.h1.textShadow || '';
-            });
-          }
-
-          if (text.h2) {
-            document.querySelectorAll('h2').forEach(h2 => {
-              h2.style.color = text.h2.color || '';
-              h2.style.textShadow = text.h2.textShadow || '';
-            });
-          }
-
-          if (text.h3) {
-            document.querySelectorAll('h3').forEach(h3 => {
-              h3.style.color = text.h3.color || '';
-              h3.style.textShadow = text.h3.textShadow || '';
-            });
-          }
-        }
-      }
-
-      // 设置背景图片
-      if (themeBg && theme.images && theme.images.background) {
-        themeBg.style.backgroundImage = `url('${theme.images.background}')`;
-        themeBg.classList.add('visible');
-      }
-
-      // 创建主题面板
+      // 3. 渲染主题面板（角色卡片等，由元数据 JSON 的 panels 数组驱动）
+      document.querySelectorAll('.theme-panel').forEach(el => el.remove());
       if (theme.panels && Array.isArray(theme.panels)) {
         theme.panels.forEach(panelConfig => {
           if (panelConfig.enabled) {
@@ -13892,264 +13872,108 @@
         });
       }
 
-      // 创建主题面板的辅助函数
-      function createThemePanel(panelConfig) {
-        const panel = document.createElement('div');
-        panel.id = `${panelConfig.id}-panel`;
-        panel.className = 'theme-panel';
-
-        // 设置面板样式
-        const position = panelConfig.position || { right: '40px', bottom: '80px', width: '220px' };
-        const style = panelConfig.style || {};
-
-        panel.style.cssText = `
-          position: fixed;
-          right: ${position.right};
-          bottom: ${position.bottom};
-          width: ${position.width};
-          padding: 14px 14px 12px 14px;
-          border-radius: 18px;
-          background: ${style.background || 'rgba(255, 255, 255, 0.95)'};
-          box-shadow: ${style.boxShadow || '0 0 18px rgba(0, 0, 0, 0.2)'};
-          border: ${style.border || '1px solid rgba(0, 0, 0, 0.1)'};
-          z-index: 9000;
-          backdrop-filter: ${style.backdropFilter || 'blur(10px)'};
-          display: block;
-        `;
-
-        // 根据面板类型创建内容
-        let panelContent = '';
-        if (panelConfig.type === 'character' && panelConfig.image) {
-          const avatarStyle = style.avatarBorder ? `border: ${style.avatarBorder}; box-shadow: ${style.avatarShadow};` : '';
-          const nameStyle = style.nameColor ? `color: ${style.nameColor};` : '';
-          const nameTextShadow = style.nameTextShadow ? `text-shadow: ${style.nameTextShadow};` : '';
-          const descStyle = style.descColor ? `color: ${style.descColor};` : '';
-
-          panelContent = `
-            <div class="panel-avatar" style="${avatarStyle}">
-              <img src="${panelConfig.image}" alt="${panelConfig.title}" class="panel-img">
-            </div>
-            <div class="panel-info">
-              <div class="panel-name" style="${nameStyle} ${nameTextShadow}">${panelConfig.title || ''}</div>
-              <div class="panel-desc" style="${descStyle}">${panelConfig.description || ''}</div>
-            </div>
-          `;
-        } else if (panelConfig.type === 'info') {
-          const nameStyle = style.nameColor ? `color: ${style.nameColor};` : '';
-          const nameTextShadow = style.nameTextShadow ? `text-shadow: ${style.nameTextShadow};` : '';
-          const descStyle = style.descColor ? `color: ${style.descColor};` : '';
-
-          panelContent = `
-            <div class="panel-info">
-              <div class="panel-name" style="${nameStyle} ${nameTextShadow}">${panelConfig.title || ''}</div>
-              <div class="panel-desc" style="${descStyle}">${panelConfig.description || ''}</div>
-            </div>
-          `;
-        }
-
-        panel.innerHTML = panelContent;
-        document.body.appendChild(panel);
-      }
-
-      // 更新按钮颜色等
-      document.querySelectorAll('.nav-btn.active').forEach(btn => {
-        btn.style.background = theme.primaryColor;
-      });
-      document.querySelectorAll('.match-btn').forEach(btn => {
-        btn.style.background = theme.accentColor;
-      });
-      document.querySelectorAll('.cancel-btn').forEach(btn => {
-        btn.style.background = theme.secondaryColor;
-      });
-      document.querySelectorAll('.lobby-btn').forEach(btn => {
-        btn.style.boxShadow = `0 3px 6px ${theme.primaryColor}33`;
-      });
-
-      // 更新大厅UI元素样式
-      if (lobbyContainer) {
-        lobbyContainer.style.background = theme.uiColors.containerBg;
-      }
-      if (lobbyTitle) {
-        lobbyTitle.style.color = theme.uiColors.titleColor;
-      }
-      if (lobbyStatus) {
-        lobbyStatus.style.color = theme.uiColors.statusColor;
-        lobbyStatus.style.background = theme.uiColors.statusBg;
-      }
-      if (onlineUsersElement) {
-        onlineUsersElement.style.background = theme.uiColors.usersBg;
-      }
-      if (onlineUsersTitle) {
-        onlineUsersTitle.style.color = theme.uiColors.usersTitleColor;
-      }
-      if (userList) {
-        const userItems = userList.querySelectorAll('.user-item');
-        userItems.forEach(item => {
-          item.style.background = theme.uiColors.userItemBg;
-          item.style.color = theme.uiColors.userItemColor;
-        });
-      }
-
-      // 更新排行榜UI元素样式（新设计）
-      if (leaderboardContainer) {
-        leaderboardContainer.style.background = theme.uiColors.leaderboardBg;
-      }
-      if (leaderboardTitle) {
-        leaderboardTitle.style.color = theme.uiColors.leaderboardTitleColor;
-      }
-      if (leaderboardList) {
-        const leaderboardItems = leaderboardList.querySelectorAll('.leaderboard-item');
-        leaderboardItems.forEach(item => {
-          if (!item.classList.contains('top-1') && !item.classList.contains('top-2') && !item.classList.contains('top-3')) {
-            item.style.background = theme.uiColors.leaderboardItemBg;
-          }
-          const nameEl = item.querySelector('.leaderboard-player-name');
-          if (nameEl) {
-            nameEl.style.color = theme.uiColors.nameColor;
-          }
-          const metaEl = item.querySelector('.leaderboard-player-meta');
-          if (metaEl) {
-            metaEl.style.color = theme.uiColors.levelColor;
-          }
-          const statValues = item.querySelectorAll('.leaderboard-stat-value');
-          statValues.forEach(el => {
-            if (!el.classList.contains('win') && !el.classList.contains('lose') && !el.classList.contains('draw')) {
-              el.style.color = theme.uiColors.winsColor;
-            }
-          });
-          const winrateText = item.querySelector('.leaderboard-winrate-text');
-          if (winrateText) {
-            winrateText.style.color = theme.uiColors.winrateColor;
-          }
-        });
-      }
-
-      // 更新棋盘颜色
-      gobangBoard.style.background = theme.boardBackground.gobang;
-      goBoard.style.background = theme.boardBackground.go;
-      chessBoard.style.background = theme.boardBackground['chinese-chess'];
-
-      // 更新棋子颜色和效果
-      const pieceEffects = theme.effects?.pieces;
-      // 五子棋黑白子
-      document.querySelectorAll('.gobang-black').forEach(piece => {
-        piece.style.background = theme.pieceColor.gobangBlack;
-        if (pieceEffects) {
-          piece.style.boxShadow = pieceEffects.shadow || '';
-          piece.style.filter = pieceEffects.filter || '';
-        } else {
-          piece.style.boxShadow = '';
-          piece.style.filter = '';
-        }
-      });
-      document.querySelectorAll('.gobang-white').forEach(piece => {
-        piece.style.background = theme.pieceColor.gobangWhite;
-        if (pieceEffects) {
-          piece.style.boxShadow = pieceEffects.shadowWhite || '';
-          piece.style.filter = pieceEffects.filter || '';
-        } else {
-          piece.style.boxShadow = '';
-          piece.style.filter = '';
-        }
-      });
-      // 围棋黑白子
-      document.querySelectorAll('.go-black').forEach(piece => {
-        piece.style.background = theme.pieceColor.goBlack;
-        if (pieceEffects) {
-          piece.style.boxShadow = pieceEffects.shadow || '';
-          piece.style.filter = pieceEffects.filter || '';
-        } else {
-          piece.style.boxShadow = '';
-          piece.style.filter = '';
-        }
-      });
-      document.querySelectorAll('.go-white').forEach(piece => {
-        piece.style.background = theme.pieceColor.goWhite;
-        if (pieceEffects) {
-          piece.style.boxShadow = pieceEffects.shadowWhite || '';
-          piece.style.filter = pieceEffects.filter || '';
-        } else {
-          piece.style.boxShadow = '';
-          piece.style.filter = '';
-        }
-      });
-      // 象棋红黑子
-      document.querySelectorAll('.chess-red').forEach(piece => {
-        piece.style.background = theme.pieceColor.chessRed;
-        if (pieceEffects) {
-          piece.style.boxShadow = pieceEffects.shadow || '';
-          piece.style.filter = pieceEffects.filter || '';
-        } else {
-          piece.style.boxShadow = '';
-          piece.style.filter = '';
-        }
-      });
-      document.querySelectorAll('.chess-black').forEach(piece => {
-        piece.style.background = theme.pieceColor.chessBlack;
-        if (pieceEffects) {
-          piece.style.boxShadow = pieceEffects.shadowWhite || '';
-          piece.style.filter = pieceEffects.filter || '';
-        } else {
-          piece.style.boxShadow = '';
-          piece.style.filter = '';
-        }
-      });
-
-      // 更新棋盘格子悬停效果
-      const cellEffects = theme.effects?.cells;
-      if (cellEffects) {
-        document.querySelectorAll('.gobang-cell').forEach(cell => {
-          cell.style.background = cellEffects.background || 'transparent';
-          cell.style.boxShadow = cellEffects.boxShadow || 'none';
-        });
-        document.querySelectorAll('.go-cell').forEach(cell => {
-          cell.style.background = cellEffects.background || 'transparent';
-          cell.style.boxShadow = cellEffects.boxShadow || 'none';
-        });
-        document.querySelectorAll('.chess-intersection').forEach(cell => {
-          cell.style.background = cellEffects.background || 'transparent';
-          cell.style.boxShadow = cellEffects.boxShadow || 'none';
-        });
-
-        // 应用最后一步效果
-        if (cellEffects.lastMove) {
-          const lastMoveEffects = cellEffects.lastMove;
-          document.querySelectorAll('.gobang-cell.last-move').forEach(cell => {
-            cell.style.background = lastMoveEffects.background || '';
-            cell.style.boxShadow = lastMoveEffects.boxShadow || '';
-          });
-          document.querySelectorAll('.go-cell.last-move').forEach(cell => {
-            cell.style.background = lastMoveEffects.background || '';
-            cell.style.boxShadow = lastMoveEffects.boxShadow || '';
-          });
-          document.querySelectorAll('.chess-intersection.last-move').forEach(cell => {
-            cell.style.background = lastMoveEffects.background || '';
-            cell.style.boxShadow = lastMoveEffects.boxShadow || '';
-          });
-        }
-      } else {
-        document.querySelectorAll('.gobang-cell').forEach(cell => {
-          cell.style.background = 'transparent';
-          cell.style.boxShadow = 'none';
-        });
-        document.querySelectorAll('.go-cell').forEach(cell => {
-          cell.style.background = 'transparent';
-          cell.style.boxShadow = 'none';
-        });
-        document.querySelectorAll('.chess-intersection').forEach(cell => {
-          cell.style.background = 'transparent';
-          cell.style.boxShadow = 'none';
-        });
-      }
-
-      // 保存主题选择到 localStorage
+      // 4. 保存主题选择到 localStorage
+      // 注意：保存原始 themeKey 而不是 currentTheme，
+      // 因为服务器主题未加载时 currentTheme 会被回退为 'default'，
+      // 若保存回退值会覆盖用户的真实选择，导致刷新后主题丢失
       localStorage.setItem('selectedTheme', themeKey);
 
-      // 如果主题页面正在显示，刷新主题列表以更新选中状态
+      // 5. 如果主题页面正在显示，刷新主题列表以更新选中状态
       const themeContainer = document.getElementById('theme-container');
       if (themeContainer && themeContainer.style.display === 'block') {
         showThemeModal();
       }
+    }
+
+    // 主题 CSS 加载：缓存 + 单个 style 标签，避免重复加载与切换竞态
+    const themeCssCache = {};
+    let themeCssRequestId = 0;
+    async function applyThemeCss(cssUrl) {
+      const requestId = ++themeCssRequestId;
+      const oldStyle = document.getElementById('theme-dynamic-css');
+      if (oldStyle) {
+        oldStyle.remove();
+      }
+      if (!cssUrl) return;
+
+      let cssText = themeCssCache[cssUrl];
+      if (cssText === undefined) {
+        try {
+          const res = await fetch(cssUrl);
+          cssText = await res.text();
+          themeCssCache[cssUrl] = cssText;
+        } catch (err) {
+          console.warn('主题 CSS 加载失败', { cssUrl, error: err.message });
+          return;
+        }
+      }
+
+      // 等待期间若又发起了新的主题请求，丢弃本次结果，避免旧主题覆盖新主题
+      if (requestId !== themeCssRequestId) return;
+
+      const style = document.createElement('style');
+      style.id = 'theme-dynamic-css';
+      style.textContent = cssText;
+      document.head.appendChild(style);
+    }
+
+    // 创建主题面板（由元数据 JSON 的 panels 数组驱动）
+    function createThemePanel(panelConfig) {
+      const panel = document.createElement('div');
+      panel.id = `${panelConfig.id}-panel`;
+      panel.className = 'theme-panel';
+
+      // 设置面板样式
+      const position = panelConfig.position || { right: '40px', bottom: '80px', width: '220px' };
+      const style = panelConfig.style || {};
+
+      panel.style.cssText = `
+        position: fixed;
+        right: ${position.right};
+        bottom: ${position.bottom};
+        width: ${position.width};
+        padding: 14px 14px 12px 14px;
+        border-radius: 18px;
+        background: ${style.background || 'rgba(255, 255, 255, 0.95)'};
+        box-shadow: ${style.boxShadow || '0 0 18px rgba(0, 0, 0, 0.2)'};
+        border: ${style.border || '1px solid rgba(0, 0, 0, 0.1)'};
+        z-index: 9000;
+        backdrop-filter: ${style.backdropFilter || 'blur(10px)'};
+        display: block;
+      `;
+
+      // 根据面板类型创建内容
+      let panelContent = '';
+      if (panelConfig.type === 'character' && panelConfig.image) {
+        const avatarStyle = style.avatarBorder ? `border: ${style.avatarBorder}; box-shadow: ${style.avatarShadow};` : '';
+        const nameStyle = style.nameColor ? `color: ${style.nameColor};` : '';
+        const nameTextShadow = style.nameTextShadow ? `text-shadow: ${style.nameTextShadow};` : '';
+        const descStyle = style.descColor ? `color: ${style.descColor};` : '';
+
+        panelContent = `
+          <div class="panel-avatar" style="${avatarStyle}">
+            <img src="${panelConfig.image}" alt="${panelConfig.title}" class="panel-img">
+          </div>
+          <div class="panel-info">
+            <div class="panel-name" style="${nameStyle} ${nameTextShadow}">${panelConfig.title || ''}</div>
+            <div class="panel-desc" style="${descStyle}">${panelConfig.description || ''}</div>
+          </div>
+        `;
+      } else if (panelConfig.type === 'info') {
+        const nameStyle = style.nameColor ? `color: ${style.nameColor};` : '';
+        const nameTextShadow = style.nameTextShadow ? `text-shadow: ${style.nameTextShadow};` : '';
+        const descStyle = style.descColor ? `color: ${style.descColor};` : '';
+
+        panelContent = `
+          <div class="panel-info">
+            <div class="panel-name" style="${nameStyle} ${nameTextShadow}">${panelConfig.title || ''}</div>
+            <div class="panel-desc" style="${descStyle}">${panelConfig.description || ''}</div>
+          </div>
+        `;
+      }
+
+      panel.innerHTML = panelContent;
+      document.body.appendChild(panel);
     }
 
     window.applyTheme = applyTheme;

@@ -7,6 +7,7 @@ class ThemeManager {
     this.dataStore = dataStore;
     this.themes = new Map();
     this.themesDir = path.join(__dirname, '..', 'config', 'themes');
+    this.cssBaseUrl = '/themes';
     this.init();
   }
 
@@ -36,8 +37,15 @@ class ThemeManager {
           const theme = JSON.parse(content);
 
           if (theme.id && theme.name) {
+            // 关联同目录下的主题 CSS 文件（新皮肤格式：元数据 json + 样式 css）
+            const cssFile = `${theme.id}.css`;
+            if (fs.existsSync(path.join(this.themesDir, cssFile))) {
+              theme.cssUrl = `${this.cssBaseUrl}/${cssFile}`;
+            } else {
+              theme.cssUrl = '';
+            }
             this.themes.set(theme.id, theme);
-            logger.info('加载主题', { id: theme.id, name: theme.name });
+            logger.info('加载主题', { id: theme.id, name: theme.name, cssUrl: theme.cssUrl });
           }
         } catch (err) {
           logger.warn('加载主题文件失败', { file, error: err.message });

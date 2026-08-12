@@ -1,0 +1,440 @@
+/* ============ 海洋之心主题 ============
+   配合元数据文件 ocean.json 使用。
+   通过 body[data-theme="ocean"] 作用域覆盖默认 CSS 变量实现换肤。 */
+
+body[data-theme="ocean"] {
+  /* 全局 */
+  --theme-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --theme-primary: #00d4ff;
+  --theme-secondary: #6c757d;
+  --theme-accent: #27ae60;
+
+  /* 大厅 UI */
+  --theme-container-bg: rgba(30, 58, 95, 0.9);
+  --theme-title-color: #ffffff;
+  --theme-status-color: #e3f2fd;
+  --theme-status-bg: rgba(0, 212, 255, 0.1);
+
+  /* 在线用户 */
+  --theme-users-bg: rgba(0, 212, 255, 0.05);
+  --theme-users-title-color: #00d4ff;
+  --theme-user-item-bg: rgba(0, 212, 255, 0.2);
+  --theme-user-item-color: #ffffff;
+
+  /* 排行榜 */
+  --theme-leaderboard-bg: rgba(0, 212, 255, 0.05);
+  --theme-leaderboard-title-color: #00d4ff;
+  --theme-leaderboard-item-bg: rgba(0, 212, 255, 0.1);
+  --theme-rank-color: #ffffff;
+  --theme-name-color: #e3f2fd;
+  --theme-level-color: #90caf9;
+  --theme-wins-color: #48bb78;
+  --theme-winrate-color: #4299e1;
+
+  /* 棋盘 */
+  --theme-board-gobang: #1e3a5f;
+  --theme-board-go: #2a4a7f;
+  --theme-board-chess: #1e3a5f;
+
+  /* 棋子 */
+  --theme-piece-gobang-black: #0a1929;
+  --theme-piece-gobang-white: #e3f2fd;
+  --theme-piece-go-black: #0a1929;
+  --theme-piece-go-white: #e3f2fd;
+  --theme-piece-chess-red: #e53935;
+  --theme-piece-chess-black: #0a1929;
+
+  /* 象棋交互态 */
+  --theme-chess-selected-shadow:
+    0 6px 16px rgba(0, 212, 255, 0.5),
+    0 0 20px rgba(0, 212, 255, 0.3),
+    inset 0 2px 4px rgba(255, 255, 255, 0.4);
+  --theme-chess-valid-bg: rgba(0, 212, 255, 0.3);
+
+  /* 导航栏 */
+  --theme-nav-bg: rgba(30, 58, 95, 0.95);
+  --theme-nav-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  --theme-nav-btn-bg: rgba(0, 212, 255, 0.12);
+  --theme-nav-btn-bg-hover: rgba(0, 212, 255, 0.28);
+  --theme-nav-btn-color: #e3f2fd;
+  --theme-nav-btn-active-bg: #00d4ff;
+  --theme-nav-btn-active-hover-bg: #00b8d9;
+  --theme-nav-btn-active-color: #0a1929;
+  --theme-shortcut-bg: rgba(0, 212, 255, 0.3);
+  --theme-shortcut-color: #90caf9;
+
+  /* 通用按钮 */
+  --theme-btn-primary-bg: #00d4ff;
+  --theme-btn-primary-bg-hover: #00b8d9;
+  --theme-btn-primary-shadow: 0 3px 10px rgba(0, 212, 255, 0.4);
+  --theme-btn-primary-shadow-hover: 0 4px 14px rgba(0, 212, 255, 0.6);
+  --theme-btn-disabled-bg: #546e7a;
+  --theme-btn-danger-bg: #e53935;
+  --theme-btn-danger-bg-hover: #c62828;
+  --theme-btn-warning-bg: #7e57c2;
+  --theme-btn-warning-bg-hover: #5e35b1;
+  --theme-btn-cancel-bg-hover: #c62828;
+  --theme-btn-match-bg-hover: #00838f;
+
+  /* 挑战按钮 */
+  --theme-challenge-bg: #00d4ff;
+  --theme-challenge-bg-hover: #00b8d9;
+
+  /* 面板边框 */
+  --theme-border-color: rgba(0, 212, 255, 0.4);
+  --theme-border-color-dark: #0d47a1;
+  --theme-panel-bg: rgba(30, 58, 95, 0.92);
+  --theme-panel-shadow: 0 4px 18px rgba(0, 0, 0, 0.3);
+
+  /* 信息/状态面板 */
+  --theme-info-title-color: #90caf9;
+  --theme-info-title-border: #00d4ff;
+  --theme-info-content-color: #bbdefb;
+  --theme-info-content-divider: rgba(0, 212, 255, 0.25);
+  --theme-info-label-color: #64b5f6;
+  --theme-info-value-color: #ffffff;
+  --theme-info-value-bg: rgba(0, 212, 255, 0.2);
+  --theme-status-border: #00d4ff;
+
+  /* 状态 value */
+  --theme-value-connected-color: #66bb6a;
+  --theme-value-connected-bg: rgba(72, 187, 120, 0.25);
+  --theme-value-waiting-color: #ffb74d;
+  --theme-value-waiting-bg: rgba(255, 183, 77, 0.25);
+  --theme-value-black-color: #90caf9;
+  --theme-value-black-bg: rgba(13, 71, 161, 0.3);
+  --theme-value-white-color: #e1f5fe;
+  --theme-value-white-bg: rgba(0, 188, 212, 0.35);
+  --theme-value-turn-color: #ffffff;
+  --theme-value-turn-bg: rgba(0, 212, 255, 0.45);
+  --theme-value-danger-color: #ef9a9a;
+  --theme-value-danger-bg: rgba(244, 67, 54, 0.3);
+  --theme-value-normal-color: #ce93d8;
+  --theme-value-normal-bg: rgba(171, 71, 188, 0.3);
+  --theme-value-red-color: #ffab91;
+  --theme-value-red-bg: rgba(229, 57, 53, 0.3);
+  --theme-value-green-color: #81c784;
+  --theme-value-green-bg: rgba(67, 160, 71, 0.3);
+
+  /* 弹窗/模态 */
+  --theme-modal-overlay: rgba(10, 25, 41, 0.8);
+  --theme-modal-bg: rgba(30, 58, 95, 0.98);
+  --theme-modal-title-color: #90caf9;
+
+  /* 账号栏 */
+  --theme-account-bar-bg: rgba(30, 58, 95, 0.95);
+  --theme-account-bar-border: rgba(0, 212, 255, 0.5);
+  --theme-account-nickname-color: #ffffff;
+  --theme-account-user-details-color: #bbdefb;
+  --theme-account-avatar-gradient: linear-gradient(135deg, #00d4ff, #7e57c2);
+  --theme-account-coin-gradient: linear-gradient(135deg, #00bcd4, #26c6da);
+  --theme-account-level-gradient: linear-gradient(135deg, #42a5f5, #7e57c2);
+  --theme-account-exp-gradient: linear-gradient(135deg, #29b6f6, #66bb6a);
+
+  /* 聊天 */
+  --theme-chat-container-bg: rgba(30, 58, 95, 0.92);
+  --theme-chat-msg-bg: rgba(0, 212, 255, 0.1);
+  --theme-chat-msg-self-bg: rgba(0, 188, 212, 0.28);
+  --theme-chat-msg-other-bg: rgba(30, 136, 229, 0.22);
+  --theme-chat-sender-color: #4fc3f7;
+  --theme-chat-input-border: rgba(0, 212, 255, 0.5);
+  --theme-chat-input-focus: #00d4ff;
+  --theme-chat-send-bg: #00d4ff;
+  --theme-chat-send-bg-hover: #0097a7;
+  --theme-chat-channel-bg: rgba(0, 212, 255, 0.15);
+  --theme-chat-channel-border: rgba(0, 212, 255, 0.4);
+  --theme-chat-channel-active-bg: rgba(0, 188, 212, 0.3);
+  --theme-chat-channel-active-color: #e0f7fa;
+
+  /* 落子记录 */
+  --theme-move-log-list-bg: rgba(0, 212, 255, 0.1);
+  --theme-move-log-black-bg: rgba(0, 212, 255, 0.25);
+  --theme-move-log-black-color: #e1f5fe;
+  --theme-move-log-white-bg: rgba(255, 255, 255, 0.15);
+  --theme-move-log-white-color: #e3f2fd;
+  --theme-move-log-red-bg: rgba(244, 67, 54, 0.25);
+  --theme-move-log-red-color: #ffcdd2;
+  --theme-move-log-green-bg: rgba(76, 175, 80, 0.25);
+  --theme-move-log-green-color: #c8e6c9;
+
+  /* 统计/提示文本 */
+  --theme-tip-text-color: #90caf9;
+  --theme-stat-label-color: #90caf9;
+  --theme-stat-value-color: #ffffff;
+  --theme-stat-item-bg: rgba(0, 212, 255, 0.15);
+  --theme-stat-item-border: #7e57c2;
+
+  /* 胜利/广播横幅渐变 */
+  --theme-winner-gradient: linear-gradient(135deg, #00d4ff 0%, #7e57c2 100%);
+
+  /* 提示弹窗 */
+  --theme-tip-popup-border: #00d4ff;
+
+  /* 滚动条 */
+  --theme-scrollbar-track: rgba(30, 58, 95, 0.6);
+  --theme-scrollbar-thumb: #00d4ff;
+  --theme-scrollbar-thumb-hover: #7e57c2;
+
+  /* 排行榜 */
+  --theme-lv-badge-bg: rgba(0, 212, 255, 0.22);
+  --theme-lv-badge-color: #e1f5fe;
+  --theme-streak-badge-bg: rgba(244, 67, 54, 0.28);
+  --theme-streak-badge-color: #ffcdd2;
+  --theme-stat-label-color-2: #90caf9;
+  --theme-stat-win-color: #66bb6a;
+  --theme-stat-lose-color: #ef5350;
+  --theme-stat-draw-color: #ab47bc;
+  --theme-winrate-bar-bg: rgba(0, 212, 255, 0.15);
+  --theme-winrate-bar-high: linear-gradient(90deg, #66bb6a, #26c6da);
+  --theme-winrate-bar-mid: linear-gradient(90deg, #ffb300, #00d4ff);
+  --theme-winrate-bar-low: linear-gradient(90deg, #ef5350, #ab47bc);
+  --theme-empty-color: #90caf9;
+  --theme-self-row-bg: rgba(0, 212, 255, 0.22);
+  --theme-self-row-border: #00d4ff;
+  --theme-self-label-bg: rgba(0, 212, 255, 0.2);
+  --theme-self-label-color: #b3e5fc;
+  --theme-self-rank-color: #ffffff;
+
+  /* 在线用户状态徽章 */
+  --theme-user-waiting-bg: rgba(255, 193, 7, 0.22);
+  --theme-user-playing-bg: rgba(67, 160, 71, 0.22);
+  --theme-user-gobang-border: #ef5350;
+  --theme-user-go-border: #26c6da;
+  --theme-user-chess-border: #7e57c2;
+
+  /* 贪吃蛇 */
+  --theme-snake-bg: rgba(30, 58, 95, 0.85);
+  --theme-snake-info-bg: rgba(21, 67, 110, 0.9);
+  --theme-snake-info-item-color: #e3f2fd;
+  --theme-snake-info-label-color: #90caf9;
+  --theme-snake-info-value-bg: rgba(0, 212, 255, 0.22);
+  --theme-snake-info-value-color: #e1f5fe;
+  --theme-snake-canvas-bg: #0a1929;
+  --theme-snake-canvas-border: #0d47a1;
+  --theme-snake-start-bg: #00897b;
+  --theme-snake-restart-bg: #00d4ff;
+  --theme-snake-rules-bg: rgba(21, 67, 110, 0.9);
+  --theme-snake-rules-color: #e3f2fd;
+  --theme-snake-rules-content-color: #90caf9;
+
+  /* Toast */
+  --theme-toast-error-bg: rgba(244, 67, 54, 0.25);
+  --theme-toast-error-color: #ffcdd2;
+  --theme-toast-error-border: #ef5350;
+  --theme-toast-success-bg: rgba(67, 160, 71, 0.25);
+  --theme-toast-success-color: #c8e6c9;
+  --theme-toast-success-border: #66bb6a;
+  --theme-toast-warning-bg: rgba(255, 167, 38, 0.25);
+  --theme-toast-warning-color: #ffe0b2;
+  --theme-toast-warning-border: #ffb74d;
+
+  /* 登录模态 */
+  --theme-login-option-bg: rgba(0, 212, 255, 0.1);
+  --theme-login-option-border: rgba(0, 212, 255, 0.4);
+  --theme-login-option-hover-border: #00d4ff;
+  --theme-login-option-hover-bg: rgba(0, 212, 255, 0.18);
+  --theme-login-option-active-bg: rgba(0, 212, 255, 0.3);
+  --theme-login-icon-bg: rgba(0, 212, 255, 0.3);
+  --theme-login-title-color: #ffffff;
+  --theme-login-desc-color: #90caf9;
+  --theme-login-subtitle-color: #bbdefb;
+
+  /* 帮助提示条 */
+  --theme-hint-description-color: #ffe0b2;
+  --theme-hint-description-bg: linear-gradient(135deg, rgba(0, 212, 255, 0.2) 0%, rgba(126, 87, 194, 0.2) 100%);
+  --theme-hint-description-border: #00d4ff;
+
+  /* 版本文字 */
+  --theme-version-color: #90caf9;
+}
+
+/* ========== 海洋光效 ========== */
+
+/* 标题柔和光晕 */
+body[data-theme="ocean"] h1,
+body[data-theme="ocean"] h2,
+body[data-theme="ocean"] h3 {
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3), 0 0 14px rgba(0, 212, 255, 0.3);
+}
+
+/* 按钮光效 */
+body[data-theme="ocean"] .nav-btn.active {
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.5), 0 0 18px rgba(0, 212, 255, 0.25);
+}
+
+body[data-theme="ocean"] .match-btn {
+  box-shadow: 0 0 10px rgba(39, 174, 96, 0.5), 0 0 18px rgba(39, 174, 96, 0.25);
+}
+
+body[data-theme="ocean"] .cancel-btn {
+  box-shadow: 0 0 8px rgba(108, 117, 125, 0.4);
+}
+
+/* 棋盘外发光（水波纹质感） */
+body[data-theme="ocean"] .gobang-board,
+body[data-theme="ocean"] .go-board,
+body[data-theme="ocean"] .chess-board {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), 0 0 24px rgba(0, 212, 255, 0.25);
+  border-color: #0d47a1;
+}
+
+/* 棋子轻微发光 */
+body[data-theme="ocean"] .gobang-black,
+body[data-theme="ocean"] .go-black,
+body[data-theme="ocean"] .chess-black {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), 0 0 10px rgba(0, 212, 255, 0.35);
+}
+
+body[data-theme="ocean"] .gobang-white,
+body[data-theme="ocean"] .go-white {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), 0 0 10px rgba(227, 242, 253, 0.4);
+}
+
+/* 格子 hover 高亮 */
+body[data-theme="ocean"] .gobang-cell:hover,
+body[data-theme="ocean"] .go-cell:hover,
+body[data-theme="ocean"] .chess-intersection:hover {
+  background: rgba(0, 212, 255, 0.3);
+  box-shadow: 0 0 12px rgba(0, 212, 255, 0.5);
+}
+
+/* 最后一步标记用主题色 */
+body[data-theme="ocean"] .gobang-cell.last-move::before,
+body[data-theme="ocean"] .go-cell.last-move::before,
+body[data-theme="ocean"] .chess-intersection.last-move::before {
+  background: radial-gradient(circle, rgba(0, 212, 255, 0.5) 0%, transparent 70%);
+  box-shadow: 0 0 14px rgba(0, 212, 255, 0.7);
+}
+
+/* 导航栏边框 */
+body[data-theme="ocean"] .game-nav {
+  border: 1px solid rgba(0, 212, 255, 0.5);
+}
+
+/* 面板边框 */
+body[data-theme="ocean"] .lobby-container,
+body[data-theme="ocean"] .info-panel,
+body[data-theme="ocean"] .online-users-panel,
+body[data-theme="ocean"] .chat-container,
+body[data-theme="ocean"] .move-log-panel,
+body[data-theme="ocean"] .advanced-stats,
+body[data-theme="ocean"] .snake-game-container {
+  border: 1px solid rgba(0, 212, 255, 0.4);
+}
+
+/* 账号栏 */
+body[data-theme="ocean"] .account-info {
+  border: 1px solid rgba(0, 212, 255, 0.55);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+/* 排行榜头部 */
+body[data-theme="ocean"] .leaderboard-header-stats {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+/* 胜利弹窗 */
+body[data-theme="ocean"] .win-alert {
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(0, 212, 255, 0.4);
+}
+
+/* Toast 阴影 */
+body[data-theme="ocean"] .error-toast {
+  box-shadow: 0 4px 16px rgba(244, 67, 54, 0.4);
+}
+
+body[data-theme="ocean"] .success-toast {
+  box-shadow: 0 4px 16px rgba(67, 160, 71, 0.4);
+}
+
+body[data-theme="ocean"] .warning-toast {
+  box-shadow: 0 4px 16px rgba(255, 167, 38, 0.4);
+}
+
+/* 滚动条 */
+body[data-theme="ocean"] ::-webkit-scrollbar-thumb {
+  box-shadow: 0 0 6px rgba(0, 212, 255, 0.45);
+}
+
+body[data-theme="ocean"] ::-webkit-scrollbar-thumb:hover {
+  box-shadow: 0 0 10px rgba(126, 87, 194, 0.55);
+}
+
+/* 登录模态 */
+body[data-theme="ocean"] .auto-login-content {
+  border: 1px solid rgba(0, 212, 255, 0.6);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+body[data-theme="ocean"] .system-broadcast {
+  box-shadow: 0 10px 40px rgba(0, 212, 255, 0.4);
+}
+
+/* nav-btn hover */
+body[data-theme="ocean"] .nav-btn:hover {
+  box-shadow: 0 0 12px rgba(0, 212, 255, 0.5);
+}
+
+/* 提示弹窗 */
+body[data-theme="ocean"] .tip-popup {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+/* 等级徽章 */
+body[data-theme="ocean"] .leaderboard-lv-badge {
+  box-shadow: 0 0 6px rgba(0, 212, 255, 0.45);
+}
+
+/* 状态条 */
+body[data-theme="ocean"] .status-box {
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* 账号徽章 */
+body[data-theme="ocean"] .account-starcoins,
+body[data-theme="ocean"] .account-level,
+body[data-theme="ocean"] .account-exp {
+  box-shadow: 0 2px 6px rgba(0, 212, 255, 0.4);
+}
+
+/* 聊天按钮 */
+body[data-theme="ocean"] .chat-send-btn:hover {
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+}
+
+/* 挑战按钮 */
+body[data-theme="ocean"] .challenge-btn:hover {
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.45);
+}
+
+/* 排行榜前三名 */
+body[data-theme="ocean"] .leaderboard-item.top-1,
+body[data-theme="ocean"] .leaderboard-item.top-2,
+body[data-theme="ocean"] .leaderboard-item.top-3 {
+  background: rgba(0, 212, 255, 0.2);
+  border: 1px solid rgba(126, 87, 194, 0.5);
+}
+
+body[data-theme="ocean"] .leaderboard-item.top-1 {
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+}
+
+body[data-theme="ocean"] .leaderboard-item.top-2 {
+  box-shadow: 0 0 10px rgba(189, 189, 189, 0.4);
+}
+
+body[data-theme="ocean"] .leaderboard-item.top-3 {
+  box-shadow: 0 0 10px rgba(126, 87, 194, 0.4);
+}
+
+/* 自己的排名行 */
+body[data-theme="ocean"] .leaderboard-item.is-me {
+  box-shadow: 0 0 12px rgba(0, 212, 255, 0.55);
+}
+
+/* 楚河汉界 */
+body[data-theme="ocean"] .chess-river::before,
+body[data-theme="ocean"] .chess-river::after {
+  color: #90caf9;
+  text-shadow: 0 0 6px rgba(0, 212, 255, 0.5);
+}

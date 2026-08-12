@@ -2,84 +2,10 @@
   "id": "cyberpunk",
   "name": "赛博朋克",
   "description": "赛博朋克风格主题，带有霓虹效果和未来感",
-  "background": "radial-gradient(circle at 20% 50%, rgba(0, 212, 255, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255, 0, 255, 0.1) 0%, transparent 50%), #1e0030",
   "primaryColor": "#00d4ff",
   "secondaryColor": "#ff00ff",
   "accentColor": "#ff1493",
-  "images": {
-    "background": "/server/assets/lucy.png"
-  },
-  "effects": {
-    "global": {
-      "textShadow": "0 0 5px #00d4ff, 0 0 10px #00d4ff, 0 0 15px #ff00ff",
-      "buttonShadow": "0 0 10px #00d4ff, 0 0 20px #ff00ff, inset 0 0 10px rgba(255, 255, 255, 0.1)",
-      "buttonBorder": "1px solid #00d4ff"
-    },
-    "board": {
-      "className": "cyberpunk-gobang",
-      "glowEffect": true,
-      "glowStyle": {
-        "background": "radial-gradient(circle at 20% 50%, rgba(0, 212, 255, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255, 0, 255, 0.1) 0%, transparent 50%)",
-        "opacity": 0.2
-      },
-      "style": {
-        "border": "2px solid #00d4ff",
-        "boxShadow": "0 0 20px rgba(0, 212, 255, 0.7), 0 0 40px rgba(255, 0, 255, 0.6)",
-        "animation": "neon-pulse 2.4s ease-in-out infinite"
-      }
-    },
-    "pieces": {
-      "shadow": "0 0 15px #ff1493, 0 0 30px #ff1493, 0 0 45px #ff1493, inset 0 0 10px rgba(255, 105, 180, 0.5)",
-      "shadowWhite": "0 0 15px #ff1493, 0 0 30px #ff1493, 0 0 45px #ff69b4, inset 0 0 10px rgba(255, 105, 180, 0.5)",
-      "filter": "brightness(1.4) saturate(1.3)",
-      "black": {
-        "background": "radial-gradient(circle at 30% 30%, #2a2a2a, #000)",
-        "boxShadow": "0 0 15px #ff1493, 0 0 30px #ff1493, 0 0 45px #ff1493, inset 0 0 10px rgba(255, 105, 180, 0.5)",
-        "filter": "brightness(1.4) saturate(1.3)"
-      },
-      "white": {
-        "background": "radial-gradient(circle at 30% 30%, #fff, #e0e0e0)",
-        "boxShadow": "0 0 15px #ff1493, 0 0 30px #ff1493, 0 0 45px #ff69b4, inset 0 0 10px rgba(255, 105, 180, 0.5)",
-        "filter": "brightness(1.4) saturate(1.3)"
-      },
-      "selected": {
-        "boxShadow": "0 0 25px #00d4ff, 0 0 50px #00d4ff, 0 0 75px #00d4ff, inset 0 0 15px rgba(0, 212, 255, 0.8)"
-      }
-    },
-    "cells": {
-      "background": "rgba(255, 20, 147, 0.15)",
-      "boxShadow": "inset 0 0 10px rgba(255, 20, 147, 0.3)",
-      "hover": {
-        "background": "rgba(0, 255, 255, 0.4)",
-        "boxShadow": "0 0 15px rgba(0, 255, 255, 0.8), inset 0 0 8px rgba(0, 255, 255, 0.5)"
-      },
-      "lastMove": {
-        "background": "rgba(255, 0, 255, 0.5)",
-        "boxShadow": "0 0 20px rgba(255, 0, 255, 0.9), inset 0 0 10px rgba(255, 0, 255, 0.6)"
-      }
-    },
-    "animations": {
-      "neonPulse": {
-        "keyframes": [
-          {
-            "opacity": "1",
-            "boxShadow": "0 0 20px rgba(0, 212, 255, 0.7), 0 0 40px rgba(255, 0, 255, 0.6)"
-          },
-          {
-            "opacity": "0.8",
-            "boxShadow": "0 0 30px rgba(0, 212, 255, 0.9), 0 0 60px rgba(255, 0, 255, 0.8)"
-          },
-          {
-            "opacity": "1",
-            "boxShadow": "0 0 20px rgba(0, 212, 255, 0.7), 0 0 40px rgba(255, 0, 255, 0.6)"
-          }
-        ],
-        "duration": "2.4s",
-        "timingFunction": "ease-in-out",
-        "iterationCount": "infinite"
-      }
-    }
-  },
+  "background": "radial-gradient(circle at 20% 50%, rgba(0, 212, 255, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255, 0, 255, 0.1) 0%, transparent 50%), #1e0030",
   "panels": [
     {
       "id": "lucy",
@@ -105,70 +31,5 @@
         "descColor": "#cbd5f5"
       }
     }
-  ],
-  "boardBackground": {
-    "gobang": "radial-gradient(circle at 20% 20%, rgba(0, 212, 255, 0.12) 0, transparent 55%), radial-gradient(circle at 80% 80%, rgba(255, 0, 255, 0.12) 0, transparent 55%), #1e0030",
-    "go": "radial-gradient(circle at 20% 20%, rgba(0, 212, 255, 0.12) 0, transparent 55%), radial-gradient(circle at 80% 80%, rgba(255, 0, 255, 0.12) 0, transparent 55%), #1e0030",
-    "chinese-chess": "radial-gradient(circle at 20% 20%, rgba(0, 212, 255, 0.12) 0, transparent 55%), radial-gradient(circle at 80% 80%, rgba(255, 0, 255, 0.12) 0, transparent 55%), #1e0030"
-  },
-  "pieceColor": {
-    "gobangBlack": "#000",
-    "gobangWhite": "#fff",
-    "goBlack": "#000",
-    "goWhite": "#fff",
-    "chessRed": "#ff1493",
-    "chessBlack": "#00d4ff"
-  },
-  "uiColors": {
-    "containerBg": "rgba(30, 0, 48, 0.8)",
-    "titleColor": "#00d4ff",
-    "statusColor": "#ffffff",
-    "statusBg": "rgba(0, 212, 255, 0.1)",
-    "usersBg": "rgba(30, 0, 48, 0.6)",
-    "usersTitleColor": "#00d4ff",
-    "userItemBg": "rgba(0, 212, 255, 0.2)",
-    "userItemColor": "#ffffff",
-    "leaderboardBg": "rgba(30, 0, 48, 0.6)",
-    "leaderboardTitleColor": "#00d4ff",
-    "leaderboardItemBg": "rgba(30, 0, 48, 0.8)",
-    "rankColor": "#ffffff",
-    "nameColor": "#00d4ff",
-    "levelColor": "#ff00ff",
-    "winsColor": "#00ff00",
-    "winrateColor": "#ffff00",
-    "buttons": {
-      "active": {
-        "background": "#00d4ff",
-        "boxShadow": "0 0 10px #00d4ff, 0 0 20px #ff00ff, inset 0 0 10px rgba(255, 255, 255, 0.1)",
-        "border": "1px solid #00d4ff"
-      },
-      "match": {
-        "background": "#ff1493",
-        "boxShadow": "0 0 10px #ff1493, 0 0 20px #ff00ff, inset 0 0 10px rgba(255, 255, 255, 0.1)",
-        "border": "1px solid #ff1493"
-      },
-      "cancel": {
-        "background": "#ff00ff",
-        "boxShadow": "0 0 10px #ff00ff, 0 0 20px #00d4ff, inset 0 0 10px rgba(255, 255, 255, 0.1)",
-        "border": "1px solid #ff00ff"
-      },
-      "lobby": {
-        "boxShadow": "0 3px 6px rgba(0, 212, 255, 0.2)"
-      }
-    },
-    "text": {
-      "h1": {
-        "color": "#00d4ff",
-        "textShadow": "0 0 5px #00d4ff, 0 0 10px #00d4ff, 0 0 15px #ff00ff"
-      },
-      "h2": {
-        "color": "#00d4ff",
-        "textShadow": "0 0 5px #00d4ff, 0 0 10px #00d4ff, 0 0 15px #ff00ff"
-      },
-      "h3": {
-        "color": "#00d4ff",
-        "textShadow": "0 0 5px #00d4ff, 0 0 10px #00d4ff, 0 0 15px #ff00ff"
-      }
-    }
-  }
+  ]
 }

@@ -103,6 +103,9 @@ app.use(express.static(path.join(__dirname, '..')));
 // 静态资源服务 - 勋章图标等
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
+// 主题样式静态服务（新皮肤格式：元数据 json + 样式 css）
+app.use('/themes', express.static(path.join(__dirname, 'config', 'themes')));
+
 // 自定义头像静态服务
 app.use('/data/cosmetics/avatars', express.static(path.join(__dirname, '..', 'data', 'cosmetics', 'avatars')));
 

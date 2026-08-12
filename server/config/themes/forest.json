@@ -2,39 +2,8 @@
   "id": "forest",
   "name": "森林秘境",
   "description": "自然的森林风格主题",
-  "background": "linear-gradient(135deg, #134e5e 0%, #71b280 100%)",
   "primaryColor": "#4caf50",
   "secondaryColor": "#8d6e63",
   "accentColor": "#ff9800",
-  "boardBackground": {
-    "gobang": "#5d4037",
-    "go": "#795548",
-    "chinese-chess": "#5d4037"
-  },
-  "pieceColor": {
-    "gobangBlack": "#2e7d32",
-    "gobangWhite": "#c8e6c9",
-    "goBlack": "#2e7d32",
-    "goWhite": "#c8e6c9",
-    "chessRed": "#d84315",
-    "chessBlack": "#1b5e20"
-  },
-  "uiColors": {
-    "containerBg": "rgba(93, 64, 55, 0.9)",
-    "titleColor": "#ffffff",
-    "statusColor": "#c8e6c9",
-    "statusBg": "rgba(76, 175, 80, 0.1)",
-    "usersBg": "rgba(76, 175, 80, 0.05)",
-    "usersTitleColor": "#4caf50",
-    "userItemBg": "rgba(76, 175, 80, 0.2)",
-    "userItemColor": "#ffffff",
-    "leaderboardBg": "rgba(76, 175, 80, 0.05)",
-    "leaderboardTitleColor": "#4caf50",
-    "leaderboardItemBg": "rgba(76, 175, 80, 0.1)",
-    "rankColor": "#ffffff",
-    "nameColor": "#c8e6c9",
-    "levelColor": "#a5d6a7",
-    "winsColor": "#81c784",
-    "winrateColor": "#4caf50"
-  }
+  "background": "linear-gradient(135deg, #134e5e 0%, #71b280 100%)"
 }
