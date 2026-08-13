@@ -57,3 +57,11 @@ export function $(selector, root = document) {
 export function $$(selector, root = document) {
   return Array.from(root.querySelectorAll(selector));
 }
+
+/**
+ * 获取视图内容容器（#view-root，不存在时回退 body）
+ * @returns {HTMLElement}
+ */
+export function viewRoot() {
+  return document.getElementById('view-root') || document.body;
+}

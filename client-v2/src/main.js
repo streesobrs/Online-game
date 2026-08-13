@@ -17,6 +17,10 @@ import { initShortcuts } from './utils/shortcut.js';
 import { NAV_ITEMS, GAMES, FEATURES, findItem } from './data/navItems.js';
 import * as themes from './features/themes/index.js';
 import { switchLayout } from './layouts/registry.js';
+import { viewRoot } from './utils/dom.js';
+import * as login from './features/auth/login.js';
+import { renderLobby } from './features/lobby/index.js';
+import { renderGobang } from './games/gobang/index.js';
 
 console.log('[v2] main.js 已加载');
 
@@ -36,12 +40,17 @@ window.shortcuts = { initShortcuts };
 window.navItems = { NAV_ITEMS, GAMES, FEATURES, findItem };
 window.themes = themes;
 window.switchLayout = switchLayout;
+window.login = login;
 
 // 初始化登录态（恢复 token、订阅登录事件、socket 连接后自动登录）
 auth.initAuth();
 
 // 初始化主题（应用 v1/v2 共享的 selectedTheme）
 themes.initThemes();
+
+// 注册业务视图路由（须在 initRouter 之前，保证当前 hash 首次处理即命中）
+registerRoute('lobby', () => renderLobby(viewRoot()));
+registerRoute('gobang', () => renderGobang(viewRoot()));
 
 // 初始化路由（hashchange 监听 + 处理当前 hash）
 initRouter();

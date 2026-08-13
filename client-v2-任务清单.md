@@ -57,16 +57,16 @@ AI 完成任务时填写：
 
 | 阶段 | 任务数 | 完成 | 已验证 | 状态 |
 |------|--------|------|--------|------|
-| 阶段 1：骨架搭建 | 26 | 20 | 18 | 进行中 |
+| 阶段 1：骨架搭建 | 26 | 23 | 20 | 进行中 |
 | 阶段 2：五子棋迁移 | 12 | 0 | 0 | 未开始 |
 | 阶段 3：其余游戏迁移 | 12 | 0 | 0 | 未开始 |
 | 阶段 4：功能模块迁移 | 17 | 0 | 0 | 未开始 |
 | 阶段 5：打磨上线 | 6 | 0 | 0 | 未开始 |
-| **合计** | **73** | **20** | **18** | — |
+| **合计** | **73** | **23** | **20** | — |
 
 ---
 
-## 阶段 1：骨架搭建 [20/26]
+## 阶段 1：骨架搭建 [23/26]
 
 > **目标**：v2 可访问、能登录、能匹配、能进空棋盘  
 > **验收标准**：访问 `http://server:8080/beta/` 看到 v2 界面，能用 v1 账号登录  
@@ -353,6 +353,8 @@ AI 完成任务时填写：
       - switchLayout(id)：清理旧布局（cleanup + innerHTML 清空）→ 渲染新布局到 #nav-root（不存在则 #app）→ localStorage 持久化（key `nav-layout`）
     - 自测方式：F5 刷新 `/beta/` 出现顶部导航栏；控制台执行 `switchLayout('topnav')` 导航重渲染且 `localStorage.getItem('nav-layout')` 为 'topnav'
 
+✅ 已验证（2026-08-13）
+
 - [x] **1.6.2** 实现 layouts/topnav.js（顶部导航布局）
   - 依赖：1.6.1、1.4.2
   - 验证：导航栏显示 4 游戏 + 6 功能按钮；点击按钮能切换路由；active 状态正确
@@ -366,9 +368,11 @@ AI 完成任务时填写：
       - main.js 挂载 `window.switchLayout` 并调用 `switchLayout(localStorage.getItem('nav-layout') || 'topnav')`
     - 自测方式：F5 刷新 `/beta/` 导航栏显示 4 游戏 + 6 功能按钮；点击「五子棋」URL hash 变 `#/gobang` 且该按钮高亮；按快捷键 3 高亮切到「象棋」（内容区暂无视图属预期，1.7 注册）
 
-### 1.7 业务界面 [0/3]
+✅ 已验证（2026-08-13）
 
-- [ ] **1.7.1** 实现 features/auth/login.js（登录界面）
+### 1.7 业务界面 [3/3]
+
+- [x] **1.7.1** 实现 features/auth/login.js（登录界面）
   - 依赖：1.3.3、1.2.5
   - 验证：
     - 显示登录弹窗（用户名 + 密码输入框）
@@ -376,19 +380,38 @@ AI 完成任务时填写：
     - 登录失败显示 toast 错误提示
     - 支持游客登录、账号登录两种模式
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/features/auth/login.js
+    - 实现内容：
+      - `showLoginModal()`：modal 弹窗含用户名/密码输入框（回车可提交）、游客登录按钮、提示文案
+      - `checkLogin()`：未登录弹窗并返回 false（供 1.8.1 自动登录检测使用）
+      - `isLoggedIn()`：基于 store.user
+      - store.subscribe('user')：登录成功后自动关闭弹窗（账号/游客均生效）
+      - 登录协议复用 core/auth.js（account_login / guest_login）；失败 toast 由 auth.js loginResult 处理
+    - 自测方式：控制台执行 `login.showLoginModal()` 出现登录弹窗；输入 v1 账号密码点「登 录」→ 弹窗自动关闭、`store.get('user')` 有值、`localStorage.getItem('userToken')` 已写入；输入错误密码 → 右上角红色错误提示
 
-- [ ] **1.7.2** 实现 features/lobby/（大厅匹配）
+- [x] **1.7.2** 实现 features/lobby/（大厅匹配）
   - 依赖：1.3.2、1.6.2
   - 验证：能显示「开始匹配」按钮；点击后向服务端发送 `match_request`；能取消匹配
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/features/lobby/index.js、client-v2/src/utils/dom.js、client-v2/index.html、client-v2/src/styles/common.css
+    - 实现内容：
+      - `renderLobby(container)`：游戏选择（4 游戏按钮，默认选中五子棋）+「开始匹配」/「取消匹配」+ 状态文案
+      - 开始匹配：`emit('match_request', { game })`（协议与 v1 一致），切换等待态；取消：`emit('cancel_match')` 恢复
+      - 匹配中禁止切换游戏；未连接/未登录时 toast 拦截
+      - 订阅 lobby:matchSuccess / lobby:matchTimeout（基础提示，完整对战逻辑见阶段 2）；cleanup 时若匹配中自动发 cancel_match
+      - 配套：dom.js 新增 `viewRoot()`（#view-root 内容容器）；index.html #app 内拆分为 nav-root + view-root；common.css 新增 #view-root/.btn-secondary/.lobby-game-btn.active 样式
+    - 自测方式：F5 刷新 `/beta/` 默认显示大厅（匹配按钮）；选「贪吃蛇」点「开始匹配」→ 状态变"正在寻找贪吃蛇对手"，服务端收到 match_request（另一浏览器/v1 可匹配）；点「取消匹配」→ 状态恢复、发送 cancel_match
 
-- [ ] **1.7.3** 实现 games/gobang/ 空棋盘渲染
+- [x] **1.7.3** 实现 games/gobang/ 空棋盘渲染
   - 依赖：1.6.2
   - 验证：点击「五子棋」导航，显示 15×15 空棋盘；棋盘视觉风格接近 v1
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/games/gobang/index.js、client-v2/src/styles/common.css
+    - 实现内容：
+      - `renderGobang(container)`：CSS grid 渲染 15×15 空棋盘（.gobang-board），背景用 --theme-board-gobang（木色，与 v1 一致）
+      - 格子线用 ::before/::after 背景线实现（无 1px 双线）；hover 显示落子预览（.gobang-cell--preview），纯前端无落子逻辑
+      - 返回 cleanup；main.js 已注册 'gobang' 路由
+    - 自测方式：点击导航「五子棋」或按 1 → #view-root 出现 15×15 木色棋盘，鼠标悬停格子显示蓝色预览
 
 ### 1.8 应用整合与部署 [0/3]
 

@@ -246,3 +246,70 @@
     background: var(--theme-shortcut-bg);
     color: var(--theme-shortcut-color);
 }
+
+/* ---- 视图内容容器 ---- */
+#view-root {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* ---- 通用按钮：次要（灰色） ---- */
+.btn-secondary {
+    background: var(--theme-secondary);
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+}
+
+/* ---- 大厅：游戏选择按钮 ---- */
+.lobby-game-btn.active {
+    outline: 2px solid var(--theme-primary);
+    outline-offset: 2px;
+    box-shadow: var(--theme-btn-primary-shadow-hover);
+}
+
+/* ---- 五子棋空棋盘（15×15） ---- */
+.gobang-board {
+    display: grid;
+    grid-template-columns: repeat(15, 32px);
+    grid-template-rows: repeat(15, 32px);
+    background: var(--theme-board-gobang);
+    border: 2px solid var(--theme-border-color-dark);
+    border-radius: 4px;
+    box-shadow: var(--theme-panel-shadow);
+}
+
+.gobang-cell {
+    position: relative;
+    width: 32px;
+    height: 32px;
+}
+
+/* 格子线（用背景线实现，避免 1px 边框双线） */
+.gobang-cell::before,
+.gobang-cell::after {
+    content: '';
+    position: absolute;
+    background: rgba(0, 0, 0, 0.18);
+}
+
+.gobang-cell::before {
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+}
+
+.gobang-cell::after {
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+}
+
+.gobang-cell--preview {
+    background: rgba(0, 123, 255, 0.14);
+}
