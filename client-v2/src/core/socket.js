@@ -25,9 +25,25 @@ export const socket = io({
 });
 
 // ===== 连接状态 =====
+// 客户端版本号：与 v1 一致从 /version（服务端 version.json）动态获取（主版本必须与服务端一致）
+let clientVersion = '1.6.0';
+fetch('/version')
+  .then((r) => r.json())
+  .then((d) => {
+    if (d && d.version) clientVersion = d.version;
+  })
+  .catch(() => { });
+
 socket.on('connect', () => {
   store.set('socketConnected', true);
   console.log('[Socket] 已连接');
+  // 对齐 v1：发送 client_connect（含版本号与 token），
+  // 服务端 handleUserConnection 据此绑定账号并置 status='online'，
+  // 已登录则回发 login_result（自动登录），这是匹配等操作的前置条件。
+  socket.emit('client_connect', {
+    clientVersion,
+    token: localStorage.getItem('userToken') || 'none',
+  });
   eventBus.emit('socket:connect');
 });
 

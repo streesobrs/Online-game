@@ -9,6 +9,7 @@ import { store } from '../../core/store.js';
 import { eventBus } from '../../core/eventBus.js';
 import { el } from '../../utils/dom.js';
 import { toast } from '../../components/toast.js';
+import { go } from '../../core/router.js';
 import { GAMES } from '../../data/navItems.js';
 
 const GAME_NAMES = Object.fromEntries(GAMES.map((g) => [g.id, g.name]));
@@ -75,10 +76,11 @@ export function renderLobby(container) {
     statusEl,
   ]));
 
-  // 匹配结果（基础提示；完整对战逻辑见阶段 2）
+  // 匹配结果（2.3.2：匹配成功写入 pendingMatch 并跳转对局视图；超时恢复匹配按钮）
   const offSuccess = eventBus.on('lobby:matchSuccess', (data) => {
     console.log('[Lobby] 匹配成功:', data);
-    toast.success('匹配成功！');
+    store.set('pendingMatch', data);
+    go('gobang');
   });
   const offTimeout = eventBus.on('lobby:matchTimeout', () => {
     isMatching = false;

@@ -34,6 +34,9 @@ export function createBoard(container, options = {}) {
   function updateCell(r, c) {
     const cell = cells[r][c];
     const v = board[r][c];
+    // 落子后移除该格悬停预览（若鼠标仍停留）
+    const preview = cell.querySelector('.stone-preview');
+    if (v !== EMPTY && preview) preview.remove();
     const piece = cell.querySelector('.gobang-black, .gobang-white');
     if (v === EMPTY) {
       if (piece) piece.remove();
@@ -42,6 +45,23 @@ export function createBoard(container, options = {}) {
       p.className = v === BLACK ? 'gobang-black' : 'gobang-white';
       cell.appendChild(p);
     }
+  }
+
+  /** 悬停预览（任务 2.1.3）：空格子显示当前回合颜色的半透明棋子 */
+  function showPreview(r, c) {
+    const cell = cells[r][c];
+    if (board[r][c] !== EMPTY) return;
+    const color = turn;
+    const prev = cell.querySelector('.stone-preview');
+    if (prev) prev.remove();
+    const p = document.createElement('div');
+    p.className = 'stone-preview ' + (color === BLACK ? 'preview-black' : 'preview-white');
+    cell.appendChild(p);
+  }
+
+  function hidePreview(r, c) {
+    const prev = cells[r][c].querySelector('.stone-preview');
+    if (prev) prev.remove();
   }
 
   /** 清除上一手落子高亮 */
@@ -86,15 +106,30 @@ export function createBoard(container, options = {}) {
     }
   }
 
-  /** 重置棋盘（清空棋子、黑先、清除标记） */
+  /** 重置棋盘（清空棋子、黑先、清除标记与预览） */
   function reset() {
     board = Array.from({ length: size }, () => Array(size).fill(EMPTY));
     turn = BLACK;
     lastMove = null;
     cells.forEach((row) => row.forEach((cell) => {
-      const piece = cell.querySelector('.gobang-black, .gobang-white');
-      if (piece) piece.remove();
+      cell.querySelectorAll('.gobang-black, .gobang-white, .stone-preview').forEach((n) => n.remove());
       cell.classList.remove('last-move');
+    }));
+  }
+
+  /**
+   * 用服务端数据恢复棋盘（悔棋 undo_accepted / 重连）
+   * @param {number[][]} nextBoard - 19×19 棋盘数据
+   * @param {number} [currentPlayer] - 当前应落子方（1 黑 / 2 白）
+   */
+  function restore(nextBoard, currentPlayer) {
+    board = (nextBoard || []).map((row) => Array.from(row || []));
+    if (currentPlayer) turn = currentPlayer;
+    lastMove = null;
+    cells.forEach((row, r) => row.forEach((cell, c) => {
+      cell.querySelectorAll('.gobang-black, .gobang-white, .stone-preview').forEach((n) => n.remove());
+      cell.classList.remove('last-move');
+      updateCell(r, c);
     }));
   }
 
@@ -110,6 +145,8 @@ export function createBoard(container, options = {}) {
     for (let c = 0; c < size; c++) {
       const cell = el('div', { class: 'gobang-cell', 'data-r': r, 'data-c': c });
       cell.addEventListener('click', () => handleClick(r, c));
+      cell.addEventListener('mouseenter', () => showPreview(r, c));
+      cell.addEventListener('mouseleave', () => hidePreview(r, c));
       cells[r][c] = cell;
       root.append(cell);
     }
@@ -124,6 +161,7 @@ export function createBoard(container, options = {}) {
     get lastMove() { return lastMove; },
     place,
     reset,
+    restore,
     destroy,
   };
 }

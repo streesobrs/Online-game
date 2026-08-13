@@ -1,9 +1,11 @@
 /**
  * 五子棋视图（阶段 2）
- * 2.1.1 起由 games/gobang/board.js 的 createBoard 渲染 19×19 棋盘并提供落子交互。
- * 完整联机逻辑（socket 事件/胜负判定/悔棋等）在 2.2~2.4 接入。
+ * - 本地模式：createBoard 渲染 19×19 棋盘 + 本地交替落子（调试/演示用）
+ * - 对局模式：匹配成功后（store.pendingMatch 有数据）由 play.js 启动联机对局
  */
 import { createBoard } from './board.js';
+import { startMatch, cleanupMatch } from './play.js';
+import { store } from '../../core/store.js';
 import { viewRoot } from '../../utils/dom.js';
 
 /**
@@ -12,13 +14,25 @@ import { viewRoot } from '../../utils/dom.js';
  * @returns {Function} cleanup 函数
  */
 export function renderGobang(container = viewRoot()) {
+  // 对局模式：有待开始的对局（lobby 匹配成功写入 pendingMatch）
+  const pending = store.get('pendingMatch');
+  if (pending) {
+    store.set('pendingMatch', null);
+    const match = startMatch(container, pending);
+    window.gobangMatch = match;
+    return () => {
+      cleanupMatch();
+      if (window.gobangMatch === match) delete window.gobangMatch;
+    };
+  }
+
+  // 本地模式（调试）
   const boardEl = document.createElement('div');
   const board = createBoard(boardEl);
 
   container.innerHTML = '';
   container.append(boardEl);
 
-  // 调试辅助：控制台可验证 createBoard API
   window.gobangBoard = board;
 
   return () => {

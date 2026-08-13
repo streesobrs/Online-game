@@ -16,6 +16,7 @@ const TOAST_STYLE = `
 .toast--success{background:#28a745}
 .toast--error{background:#dc3545}
 .toast--info{background:#17a2b8}
+.toast--warn{background:#ffc107;color:#212529}
 `;
 
 function ensureStyle() {
@@ -62,5 +63,7 @@ export const toast = {
   error: (message) => show(message, 'error'),
   /** @param {string} message */
   info: (message) => show(message, 'info'),
+  /** @param {string} message */
+  warn: (message) => show(message, 'warn'),
   show,
 };

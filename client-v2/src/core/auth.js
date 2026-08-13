@@ -107,10 +107,8 @@ export function initAuth() {
     }
   });
 
-  // socket 连接成功后自动恢复登录态
-  eventBus.on('socket:connect', () => {
-    if (getToken()) fetchAccountByToken();
-  });
+  // 注意：登录态恢复已由 socket.js 的 client_connect 统一处理（对齐 v1），
+  // 服务端会回发 login_result / 自动登录，不再单独调用 get_account_by_token。
 
   return { loggedIn: !!token, token: token || null };
 }

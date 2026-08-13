@@ -58,11 +58,11 @@ AI 完成任务时填写：
 | 阶段 | 任务数 | 完成 | 已验证 | 状态 |
 |------|--------|------|--------|------|
 | 阶段 1：骨架搭建 | 26 | 26 | 26 | ✅ 已完成 |
-| 阶段 2：五子棋迁移 | 12 | 2 | 0 | 进行中 |
+| 阶段 2：五子棋迁移 | 12 | 12 | 9 | 进行中 |
 | 阶段 3：其余游戏迁移 | 12 | 0 | 0 | 未开始 |
 | 阶段 4：功能模块迁移 | 17 | 0 | 0 | 未开始 |
 | 阶段 5：打磨上线 | 6 | 0 | 0 | 未开始 |
-| **合计** | **73** | **28** | **26** | — |
+| **合计** | **73** | **38** | **35** | — |
 
 ---
 
@@ -468,12 +468,12 @@ AI 完成任务时填写：
 
 ---
 
-## 阶段 2：五子棋完整迁移 [2/12]
+## 阶段 2：五子棋完整迁移 [12/12]
 
 > **目标**：v2 五子棋可联机对战，v2 玩家能和 v1 玩家对弈  
 > **前置条件**：阶段 1 全部 ✅ 已验证 ✅
 
-### 2.1 棋盘与渲染 [2/3]
+### 2.1 棋盘与渲染 [3/3]
 
 - [x] **2.1.1** 实现 gobang/board.js（棋盘渲染与交互）
   - 依赖：1.7.3
@@ -500,71 +500,160 @@ AI 完成任务时填写：
       - 已预留 .stone-preview（悬停预览棋子，2.1.3 使用）与 .last-move 脉动光圈样式
     - 自测方式：刷新后五子棋棋盘为 19×19 木色棋盘（36px 格、深色线、金棕色边框），落子时棋子带掉落动画，hover 格子有浅色高亮
 
-- [ ] **2.1.3** 实现最后落子高亮、悬停预览
+✅ 已验证（2026-08-13）
+
+- [x] **2.1.3** 实现最后落子高亮、悬停预览
   - 依赖：2.1.1
   - 验证：落子后该位置有高亮标记；鼠标悬停显示半透明预览棋子
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/games/gobang/board.js
+    - 实现内容：
+      - 最后落子高亮：`markLastMove(r, c)` 在最新落子格加 `.last-move` 类（蓝色脉动光圈，样式随 2.1.2 的 .last-move::before + gobang-pulse 动画），落新子时先清除旧高亮
+      - 悬停预览：mouseenter → 空格子显示 `.stone-preview`（preview-black/preview-white 半透明棋子，颜色 = 当前 turn），mouseleave 移除
+      - 落子后自动移除该格残留预览（updateCell）；reset 清空预览元素
+    - 自测方式：刷新后点五子棋 → 鼠标悬停空格显示当前回合颜色半透明棋子；落子后该格有蓝色脉动光圈且只保留最后一手；已有棋子的格子悬停不显示预览
 
-### 2.2 规则与判定 [0/3]
+✅ 已验证（2026-08-13）
 
-- [ ] **2.2.1** 实现 gobang/rules.js（胜负判定）
+### 2.2 规则与判定 [3/3]
+
+- [x] **2.2.1** 实现 gobang/rules.js（胜负判定）
   - 依赖：2.1.1
   - 验证：横、竖、斜、反斜四个方向五连判定正确；边界情况（封堵）正确
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/games/gobang/rules.js
+    - 实现内容：
+      - `checkWin(board, r, c, color, size)`：以最后一手为原点，四方向（[0,1] 横 / [1,0] 竖 / [1,1] 斜 / [1,-1] 反斜）正反延伸计数，≥5 即赢；逻辑与 v1 checkGobangWin 完全一致
+      - `maxChain(board, r, c, color)`：最长连子数（对齐 v1 calculateGobangChain）
+      - `countEmpty(board)`：剩余空位数
+      - 说明：PvP 真正胜负由服务端判定（handleMove → checkGameOver → game_result），本模块用于本地即时反馈 / AI 模式判定 / 状态统计
+    - 自测方式：控制台（进入 #/gobang 后）：
+      ```js
+      const { checkWin, maxChain } = await import('./src/games/gobang/rules.js');
+      // 构造五连棋盘（竖线 (0,9)~(4,9) 均为黑 1）
+      const b = new Array(19).fill(0).map(() => new Array(19).fill(0));
+      for (let i = 0; i < 5; i++) b[i][9] = 1;
+      checkWin(b, 4, 9, 1);  // true
+      checkWin(b, 4, 8, 1);  // false（被堵/不在连线上）
+      maxChain(b, 2, 9, 1);  // 5
+      ```
 
-- [ ] **2.2.2** 实现禁手判定（如有，按 v1 逻辑）
+- [x] **2.2.2** 实现禁手判定（如有，按 v1 逻辑）
   - 依赖：2.2.1
   - 验证：与 v1 行为一致（v1 是否实现禁手需查源码确认）
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：无（仅确认结论）
+    - 查证结果：v1 客户端与服务端均**未实现**禁手判定。证据：
+      - v1 规则文案（index.html L4666）：`禁止三三、四四、长连等禁手（本版本简化规则）`
+      - v1 客户端 checkGobangWin：四方向 count ≥ 5 即赢（长连 >5 也算赢，无禁手拦截）
+      - v1 服务端 GameManager.checkGobangWin（L2851-2874）：同样 count ≥ 5 判赢，无禁手逻辑；executeMove 不拦截
+    - v2 按 v1 行为保持一致：不实现禁手，长连判赢。后续若需禁手属功能增强，不在本迁移范围
 
-- [ ] **2.2.3** 实现平局判定（棋盘满）
+- [x] **2.2.3** 实现平局判定（棋盘满）
   - 依赖：2.2.1
   - 验证：棋盘填满后判定平局，触发 `game_result` 事件
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/games/gobang/rules.js
+    - 实现内容：
+      - `checkDraw(board, size)`：棋盘是否已填满（无空位）；`countEmpty` 统计空位数
+      - 联机上报协议已确认：v1 服务端 handleGameResult 支持 `emit('game_result', { result: 'draw' })` → endGame('draw') 并广播 game_result 给双方（server.js L2793）
+      - 平局触发点：本地判定平局 → 触发 eventBus `gobang:draw` → 对局模块（2.3.3）上报服务端并展示平局结果；19×19 棋盘几乎不会实际下满，属理论完备性处理
+    - 自测方式：控制台：
+      ```js
+      const { checkDraw, countEmpty } = await import('./src/games/gobang/rules.js');
+      const full = new Array(19).fill(0).map(() => new Array(19).fill(2));
+      checkDraw(full);   // true
+      countEmpty(full);  // 0
+      const b2 = new Array(19).fill(0).map(() => new Array(19).fill(0));
+      countEmpty(b2);    // 361
+      ```
 
-### 2.3 联机对战 [0/3]
+✅ 已验证（2026-08-13）
 
-- [ ] **2.3.1** 实现联机落子同步（emit move + on move）
+### 2.3 联机对战 [3/3]
+
+- [x] **2.3.1** 实现联机落子同步（emit move + on move）
   - 依赖：2.2.1、1.7.2
   - 验证：v2 玩家 vs v1 玩家能正常对弈，双方落子实时同步
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/games/gobang/play.js、client-v2/src/features/lobby/index.js、client-v2/src/games/gobang/index.js
+    - 实现内容：
+      - `startMatch(container, matchData)`：对局控制器，`createBoard` 以 onPlace 回调接管落子流程
+      - 我方落子：校验轮到己方 → `board.place` → `socket.emit('move', { r, c, game: 'gobang' })`（协议与 v1 一致，服务端自行判定 color 并转发）
+      - 对手落子：订阅 `game:move`（socket 'move' → eventBus）→ 校验位置/跳过自己 → `board.place(data.r, data.c, data.color)` → `board.turn = me`
+      - 回合控制：`board.turn` 表示当前应落子方，黑先；本地 checkWin 仅做即时提示，正式结果以服务端 game_ended 为准
+    - 自测方式：v2 与 v1（或两个 v2）匹配后对弈，双方落子实时同步、回合互斥（非己回合落子被拦截）
 
-- [ ] **2.3.2** 实现匹配成功后进入对局房间
+- [x] **2.3.2** 实现匹配成功后进入对局房间
   - 依赖：2.3.1
   - 验证：匹配成功后显示对手信息、先手方、计时器
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/games/gobang/play.js、client-v2/src/features/lobby/index.js、client-v2/src/games/gobang/styles.css
+    - 实现内容：
+      - lobby 订阅 `lobby:matchSuccess`（match_success → { gameId, opponentId, color }）：写入 `store.pendingMatch` 并 `go('#/gobang')`
+      - renderGobang 检测 pendingMatch → 以对局模式启动 startMatch，清空 pendingMatch
+      - 对局信息栏（.gobang-match-info）：对手信息（👤 对手）、当前回合/先手方（我的回合·黑棋 / 对方回合·白棋，轮到己方高亮）、计时器（⏱ mm:ss，每秒刷新）、返回大厅按钮
+      - gobang/styles.css 新增信息栏样式
+    - 自测方式：匹配成功后自动进入对局界面，信息栏显示对手、先手方（黑先）、计时器开始走动
 
-- [ ] **2.3.3** 实现游戏结束流程（胜负展示、返回大厅）
+- [x] **2.3.3** 实现游戏结束流程（胜负展示、返回大厅）
   - 依赖：2.3.1
   - 验证：游戏结束显示胜利提示；点击返回大厅能正常回到大厅
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/games/gobang/play.js
+    - 实现内容：
+      - 订阅 `game:ended`（game_ended → { gameId, result, winner, reason }）：按 result 展示结果文案（win/draw/resign/timeout），弹出 modal「游戏结束」+「返回大厅」按钮
+      - 订阅 `lobby:opponentLeft`：对手认输/离开处理，同样弹出结果提示
+      - 返回大厅：modal 确认 → `go('#/lobby')`；信息栏「返回大厅」按钮对局中二次确认（确认后 emit return_lobby）
+      - 平局路径：2.2.3 的 checkDraw 供本地预判，联机终局统一以服务端 game_ended(result=draw) 为准（服务端 handleGameResult 支持客户端上报 draw）
+    - 自测方式：对局五连后服务端广播 game_ended → 弹出「你获胜了/你输了」；点击「返回大厅」回到大厅；认输场景（v1 侧认输）v2 收到 opponent_left 提示
 
-### 2.4 辅助功能 [0/3]
+### 2.4 辅助功能 [3/3]
 
-- [ ] **2.4.1** 实现悔棋功能（undo_request / undo_response）
+- [x] **2.4.1** 实现悔棋功能（undo_request / undo_response）
   - 依赖：2.3.1
   - 验证：v2 玩家能发起悔棋；v1 玩家发起悔棋时 v2 能收到提示
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/games/gobang/play.js、client-v2/src/games/gobang/board.js
+    - 实现内容：
+      - 发起：信息栏「⏪ 悔棋」→ `emit('undo_request')` → 收到 `undo_request_sent`（game:undoRequestSent）提示等待对方
+      - 响应：收到 `undo_request`（game:undoRequest，{ from, fromNickname }）→ modal 确认 → 同意 `emit('undo_response',{accepted:true})` / 拒绝 `{accepted:false}`
+      - 结果：`undo_accepted`（game:undoAccepted）携带服务端完整棋盘数据 { board, currentPlayer, moveCount, gameType } → board.js 新增 `restore(board, currentPlayer)` 重建棋盘与回合（服务端 executeUndoMove 撤销双方最近两步）；`undo_rejected`（game:undoRejected）提示拒绝
+      - 游戏结束后拦截悔棋请求
+    - 自测方式：对局中我方点「悔棋」→ 对方弹确认框；同意后双方棋盘回退两步、回合正确；拒绝则提示「悔棋请求被拒绝」
 
-- [ ] **2.4.2** 实现认输功能（resign）
+- [x] **2.4.2** 实现认输功能（resign）
   - 依赖：2.3.1
   - 验证：点击认输后游戏结束，对手胜利
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/games/gobang/play.js
+    - 实现内容：
+      - 信息栏「🏳️ 认输」→ modal 二次确认 → `emit('resign')`
+      - 结束展示复用 2.3.3：认输方/对手分别收到 game_ended(result='resign') 或 opponent_left(result='resign')，弹窗显示「对方认输，你获胜了/你认输了」+ 返回大厅
+    - 自测方式：对局中点「认输」确认 → 游戏结束弹窗「你认输了」，对方（v1）显示「对方认输，你获胜了」
 
-- [ ] **2.4.3** 实现重置游戏（reset 系列）
+  **问题反馈**：
+  - 问题描述：v2 点认输后仅提示「已认输，等待结果…」，游戏不结束，对方无反应
+  - 期望行为：认输后游戏结束，认输方/对方均收到结果
+  - **AI 修复**：服务端（server.js）**没有** `socket.on('resign')` 监听，认输唯一途径是 `game_result {result:'resign'}`（与 v1 落子获胜上报 game_result 同机制）。已将 play.js 认输确认回调由 `emit('resign')` 改为 `emit('game_result', { result: 'resign', reason: '主动认输' })`，服务端 handleGameResult 校验通过后 endGame 广播 game_ended，v2 侧 game:ended 弹窗正常展示胜负
+
+- [x] **2.4.3** 实现重置游戏（reset 系列）
   - 依赖：2.3.1
   - 验证：能发起重置请求；对方同意/拒绝后行为正确
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/games/gobang/play.js
+    - 实现内容：
+      - 发起：信息栏「🔄 重置」→ modal 确认 → `emit('reset')`（v1 协议，resetGame(true) 同款，服务端转发 `reset_request` 给对方并设 30 秒超时）
+      - 响应：收到 `reset_request`（game:resetRequest，含 message/requestId，兼容「再来一局」文案）→ modal → 同意 `emit('reset_confirm')` / 拒绝 `emit('reset_reject',{requestId})`
+      - 结果：双方收到 `reset`（game:resetDone）→ board.reset() 重建空棋盘、回合黑先、计时归零；请求方另收 `reset_accepted`；拒绝 `reset_rejected`；超时 `reset_request_timeout`
+    - 自测方式：对局中点「重置」→ 对方弹确认框；同意后双方棋盘清空重开；拒绝则提示「对方拒绝了重置请求」
+
+  **问题反馈**：
+  - 问题描述：v1 确认重置后，v2 棋盘未清空；v1 提示「错误，没有待处理的悔棋请求」
+  - 期望行为：v1 确认后双方棋盘清空重开
+  - **AI 修复**：
+    - v2 棋盘未清空根因：服务端 handleResetConfirm 确认后广播的是 `reset` 事件（EVENT_MAP → `game:reset`），而 play.js 误监听 `game:resetDone`（对应 `game_reset`，是管理员强制重置专用事件），事件名不匹配导致无人处理。已改为监听 `game:reset` → board.reset() 重建空棋盘
+    - v1 报「没有待处理的悔棋请求」是 v1 自身确认按钮事件冲突（showConfirmDialog 用 onclick 覆盖赋值 + DOMContentLoaded 用 addEventListener，同一点同意按钮同时触发残留的 undo_response 与 reset_confirm），属 v1 侧问题，红线不允许修改；服务端 reset_confirm 仍正常执行，v2 修复后功能不受影响
 
 ---
 
