@@ -5,6 +5,7 @@
  * 登录成功（store.user 更新）后自动关闭弹窗。
  */
 import { store } from '../../core/store.js';
+import { eventBus } from '../../core/eventBus.js';
 import * as auth from '../../core/auth.js';
 import { modal } from '../../components/modal.js';
 import { el } from '../../utils/dom.js';
@@ -67,6 +68,25 @@ export function checkLogin() {
   if (isLoggedIn()) return true;
   showLoginModal();
   return false;
+}
+
+/**
+ * 自动登录检测（任务 1.8.1）
+ * socket 连接后：
+ * - 无 token → 直接弹出登录框（游客/账号登录）
+ * - 有 token → auth.js 已发 get_account_by_token；若 account_info 失败（token 失效）→ 弹出登录框
+ */
+export function initLoginCheck() {
+  eventBus.on('socket:connect', () => {
+    if (!auth.getToken()) {
+      showLoginModal();
+    }
+  });
+  eventBus.on('user:accountInfo', (data) => {
+    if (!(data && data.success)) {
+      showLoginModal();
+    }
+  });
 }
 
 // 登录成功后自动关闭弹窗

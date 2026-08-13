@@ -57,16 +57,16 @@ AI 完成任务时填写：
 
 | 阶段 | 任务数 | 完成 | 已验证 | 状态 |
 |------|--------|------|--------|------|
-| 阶段 1：骨架搭建 | 26 | 23 | 20 | 进行中 |
+| 阶段 1：骨架搭建 | 26 | 25 | 23 | 进行中 |
 | 阶段 2：五子棋迁移 | 12 | 0 | 0 | 未开始 |
 | 阶段 3：其余游戏迁移 | 12 | 0 | 0 | 未开始 |
 | 阶段 4：功能模块迁移 | 17 | 0 | 0 | 未开始 |
 | 阶段 5：打磨上线 | 6 | 0 | 0 | 未开始 |
-| **合计** | **73** | **23** | **20** | — |
+| **合计** | **73** | **25** | **23** | — |
 
 ---
 
-## 阶段 1：骨架搭建 [23/26]
+## 阶段 1：骨架搭建 [25/26]
 
 > **目标**：v2 可访问、能登录、能匹配、能进空棋盘  
 > **验收标准**：访问 `http://server:8080/beta/` 看到 v2 界面，能用 v1 账号登录  
@@ -389,6 +389,8 @@ AI 完成任务时填写：
       - 登录协议复用 core/auth.js（account_login / guest_login）；失败 toast 由 auth.js loginResult 处理
     - 自测方式：控制台执行 `login.showLoginModal()` 出现登录弹窗；输入 v1 账号密码点「登 录」→ 弹窗自动关闭、`store.get('user')` 有值、`localStorage.getItem('userToken')` 已写入；输入错误密码 → 右上角红色错误提示
 
+✅ 已验证（2026-08-13）
+
 - [x] **1.7.2** 实现 features/lobby/（大厅匹配）
   - 依赖：1.3.2、1.6.2
   - 验证：能显示「开始匹配」按钮；点击后向服务端发送 `match_request`；能取消匹配
@@ -402,6 +404,8 @@ AI 完成任务时填写：
       - 配套：dom.js 新增 `viewRoot()`（#view-root 内容容器）；index.html #app 内拆分为 nav-root + view-root；common.css 新增 #view-root/.btn-secondary/.lobby-game-btn.active 样式
     - 自测方式：F5 刷新 `/beta/` 默认显示大厅（匹配按钮）；选「贪吃蛇」点「开始匹配」→ 状态变"正在寻找贪吃蛇对手"，服务端收到 match_request（另一浏览器/v1 可匹配）；点「取消匹配」→ 状态恢复、发送 cancel_match
 
+✅ 已验证（2026-08-13）
+
 - [x] **1.7.3** 实现 games/gobang/ 空棋盘渲染
   - 依赖：1.6.2
   - 验证：点击「五子棋」导航，显示 15×15 空棋盘；棋盘视觉风格接近 v1
@@ -413,25 +417,37 @@ AI 完成任务时填写：
       - 返回 cleanup；main.js 已注册 'gobang' 路由
     - 自测方式：点击导航「五子棋」或按 1 → #view-root 出现 15×15 木色棋盘，鼠标悬停格子显示蓝色预览
 
-### 1.8 应用整合与部署 [0/3]
+✅ 已验证（2026-08-13）
 
-- [ ] **1.8.1** main.js 整合（初始化所有模块）
+### 1.8 应用整合与部署 [2/3]
+
+- [x] **1.8.1** main.js 整合（初始化所有模块）
   - 依赖：1.2.1~1.2.5、1.3.1~1.3.3、1.4.1~1.4.3、1.5.3、1.6.2、1.7.1~1.7.3
   - 验证：
     - main.js 按正确顺序初始化：eventBus → store → socket → api → auth → router → shortcut → layout → 默认视图
     - 访问 `/beta/` 自动检测登录态，未登录显示登录弹窗
     - 登录后显示导航栏 + 默认大厅视图
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/main.js、client-v2/src/features/auth/login.js
+    - 实现内容：
+      - main.js 完整整合，按顺序初始化：auth → themes → 路由注册 → initRouter → initShortcuts → switchLayout → login.initLoginCheck()
+      - login.js 新增 `initLoginCheck()`：socket 连接后无 token → 直接弹登录框；有 token 但 account_info 失败（token 失效）→ 弹登录框；已登录（token 有效）→ 不弹窗
+      - 有 token 自动登录：initAuth 恢复 token → socket connect → get_account_by_token → store.user 恢复
+    - 自测方式：清除 localStorage 的 userToken 后 F5 刷新 `/beta/` → 自动弹出登录框；登录后关闭并显示导航栏 + 大厅；不清 token 刷新 → 不弹窗且 `store.get('user')` 自动恢复
 
-- [ ] **1.8.2** 服务端追加 /beta/ + /preview/ 静态伺服
+- [x] **1.8.2** 服务端追加 /beta/ + /preview/ 静态伺服
   - 依赖：1.8.1
   - 验证：
     - 在 server.js 追加 2 行 `app.use('/beta', ...)` 和 `app.use('/preview', ...)`
     - 重启服务端后访问 `http://localhost:8080/beta/` 看到 v2
     - 访问 `http://localhost:8080/preview/` 同样看到 v2
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：server/server.js（已随任务 1.1.4 追加，本次仅核对）
+    - 实现内容：server.js L113-114 已存在：
+      - `app.use('/beta', express.static(path.join(__dirname, '..', 'client-v2')))`
+      - `app.use('/preview', express.static(path.join(__dirname, '..', 'client-v2')))`
+      - 属红线允许的 2 行静态伺服，未动服务端业务逻辑
+    - 自测方式：**重启服务端**后访问 `http://localhost:8080/beta/` 和 `http://localhost:8080/preview/`，均显示 v2 界面
 
 - [ ] **1.8.3** 阶段 1 整体验证
   - 依赖：1.8.2
@@ -445,7 +461,7 @@ AI 完成任务时填写：
     - [ ] 主题切换可用（至少 default + 1 个 v1 主题）
     - [ ] 快捷键 1/2/3/4 能切换游戏
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 待用户按验证清单逐项确认后标记
 
 ---
 
