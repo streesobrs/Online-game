@@ -16,6 +16,7 @@ import { initRouter, registerRoute, go, isActive } from './core/router.js';
 import { initShortcuts } from './utils/shortcut.js';
 import { NAV_ITEMS, GAMES, FEATURES, findItem } from './data/navItems.js';
 import * as themes from './features/themes/index.js';
+import { switchLayout } from './layouts/registry.js';
 
 console.log('[v2] main.js 已加载');
 
@@ -34,6 +35,7 @@ window.registerRoute = registerRoute;
 window.shortcuts = { initShortcuts };
 window.navItems = { NAV_ITEMS, GAMES, FEATURES, findItem };
 window.themes = themes;
+window.switchLayout = switchLayout;
 
 // 初始化登录态（恢复 token、订阅登录事件、socket 连接后自动登录）
 auth.initAuth();
@@ -46,6 +48,9 @@ initRouter();
 
 // 初始化快捷键（元数据驱动，按 1/2/3/4 切换游戏）
 initShortcuts();
+
+// 渲染布局（导航栏；读取本地保存的布局，默认 topnav）
+switchLayout(localStorage.getItem('nav-layout') || 'topnav');
 
 // 校验挂载点是否存在
 const app = document.getElementById('app');

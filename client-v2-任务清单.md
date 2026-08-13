@@ -57,16 +57,16 @@ AI 完成任务时填写：
 
 | 阶段 | 任务数 | 完成 | 已验证 | 状态 |
 |------|--------|------|--------|------|
-| 阶段 1：骨架搭建 | 26 | 18 | 15 | 进行中 |
+| 阶段 1：骨架搭建 | 26 | 20 | 18 | 进行中 |
 | 阶段 2：五子棋迁移 | 12 | 0 | 0 | 未开始 |
 | 阶段 3：其余游戏迁移 | 12 | 0 | 0 | 未开始 |
 | 阶段 4：功能模块迁移 | 17 | 0 | 0 | 未开始 |
 | 阶段 5：打磨上线 | 6 | 0 | 0 | 未开始 |
-| **合计** | **73** | **18** | **15** | — |
+| **合计** | **73** | **20** | **18** | — |
 
 ---
 
-## 阶段 1：骨架搭建 [18/26]
+## 阶段 1：骨架搭建 [20/26]
 
 > **目标**：v2 可访问、能登录、能匹配、能进空棋盘  
 > **验收标准**：访问 `http://server:8080/beta/` 看到 v2 界面，能用 v1 账号登录  
@@ -310,6 +310,8 @@ AI 完成任务时填写：
       - index.html 移除空 href 占位 link（主题 CSS 改由 features/themes 动态注入）
     - 自测方式：F5 刷新 `/beta/`，页面出现浅灰渐变背景；控制台 `getComputedStyle(document.body).background` 非空；`getComputedStyle(document.body).getPropertyValue('--theme-primary')` 为 `#007bff`
 
+✅ 已验证（2026-08-13）
+
 - [x] **1.5.2** 复制 v1 主题 CSS 到 client-v2/themes/
   - 依赖：1.1.1
   - 验证：`themes/cyberpunk.css`、`ocean.css`、`forest.css` 存在
@@ -317,6 +319,8 @@ AI 完成任务时填写：
     - 修改文件：client-v2/themes/{cyberpunk,ocean,forest}.css（从 server/config/themes/ 复制，服务端文件未动）
     - 实现内容：3 个主题 CSS 与 v1 完全一致（body[data-theme] 作用域覆盖 --theme-* 变量），v2 用本地相对路径加载
     - 自测方式：`client-v2/themes/` 下存在 3 个 css 文件；`themes/cyberpunk.css` 首行为注释、含 `body[data-theme="cyberpunk"]` 选择器
+
+✅ 已验证（2026-08-13）
 
 - [x] **1.5.3** 实现 features/themes/（主题切换功能）
   - 依赖：1.5.1、1.5.2
@@ -334,19 +338,33 @@ AI 完成任务时填写：
       - main.js 挂载 `window.themes` 并调用 `initThemes()`
     - 自测方式：控制台 `themes.renderThemePanel(document.body)` 出现 4 个主题按钮；点击「赛博朋克」页面立即变紫黑且 `localStorage.getItem('selectedTheme')` 为 'cyberpunk'；F5 刷新后保持该主题；v1 页面主题选择同步（共享 key）
 
-### 1.6 布局与导航 [0/2]
+✅ 已验证（2026-08-13）
 
-- [ ] **1.6.1** 实现 layouts/registry.js（布局注册表）
+### 1.6 布局与导航 [2/2]
+
+- [x] **1.6.1** 实现 layouts/registry.js（布局注册表）
   - 依赖：1.4.1
   - 验证：`switchLayout('topnav')` 能切换布局，localStorage 持久化
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/layouts/registry.js
+    - 实现内容：按开发文档第十章 10.2 实现：
+      - LAYOUTS 注册表（topnav 已注册；hub/dock 留注释待后续任务）
+      - getLayout(id)：未知 id 回退 topnav
+      - switchLayout(id)：清理旧布局（cleanup + innerHTML 清空）→ 渲染新布局到 #nav-root（不存在则 #app）→ localStorage 持久化（key `nav-layout`）
+    - 自测方式：F5 刷新 `/beta/` 出现顶部导航栏；控制台执行 `switchLayout('topnav')` 导航重渲染且 `localStorage.getItem('nav-layout')` 为 'topnav'
 
-- [ ] **1.6.2** 实现 layouts/topnav.js（顶部导航布局）
+- [x] **1.6.2** 实现 layouts/topnav.js（顶部导航布局）
   - 依赖：1.6.1、1.4.2
   - 验证：导航栏显示 4 游戏 + 6 功能按钮；点击按钮能切换路由；active 状态正确
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/layouts/topnav.js、client-v2/src/styles/common.css、client-v2/src/main.js
+    - 实现内容：按开发文档第十章 10.3 实现（用 el() 构建，比文档模板字符串更安全）：
+      - 导航栏：游戏组（GAMES 4 个）+ 分隔线 + 功能组（FEATURES 6 个），按钮含 icon/name/快捷键角标
+      - 点击 → handleNavClick(id) 路由切换；store.subscribe('currentView') 同步 active 高亮
+      - 返回 cleanup：取消订阅 + 销毁 DOM（事件监听随元素释放）
+      - common.css 新增导航样式（.nav-layout/.nav-group/.nav-btn 系列，全部基于 --theme-nav-* 变量，主题可换肤）
+      - main.js 挂载 `window.switchLayout` 并调用 `switchLayout(localStorage.getItem('nav-layout') || 'topnav')`
+    - 自测方式：F5 刷新 `/beta/` 导航栏显示 4 游戏 + 6 功能按钮；点击「五子棋」URL hash 变 `#/gobang` 且该按钮高亮；按快捷键 3 高亮切到「象棋」（内容区暂无视图属预期，1.7 注册）
 
 ### 1.7 业务界面 [0/3]
 
