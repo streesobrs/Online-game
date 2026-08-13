@@ -19,6 +19,7 @@ import { viewRoot } from './utils/dom.js';
 import * as login from './features/auth/login.js';
 import { renderLobby } from './features/lobby/index.js';
 import { renderGobang } from './games/gobang/index.js';
+import { renderGo } from './games/go/index.js';
 
 console.log('[v2] main.js 已加载');
 
@@ -49,6 +50,7 @@ themes.initThemes();
 // 3. 注册业务视图路由（须在 initRouter 之前，保证当前 hash 首次处理即命中）
 registerRoute('lobby', () => renderLobby(viewRoot()));
 registerRoute('gobang', () => renderGobang(viewRoot()));
+registerRoute('go', () => renderGo(viewRoot()));
 
 // 4. 初始化路由（hashchange 监听 + 处理当前 hash）
 initRouter();

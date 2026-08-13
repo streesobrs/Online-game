@@ -1,0 +1,196 @@
+/**
+ * 围棋专属样式（任务 3.1.1）
+ * 移植 v1 棋盘视觉：21×21 grid、木色底、深色网格线、星位、渐变立体棋子、落子动画。
+ * 尺寸与 v1 一致（cell 34px、棋盘 padding 24px、border 4px #8b6914）。
+ */
+
+/* ---- 对局信息栏（3.1.3）---- */
+.go-match-info {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  max-width: 762px;
+  width: 100%;
+}
+
+.go-info-tag {
+  font-size: 13px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  white-space: nowrap;
+}
+
+/* ---- 棋盘容器 ---- */
+.go-board {
+  display: grid;
+  grid-template-columns: repeat(21, 34px);
+  grid-template-rows: repeat(21, 34px);
+  gap: 0;
+  position: relative;
+  background: var(--theme-board-go);
+  padding: 41px;
+  /* 24px + 17px（半格）：外圈网格线整体向中心缩半格 */
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.3);
+  border: 4px solid #8b6914;
+  transform: translateZ(0);
+  will-change: contents;
+}
+
+/* 网格线：周期 34px，线画在周期内 16~17px 处。
+   竖线（90deg）偏移 24px 已对齐；横线（0deg）在此基础上再上移 14px（棋子 28px 的一半）对齐 */
+.go-board::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 16px, rgba(0, 0, 0, 0.4) 16px 17px, transparent 17px 34px),
+    repeating-linear-gradient(0deg, transparent 0 16px, rgba(0, 0, 0, 0.4) 16px 17px, transparent 17px 34px);
+  background-position: 41px 41px, 41px 27px;
+  background-repeat: repeat;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* 棋盘光泽 */
+.go-board::after {
+  content: '';
+  position: absolute;
+  top: 41px;
+  left: 41px;
+  right: 41px;
+  bottom: 41px;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.1) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ---- 格子 ---- */
+.go-cell {
+  width: 34px;
+  height: 34px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+  pointer-events: auto;
+  z-index: 3;
+}
+
+.go-cell:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: scale(1.05);
+}
+
+/* 星位（与 v1 一致：黑色小圆点） */
+.go-star {
+  width: 8px;
+  height: 8px;
+  background: radial-gradient(circle at 30% 30%, #1a1a1a 0%, #000000 100%);
+  border-radius: 50%;
+  position: absolute;
+  z-index: 2;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+/* 悬停预览棋子 */
+.go-cell .stone-preview {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.go-cell .stone-preview.preview-black {
+  background: radial-gradient(circle at 35% 35%, #4a4a4a 0%, #1a1a1a 60%, #000000 100%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.15);
+}
+
+.go-cell .stone-preview.preview-white {
+  background: radial-gradient(circle at 35% 35%, #ffffff 0%, #f0f0f0 60%, #d0d0d0 100%);
+  border: 1px solid #c0c0c0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 2px 4px rgba(255, 255, 255, 0.8);
+}
+
+/* 最后落子高亮（与 v1 一致：红色脉动光圈） */
+.go-cell.last-move::before {
+  content: '';
+  position: absolute;
+  width: 38px;
+  height: 38px;
+  background: radial-gradient(circle, rgba(255, 0, 0, 0.5) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: go-pulse 1.5s ease-in-out infinite;
+  z-index: 10;
+}
+
+@keyframes go-pulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+
+  50% {
+    transform: scale(1.2);
+    opacity: 0.4;
+  }
+}
+
+/* ---- 棋子（与 v1 一致的渐变立体样式） ---- */
+.go-black,
+.go-white {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  transform: translateZ(0);
+  will-change: transform;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation: go-stoneDrop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  z-index: 4;
+}
+
+@keyframes go-stoneDrop {
+  0% {
+    transform: scale(1.3) translateY(-15px);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.go-black {
+  background: radial-gradient(circle at 35% 35%, #3a3a3a 0%, #1a1a1a 60%, #000000 100%);
+  background-color: var(--theme-piece-go-black);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.5),
+    inset 0 2px 4px rgba(255, 255, 255, 0.12),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.35);
+}
+
+.go-white {
+  background: radial-gradient(circle at 35% 35%, #ffffff 0%, #f5f5f5 60%, #e0e0e0 100%);
+  background-color: var(--theme-piece-go-white);
+  border: 1px solid #c0c0c0;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.35),
+    inset 0 2px 4px rgba(255, 255, 255, 0.9),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.08);
+}

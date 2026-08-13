@@ -76,11 +76,12 @@ export function renderLobby(container) {
     statusEl,
   ]));
 
-  // 匹配结果（2.3.2：匹配成功写入 pendingMatch 并跳转对局视图；超时恢复匹配按钮）
+  // 匹配结果（2.3.2：匹配成功写入 pendingMatch 并跳转对应游戏视图；超时恢复匹配按钮）
   const offSuccess = eventBus.on('lobby:matchSuccess', (data) => {
     console.log('[Lobby] 匹配成功:', data);
     store.set('pendingMatch', data);
-    go('gobang');
+    // 按匹配的游戏类型跳转对应视图（服务端 match_success 携带 game 字段）
+    go(data.game || matchGame || 'gobang');
   });
   const offTimeout = eventBus.on('lobby:matchTimeout', () => {
     isMatching = false;

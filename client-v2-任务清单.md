@@ -58,11 +58,11 @@ AI 完成任务时填写：
 | 阶段 | 任务数 | 完成 | 已验证 | 状态 |
 |------|--------|------|--------|------|
 | 阶段 1：骨架搭建 | 26 | 26 | 26 | ✅ 已完成 |
-| 阶段 2：五子棋迁移 | 12 | 12 | 9 | 进行中 |
+| 阶段 2：五子棋迁移 | 12 | 12 | 12 | ✅ 已完成 |
 | 阶段 3：其余游戏迁移 | 12 | 0 | 0 | 未开始 |
 | 阶段 4：功能模块迁移 | 17 | 0 | 0 | 未开始 |
 | 阶段 5：打磨上线 | 6 | 0 | 0 | 未开始 |
-| **合计** | **73** | **38** | **35** | — |
+| **合计** | **73** | **38** | **38** | — |
 
 ---
 
@@ -468,7 +468,7 @@ AI 完成任务时填写：
 
 ---
 
-## 阶段 2：五子棋完整迁移 [12/12]
+## 阶段 2：五子棋完整迁移 [12/12] ✅
 
 > **目标**：v2 五子棋可联机对战，v2 玩家能和 v1 玩家对弈  
 > **前置条件**：阶段 1 全部 ✅ 已验证 ✅
@@ -622,6 +622,8 @@ AI 完成任务时填写：
       - 游戏结束后拦截悔棋请求
     - 自测方式：对局中我方点「悔棋」→ 对方弹确认框；同意后双方棋盘回退两步、回合正确；拒绝则提示「悔棋请求被拒绝」
 
+✅ 已验证（2026-08-13）
+
 - [x] **2.4.2** 实现认输功能（resign）
   - 依赖：2.3.1
   - 验证：点击认输后游戏结束，对手胜利
@@ -636,6 +638,8 @@ AI 完成任务时填写：
   - 问题描述：v2 点认输后仅提示「已认输，等待结果…」，游戏不结束，对方无反应
   - 期望行为：认输后游戏结束，认输方/对方均收到结果
   - **AI 修复**：服务端（server.js）**没有** `socket.on('resign')` 监听，认输唯一途径是 `game_result {result:'resign'}`（与 v1 落子获胜上报 game_result 同机制）。已将 play.js 认输确认回调由 `emit('resign')` 改为 `emit('game_result', { result: 'resign', reason: '主动认输' })`，服务端 handleGameResult 校验通过后 endGame 广播 game_ended，v2 侧 game:ended 弹窗正常展示胜负
+
+✅ 已验证（2026-08-13）
 
 - [x] **2.4.3** 实现重置游戏（reset 系列）
   - 依赖：2.3.1
@@ -655,6 +659,8 @@ AI 完成任务时填写：
     - v2 棋盘未清空根因：服务端 handleResetConfirm 确认后广播的是 `reset` 事件（EVENT_MAP → `game:reset`），而 play.js 误监听 `game:resetDone`（对应 `game_reset`，是管理员强制重置专用事件），事件名不匹配导致无人处理。已改为监听 `game:reset` → board.reset() 重建空棋盘
     - v1 报「没有待处理的悔棋请求」是 v1 自身确认按钮事件冲突（showConfirmDialog 用 onclick 覆盖赋值 + DOMContentLoaded 用 addEventListener，同一点同意按钮同时触发残留的 undo_response 与 reset_confirm），属 v1 侧问题，红线不允许修改；服务端 reset_confirm 仍正常执行，v2 修复后功能不受影响
 
+✅ 已验证（2026-08-13）
+
 ---
 
 ## 阶段 3：其余游戏迁移 [0/12]
@@ -664,29 +670,62 @@ AI 完成任务时填写：
 
 ### 3.1 围棋 [0/4]
 
-- [ ] **3.1.1** 实现 go/board.js（19×19 棋盘渲染）
+- [x] **3.1.1** 实现 go/board.js（19×19 棋盘渲染）
   - 依赖：阶段 2
   - 验证：19×19 棋盘正确显示，星位标记正确
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/games/go/board.js（新建）、client-v2/src/games/go/styles.css（新建）、client-v2/src/games/go/index.js（新建）、client-v2/src/main.js、client-v2/index.html
+    - 实现内容：
+      - 尺寸说明：任务清单标题「19×19」为笔误，v1 客户端 `gameConfigs.go.size = 21` 且服务端 `initializeGoBoard` 为 21×21，联机尺寸必须与服务端一致，故实现为 **21×21**
+      - board.js：仿 gobang/board.js 结构，提供 place/reset/restore/destroy、turn/lastMove、悬停预览；星位按 v1 `initGoBoard` 逻辑（3/9/15 行×3/9/15 列交叉点）；棋子 DOM 类名 go-black/go-white 与 v1 一致
+      - styles.css：移植 v1 围棋视觉（21×21 grid、cell 34px、木色底+网格线、星位 8px、渐变立体棋子、落子动画、红色 last-move 光圈）
+      - index.js：视图入口，本地模式渲染棋盘；对局模式 pendingMatch 暂提示「开发中」（3.1.3 接入）
+      - main.js 注册 `go` 路由；index.html 引入 go/styles.css
+    - 自测方式：访问 `/beta/#/go`，21×21 棋盘显示，3/9/15 交叉点有 9 个星位，点击交替落黑/白子，悬停有半透明预览
 
-- [ ] **3.1.2** 实现 go/rules.js（提子规则）
+✅ 已验证（2026-08-13）
+（视觉微调记录：网格线相位对齐 cell 中心、横线按反馈上移 14px、外圈经 padding 41px 整体内缩半格）
+
+- [x] **3.1.2** 实现 go/rules.js（提子规则）
   - 依赖：3.1.1
   - 验证：包围对方棋子能正确提子；自杀手判定正确
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/games/go/rules.js（新建）、client-v2/src/games/go/index.js（本地模式接入规则）
+    - 实现内容：
+      - rules.js 纯函数模块：getGroup（DFS 连通块）、hasLiberty（块是否有气）、capturedStones（收集无气块）、tryPlace（完整落子流程：落子 → 提对方无气块 → 自杀检查）、countEmpty（预留 3.1.4 数目判定）
+      - 与 v1 逻辑一致：提子=整块无气全提；自杀=落子后己方块无气则禁止（v1 removeCapturedStones / hasGroupLiberty 同款）
+      - 服务端 executeGoMove 只落子不提子，提子由客户端本地完成，故纯函数不可变设计（返回新棋盘 + captured）便于联机双方本地同步（3.1.3 复用）
+      - index.js 本地模式接入 tryPlace：提子 toast 提示颗数、自杀位置提示无法落子
+    - 自测方式：Node 运行 8 个断言用例全部通过（提单子/提整块/角部自杀/提对方获得气/占用位置不可落），已删除临时测试文件
 
-- [ ] **3.1.3** 实现围棋联机对战
+✅ 已验证（2026-08-13）
+（后续修复：本地模式由 restore 全量重绘改为 removeStone+place 增量更新，消除落子时所有棋子跳动）
+
+- [x] **3.1.3** 实现围棋联机对战
   - 依赖：3.1.2
   - 验证：v2 vs v1 围棋对弈正常
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/games/go/play.js（新建）、client-v2/src/games/go/index.js（对局模式接入 startMatch）、client-v2/src/games/go/styles.css（信息栏样式）
+    - 实现内容：
+      - play.js 联机控制器（仿 gobang/play.js）：信息栏（回合/对手/计时/认输/返回大厅）、落子同步、game:ended / lobby:opponentLeft 结束弹窗
+      - 提子/自杀/打劫客户端本地处理：服务端 executeGoMove 只落子、checkGoWin 恒 false（与 v1 一致），本地用 tryPlace（落子+提对方+自杀检查）+ removeStone 增量渲染；打劫 isKo/koPosition/koColor 复刻 v1（上一手只提一子形成劫位，对方不能立即回提）
+      - 终局判定复刻 v1 checkGoWin：棋盘填满 ≥95% 或双方均无合法手（hasValidMove 用 tryPlace 不可变探测）→ `game_result {result:'win', reason:'棋盘填满'}`
+      - 认输与五子棋一致：`game_result {result:'resign'}`（服务端无 resign 事件）
+      - index.js：pendingMatch 存在时 startMatch 启动联机对局（window.goMatch）
+    - 自测方式：v1 大厅选「围棋」匹配 + v2 大厅选「围棋」匹配 → 双方对弈：落子同步、提子一致、自杀/打劫提示、认输或填满结束
 
-- [ ] **3.1.4** 实现数目/终局判定（按 v1 逻辑）
+✅ 已验证（2026-08-13）
+（用户放行红线，顺带修复 v1 固有 bug：handleBoardMove 接收落子后补提子逻辑 removeCapturedStones(3-对方色)，使 v1 vs v1 / v2 vs v1 双方棋盘同步、提子显示一致）
+
+- [x] **3.1.4** 实现数目/终局判定（按 v1 逻辑）
   - 依赖：3.1.2
   - 验证：与 v1 行为一致
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/games/go/rules.js（countScore/getTerritory）、client-v2/src/games/go/play.js（finishGo 接入点目弹窗）
+    - 实现内容：
+      - rules.js 新增 `countScore(board, size, komi=7.5)`（复刻 v1 countGoScore）：黑分 = 子数 + 纯黑边界空域；白分 = 子数 + 纯白边界空域 + 贴目 7.5；`getTerritory` 复刻 v1 getGoTerritory（空域 BFS + 边界黑白标记，混合边界不计）
+      - play.js `finishGo` 终局时调用 `showScoreModal` 本地点目弹窗（复刻 v1 showGameResult：胜者标题、黑白双卡[分数/子数/领地/贴目]、胜负差），同时仍发 `game_result` 由服务端结算；game:ended 弹窗与本地点目框不冲突（gameOver 守卫）
+    - 自测方式：Node 运行 6 个断言用例全部通过（空棋盘贴目、环形黑领地、混合边界不计、贴目胜者判定），已删除临时测试文件；浏览器填满/无合法手终局后弹出数子结果框
 
 ### 3.2 中国象棋 [0/4]
 

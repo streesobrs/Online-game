@@ -14,9 +14,9 @@ import { viewRoot } from '../../utils/dom.js';
  * @returns {Function} cleanup 函数
  */
 export function renderGobang(container = viewRoot()) {
-  // 对局模式：有待开始的对局（lobby 匹配成功写入 pendingMatch）
+  // 对局模式：有待开始的对局（lobby 匹配成功写入 pendingMatch，game 必须是本游戏）
   const pending = store.get('pendingMatch');
-  if (pending) {
+  if (pending && (!pending.game || pending.game === 'gobang')) {
     store.set('pendingMatch', null);
     const match = startMatch(container, pending);
     window.gobangMatch = match;

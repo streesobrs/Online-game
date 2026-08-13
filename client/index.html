@@ -8998,6 +8998,12 @@
         gameState.whiteCount++;
       }
 
+      // 围棋提子（修复：接收端同样执行提子，与 handleGoClick 规则一致，保证双方棋盘同步；
+      // 之前仅落子方本地提子，导致接收端死子残留、双方棋盘不一致）
+      if (currentGame === 'go') {
+        removeCapturedStones(3 - opponentColor);
+      }
+
       if (currentGame === 'gobang') {
         const chain = calculateGobangChain(data.r, data.c, opponentColor);
         if (chain > gameState.maxChain) {
