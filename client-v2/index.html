@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>联机大厅 v2</title>
+  <!-- 基础样式（本地相对路径） -->
+  <link rel="stylesheet" href="./src/styles/variables.css">
+  <link rel="stylesheet" href="./src/styles/base.css">
+  <link rel="stylesheet" href="./src/styles/common.css">
+  <!-- 动态主题 CSS 由 src/features/themes/index.js 运行时注入（<style id="theme-dynamic-css">） -->
+</head>
+
+<body>
+  <div id="app"></div>
+  <!-- 第三方库：用 v1 服务端自带的 socket.io（绝对路径，挂到 window.io） -->
+  <script src="/socket.io/socket.io.js"></script>
+  <!-- 应用入口（原生 ES Modules，无构建） -->
+  <script type="module" src="./src/main.js"></script>
+</body>
+
+</html>

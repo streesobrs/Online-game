@@ -1,0 +1,176 @@
+/* ============ 通用组件类 ============
+   供各业务模块复用的基础类：按钮、输入框、面板、文本。 */
+
+/* ---- 按钮 ---- */
+.btn {
+    display: inline-block;
+    padding: 8px 16px;
+    font-size: 14px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #ffffff;
+    background: var(--theme-btn-primary-bg);
+    box-shadow: var(--theme-btn-primary-shadow);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.btn:hover {
+    background: var(--theme-btn-primary-bg-hover);
+    box-shadow: var(--theme-btn-primary-shadow-hover);
+    transform: translateY(-1px);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+.btn:disabled,
+.btn.disabled {
+    background: var(--theme-btn-disabled-bg);
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+.btn-primary {
+    background: var(--theme-btn-primary-bg);
+}
+
+.btn-primary:hover {
+    background: var(--theme-btn-primary-bg-hover);
+}
+
+.btn-danger {
+    background: var(--theme-btn-danger-bg);
+}
+
+.btn-danger:hover {
+    background: var(--theme-btn-danger-bg-hover);
+}
+
+.btn-warning {
+    background: var(--theme-btn-warning-bg);
+}
+
+.btn-warning:hover {
+    background: var(--theme-btn-warning-bg-hover);
+}
+
+.btn-success {
+    background: var(--theme-accent);
+}
+
+.btn-success:hover {
+    background: var(--theme-btn-match-bg-hover);
+}
+
+.btn-sm {
+    padding: 4px 10px;
+    font-size: 12px;
+}
+
+.btn-lg {
+    padding: 12px 24px;
+    font-size: 16px;
+}
+
+/* ---- 输入框 ---- */
+.input {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 14px;
+    color: var(--theme-stat-value-color);
+    background: var(--theme-status-bg);
+    border: 1px solid var(--theme-border-color);
+    border-radius: 6px;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input:focus {
+    border-color: var(--theme-chat-input-focus);
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15);
+}
+
+/* ---- 面板 / 卡片 ---- */
+.panel {
+    background: var(--theme-panel-bg);
+    border: 1px solid var(--theme-border-color);
+    border-radius: 10px;
+    box-shadow: var(--theme-panel-shadow);
+    padding: 16px;
+}
+
+.panel-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--theme-title-color);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--theme-info-title-border);
+}
+
+/* ---- 文本辅助 ---- */
+.text-muted {
+    color: var(--theme-tip-text-color);
+}
+
+.text-danger {
+    color: var(--theme-btn-danger-bg);
+}
+
+.text-success {
+    color: var(--theme-accent);
+}
+
+/* ---- 布局辅助 ---- */
+.flex {
+    display: flex;
+}
+
+.flex-col {
+    display: flex;
+    flex-direction: column;
+}
+
+.items-center {
+    align-items: center;
+}
+
+.justify-between {
+    justify-content: space-between;
+}
+
+.gap-8 {
+    gap: 8px;
+}
+
+.gap-16 {
+    gap: 16px;
+}
+
+.mt-8 {
+    margin-top: 8px;
+}
+
+.mt-16 {
+    margin-top: 16px;
+}
+
+/* ---- 页面切换容器：统一淡入过渡 ---- */
+.achievements-container,
+.ai-game-container,
+.leaderboard-page,
+.theme-container,
+.spectate-container,
+.snake-game-container {
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* 主题按钮高亮 */
+.theme-btn.active {
+    outline: 2px solid var(--theme-primary);
+    outline-offset: 2px;
+    box-shadow: var(--theme-btn-primary-shadow-hover);
+}

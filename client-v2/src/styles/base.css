@@ -1,0 +1,71 @@
+/* ============ 基础样式（重置 + 全局） ============ */
+/* 来源：v1 index.html 全局重置与 body 样式 */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body {
+    min-height: 100vh;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: 'PingFang SC', 'Microsoft Yahei', Arial, sans-serif;
+    padding: 20px;
+    min-height: 100vh;
+    background: var(--theme-bg);
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    transition: background 0.3s ease;
+}
+
+/* 仅对交互元素添加过渡，避免全局性能问题 */
+button,
+.nav-btn,
+.info-panel,
+.lobby-container,
+.chat-container,
+.online-users-panel,
+.move-log-panel,
+.controls button,
+.modal,
+.tip-popup,
+.win-alert,
+.toast {
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+}
+
+/* 通用滚动条 */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--theme-scrollbar-track);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--theme-scrollbar-thumb);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--theme-scrollbar-thumb-hover);
+}
+
+h2 {
+    color: var(--theme-title-color);
+}
+
+p {
+    color: var(--theme-status-color);
+}

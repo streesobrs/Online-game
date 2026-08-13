@@ -109,6 +109,10 @@ app.use('/themes', express.static(path.join(__dirname, 'config', 'themes')));
 // 自定义头像静态服务
 app.use('/data/cosmetics/avatars', express.static(path.join(__dirname, '..', 'data', 'cosmetics', 'avatars')));
 
+// v2 客户端灰度访问入口（不影响 v1）
+app.use('/beta', express.static(path.join(__dirname, '..', 'client-v2')));
+app.use('/preview', express.static(path.join(__dirname, '..', 'client-v2')));
+
 // API路由
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'admin.html'));

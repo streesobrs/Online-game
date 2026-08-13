@@ -1,0 +1,250 @@
+/* ============ CSS 变量（默认主题） ============
+   变量体系与 v1 完全一致（--theme-*），保证 v1 主题 CSS
+   （body[data-theme="xxx"] 作用域覆盖同名变量）可直接复用。
+   来源：client/index.html 内嵌 :root 定义。 */
+
+:root {
+    /* 全局 */
+    --theme-bg: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+    --theme-primary: #007bff;
+    --theme-secondary: #6c757d;
+    --theme-accent: #27ae60;
+
+    /* 大厅 UI */
+    --theme-container-bg: #ffffff;
+    --theme-title-color: #2c3e50;
+    --theme-status-color: #4a5568;
+    --theme-status-bg: #f7fafc;
+
+    /* 在线用户 */
+    --theme-users-bg: #f8f9fa;
+    --theme-users-title-color: #2d3748;
+    --theme-user-item-bg: #e3f2fd;
+    --theme-user-item-color: #2d3748;
+
+    /* 排行榜 */
+    --theme-leaderboard-bg: #f8f9fa;
+    --theme-leaderboard-title-color: #2d3748;
+    --theme-leaderboard-item-bg: #ffffff;
+    --theme-rank-color: #4a5568;
+    --theme-name-color: #2d3748;
+    --theme-level-color: #718096;
+    --theme-wins-color: #38a169;
+    --theme-winrate-color: #4299e1;
+
+    /* 棋盘 */
+    --theme-board-gobang: #bb9a7b;
+    --theme-board-go: #d4a76a;
+    --theme-board-chess: #f0d9b5;
+
+    /* 棋子 */
+    --theme-piece-gobang-black: #000;
+    --theme-piece-gobang-white: #fff;
+    --theme-piece-go-black: #000;
+    --theme-piece-go-white: #fff;
+    --theme-piece-chess-red: #c0392b;
+    --theme-piece-chess-black: #2c3e50;
+
+    /* 象棋交互态 */
+    --theme-chess-selected-shadow:
+        0 6px 16px rgba(0, 123, 255, 0.5),
+        0 0 20px rgba(0, 123, 255, 0.3),
+        inset 0 2px 4px rgba(255, 255, 255, 0.4);
+    --theme-chess-valid-bg: rgba(0, 123, 255, 0.25);
+
+    /* 导航栏 */
+    --theme-nav-bg: #ffffff;
+    --theme-nav-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+    --theme-nav-btn-bg: #f8f9fa;
+    --theme-nav-btn-bg-hover: #e9ecef;
+    --theme-nav-btn-color: #495057;
+    --theme-nav-btn-active-bg: var(--theme-primary);
+    --theme-nav-btn-active-hover-bg: #0056b3;
+    --theme-nav-btn-active-color: #ffffff;
+    --theme-shortcut-bg: #e9ecef;
+    --theme-shortcut-color: #6c757d;
+
+    /* 通用按钮 */
+    --theme-btn-primary-bg: #3498db;
+    --theme-btn-primary-bg-hover: #2980b9;
+    --theme-btn-primary-shadow: 0 3px 6px rgba(52, 152, 219, 0.2);
+    --theme-btn-primary-shadow-hover: 0 4px 8px rgba(52, 152, 219, 0.3);
+    --theme-btn-disabled-bg: #bdc3c7;
+    --theme-btn-danger-bg: #e74c3c;
+    --theme-btn-danger-bg-hover: #c0392b;
+    --theme-btn-warning-bg: #9c27b0;
+    --theme-btn-warning-bg-hover: #7b1fa2;
+    --theme-btn-cancel-bg-hover: #c0392b;
+    --theme-btn-match-bg-hover: #219653;
+
+    /* 挑战按钮 */
+    --theme-challenge-bg: #3498db;
+    --theme-challenge-bg-hover: #2980b9;
+
+    /* 面板边框 */
+    --theme-border-color: #e2e8f0;
+    --theme-border-color-dark: #8b6914;
+    --theme-panel-bg: #ffffff;
+    --theme-panel-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+
+    /* 信息/状态面板 */
+    --theme-info-title-color: #2c3e50;
+    --theme-info-title-border: #3498db;
+    --theme-info-content-color: #4a5568;
+    --theme-info-content-divider: #f0f0f0;
+    --theme-info-label-color: #718096;
+    --theme-info-value-color: #2d3748;
+    --theme-info-value-bg: #f7fafc;
+    --theme-status-border: #3498db;
+
+    /* 状态 value 配色 */
+    --theme-value-connected-color: #27ae60;
+    --theme-value-connected-bg: #e8f5e9;
+    --theme-value-waiting-color: #f39c12;
+    --theme-value-waiting-bg: #fff8e1;
+    --theme-value-black-color: #000;
+    --theme-value-black-bg: #f5f5f5;
+    --theme-value-white-color: #fff;
+    --theme-value-white-bg: #333;
+    --theme-value-turn-color: #3498db;
+    --theme-value-turn-bg: #e3f2fd;
+    --theme-value-danger-color: #e74c3c;
+    --theme-value-danger-bg: #ffebee;
+    --theme-value-normal-color: #9c27b0;
+    --theme-value-normal-bg: #f3e5f5;
+    --theme-value-red-color: #c0392b;
+    --theme-value-red-bg: #ffeaa7;
+    --theme-value-green-color: #27ae60;
+    --theme-value-green-bg: #d5f4e6;
+
+    /* 弹窗/模态 */
+    --theme-modal-overlay: rgba(0, 0, 0, 0.6);
+    --theme-modal-bg: #ffffff;
+    --theme-modal-title-color: #1a202c;
+
+    /* 账号栏 */
+    --theme-account-bar-bg: rgba(255, 255, 255, 0.98);
+    --theme-account-bar-border: rgba(226, 232, 240, 0.8);
+    --theme-account-nickname-color: #2d3748;
+    --theme-account-user-details-color: #4a5568;
+    --theme-account-avatar-gradient: linear-gradient(135deg, #667eea, #764ba2);
+    --theme-account-coin-gradient: linear-gradient(135deg, #667eea, #764ba2);
+    --theme-account-level-gradient: linear-gradient(135deg, #f39c12, #e74c3c);
+    --theme-account-exp-gradient: linear-gradient(135deg, #3498db, #2ecc71);
+
+    /* 聊天 */
+    --theme-chat-container-bg: #ffffff;
+    --theme-chat-msg-bg: #f7fafc;
+    --theme-chat-msg-self-bg: #e3f2fd;
+    --theme-chat-msg-other-bg: #f5f5f5;
+    --theme-chat-sender-color: #3498db;
+    --theme-chat-input-border: #dddddd;
+    --theme-chat-input-focus: #3498db;
+    --theme-chat-send-bg: #27ae60;
+    --theme-chat-send-bg-hover: #219653;
+    --theme-chat-channel-bg: #f7fafc;
+    --theme-chat-channel-border: #e2e8f0;
+    --theme-chat-channel-active-bg: #e3f2fd;
+    --theme-chat-channel-active-color: #1976d2;
+
+    /* 落子记录 */
+    --theme-move-log-list-bg: #f7fafc;
+    --theme-move-log-black-bg: #e8f5e9;
+    --theme-move-log-black-color: #000;
+    --theme-move-log-white-bg: #fdf2f8;
+    --theme-move-log-white-color: #333;
+    --theme-move-log-red-bg: #ffebee;
+    --theme-move-log-red-color: #c0392b;
+    --theme-move-log-green-bg: #e8f5e9;
+    --theme-move-log-green-color: #27ae60;
+
+    /* 统计/提示文本 */
+    --theme-tip-text-color: #7f8c8d;
+    --theme-stat-label-color: #718096;
+    --theme-stat-value-color: #2d3748;
+    --theme-stat-item-bg: #f7fafc;
+    --theme-stat-item-border: #9c27b0;
+
+    /* 胜利/广播横幅渐变 */
+    --theme-winner-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+    /* 提示弹窗 */
+    --theme-tip-popup-border: #007bff;
+
+    /* 滚动条 */
+    --theme-scrollbar-track: #f1f1f1;
+    --theme-scrollbar-thumb: #cbd5e0;
+    --theme-scrollbar-thumb-hover: #94a3b8;
+
+    /* 排行榜：等级徽章等 */
+    --theme-lv-badge-bg: #e2e8f0;
+    --theme-lv-badge-color: #4a5568;
+    --theme-streak-badge-bg: #fed7d7;
+    --theme-streak-badge-color: #e53e3e;
+    --theme-stat-label-color-2: #a0aec0;
+    --theme-stat-win-color: #38a169;
+    --theme-stat-lose-color: #e53e3e;
+    --theme-stat-draw-color: #a0aec0;
+    --theme-winrate-bar-bg: #e2e8f0;
+    --theme-winrate-bar-high: linear-gradient(90deg, #38a169, #68d391);
+    --theme-winrate-bar-mid: linear-gradient(90deg, #d69e2e, #f6e05e);
+    --theme-winrate-bar-low: linear-gradient(90deg, #e53e3e, #fc8181);
+    --theme-empty-color: #a0aec0;
+    --theme-self-row-bg: #ebf4ff;
+    --theme-self-row-border: #667eea;
+    --theme-self-label-bg: rgba(102, 126, 234, 0.1);
+    --theme-self-label-color: #667eea;
+    --theme-self-rank-color: #2d3748;
+
+    /* 在线用户状态徽章 */
+    --theme-user-waiting-bg: #fff8e1;
+    --theme-user-playing-bg: #e8f5e9;
+    --theme-user-gobang-border: #ff6b6b;
+    --theme-user-go-border: #4ecdc4;
+    --theme-user-chess-border: #45b7d1;
+
+    /* 贪吃蛇 */
+    --theme-snake-bg: #f8f9fa;
+    --theme-snake-info-bg: #ffffff;
+    --theme-snake-info-item-color: #495057;
+    --theme-snake-info-label-color: #6c757d;
+    --theme-snake-info-value-bg: #e3f2fd;
+    --theme-snake-info-value-color: #1976d2;
+    --theme-snake-canvas-bg: #263238;
+    --theme-snake-canvas-border: #37474f;
+    --theme-snake-start-bg: #4caf50;
+    --theme-snake-restart-bg: #2196f3;
+    --theme-snake-rules-bg: #ffffff;
+    --theme-snake-rules-color: #495057;
+    --theme-snake-rules-content-color: #6c757d;
+
+    /* Toast 提示 */
+    --theme-toast-error-bg: #fed7d7;
+    --theme-toast-error-color: #c53030;
+    --theme-toast-error-border: #e53e3e;
+    --theme-toast-success-bg: #c6f6d5;
+    --theme-toast-success-color: #276749;
+    --theme-toast-success-border: #38a169;
+    --theme-toast-warning-bg: #fef5e7;
+    --theme-toast-warning-color: #744210;
+    --theme-toast-warning-border: #d69e2e;
+
+    /* 登录模态 */
+    --theme-login-option-bg: #f7fafc;
+    --theme-login-option-border: #e2e8f0;
+    --theme-login-option-hover-border: #4299e1;
+    --theme-login-option-hover-bg: #ebf8ff;
+    --theme-login-option-active-bg: #bee3f8;
+    --theme-login-icon-bg: #e2e8f0;
+    --theme-login-title-color: #2d3748;
+    --theme-login-desc-color: #718096;
+    --theme-login-subtitle-color: #718096;
+
+    /* 帮助提示条 / 描述条 */
+    --theme-hint-description-color: #e67e22;
+    --theme-hint-description-bg: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%);
+    --theme-hint-description-border: #f1c40f;
+
+    /* 版本/滚动条文字 */
+    --theme-version-color: #94a3b8;
+}
