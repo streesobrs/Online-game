@@ -1,0 +1,152 @@
+/**
+ * 五子棋专属样式（任务 2.1.2）
+ * 移植 v1 棋盘视觉：19×19 grid、木色底、深色网格线、渐变立体棋子、落子动画。
+ * 尺寸/变量与 v1 一致（cell 36px、棋盘 padding 20px、border 4px #8b6914）。
+ */
+
+/* ---- 棋盘容器 ---- */
+.gobang-board {
+  display: grid;
+  grid-template-columns: repeat(19, 36px);
+  grid-template-rows: repeat(19, 36px);
+  gap: 0;
+  position: relative;
+  background: var(--theme-board-gobang);
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.3);
+  border: 4px solid #8b6914;
+  transform: translateZ(0);
+  will-change: contents;
+}
+
+/* 网格线（repeating-linear-gradient，与 v1 一致） */
+.gobang-board::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image:
+    repeating-linear-gradient(90deg, transparent, transparent 35px, rgba(0, 0, 0, 0.3) 35px, rgba(0, 0, 0, 0.3) 36px),
+    repeating-linear-gradient(0deg, transparent, transparent 35px, rgba(0, 0, 0, 0.3) 35px, rgba(0, 0, 0, 0.3) 36px);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* 棋盘光泽 */
+.gobang-board::after {
+  content: '';
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  right: 20px;
+  bottom: 20px;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.1) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ---- 格子 ---- */
+.gobang-cell {
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+  pointer-events: auto;
+  z-index: 3;
+}
+
+.gobang-cell:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: scale(1.05);
+}
+
+/* 悬停预览棋子（任务 2.1.3） */
+.gobang-cell .stone-preview {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  opacity: 0.4;
+  pointer-events: none;
+}
+.gobang-cell .stone-preview.preview-black {
+  background: radial-gradient(circle at 35% 35%, #4a4a4a 0%, #1a1a1a 60%, #000000 100%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.15);
+}
+.gobang-cell .stone-preview.preview-white {
+  background: radial-gradient(circle at 35% 35%, #ffffff 0%, #f0f0f0 60%, #d0d0d0 100%);
+  border: 1px solid #c0c0c0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 2px 4px rgba(255, 255, 255, 0.8);
+}
+
+/* 最后落子高亮（任务 2.1.3，与 v1 一致：蓝色脉动光圈） */
+.gobang-cell.last-move::before {
+  content: '';
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  background: radial-gradient(circle, rgba(0, 123, 255, 0.4) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: gobang-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes gobang-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.4;
+  }
+}
+
+/* ---- 棋子（与 v1 一致的渐变立体样式） ---- */
+.gobang-black,
+.gobang-white {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  transform: translateZ(0);
+  will-change: transform;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation: gobang-stoneDrop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+}
+
+@keyframes gobang-stoneDrop {
+  0% {
+    transform: scale(1.3) translateY(-15px);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.gobang-black {
+  background: radial-gradient(circle at 35% 35%, #4a4a4a 0%, #1a1a1a 60%, #000000 100%);
+  background-color: var(--theme-piece-gobang-black);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.5),
+    inset 0 2px 4px rgba(255, 255, 255, 0.15),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.gobang-white {
+  background: radial-gradient(circle at 35% 35%, #ffffff 0%, #f0f0f0 60%, #d0d0d0 100%);
+  background-color: var(--theme-piece-gobang-white);
+  border: 1px solid #c0c0c0;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.3),
+    inset 0 2px 4px rgba(255, 255, 255, 0.8),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.1);
+}
