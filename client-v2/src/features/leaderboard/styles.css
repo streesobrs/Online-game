@@ -1,0 +1,236 @@
+/**
+ * 排行榜模块样式（任务 4.3.1）
+ * 复刻 v1 排行榜：类型筛选按钮、榜单条目（奖牌/名次/玩家/明细/胜率条）。
+ */
+.leaderboard-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 16px 32px;
+}
+
+.leaderboard-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--theme-title-color, #2c3e50);
+  padding: 20px 0 12px;
+  text-align: center;
+}
+
+/* ===== 类型筛选 ===== */
+.leaderboard-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.leaderboard-controls .lobby-btn {
+  padding: 7px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  background: #ffffff;
+  font-size: 13px;
+  color: #4a5568;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.leaderboard-controls .lobby-btn:hover {
+  border-color: var(--theme-primary, #3498db);
+  transform: scale(1.05);
+}
+
+.leaderboard-controls .lobby-btn.active {
+  background: #e3f2fd;
+  border-color: var(--theme-primary, #3498db);
+  color: #1976d2;
+  font-weight: 600;
+  transform: scale(1.05);
+}
+
+/* ===== 榜单 ===== */
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.leaderboard-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #718096;
+  font-size: 14px;
+}
+
+.leaderboard-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--theme-container-bg, #ffffff);
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.leaderboard-item.top-1 {
+  border-color: #f6ad55;
+  background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%);
+}
+
+.leaderboard-item.top-2 {
+  border-color: #cbd5e0;
+  background: linear-gradient(135deg, #f7fafc 0%, #ffffff 100%);
+}
+
+.leaderboard-item.top-3 {
+  border-color: #ed8936;
+  background: linear-gradient(135deg, #fffaf0 0%, #ffffff 100%);
+}
+
+.leaderboard-item.is-me {
+  border-color: var(--theme-primary, #3498db);
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.25);
+}
+
+/* 名次 */
+.leaderboard-rank-col {
+  width: 44px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.leaderboard-rank-medal {
+  font-size: 26px;
+}
+
+.leaderboard-rank-num {
+  font-size: 18px;
+  font-weight: 700;
+  color: #a0aec0;
+}
+
+/* 玩家信息 */
+.leaderboard-player-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.leaderboard-player-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2d3748;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.leaderboard-item.is-me .leaderboard-player-name {
+  color: #1976d2;
+}
+
+.leaderboard-player-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #718096;
+  flex-wrap: wrap;
+}
+
+.leaderboard-lv-badge {
+  background: #edf2f7;
+  color: #4a5568;
+  padding: 1px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+.leaderboard-streak-badge {
+  background: #fff5f5;
+  color: #e53e3e;
+  padding: 1px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+.leaderboard-maxstreak {
+  font-size: 10px;
+  color: #a0aec0;
+}
+
+/* 明细（胜/负/平 或 最高分） */
+.leaderboard-player-detail {
+  display: flex;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.leaderboard-stat-item {
+  text-align: center;
+  min-width: 34px;
+}
+
+.leaderboard-stat-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: #2d3748;
+}
+
+.leaderboard-stat-value.win {
+  color: #38a169;
+}
+
+.leaderboard-stat-value.lose {
+  color: #e53e3e;
+}
+
+.leaderboard-stat-value.draw {
+  color: #a0aec0;
+}
+
+.leaderboard-stat-label {
+  font-size: 10px;
+  color: #a0aec0;
+  margin-top: 2px;
+}
+
+/* 胜率 */
+.leaderboard-winrate-col {
+  width: 92px;
+  flex-shrink: 0;
+}
+
+.leaderboard-winrate-text {
+  font-size: 12px;
+  font-weight: 700;
+  color: #4a5568;
+  text-align: right;
+  margin-bottom: 4px;
+}
+
+.leaderboard-winrate-bar-bg {
+  height: 6px;
+  background: #edf2f7;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.leaderboard-winrate-bar {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.leaderboard-winrate-bar.high {
+  background: linear-gradient(90deg, #48bb78, #38a169);
+}
+
+.leaderboard-winrate-bar.mid {
+  background: linear-gradient(90deg, #ed8936, #dd6b20);
+}
+
+.leaderboard-winrate-bar.low {
+  background: linear-gradient(90deg, #e53e3e, #c53030);
+}

@@ -230,6 +230,20 @@
     background: var(--theme-nav-btn-active-hover-bg);
 }
 
+/* 切回旧版按钮（a 标签样式对齐 nav-btn + 灰色区分） */
+a.nav-btn.nav-btn--legacy {
+    text-decoration: none;
+    color: var(--theme-nav-btn-color);
+    background: var(--theme-nav-btn-bg);
+    border: 1px dashed var(--theme-border-color, #cbd5e0);
+    opacity: 0.85;
+}
+
+a.nav-btn.nav-btn--legacy:hover {
+    background: var(--theme-nav-btn-bg-hover);
+    opacity: 1;
+}
+
 .nav-btn__icon {
     font-size: 16px;
     line-height: 1;

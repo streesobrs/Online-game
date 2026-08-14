@@ -31,7 +31,12 @@ export function renderTopNav(container) {
   container.append(
     el('div', { class: 'nav-group nav-group--games' }, GAMES.map(navButton)),
     el('div', { class: 'nav-divider' }),
-    el('div', { class: 'nav-group nav-group--features' }, FEATURES.map(navButton))
+    el('div', { class: 'nav-group nav-group--features' }, FEATURES.map(navButton)),
+    el('div', { class: 'nav-divider' }),
+    el('a', { class: 'nav-btn nav-btn--legacy', href: '/', title: '切换回旧版客户端' }, [
+      el('span', { class: 'nav-btn__icon' }, '🕰️'),
+      el('span', { class: 'nav-btn__name' }, '旧版'),
+    ])
   );
 
   const buttons = Array.from(container.querySelectorAll('[data-nav]'));

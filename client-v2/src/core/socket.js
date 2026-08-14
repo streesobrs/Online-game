@@ -131,6 +131,7 @@ const EVENT_MAP = {
   // 聊天
   chat_message: 'chat:message',
   chat_error: 'chat:error',
+  chat_history: 'chat:history',
 
   // 成就与排行
   achievements_unlocked: 'achievement:unlocked',

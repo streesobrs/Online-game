@@ -3277,7 +3277,7 @@ io.on('connection', (socket) => {
             }
           }
 
-          await gameManager.achievementManager.checkAchievements(accountId, {
+          const unlockedAchievements = await gameManager.achievementManager.checkAchievements(accountId, {
             ...postAccount.stats,
             ...(postAccount.stats?.flags || {}),
             // 用当前游戏时间覆盖持久标志位
@@ -3304,6 +3304,10 @@ io.on('connection', (socket) => {
             gameTypeHighScores,
             timestamp: Date.now()
           });
+          // 贪吃蛇结束解锁的成就需通知客户端（对齐棋类/AI 对战：成就解锁弹窗）
+          if (unlockedAchievements.length > 0 && socket && socket.connected) {
+            socket.emit('achievements_unlocked', { achievements: unlockedAchievements });
+          }
         }
       }
 
@@ -3388,6 +3392,29 @@ io.on('connection', (socket) => {
 
   // ========== 聊天相关事件 ==========
 
+  // 聊天消息后检查成就（话痨等聊天类成就即时解锁，不再依赖打局顺带检查）
+  async function checkChatAchievements(accountId, socket) {
+    try {
+      if (!gameManager.achievementManager) return;
+      const account = await gameManager.accountManager.getAccount(accountId);
+      if (!account) return;
+      const raw = account.achievements || [];
+      const currentIds = Array.isArray(raw)
+        ? (raw.length > 0 && typeof raw[0] === 'object' ? raw.map(a => a.id) : raw.slice())
+        : [];
+      const unlocked = await gameManager.achievementManager.checkAchievements(accountId, {
+        ...(account.account?.activity || {}),
+        achievementCount: currentIds.length,
+        badges: account.stats?.badges || 0,
+      });
+      if (unlocked.length > 0 && socket && socket.connected) {
+        socket.emit('achievements_unlocked', { achievements: unlocked });
+      }
+    } catch (err) {
+      logger.error('聊天成就检查失败', { accountId, error: err.message });
+    }
+  }
+
   // 全局聊天
   socket.on('chat_global', (data) => {
     if (config.system.maintenanceEnabled && config.system.maintenanceBlockChat && !adminManager.isAdmin(socket)) {
@@ -3395,7 +3422,13 @@ io.on('connection', (socket) => {
       return;
     }
     const result = chatManager.handleGlobalChat(socket.id, data, io);
-    if (!result.success) {
+    if (result.success) {
+      // 聊天消息后检查成就（话痨等即时解锁）
+      const userSession = userManager.getUserBySocketId(socket.id);
+      if (userSession && userSession.accountId) {
+        checkChatAchievements(userSession.accountId, socket);
+      }
+    } else {
       socket.emit('chat_error', { message: result.message });
       // 如果是被禁言，发送广播通知
       if (result.message && result.message.includes('禁言')) {
@@ -3415,7 +3448,13 @@ io.on('connection', (socket) => {
       return;
     }
     const result = chatManager.handleGameChat(socket.id, data, io);
-    if (!result.success) {
+    if (result.success) {
+      // 聊天消息后检查成就（话痨等即时解锁；局内消息也计入统计）
+      const userSession = userManager.getUserBySocketId(socket.id);
+      if (userSession && userSession.accountId) {
+        checkChatAchievements(userSession.accountId, socket);
+      }
+    } else {
       socket.emit('chat_error', { message: result.message });
       // 如果是被禁言，发送广播通知
       if (result.message && result.message.includes('禁言')) {

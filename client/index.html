@@ -366,6 +366,19 @@
       background: var(--theme-nav-btn-active-hover-bg);
     }
 
+    /* 新版跳转按钮（绿色高亮） */
+    .nav-btn--v2 {
+      background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+      color: #ffffff;
+      margin-left: auto;
+      box-shadow: 0 2px 8px rgba(56, 161, 105, 0.35);
+    }
+
+    .nav-btn--v2:hover {
+      background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+      transform: translateY(-2px);
+    }
+
     /* 快捷键提示样式 */
     .shortcut-hint {
       font-size: 10px;
@@ -3949,6 +3962,9 @@
     </button>
     <button class="nav-btn" data-page="shortcuts" onclick="showCustomShortcutsPanel()">
       ⌨️ 快捷键<sup class="shortcut-hint">K</sup>
+    </button>
+    <button class="nav-btn nav-btn--v2" onclick="location.href='/beta/'">
+      ✨ 新版<sup class="shortcut-hint">β</sup>
     </button>
   </div>
 

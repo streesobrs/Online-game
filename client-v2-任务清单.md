@@ -847,48 +847,92 @@ AI 完成任务时填写：
       - 结束弹窗：modal 显示得分/最高分，破纪录显示 🎉 新纪录，可「再来一局」
     - 自测方式：F5 刷新访问 `#/snake` 点「开始游戏」，蛇吃食物后 HUD 最高分同步刷新；撞墙/撞自己弹出结算弹窗（得分/最高分）；刷新页面后最高分保留；控制台可见 `snake_game_start`/`snake_game_end` 上报（登录账号时服务端记战绩、经验+成就检查）
 
+✅ 已验证（2026-08-14）
+（验证中发现服务端旧进程报 `处理贪吃蛇游戏结果失败 error=snakeLevel is ...` 与 `gamees.snake.totalScore` typo——磁盘/git 均无此代码，判定为服务端未重启跑旧版；同时修复磁盘代码真实崩溃点：snake_game_end 成就检查的 postAccount 在 if 块外引用，getAccount 返回 null 时必抛 TypeError，已移入块内。重启服务端后正常）
+
 ---
 
-## 阶段 4：功能模块迁移 [0/17]
+## 阶段 4：功能模块迁移 [5/17]
 
 > **目标**：v2 功能对齐 v1  
 > **前置条件**：阶段 3 全部 ✅ 已验证
 
-### 4.1 聊天 [0/2]
+### 4.1 聊天 [2/2]
 
-- [ ] **4.1.1** 实现 features/chat/（全局聊天 + 游戏内聊天）
+- [x] **4.1.1** 实现 features/chat/（全局聊天 + 游戏内聊天）
   - 依赖：阶段 3
   - 验证：能发送/接收消息；全局和游戏内聊天切换正确
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：新建 client-v2/src/features/chat/index.js、styles.css；修改 data/navItems.js（新增 chat 导航项，快捷键 C）、main.js（注册 #/chat 路由）、index.html（引入聊天样式）
+    - 实现内容：
+      - 聊天视图 `renderChat(container)`：🌐 大厅 / 🎮 局内 双频道切换（对齐 v1），消息列表 + 输入框 + 发送按钮（Enter 或点击发送）
+      - 协议与 v1 一致：发送 `chat_global {message}` / `chat_game {message}`；接收 `chat_message {scope, userId, nickname, message}`；错误 `chat_error` → toast 提示
+      - 消息/状态监听为**模块级常驻**（对齐 v1 全局 socket.on）：对局中（聊天视图未挂载）的局内消息仍入内存历史（每频道上限 100 条），切回聊天视图即显示
+      - 局内频道可用性：订阅 `user:status`（服务端匹配成功广播 playing / 返回大厅广播 online），playing/spectating 时局内按钮可用且自动切到局内频道，退出自动切回大厅（对齐 v1 updateGameChannelButton）
+      - 消息样式：自己消息右侧高亮（self）、他人左侧（other），频道标签 + 昵称 + 文本
+      - **常驻浮动聊天窗**（用户需求补充）：`initFloatingChat()` 右下角 💬 气泡按钮，任意页面（含对局中）点击展开/收起聊天面板；视图逻辑抽成 `createChatView()` 复用，#/chat 视图与浮动窗共享同一份历史与状态
+    - 自测方式：F5 刷新导航栏出现「💬 聊天」（或按 C）；右下角 💬 气泡任意页面可展开聊天；两浏览器都进 #/chat，A 发消息 B 实时收到；进入对局后局内频道自动激活并可收发局内消息
 
-- [ ] **4.1.2** 实现聊天历史加载、禁言提示
+✅ 已验证（2026-08-14，功能通过，UI 待后续美化）
+
+- [x] **4.1.2** 实现聊天历史加载、禁言提示
   - 依赖：4.1.1
   - 验证：进入大厅能加载最近聊天记录；被禁言时发送有提示
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/core/socket.js（EVENT_MAP 补 `chat_history → chat:history`）、features/chat/index.js
+    - 实现内容：
+      - **历史加载**：模块加载（进入应用）即 `emit('get_chat_history', {scope:'global'})`，服务端返回 `chat_history {scope, history}`；合并进全局历史（按 messageId 去重，上限 100），所有活动视图（#/chat + 浮动窗）自动刷新
+      - **消息去重**：chat:message 与 chat:history 均按 messageId 去重，避免广播消息与历史重复
+      - **禁言提示**：发送被禁言时服务端回 `chat_error {message}`（含剩余时间/原因）→ toast 红字提示；同时服务端发 `system_broadcast` → 新增监听显示广播通知（对齐 v1 showBroadcast）
+    - 自测方式：F5 刷新进入聊天视图，能看到最近历史消息（会话内+历史合并、无重复）；管理员在服务端禁言后，该账号发消息弹出禁言提示 toast（含剩余分钟/原因）
 
-### 4.2 成就 [0/2]
+✅ 已验证（2026-08-14；期间修复：get_chat_history 在 socket 未连接时被 emit() 丢弃，连接成功后补拉一次）
 
-- [ ] **4.2.1** 实现 features/achievements/（成就列表展示）
+### 4.2 成就 [2/2]
+
+- [x] **4.2.1** 实现 features/achievements/（成就列表展示）
   - 依赖：阶段 3
   - 验证：成就页面正确显示所有成就；已解锁/未解锁状态正确
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：新建 client-v2/src/features/achievements/index.js、styles.css；修改 main.js（注册 #/achievements 路由）、index.html（引入样式）；navItems.js 已有成就导航项
+    - 实现内容：
+      - 协议对齐 v1：`emit('get_achievements')` → `achievements_list { categories, userAchievements, totalAchievements }`（映射 `achievement:list`，EVENT_MAP 已有）
+      - 分类重组（对齐 v1）：game_type 按 condition.gameType 拆成 五子棋/象棋/围棋/贪吃蛇 四类，基础分类（胜利/等级/连胜/AI/特殊）直显；顶部「成就进度」总数 + 进度条 + 百分比
+      - 成就卡片：图标（🏆解锁/🔒未解锁）、名称、描述、进度条（current/target/percent）、状态标签（✓已解锁/○未解锁）、奖励 +EXP
+      - 分类标签可点击切换；socket 未连接时 emit 丢弃，`socket:connect` 后补拉（沿用聊天模块经验）；未登录提示
+    - 自测方式：F5 登录后按 A（或点击导航「成就」）进入成就页，看到全部成就分类与卡片；完成过对局的账号能看到部分已解锁（🏆 绿框）；点击分类标签切换正常
 
-- [ ] **4.2.2** 实现成就解锁通知、分类筛选
+✅ 已验证（2026-08-14）
+
+- [x] **4.2.2** 实现成就解锁通知、分类筛选
   - 依赖：4.2.1
   - 验证：解锁成就时收到通知；按游戏分类筛选正常
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/features/achievements/index.js、styles.css
+    - 实现内容：
+      - **解锁通知**：模块级常驻监听 `achievements_unlocked`（映射 `achievement:unlocked`，EVENT_MAP 已有）→ modal 弹窗展示解锁成就（🎉 恭喜 + 各成就 🏆 名称/描述/+EXP 奖励），任意视图（对局中/大厅/成就页）都会弹出，对齐 v1 showAchievementUnlockModal
+      - **分类筛选**：分类 tab 置顶新增「🏅 全部成就」（汇总去重），配合已有 基础5类+游戏4类 共 10 个分类可自由切换筛选
+    - 自测方式：完成一局对局触发新成就时弹出「成就解锁」弹窗；成就页分类标签含「全部成就」且切换正常
 
-### 4.3 排行榜 [0/2]
+✅ 已验证（2026-08-14）
+- 期间修复服务端缺陷（server.js）：
+  1. `chat_global`/`chat_game` 成功发送后从不检查成就，「话痨」等聊天成就只能等打局顺带触发——新增 `checkChatAchievements()` 即时检查并发 `achievements_unlocked`
+  2. 贪吃蛇结束处检查了成就但漏发 `achievements_unlocked` 通知（棋类/AI 对战都有发），已补发
+- 期间修复 v2：成就解锁弹窗后成就列表不自动刷新——模块级记录活跃成就视图，解锁时自动重新拉取列表
 
-- [ ] **4.3.1** 实现 features/leaderboard/（排行榜展示）
+### 4.3 排行榜 [1/2]
+
+- [x] **4.3.1** 实现 features/leaderboard/（排行榜展示）
   - 依赖：阶段 3
   - 验证：默认显示全游戏 Top 20；显示玩家名、等级、胜场等
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：新建 client-v2/src/features/leaderboard/index.js、styles.css；修改 main.js（注册 #/leaderboard 路由）、index.html（引入样式）；navItems.js 已有排行榜导航项（快捷键 L）
+    - 实现内容：
+      - 协议对齐 v1：`emit('get_leaderboard', {limit:20, gameType})` → `leaderboard {leaderboard}`（映射 `leaderboard:update`，EVENT_MAP 已有）
+      - 游戏类型筛选：全部/五子棋/围棋/象棋/贪吃蛇 按钮切换
+      - 榜单条目（对齐 v1 renderLeaderboardItem）：Top3 奖牌 🥇🥈🥉、其余数字名次；玩家名（自己高亮 is-me）、Lv、局数、🔥连胜/最高连胜；贪吃蛇显示最高分，棋类显示 胜/负/平；胜率条（高/中/低配色）
+      - socket 未连接时 emit 丢弃，`socket:connect` 后补拉（沿用聊天模块经验）
+    - 自测方式：F5 登录后按 L（或点击导航「排行榜」）进入，默认显示全游戏 Top20；点击类型按钮切换榜单；自己高亮显示
 
 - [ ] **4.3.2** 实现按游戏分类筛选、显示我的排名
   - 依赖：4.3.1

@@ -1,0 +1,310 @@
+/**
+ * 成就模块样式（任务 4.2.1）
+ * 复刻 v1 成就页：总进度、分类标签、成就卡片。
+ */
+.achievements-page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 16px 32px;
+}
+
+.ach-page-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--theme-title-color, #2c3e50);
+  padding: 20px 0 12px;
+  text-align: center;
+}
+
+/* ===== 顶部总进度 ===== */
+.ach-overview {
+  background: var(--theme-container-bg, #ffffff);
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  margin-bottom: 16px;
+}
+
+.ach-overview-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.ach-overview-top .title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.ach-overview-top .count {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--theme-primary, #007bff);
+}
+
+.ach-overview-bar {
+  height: 10px;
+  background: #e2e8f0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.ach-overview-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f6ad55, #ed8936);
+  border-radius: 6px;
+  transition: width 0.4s ease;
+}
+
+.ach-overview-pct {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #718096;
+  text-align: right;
+}
+
+/* ===== 分类标签 ===== */
+.ach-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.ach-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  background: #ffffff;
+  font-size: 13px;
+  color: #4a5568;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ach-tab:hover {
+  border-color: var(--theme-primary, #3498db);
+}
+
+.ach-tab.active {
+  background: #e3f2fd;
+  border-color: var(--theme-primary, #3498db);
+  color: #1976d2;
+  font-weight: 600;
+}
+
+.ach-tab .tab-count {
+  font-size: 11px;
+  color: #718096;
+  background: #edf2f7;
+  border-radius: 10px;
+  padding: 1px 7px;
+}
+
+/* ===== 成就卡片 ===== */
+.ach-scroll {
+  max-height: 560px;
+  overflow-y: auto;
+}
+
+.ach-category-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.ach-category-header .cat-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #2d3748;
+}
+
+.ach-category-header .cat-progress {
+  font-size: 12px;
+  color: #718096;
+}
+
+.ach-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.ach-card {
+  background: var(--theme-container-bg, #ffffff);
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  transition: transform 0.15s;
+}
+
+.ach-card:hover {
+  transform: translateY(-2px);
+}
+
+.ach-card.unlocked {
+  border-color: #9ae6b4;
+  background: linear-gradient(135deg, #f0fff4 0%, #ffffff 100%);
+}
+
+.ach-card.locked {
+  opacity: 0.82;
+}
+
+.ach-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ach-icon-box {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-size: 18px;
+  background: #edf2f7;
+}
+
+.ach-card.unlocked .ach-icon-box {
+  background: #c6f6d5;
+}
+
+.ach-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.ach-card-desc {
+  font-size: 12px;
+  color: #718096;
+  line-height: 1.5;
+  min-height: 32px;
+}
+
+/* 进度条 */
+.ach-card-progress {
+  background: #f7fafc;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.prog-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #4a5568;
+  margin-bottom: 5px;
+}
+
+.prog-bar {
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.prog-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4299e1, #3182ce);
+  border-radius: 4px;
+}
+
+.ach-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+}
+
+.ach-status-tag {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 10px;
+}
+
+.ach-status-tag.unlocked {
+  background: #c6f6d5;
+  color: #276749;
+}
+
+.ach-status-tag.locked {
+  background: #edf2f7;
+  color: #718096;
+}
+
+.ach-exp-tag {
+  font-size: 11px;
+  color: #b7791f;
+  background: #fefcbf;
+  padding: 3px 10px;
+  border-radius: 10px;
+}
+
+.ach-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #718096;
+  font-size: 14px;
+}
+
+/* ===== 成就解锁通知弹窗（4.2.2）===== */
+.ach-unlock-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ach-unlock-item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
+  border: 2px solid #48bb78;
+}
+
+.ach-unlock-item[data-head] {
+  background: #fffbe6;
+  border-color: #ecc94b;
+}
+
+.ach-unlock-item-icon {
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.ach-unlock-item-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2d3748;
+}
+
+.ach-unlock-item-desc {
+  font-size: 12px;
+  color: #4a5568;
+  margin-top: 2px;
+  line-height: 1.5;
+}
+
+.ach-unlock-item-exp {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ed8936;
+  margin-top: 4px;
+}

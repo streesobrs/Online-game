@@ -18,6 +18,9 @@ import { switchLayout } from './layouts/registry.js';
 import { viewRoot } from './utils/dom.js';
 import * as login from './features/auth/login.js';
 import { renderLobby } from './features/lobby/index.js';
+import { renderChat, initFloatingChat } from './features/chat/index.js';
+import { renderAchievements } from './features/achievements/index.js';
+import { renderLeaderboard } from './features/leaderboard/index.js';
 import { renderGobang } from './games/gobang/index.js';
 import { renderGo } from './games/go/index.js';
 import { renderChess } from './games/chinese-chess/index.js';
@@ -51,6 +54,9 @@ themes.initThemes();
 
 // 3. 注册业务视图路由（须在 initRouter 之前，保证当前 hash 首次处理即命中）
 registerRoute('lobby', () => renderLobby(viewRoot()));
+registerRoute('chat', () => renderChat(viewRoot()));
+registerRoute('achievements', () => renderAchievements(viewRoot()));
+registerRoute('leaderboard', () => renderLeaderboard(viewRoot()));
 registerRoute('gobang', () => renderGobang(viewRoot()));
 registerRoute('go', () => renderGo(viewRoot()));
 registerRoute('chinese-chess', () => renderChess(viewRoot()));
@@ -65,7 +71,10 @@ initShortcuts();
 // 6. 渲染布局（导航栏；读取本地保存的布局，默认 topnav）
 switchLayout(localStorage.getItem('nav-layout') || 'topnav');
 
-// 7. 自动登录检测：未登录（无 token / token 失效）时弹出登录框
+// 7. 初始化常驻浮动聊天窗（任意页面随时聊天）
+initFloatingChat();
+
+// 8. 自动登录检测：未登录（无 token / token 失效）时弹出登录框
 login.initLoginCheck();
 
 // 校验挂载点是否存在
