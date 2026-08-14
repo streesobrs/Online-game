@@ -1,0 +1,221 @@
+/**
+ * 商城样式（任务 4.6.1/4.6.2/4.6.3）
+ * 分类 Tab + 商品卡片网格 + 余额/VIP 头部 + 购买/使用/装备按钮，样式对齐 v1 浅色卡片风。
+ */
+
+/* ===== 头部：余额 + VIP ===== */
+.shop-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  background: var(--surface-alt, #f7fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+}
+
+.shop-balance {
+  font-size: 16px;
+  font-weight: 700;
+  color: #d69e2e;
+}
+
+.shop-vip-badge {
+  font-size: 13px;
+  font-weight: 600;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+  color: #fff;
+  padding: 2px 12px;
+  border-radius: 12px;
+}
+
+/* ===== 分类 Tab ===== */
+.shop-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 16px;
+}
+
+.shop-tab {
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--surface, #fff);
+  color: var(--text-secondary, #4a5568);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.shop-tab:hover {
+  border-color: #6366f1;
+  color: #6366f1;
+}
+
+.shop-tab.active {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: #fff;
+}
+
+/* ===== 商品网格 ===== */
+.shop-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.shop-card {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.2s;
+}
+
+.shop-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.shop-card-icon {
+  font-size: 36px;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.shop-card-name {
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.shop-rarity {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.shop-card-desc {
+  font-size: 12px;
+  color: var(--text-secondary, #718096);
+  margin: 6px 0;
+  min-height: 34px;
+  line-height: 1.5;
+}
+
+.shop-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+}
+
+.shop-price {
+  font-weight: 700;
+  color: #d69e2e;
+}
+
+.shop-owned {
+  font-size: 12px;
+  color: var(--text-secondary, #a0aec0);
+}
+
+.shop-owned.owned {
+  color: #48bb78;
+  font-weight: 600;
+}
+
+.shop-count {
+  font-size: 12px;
+  color: var(--text-secondary, #718096);
+}
+
+.shop-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.shop-card-actions .btn {
+  flex: 1;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 0;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.shop-buy-btn {
+  background: #6366f1;
+  color: #fff;
+}
+
+.shop-buy-btn:hover {
+  background: #4f46e5;
+}
+
+.shop-use-btn {
+  background: #48bb78;
+  color: #fff;
+}
+
+.shop-use-btn:hover {
+  background: #38a169;
+}
+
+.shop-equip-btn {
+  background: #edf2f7;
+  color: #4a5568;
+}
+
+.shop-equip-btn:hover {
+  background: #e2e8f0;
+}
+
+.shop-equip-btn.equipped {
+  background: #ebf8ff;
+  color: #3182ce;
+  cursor: default;
+}
+
+/* ===== 购买弹窗：数量输入 ===== */
+.shop-buy-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.shop-qty-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.shop-qty-row label {
+  color: var(--text-secondary, #4a5568);
+  white-space: nowrap;
+}
+
+.shop-qty-input {
+  flex: 1;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 14px;
+  outline: none;
+}
+
+.shop-qty-input:focus {
+  border-color: #6366f1;
+}

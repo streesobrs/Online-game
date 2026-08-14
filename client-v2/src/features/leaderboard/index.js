@@ -41,15 +41,15 @@ function leaderboardItem(player, gameType) {
   // 明细：贪吃蛇显示最高分，棋类显示胜/负/平
   const statEls = isSnake
     ? [el('div', { class: 'leaderboard-stat-item' }, [
-        el('div', { class: 'leaderboard-stat-value' }, String(player.score || 0)),
-        el('div', { class: 'leaderboard-stat-label' }, '最高分'),
-      ])]
+      el('div', { class: 'leaderboard-stat-value' }, String(player.score || 0)),
+      el('div', { class: 'leaderboard-stat-label' }, '最高分'),
+    ])]
     : ['wins', 'losses', 'draws'].map((key, idx) =>
-        el('div', { class: 'leaderboard-stat-item' }, [
-          el('div', { class: `leaderboard-stat-value ${['win', 'lose', 'draw'][idx]}` }, String(player[key] || 0)),
-          el('div', { class: 'leaderboard-stat-label' }, ['胜', '负', '平'][idx]),
-        ])
-      );
+      el('div', { class: 'leaderboard-stat-item' }, [
+        el('div', { class: `leaderboard-stat-value ${['win', 'lose', 'draw'][idx]}` }, String(player[key] || 0)),
+        el('div', { class: 'leaderboard-stat-label' }, ['胜', '负', '平'][idx]),
+      ])
+    );
 
   const totalForRate = (player.wins || 0) + (player.losses || 0) + (player.draws || 0);
 
@@ -68,14 +68,14 @@ function leaderboardItem(player, gameType) {
     el('div', { class: 'leaderboard-player-detail' }, statEls),
     !isSnake && totalForRate > 0
       ? el('div', { class: 'leaderboard-winrate-col' }, [
-          el('div', { class: 'leaderboard-winrate-text' }, player.winrate || '0%'),
-          el('div', { class: 'leaderboard-winrate-bar-bg' }, [
-            el('div', {
-              class: `leaderboard-winrate-bar ${winrateCls}`,
-              style: `width:${Math.min(player.winrateNum || 0, 100)}%;`,
-            }),
-          ]),
-        ])
+        el('div', { class: 'leaderboard-winrate-text' }, player.winrate || '0%'),
+        el('div', { class: 'leaderboard-winrate-bar-bg' }, [
+          el('div', {
+            class: `leaderboard-winrate-bar ${winrateCls}`,
+            style: `width:${Math.min(player.winrateNum || 0, 100)}%;`,
+          }),
+        ]),
+      ])
       : null,
   ]);
 }
@@ -90,6 +90,7 @@ export function renderLeaderboard(container = viewRoot()) {
 
   const typeBtnsEl = el('div', { class: 'leaderboard-controls' });
   const listEl = el('div', { class: 'leaderboard-list' });
+  const myRankEl = el('div', { class: 'leaderboard-self-container' });
 
   container.innerHTML = '';
   container.append(
@@ -97,6 +98,7 @@ export function renderLeaderboard(container = viewRoot()) {
       el('div', { class: 'leaderboard-title' }, '🏆 排行榜'),
       typeBtnsEl,
       listEl,
+      myRankEl,
     ])
   );
 
@@ -115,6 +117,7 @@ export function renderLeaderboard(container = viewRoot()) {
   function selectType(key) {
     gameType = key;
     renderTypes();
+    myRankEl.innerHTML = ''; // 切换类型时清空旧排名，等待新类型 my_rank 返回
     load();
   }
 
@@ -127,6 +130,41 @@ export function renderLeaderboard(container = viewRoot()) {
     }
     listEl.innerHTML = '';
     list.forEach((player) => listEl.append(leaderboardItem(player, gameType)));
+
+    // 我的排名：自己不在 Top20 时向服务端请求单独排名（对齐 v1 updateLeaderboard）
+    const myUsername = localStorage.getItem('nickname');
+    const inTopList = list.some(
+      (p) =>
+        (p.id != null && String(p.id) === String(myId)) ||
+        (myUsername && p.name === myUsername)
+    );
+    if (inTopList) {
+      myRankEl.innerHTML = '';
+    } else {
+      emit('get_my_rank', { gameType });
+    }
+  }
+
+  function renderMyRank(data) {
+    if (!data || data.inTopList) {
+      myRankEl.innerHTML = '';
+      return;
+    }
+    const player = data.player;
+    if (!player) {
+      myRankEl.innerHTML = '';
+      return;
+    }
+    myRankEl.innerHTML = '';
+    myRankEl.append(
+      el('div', { class: 'leaderboard-self-card' }, [
+        el('span', { class: 'leaderboard-self-label' }, '我的排名'),
+        el('span', { class: 'leaderboard-self-rank' }, `#${player.rank}`),
+        el('span', { class: 'leaderboard-self-name' }, player.name || '未知'),
+        el('span', { class: 'leaderboard-lv-badge' }, `Lv.${player.level || 1}`),
+        el('span', { class: 'leaderboard-self-stats' }, `🏟️ ${player.totalGames || 0}局 · ${player.winrate || '0%'}`),
+      ])
+    );
   }
 
   function load() {
@@ -142,10 +180,12 @@ export function renderLeaderboard(container = viewRoot()) {
   const offData = eventBus.on('leaderboard:update', (data) => {
     if (data && data.leaderboard) render(data);
   });
+  const offMyRank = eventBus.on('leaderboard:myRank', renderMyRank);
   const offConnect = eventBus.on('socket:connect', load);
 
   return () => {
     offData();
+    offMyRank();
     offConnect();
     container.innerHTML = '';
   };

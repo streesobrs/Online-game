@@ -57,15 +57,45 @@ export const api = {
   },
 
   shop: {
-    getData: () => api.get('/api/shop/data'),
-    getInventory: () => api.get('/api/shop/inventory'),
-    buy: (itemId, quantity) => api.post('/api/shop/buy', { itemId, quantity }),
-    useItem: (itemId) => api.post('/api/shop/use-item', { itemId }),
+    /** 商城数据（商品列表，可传 userId 获取动态价格） */
+    getData: (userId) => api.get(`/api/shop/data?userId=${encodeURIComponent(userId || '')}`),
+    /** 背包 */
+    getInventory: (userId) => api.get(`/api/shop/inventory?userId=${encodeURIComponent(userId || '')}`),
+    /** 购买商品 @param {string} itemId @param {number} [quantity=1] */
+    buy: (userId, itemId, quantity = 1) => api.post('/api/shop/buy', { userId, itemId, quantity }),
+    /** 使用道具 */
+    useItem: (userId, itemId) => api.post('/api/shop/use-item', { userId, itemId }),
+    /** 星钻余额 */
+    getBalance: (userId) => api.get(`/api/currency/balance?userId=${encodeURIComponent(userId || '')}`),
+    /** 会员信息 */
+    getVip: (userId) => api.get(`/api/shop/vip?userId=${encodeURIComponent(userId || '')}`),
+    /** 用户外观（已拥有 + 已装备） */
+    getCosmetics: (userId) => api.get(`/api/shop/cosmetics?userId=${encodeURIComponent(userId || '')}`),
+    /** 全部外观配置 */
+    getCosmeticsConfig: () => api.get('/api/shop/cosmetics/config'),
+    /** 装备外观 */
+    equipCosmetic: (userId, category, cosmeticId) => api.post('/api/shop/cosmetics/equip', { userId, category, cosmeticId }),
   },
 
   leaderboard: {
     /** 排行榜 @param {number} [limit=10] */
     get: (limit = 10) => api.get(`/api/leaderboard?limit=${limit}`),
+  },
+
+  profile: {
+    /** 个人资料 @param {string} accountId */
+    get: (accountId) => api.get(`/api/profile/${encodeURIComponent(accountId)}`),
+    /** 等级经验配置（levelExp.json：{level: 升到下一级所需经验}） */
+    levelExp: () => api.get('/api/config/levelExp'),
+  },
+
+  avatar: {
+    /** 上传自定义头像 @param {string} avatar - base64 dataURL @param {number} [replaceIndex] @param {string} [name] */
+    upload: (userId, avatar, replaceIndex, name) => api.post('/api/avatar/upload', { userId, avatar, replaceIndex, name }),
+    /** 删除自定义头像 */
+    remove: (userId, avatarFile) => api.post('/api/avatar/delete', { userId, avatarFile }),
+    /** 重命名自定义头像 */
+    rename: (userId, avatarFile, name) => api.post('/api/avatar/rename', { userId, avatarFile, name }),
   },
 
   themes: {
@@ -83,7 +113,8 @@ export const api = {
   },
 
   games: {
-    history: () => api.get('/api/games/history'),
+    /** 对战历史 @param {string} accountId @param {number} [limit=20] */
+    history: (accountId, limit = 20) => api.get(`/api/games/history?accountId=${encodeURIComponent(accountId || '')}&limit=${limit}`),
     stats: () => api.get('/api/games/stats'),
   },
 

@@ -6,6 +6,7 @@
  * - dual：30×30、cellSize 18、canvas 540×540（联机对局用，3.3.3 接入）
  */
 import { el } from '../../utils/dom.js';
+import { fitBoard } from '../../utils/responsive.js';
 
 export const SNAKE_CONFIG = {
   solo: {
@@ -66,12 +67,14 @@ export function createSnakeBoard(container, options = {}) {
   });
   const ctx = canvas.getContext('2d');
   container.appendChild(canvas);
+  const fit = fitBoard(canvas, container);
 
   /** 切换画布尺寸（联机开始/结束时调用） */
   function resize(nextMode) {
     config = SNAKE_CONFIG[nextMode] || SNAKE_CONFIG.solo;
     canvas.width = config.canvasWidth;
     canvas.height = config.canvasHeight;
+    fit.refresh(); // 画布原始尺寸变化后重算缩放
   }
 
   /**
@@ -157,6 +160,7 @@ export function createSnakeBoard(container, options = {}) {
     resize,
     destroy() {
       destroyed = true;
+      fit.destroy();
       canvas.remove();
     },
   };

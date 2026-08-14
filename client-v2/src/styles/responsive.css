@@ -1,0 +1,96 @@
+/**
+ * 响应式适配（任务 5.1.1 移动端 ≤768px / 5.1.2 小屏 ≤480px）
+ * 棋盘等比缩放由 src/utils/responsive.js 的 fitBoard（zoom 方案）处理，
+ * 本文件负责页面级布局适配（导航、信息栏、浮动聊天窗、方向键等）。
+ */
+
+/* ---- 触屏设备：禁用鼠标悬停效果（避免触屏误触闪动） ---- */
+@media (hover: none) {
+  .gobang-cell:hover,
+  .go-cell:hover {
+    background: transparent;
+    transform: none;
+  }
+  .chess-intersection:hover {
+    background: transparent;
+  }
+}
+
+/* ===== 5.1.1 移动端（≤768px） ===== */
+@media (max-width: 768px) {
+  /* 页面留白收紧 */
+  body {
+    padding: 10px;
+  }
+
+  /* 顶部导航紧凑：缩小按钮、隐藏快捷键角标 */
+  .nav-layout {
+    padding: 8px 10px;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .nav-btn {
+    padding: 5px 10px;
+    font-size: 13px;
+    gap: 4px;
+  }
+  .nav-btn__shortcut {
+    display: none;
+  }
+
+  /* 对局信息栏收紧（gobang/chess 共用 gobang-match-info） */
+  .gobang-match-info,
+  .go-match-info,
+  .spectate-match-info {
+    max-width: 100%;
+    gap: 6px;
+  }
+
+  /* 浮动聊天窗适配（避免固定 340px 溢出） */
+  .chat-float-panel {
+    right: 10px;
+    width: calc(100vw - 20px);
+    max-width: 340px;
+  }
+}
+
+/* ===== 5.1.2 小屏手机（≤480px） ===== */
+@media (max-width: 480px) {
+  body {
+    padding: 6px;
+  }
+  .nav-layout {
+    padding: 6px 8px;
+    gap: 5px;
+  }
+  .nav-btn {
+    padding: 5px 8px;
+    font-size: 12px;
+  }
+
+  /* 浮动聊天窗：全宽贴底展开 */
+  .chat-float-panel {
+    right: 0;
+    left: 0;
+    bottom: 0;
+    width: 100vw;
+    max-width: 100vw;
+    max-height: 62vh;
+    border-radius: 14px 14px 0 0;
+  }
+  .chat-float-btn {
+    right: 12px;
+    bottom: 12px;
+  }
+
+  /* 贪吃蛇虚拟方向键放大（方便触控） */
+  .snake-virtual-controls {
+    grid-template-columns: repeat(3, 68px);
+    grid-template-rows: repeat(3, 68px);
+  }
+  .snake-virtual-btn {
+    width: 68px;
+    height: 68px;
+    font-size: 24px;
+  }
+}

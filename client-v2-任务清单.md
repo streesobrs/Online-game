@@ -852,7 +852,7 @@ AI 完成任务时填写：
 
 ---
 
-## 阶段 4：功能模块迁移 [5/17]
+## 阶段 4：功能模块迁移 [17/17]
 
 > **目标**：v2 功能对齐 v1  
 > **前置条件**：阶段 3 全部 ✅ 已验证
@@ -920,7 +920,7 @@ AI 完成任务时填写：
   2. 贪吃蛇结束处检查了成就但漏发 `achievements_unlocked` 通知（棋类/AI 对战都有发），已补发
 - 期间修复 v2：成就解锁弹窗后成就列表不自动刷新——模块级记录活跃成就视图，解锁时自动重新拉取列表
 
-### 4.3 排行榜 [1/2]
+### 4.3 排行榜 [2/2]
 
 - [x] **4.3.1** 实现 features/leaderboard/（排行榜展示）
   - 依赖：阶段 3
@@ -934,108 +934,162 @@ AI 完成任务时填写：
       - socket 未连接时 emit 丢弃，`socket:connect` 后补拉（沿用聊天模块经验）
     - 自测方式：F5 登录后按 L（或点击导航「排行榜」）进入，默认显示全游戏 Top20；点击类型按钮切换榜单；自己高亮显示
 
-- [ ] **4.3.2** 实现按游戏分类筛选、显示我的排名
+- [x] **4.3.2** 实现按游戏分类筛选、显示我的排名
   - 依赖：4.3.1
   - 验证：切换游戏类型排行榜更新；底部显示「我的排名」
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/features/leaderboard/index.js、styles.css
+    - 实现内容：
+      - 我的排名对齐 v1：Top20 渲染后检查自己（id/nickname 匹配）是否在列，不在则 `emit('get_my_rank', {gameType})`（EVENT_MAP 已有 `my_rank → leaderboard:myRank`）
+      - 底部「我的排名」卡片：虚线高亮边框，显示 #名次/昵称/Lv/🏟️局数·胜率；inTopList 时清空（已在榜单高亮）
+      - 切换游戏类型时清空旧排名卡片，等待新类型 my_rank 返回；socket 未连接补拉沿用 connect 监听
+      - 修正昵称 key 为 `nickname`（与 auth.js NICKNAME_KEY 一致）
 
-### 4.4 AI 对战 [0/2]
+### 4.4 AI 对战 [2/2]
 
-- [ ] **4.4.1** 实现 features/ai-battle/（AI 对战入口）
+- [x] **4.4.1** 实现 features/ai-battle/（AI 对战入口）
   - 依赖：阶段 3
   - 验证：选择游戏 + 难度后能开始 AI 对战
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/features/ai-battle/index.js、styles.css；main.js（注册 `ai-battle` 路由）；index.html（引入样式）；navItems.js 已有 `ai-battle` 导航项（order 12）
+    - 实现内容：
+      - 入口视图：五子棋/围棋/象棋三张游戏类型卡片（选中态蓝底白字，对齐 v1）+ 简单🟢/中等🟡/困难🔴 难度按钮 + 返回大厅
+      - 点击难度按钮调用 `startAIBattle(container, {gameType, difficulty})` 进入对局（AI 可选游戏与 v1 一致，不含贪吃蛇）
+      - 协议对齐 v1：`emit('ai_game_start', {gameType, difficulty})` 发起
 
-- [ ] **4.4.2** 实现 AI 落子响应、对战结束流程
+- [x] **4.4.2** 实现 AI 落子响应、对战结束流程
   - 依赖：4.4.1
   - 验证：AI 能正常落子；游戏结束后能返回 AI 对战入口
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/features/ai-battle/play.js
+    - 实现内容：
+      - 对局控制器 `startAIBattle`：玩家固定 color 1 先行；gobang/go 用 `createBoard` onPlace 接管落子，chinese-chess 用 `createChessBoard` 选子走子（getChessMoves 合法走位 + isValidMove 校验）
+      - 落子协议：gobang/go `emit('ai_move', {position:{r,c}})`；象棋 `emit('ai_move', {position:{fromR,fromC,toR,toC,piece}})`
+      - 回执 `ai:moveResult`：color===1 自回显只切回合；color===2 AI 落子（gobang/go 增量 place，象棋用服务端 board 全量重建——含 `convertBackendBoardToFrontend` 将后端 `'r-ju'` 字符串格式转换为 v2 `{name,color}` 对象模型）
+      - 开局回执 `ai:gameStart`：象棋用服务端 board 重建棋盘；gobang/go 同步 currentPlayer
+      - 结束流程：本地检测（gobang 连五、象棋 isCheckmate）→ `emit('ai_game_result', {result, gameType, difficulty, duration})`；服务端权威 `ai:gameEnd` 兜底；结束弹窗 → `emit('return_lobby')` 释放 playing 状态 → 返回 AI 对战入口
 
-### 4.5 观战 [0/2]
+✅ 已验证（2026-08-14）：导航「🤖 AI对战」选游戏/难度进入对局正常；gobang/go 落子后 AI 延迟思考落子；象棋选子走子、服务端 board 重建同步；结束弹窗可返回 AI 入口
 
-- [ ] **4.5.1** 实现 features/spectate/（观战列表）
+### 4.5 观战 [2/2]
+
+- [x] **4.5.1** 实现 features/spectate/（观战列表）
   - 依赖：阶段 3
   - 验证：显示当前可观战的对局列表
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/features/spectate/index.js、styles.css；main.js（注册 `spectate` 路由）；index.html（引入样式）；navItems.js 已有 `spectate` 导航项（order 13）
+    - 实现内容：
+      - 观战列表视图：进入视图 `emit('get_spectate_list')` → 渲染 PvP + AI 对局卡片（游戏类型/🤖 AI 标签/👁️ 人数/玩家名 VS/步数），空态提示，样式对齐 v1（靛蓝观战按钮）
+      - 贪吃蛇对局不提供观战（与 v1 一致，前端拦截提示）
+      - socket 未连接时补拉：监听 `socket:connect` 重发 get_spectate_list
 
-- [ ] **4.5.2** 实现加入观战、实时同步棋盘
+- [x] **4.5.2** 实现加入观战、实时同步棋盘
   - 依赖：4.5.1
   - 验证：点击观战能进入对局；棋盘实时同步双方落子
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/features/spectate/play.js
+    - 实现内容：
+      - 加入观战：`emit('spectate_join', {gameId})` → `spectate:joined` 接管容器渲染只读棋盘（gobang/go `createBoard` onPlace 空操作禁落子；象棋 `createChessBoard` onCellClick 空操作禁走子）
+      - 回放已有落子：spectate_joined 返回 moves（gobang/go 逐手 place；象棋逐手 movePiece + setLastMove）
+      - 实时同步：订阅 `game:move`（服务端 broadcastToSpectators 广播，观战者非玩家不受 from 过滤影响），按 game/gameType 过滤后同步落子
+      - 结束流程：订阅 `game:ended` → 清理观战 → 弹窗 → `emit('spectate_leave', {gameId})` 释放 spectating 状态 → 返回观战列表
+      - cleanup 管理：模块级 activeSpectate，视图重渲染/离开时 `cleanupSpectate()` 清理订阅与棋盘 DOM
 
-### 4.6 商城 [0/3]
+✅ 已验证（2026-08-14）：观战列表显示 PvP/AI 对局卡片；点击观战进入只读棋盘并回放已有落子；双方实时落子同步；对局结束弹窗返回观战列表
 
-- [ ] **4.6.1** 实现 features/shop/（商品列表）
+### 4.6 商城 [3/3]
+
+- [x] **4.6.1** 实现 features/shop/（商品列表）
   - 依赖：阶段 3
   - 验证：显示道具、皮肤、VIP 等商品分类
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 新建 `features/shop/index.js` + `styles.css`：8 个分类 Tab（道具/头像/头像框/皮肤/背景/称号/礼包/VIP），商品卡片网格展示（图标、名称、稀有度颜色、描述、价格、背包数量/已拥有状态）
+    - `api.js` 补充带 userId 的商城封装（getData/getInventory/buy/useItem/getBalance/getVip/getCosmetics/getCosmeticsConfig/equipCosmetic）
+    - 并行拉取 6 个 API 组装视图；导航项「🛒 商城」+ 路由 shop 注册
 
-- [ ] **4.6.2** 实现购买流程、星钻余额展示
+- [x] **4.6.2** 实现购买流程、星钻余额展示
   - 依赖：4.6.1
   - 验证：能购买商品；余额正确扣减；库存更新
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 头部常驻余额（💎 星钻）+ VIP 状态显示
+    - 道具可多买：弹窗内嵌数量输入（modal content 支持 DOM 节点，1-99 限制）；外观/礼包/VIP 单买确认
+    - 调 `POST /api/shop/buy`，成功后并行刷新余额与背包并重渲染；未登录/未连接服务器有兜底提示
 
-- [ ] **4.6.3** 实现道具使用、外观装备
+- [x] **4.6.3** 实现道具使用、外观装备
   - 依赖：4.6.2
   - 验证：能使用道具（双倍经验等）；能装备/卸下外观
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 道具卡片：背包数量显示 + 「使用」按钮调 `POST /api/shop/use-item`，用返回的 account.inventory/starCoins 直接刷新
+    - 外观卡片：已拥有/已装备状态标记 + 「装备」按钮调 `POST /api/shop/cosmetics/equip`，成功后刷新 cosmetics 并重渲染
 
-### 4.7 个人资料 [0/2]
+✅ 已验证（2026-08-14）：8 个分类 Tab 切换正常；道具多买数量输入生效、余额扣减、背包数量更新；道具使用成功；外观购买/装备流程正常
 
-- [ ] **4.7.1** 实现 features/profile/（资料展示）
+### 4.7 个人资料 [2/2]
+
+- [x] **4.7.1** 实现 features/profile/（资料展示）
   - 依赖：阶段 3
   - 验证：显示用户名、等级、经验、胜场等基础信息
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 新建 `features/profile/index.js` + `styles.css`：三个 Tab（资料 / 头像 / 对战历史）
+    - 资料 Tab：头像+头像框预览、昵称/账号类型/ID/注册时间/登录次数、等级+经验条（与服务端 calcLevelAndExp 同算法，`GET /api/config/levelExp` 取经验表）、星钻/成就进度/悔棋/提示概要卡、战绩统计（总对局/胜/平/负/胜率/最佳连胜）、各棋种统计
+    - `api.js` 补充 profile.get / profile.levelExp 封装
 
-- [ ] **4.7.2** 实现头像管理、对战历史查看
+- [x] **4.7.2** 实现头像管理、对战历史查看
   - 依赖：4.7.1
   - 验证：能上传/切换头像；能查看最近对战历史
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 头像 Tab：当前形象大预览；预设头像/头像框网格（未拥有禁用，点击装备）；自定义头像（点击使用 / 📷 替换 / ✏️ 改名 modal 内嵌输入 / 🗑️ 删除），上传前 GIF 直传、非 GIF 超 2MB 自动 canvas 压缩
+    - 历史 Tab：`GET /api/games/history?accountId=&limit=50`，游戏类型 + 结果双筛选，卡片展示类型图标/对手/胜负/步数/时长/时间
+    - `api.js` 补充 avatar.upload/remove/rename 与 games.history(accountId) 封装；导航项「👤 个人资料」+ 路由 profile 注册
 
-### 4.8 主题切换 [0/2]
+✅ 已验证（2026-08-14）：三 Tab 切换正常；资料页等级/经验条/战绩统计正确；头像预设/自定义上传/改名/删除正常；历史页筛选生效
 
-- [ ] **4.8.1** 实现 features/themes/（主题选择面板）
+### 4.8 主题切换 [2/2]
+
+- [x] **4.8.1** 实现 features/themes/（主题选择面板）
   - 依赖：阶段 3
   - 验证：主题面板列出所有可用主题；当前主题高亮
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 复用已有 `features/themes/index.js`（THEMES 列表 + applyTheme + initThemes），将面板由按钮式升级为卡片式：预览色块 + 图标 + 名称 + 描述 + 「使用中」徽标
+    - 新建 `features/themes/styles.css`；**补注册 themes 路由**（此前 main.js 未注册，点击导航会空白）
+  - 验证：面板列出 默认/赛博朋克/森林/海洋 四个主题卡片
 
-- [ ] **4.8.2** 实现主题切换、持久化
+- [x] **4.8.2** 实现主题切换、持久化
   - 依赖：4.8.1
   - 验证：切换主题后页面样式立即变化；刷新后保持选择
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 切换走 `applyTheme`：body[data-theme] 触发 CSS 变量换肤 + 动态加载主题 CSS（已缓存）+ localStorage selectedTheme 持久化（与 v1 共享同一 key）
+    - 主题 CSS 已存在于 `client-v2/themes/`（cyberpunk/forest/ocean.css），启动时 `initThemes()` 恢复保存的主题
+
+✅ 已验证（2026-08-14）：四张主题卡片显示正常，当前主题高亮；切换立即生效并 toast 提示；刷新保持；与 v1 主题选择互通
 
 ---
 
-## 阶段 5：打磨上线 [0/6]
+## 阶段 5：打磨上线 [2/6]
 
 > **目标**：v2 可正式上线，性能不劣于 v1  
 > **前置条件**：阶段 4 全部 ✅ 已验证
 
-### 5.1 响应式适配 [0/2]
+### 5.1 响应式适配 [2/2]
 
-- [ ] **5.1.1** 移动端适配（768px 以下）
+- [x] **5.1.1** 移动端适配（768px 以下）
   - 依赖：阶段 4
   - 验证：手机浏览器访问布局正常；棋盘可触摸操作
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 新建 `src/utils/responsive.js`：`fitBoard(boardEl, container)` 通用棋盘缩放（CSS zoom 方案，不动棋盘内部坐标/网格线逻辑），resize 自动重算
+    - 四棋盘接入：gobang/go（grid 棋盘）、chinese-chess（SVG+绝对定位）、snake（canvas，含单/双模式切换时 refresh 重算）
+    - 新建 `src/styles/responsive.css`（≤768px）：body 留白收紧、顶部导航紧凑（隐藏快捷键角标）、对局信息栏收紧、浮动聊天窗宽度适配（防 340px 固定宽溢出）
+    - `@media (hover: none)` 禁用触屏误触的悬停效果
 
-- [ ] **5.1.2** 小屏手机适配（480px 以下）
+- [x] **5.1.2** 小屏手机适配（480px 以下）
   - 依赖：5.1.1
   - 验证：小屏手机布局不溢出；棋盘尺寸合适
   - **完成说明**：
-    <!-- AI 填写 -->
+    - responsive.css（≤480px）：进一步收紧 padding/导航，浮动聊天窗全宽贴底展开（max-height 62vh），贪吃蛇虚拟方向键放大（68px）
+    - 贪吃蛇单机（index.js）与联机（play.js）新增触摸滑动（swipe）控制方向，cleanup 时移除监听
+    - 棋盘缩放随容器宽度等比缩小，≤480px 下仍不横向溢出（zoom 同步缩小布局占位）
+
+✅ 待验证（F5 + DevTools 设备模拟）
 
 ### 5.2 性能优化 [0/2]
 

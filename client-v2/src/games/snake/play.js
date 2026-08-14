@@ -324,6 +324,23 @@ export function startDualMatch(container, matchData) {
   container.innerHTML = '';
   container.append(hud, boardEl, controls, actions);
 
+  // 触摸滑动控制方向（移动端，任务 5.1.2）
+  let touchStart = null;
+  function onTouchStart(e) {
+    touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }
+  function onTouchEnd(e) {
+    if (!touchStart) return;
+    const dx = e.changedTouches[0].clientX - touchStart.x;
+    const dy = e.changedTouches[0].clientY - touchStart.y;
+    touchStart = null;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return; // 忽略轻点
+    if (Math.abs(dx) > Math.abs(dy)) setDirection(dx > 0 ? 'right' : 'left');
+    else setDirection(dy > 0 ? 'down' : 'up');
+  }
+  boardEl.addEventListener('touchstart', onTouchStart, { passive: true });
+  boardEl.addEventListener('touchend', onTouchEnd, { passive: true });
+
   // ---- 启动 ----
   document.addEventListener('keydown', onKeydown);
   board.render({ snake: state.snake, snake2: state.snake2, foods: state.foods });
@@ -367,6 +384,8 @@ export function startDualMatch(container, matchData) {
       if (state.syncInterval) clearInterval(state.syncInterval);
       offs.forEach((off) => off());
       document.removeEventListener('keydown', onKeydown);
+      boardEl.removeEventListener('touchstart', onTouchStart);
+      boardEl.removeEventListener('touchend', onTouchEnd);
       container.innerHTML = '';
       board.destroy();
     },

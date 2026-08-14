@@ -11,10 +11,10 @@ const THEME_KEY = 'selectedTheme';
 
 /** 主题列表：default 本地（变量在 variables.css）+ 3 个复制自 v1 的主题 */
 export const THEMES = [
-  { id: 'default', name: '默认', icon: '🌞', description: '明亮简洁', cssUrl: '' },
-  { id: 'cyberpunk', name: '赛博朋克', icon: '🌃', description: '霓虹紫蓝', cssUrl: './themes/cyberpunk.css' },
-  { id: 'forest', name: '森林', icon: '🌲', description: '自然绿意', cssUrl: './themes/forest.css' },
-  { id: 'ocean', name: '海洋', icon: '🌊', description: '清新蓝调', cssUrl: './themes/ocean.css' },
+  { id: 'default', name: '默认', icon: '🌞', description: '明亮简洁，经典蓝调', preview: '#3498db', cssUrl: '' },
+  { id: 'cyberpunk', name: '赛博朋克', icon: '🌃', description: '霓虹紫蓝，科技感十足', preview: '#00d4ff', cssUrl: './themes/cyberpunk.css' },
+  { id: 'forest', name: '森林', icon: '🌲', description: '自然绿意，清新护眼', preview: '#4caf50', cssUrl: './themes/forest.css' },
+  { id: 'ocean', name: '海洋', icon: '🌊', description: '深邃蓝调，宁静致远', preview: '#00bcd4', cssUrl: './themes/ocean.css' },
 ];
 
 let currentThemeId = 'default';
@@ -101,23 +101,34 @@ export function initThemes() {
 }
 
 /**
- * 渲染主题选择面板（按钮式，当前主题高亮）
+ * 渲染主题选择面板（卡片式，当前主题高亮）
  * @param {HTMLElement} container - 挂载容器
  * @returns {HTMLElement} 面板元素
  */
 export function renderThemePanel(container) {
   const panel = el('div', { class: 'theme-container panel' }, [
-    el('h2', { class: 'panel-title' }, '主题设置'),
-    el('div', { class: 'flex gap-8', style: 'flex-wrap: wrap; margin-top: 8px' },
-      THEMES.map((theme) =>
-        el('button', {
-          class: 'btn theme-btn',
+    el('h2', { class: 'panel-title' }, '🎨 主题设置'),
+    el('div', { class: 'theme-grid' },
+      THEMES.map((theme) => {
+        const active = theme.id === currentThemeId;
+        return el('div', {
+          class: 'theme-card' + (active ? ' active' : ''),
           'data-theme-btn': theme.id,
           onClick: () => applyTheme(theme.id),
-        }, `${theme.icon} ${theme.name}`)
-      )
+        }, [
+          el('div', { class: 'theme-card-preview', style: `background:linear-gradient(135deg, ${theme.preview}, ${theme.preview}88);` },
+            el('span', { class: 'theme-card-icon' }, theme.icon)),
+          el('div', { class: 'theme-card-body' }, [
+            el('div', { class: 'theme-card-name' }, [
+              theme.name,
+              active ? el('span', { class: 'theme-card-badge' }, '使用中') : null,
+            ]),
+            el('div', { class: 'theme-card-desc' }, theme.description),
+          ]),
+        ]);
+      })
     ),
-    el('p', { class: 'text-muted', style: 'margin-top: 8px' },
+    el('p', { class: 'text-muted', style: 'margin-top: 12px' },
       '选择主题后立即生效，刷新后保持（与 v1 共享选择）。'),
   ]);
 

@@ -1,0 +1,73 @@
+/**
+ * 主题切换面板样式（任务 4.8.1/4.8.2）
+ * 卡片式主题选择，当前主题高亮「使用中」徽标。
+ */
+
+.theme-container {
+  padding: 20px;
+}
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+.theme-card {
+  background: var(--surface-alt, #f7fafc);
+  border: 2px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.theme-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.theme-card.active {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 1px #6366f1;
+}
+
+.theme-card-preview {
+  height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-card-icon {
+  font-size: 40px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+}
+
+.theme-card-body {
+  padding: 12px;
+}
+
+.theme-card-name {
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.theme-card-badge {
+  font-size: 11px;
+  background: #6366f1;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.theme-card-desc {
+  font-size: 12px;
+  color: var(--text-secondary, #718096);
+  margin-top: 4px;
+}

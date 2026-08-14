@@ -5,6 +5,7 @@
  * 棋子 DOM 与 v1 一致：cell 内子元素 div.gobang-black / .gobang-white。
  */
 import { el } from '../../utils/dom.js';
+import { fitBoard } from '../../utils/responsive.js';
 
 export const GO_SIZE = 19;
 export const EMPTY = 0;
@@ -135,6 +136,7 @@ export function createBoard(container, options = {}) {
 
   function destroy() {
     destroyed = true;
+    fit.destroy();
     container.innerHTML = '';
   }
 
@@ -152,6 +154,7 @@ export function createBoard(container, options = {}) {
     }
   }
   container.append(root);
+  const fit = fitBoard(root, container);
 
   return {
     size,

@@ -1,0 +1,93 @@
+/**
+ * 观战样式（任务 4.5.1/4.5.2）
+ * 对局卡片列表 + 只读对局视图，样式对齐 v1（卡片式布局 + 靛蓝观战按钮）。
+ */
+
+/* ===== 观战列表 ===== */
+.spectate-container {
+  padding: 20px;
+}
+
+.spectate-list {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+
+.spectate-card {
+  background: var(--surface-alt, #f7fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  padding: 16px;
+  transition: all 0.2s;
+}
+
+.spectate-card:hover {
+  border-color: #6366f1;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.15);
+}
+
+.spectate-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.spectate-game-name {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.spectate-badge {
+  font-size: 12px;
+  background: #ebf8ff;
+  color: #3182ce;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.spectate-badge.badge-ai {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.spectate-card-players {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.spectate-card-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.spectate-join-btn {
+  background: #6366f1;
+  color: white;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.spectate-join-btn:hover {
+  background: #4f46e5;
+}
+
+.spectate-join-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ===== 观战对局 ===== */
+.spectate-info-tag {
+  font-size: 14px;
+  padding: 2px 8px;
+}

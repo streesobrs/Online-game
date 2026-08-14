@@ -1,0 +1,313 @@
+/**
+ * AI 对局控制器（任务 4.4.2）
+ * 从 AI 对战入口进入后开始对局：
+ * - 玩家始终 color 1（五子棋/围棋黑方、象棋红方）先行
+ * - 玩家落子 emit('ai_move') → 服务端先回执（含当前玩家回显），AI 思考后回执落子
+ * - 结束：本地检测到胜负主动 emit('ai_game_result')；服务端判定后回发 ai_game_end
+ *
+ * 协议与 v1 一致（见开发文档附录 A）：
+ * - 发起：emit('ai_game_start', {gameType, difficulty})
+ * - 落子：gobang/go emit('ai_move', {position:{r,c}})；
+ *         chinese-chess emit('ai_move', {position:{fromR,fromC,toR,toC,piece}})
+ * - 回执：ai_move_result → {position, color, currentPlayer, board?}（象棋始终带 board）
+ * - 结束：emit('ai_game_result', {result, gameType, difficulty, duration})；ai_game_end → {result,...}
+ */
+import { createBoard, BLACK, WHITE } from '../../games/gobang/board.js';
+import { createBoard as createGoBoard } from '../../games/go/board.js';
+import { createChessBoard } from '../../games/chinese-chess/board.js';
+import { checkWin } from '../../games/gobang/rules.js';
+import { getChessMoves, isValidMove, isCheckmate } from '../../games/chinese-chess/rules.js';
+import { emit } from '../../core/socket.js';
+import { eventBus } from '../../core/eventBus.js';
+import { el } from '../../utils/dom.js';
+import { toast } from '../../components/toast.js';
+import { modal } from '../../components/modal.js';
+import { go } from '../../core/router.js';
+
+let activeBattle = null;
+
+/** 当前是否有进行中的 AI 对局 */
+export function isBattleActive() {
+  return !!activeBattle;
+}
+
+/** 后端象棋棋子类型 → 中文名（与 v1 chessPieceMap 一致） */
+const CHESS_TYPE_MAP = {
+  ju: '车', ma: '马', xiang: '相', shi: '仕', shuai: '帅',
+  pao: '炮', bing: '兵', jiang: '将', zu: '卒',
+};
+
+/** 后端象棋棋盘（字符串 'r-ju'/'b-jiang'）→ v2 对象格式 {name, color} */
+function convertBackendBoardToFrontend(board) {
+  if (!board) return null;
+  const out = Array.from({ length: 10 }, () => Array(9).fill(null));
+  for (let r = 0; r < 10; r++) {
+    for (let c = 0; c < 9; c++) {
+      const cell = board[r] && board[r][c];
+      if (cell && cell !== 0 && typeof cell === 'string') {
+        const color = cell.startsWith('r-') ? 'red' : 'black';
+        const name = CHESS_TYPE_MAP[cell.substring(2)] || cell.substring(2);
+        out[r][c] = { name, color };
+      }
+    }
+  }
+  return out;
+}
+
+const DIFF_LABEL = { easy: '简单', medium: '中等', hard: '困难' };
+
+/**
+ * 开始 AI 对局
+ * @param {HTMLElement} container - 内容容器（#view-root）
+ * @param {{ gameType: string, difficulty: 'easy'|'medium'|'hard' }} opts
+ */
+export function startAIBattle(container, { gameType, difficulty }) {
+  cleanupBattle(); // 清理旧对局
+
+  const me = 1; // 玩家始终 color 1
+  let myTurn = true;
+  let gameOver = false;
+  let resultSent = false;
+  let startTime = Date.now();
+  let timerHandle = null;
+  let selected = null; // 象棋选子
+
+  // ---- 信息栏 ----
+  const turnEl = el('span', { class: 'ai-info-tag' });
+  const timerEl = el('span', { class: 'ai-info-tag' });
+  const diffEl = el('span', { class: 'ai-info-tag' });
+  const backBtn = el('button', { class: 'btn btn-secondary', style: 'padding:4px 12px;font-size:13px;margin-left:auto;' }, '返回AI入口');
+
+  function updateTurn() {
+    if (gameOver) return;
+    turnEl.textContent = myTurn ? '● 你的回合' : '🤖 AI思考中…';
+    turnEl.style.color = myTurn ? 'var(--theme-accent, #3b82f6)' : 'inherit';
+  }
+
+  function updateTimer() {
+    const s = Math.floor((Date.now() - startTime) / 1000);
+    timerEl.textContent = `⏱ ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
+
+  diffEl.textContent = `🎮 难度：${DIFF_LABEL[difficulty] || difficulty}`;
+
+  // ---- 棋盘 ----
+  const boardEl = document.createElement('div');
+  let board = null;
+
+  if (gameType === 'gobang') {
+    board = createBoard(boardEl, {
+      onPlace: (r, c) => {
+        if (gameOver || !myTurn) { toast.warn('还没轮到你落子'); return; }
+        board.place(r, c, me);
+        myTurn = false;
+        updateTurn();
+        emit('ai_move', { position: { r, c } });
+        // 本地即时提示（正式结果以服务端 ai_game_end 为准）
+        if (checkWin(board.board, r, c, me)) {
+          toast.success('五连！等待结果确认…');
+        }
+      },
+    });
+    board.turn = BLACK; // 玩家黑先
+  } else if (gameType === 'go') {
+    board = createGoBoard(boardEl, {
+      onPlace: (r, c) => {
+        if (gameOver || !myTurn) { toast.warn('还没轮到你落子'); return; }
+        board.place(r, c, me);
+        myTurn = false;
+        updateTurn();
+        emit('ai_move', { position: { r, c } });
+      },
+    });
+    board.turn = BLACK;
+  } else if (gameType === 'chinese-chess') {
+    board = createChessBoard(boardEl, {
+      onCellClick: (r, c) => {
+        if (gameOver || !myTurn) return;
+        const piece = board.get(r, c);
+        // 已有选中棋子：尝试走子
+        if (selected) {
+          if (piece && piece.color === 'red') {
+            // 改选己方棋子
+            board.select(r, c);
+            board.setValidMoves(getChessMoves(board.board, r, c));
+            selected = { r, c };
+            return;
+          }
+          if (isValidMove(board.board, selected.r, selected.c, r, c)) {
+            const fromR = selected.r, fromC = selected.c;
+            const pieceName = board.get(fromR, fromC).name;
+            board.movePiece(fromR, fromC, r, c);
+            board.setLastMove(r, c);
+            board.clearSelection();
+            selected = null;
+            myTurn = false;
+            updateTurn();
+            emit('ai_move', {
+              position: { fromR, fromC, toR: r, toC: c, piece: pieceName },
+            });
+          }
+          return;
+        }
+        // 选中己方红棋
+        if (piece && piece.color === 'red') {
+          board.select(r, c);
+          board.setValidMoves(getChessMoves(board.board, r, c));
+          selected = { r, c };
+        }
+      },
+    });
+  }
+
+  container.innerHTML = '';
+  container.append(
+    el('div', { class: 'ai-match-info', style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;max-width:724px;width:100%;' }, [turnEl, diffEl, timerEl, backBtn]),
+    boardEl
+  );
+
+  // 通知服务端开始 AI 对战
+  emit('ai_game_start', { gameType, difficulty });
+
+  // ---- socket 事件 ----
+  const offs = [];
+
+  // 服务端开局回执（含棋盘，象棋需转换）
+  offs.push(eventBus.on('ai:gameStart', (data) => {
+    if (data.gameType && data.gameType !== gameType) return;
+    if (gameType === 'chinese-chess' && data.board) {
+      const layout = convertBackendBoardToFrontend(data.board);
+      if (layout) board.init(layout);
+    } else if (data.currentPlayer) {
+      board.turn = data.currentPlayer;
+    }
+    myTurn = data.currentPlayer === me;
+    updateTurn();
+  }));
+
+  // AI 移动结果
+  offs.push(eventBus.on('ai:moveResult', (data) => {
+    if (gameOver || resultSent) return;
+    const { position, color, currentPlayer } = data;
+
+    // 象棋：直接用服务端完整棋盘重建（含自己回显）
+    if (gameType === 'chinese-chess' && data.board) {
+      const layout = convertBackendBoardToFrontend(data.board);
+      if (layout) board.init(layout);
+    }
+
+    if (color === me) {
+      // 自己的落子回执：只切回合
+      if (data.board && gameType === 'chinese-chess') {
+        // 已重建棋盘，清除本地选子
+        board.clearSelection();
+        selected = null;
+      }
+      myTurn = currentPlayer === me;
+      updateTurn();
+      return;
+    }
+
+    // AI 落子
+    if (gameType === 'gobang' || gameType === 'go') {
+      if (position && position.r != null && position.c != null) {
+        board.place(position.r, position.c, color);
+        board.turn = BLACK;
+      }
+    } else if (gameType === 'chinese-chess' && position && position.toR != null) {
+      board.setLastMove(position.toR, position.toC);
+      board.clearSelection();
+      selected = null;
+      // 本地检测将死（服务端也判定，双保险）
+      if (isCheckmate(board.board, 'red')) {
+        finishGame('loss');
+        return;
+      }
+    }
+
+    // 本地检测 AI 五连 → 玩家输
+    if (gameType === 'gobang' && position && checkWin(board.board, position.r, position.c, color)) {
+      finishGame('loss');
+      return;
+    }
+
+    myTurn = currentPlayer === me;
+    updateTurn();
+  }));
+
+  // 游戏结束（服务端权威判定）
+  offs.push(eventBus.on('ai:gameEnd', (data) => {
+    if (gameOver || resultSent) return;
+    finishGame(data.result === 'win' ? 'win' : 'loss');
+  }));
+
+  // ---- 结束流程 ----
+  function finishGame(result) {
+    if (gameOver) return;
+    gameOver = true;
+    resultSent = true;
+    if (timerHandle) clearInterval(timerHandle);
+    updateTurn();
+
+    // 上报结果（服务端 endAIGame 有 finished 幂等保护，重复发送安全）
+    emit('ai_game_result', {
+      result,
+      gameType,
+      difficulty,
+      duration: Date.now() - startTime,
+    });
+
+    const msg = result === 'win' ? '🎉 你战胜了AI！' : '😢 你输给了AI！';
+    modal.show({
+      title: '游戏结束',
+      content: msg,
+      confirmText: '返回AI对战',
+      showCancel: false,
+      onConfirm: () => {
+        emit('return_lobby'); // 释放服务端 playing 状态
+        go('ai-battle');
+      },
+    });
+  }
+
+  // 返回按钮
+  backBtn.addEventListener('click', () => {
+    if (gameOver) { go('ai-battle'); return; }
+    modal.show({
+      title: '返回AI对战',
+      content: '确定要退出当前对局吗？',
+      confirmText: '退出',
+      showCancel: true,
+      onConfirm: () => {
+        emit('return_lobby');
+        go('ai-battle');
+      },
+    });
+  });
+
+  // 计时器
+  updateTurn();
+  updateTimer();
+  timerHandle = setInterval(updateTimer, 1000);
+
+  activeBattle = {
+    container,
+    gameType,
+    cleanup() {
+      offs.forEach((off) => off());
+      if (timerHandle) clearInterval(timerHandle);
+      if (board && typeof board.destroy === 'function') board.destroy();
+      container.innerHTML = '';
+    },
+  };
+
+  return activeBattle;
+}
+
+/** 清理当前 AI 对局（切换视图/重新开始时） */
+export function cleanupBattle() {
+  if (activeBattle) {
+    activeBattle.cleanup();
+    activeBattle = null;
+  }
+}

@@ -297,6 +297,23 @@ export function renderSnake(container = viewRoot()) {
   container.innerHTML = '';
   container.append(hud, boardEl, controls, actions);
 
+  // 触摸滑动控制方向（移动端，任务 5.1.2）
+  let touchStart = null;
+  function onTouchStart(e) {
+    touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }
+  function onTouchEnd(e) {
+    if (!touchStart) return;
+    const dx = e.changedTouches[0].clientX - touchStart.x;
+    const dy = e.changedTouches[0].clientY - touchStart.y;
+    touchStart = null;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return; // 忽略轻点
+    if (Math.abs(dx) > Math.abs(dy)) setDirection(dx > 0 ? 'right' : 'left');
+    else setDirection(dy > 0 ? 'down' : 'up');
+  }
+  boardEl.addEventListener('touchstart', onTouchStart, { passive: true });
+  boardEl.addEventListener('touchend', onTouchEnd, { passive: true });
+
   startBtn.addEventListener('click', startGame);
   document.addEventListener('keydown', onKeydown);
 
@@ -309,6 +326,8 @@ export function renderSnake(container = viewRoot()) {
     state.running = false;
     if (state.rafId) cancelAnimationFrame(state.rafId);
     document.removeEventListener('keydown', onKeydown);
+    boardEl.removeEventListener('touchstart', onTouchStart);
+    boardEl.removeEventListener('touchend', onTouchEnd);
     board.destroy();
     if (window.snakeBoard === board) delete window.snakeBoard;
   };

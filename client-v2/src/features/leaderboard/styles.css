@@ -218,6 +218,46 @@
   overflow: hidden;
 }
 
+/* 我的排名（4.3.2） */
+.leaderboard-self-container {
+  margin-top: 16px;
+}
+
+.leaderboard-self-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--theme-card, #ffffff);
+  border: 1px dashed var(--theme-primary, #38bdf8);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.leaderboard-self-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #718096;
+}
+
+.leaderboard-self-rank {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--theme-primary, #38bdf8);
+}
+
+.leaderboard-self-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.leaderboard-self-stats {
+  font-size: 12px;
+  color: #718096;
+  margin-left: auto;
+}
+
 .leaderboard-winrate-bar {
   height: 100%;
   border-radius: 4px;

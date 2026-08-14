@@ -5,6 +5,7 @@
  * 棋子 DOM 与 v1 一致：绝对定位圆形汉字棋子（chess-red / chess-black）。
  */
 import { el } from '../../utils/dom.js';
+import { fitBoard } from '../../utils/responsive.js';
 
 export const BOARD_W = 9;   // 列
 export const BOARD_H = 10;  // 行
@@ -130,6 +131,7 @@ export function createChessBoard(container, options = {}) {
 
     root.append(svg, river);
     container.appendChild(root); // 挂载到容器（与 gobang/go 一致）
+    const fit = fitBoard(root, container);
 
     // ========== 棋子渲染 ==========
     function makePieceEl(piece) {
@@ -266,6 +268,7 @@ export function createChessBoard(container, options = {}) {
         /** 销毁棋盘 DOM */
         destroy() {
             destroyed = true;
+            fit.destroy();
             root.remove();
         },
     };
