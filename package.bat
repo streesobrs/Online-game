@@ -25,6 +25,9 @@ mkdir "temp-package"
 echo Copying client folder...
 xcopy "client" "temp-package\client\" /E /I /Y >nul
 
+echo Copying client-v2 folder...
+xcopy "client-v2" "temp-package\client-v2\" /E /I /Y >nul
+
 echo Copying server folder...
 xcopy "server" "temp-package\server\" /E /I /Y >nul
 

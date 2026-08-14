@@ -475,8 +475,8 @@ module.exports = {
     maxUploadSize: 100 * 1024 * 1024,              // 更新包最大大小 100MB
     maxExtractSize: 500 * 1024 * 1024,             // 解压后最大总大小 500MB
     maxFileCount: 2000,                             // 最大文件数量
-    allowedPaths: [                                 // 允许更新的路径前缀
-      'server', 'client', 'package.json', 'package-lock.json',
+    allowedPaths: [                                 // 默认白名单（会被 server/update-whitelist.json 合并覆盖，新增路径请改该文件，无需改本配置）
+      'server', 'client', 'client-v2', 'package.json', 'package-lock.json',
       'version.json', 'start.bat', 'start.ps1', 'package.bat', 'updater'
     ],
     blockedPaths: [                                 // 禁止更新的路径
@@ -521,7 +521,7 @@ module.exports = {
 
     // 解压与差异分析
     skipDirsInDiff: ['node_modules'],               // 差异分析时跳过的目录名
-    expectedTopDirs: ['server', 'client'],          // 更新包预期顶级目录（用于自动扁平化检测）
+    expectedTopDirs: ['server', 'client', 'client-v2'],          // 更新包预期顶级目录（用于自动扁平化检测）
     expectedTopFiles: ['package.json', 'start.bat', 'version.json'], // 更新包预期顶级文件
 
     // 校验进度

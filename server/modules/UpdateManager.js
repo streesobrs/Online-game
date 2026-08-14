@@ -295,40 +295,48 @@ class UpdateManager {
     });
   }
 
-  _isPathSafe(relativePath) {
+  /**
+   * 加载合并白名单。
+   * 优先级：更新包内新 update-whitelist.json > 已安装的 update-whitelist.json > config.update.allowedPaths。
+   * 这样新增目录只需在 update-whitelist.json 中添加，随包上传本次更新即放行，服务器 config.js 无需改动。
+   */
+  _loadWhitelist(extractDir) {
+    let paths = Array.from(config.update.allowedPaths || []);
+    const candidates = [];
+    if (extractDir) {
+      const inPackage = path.join(extractDir, 'server', 'update-whitelist.json');
+      if (fs.existsSync(inPackage)) candidates.push(inPackage);
+    }
+    const installed = path.join(this.storageRoot, 'server', 'update-whitelist.json');
+    if (fs.existsSync(installed)) candidates.push(installed);
+    for (const file of candidates) {
+      try {
+        const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+        if (Array.isArray(data.paths) && data.paths.length > 0) {
+          paths = data.paths.map(p => p.replace(/^[/\\]+/, '').replace(/[/\\]+$/, ''));
+          break; // 取优先级最高的（包内优先）
+        }
+      } catch (e) {
+        logger.warn('读取 update-whitelist.json 失败，使用默认白名单', { file, error: e.message });
+      }
+    }
+    return paths;
+  }
+
+  _isPathSafe(relativePath, whitelist) {
     const normalized = path.normalize(relativePath).replace(/^[/\\]+/, '');
     if (normalized.startsWith('..') || path.isAbsolute(normalized)) return false;
 
-    for (const blocked of config.update.blockedPaths) {
-      const blockedNorm = blocked.replace(/[/\\]+$/, '').replace(/\\/g, '/');
-      const relNorm = normalized.replace(/\\/g, '/');
-      if (relNorm === blockedNorm || relNorm.startsWith(blockedNorm + '/')) {
-        return false;
-      }
-    }
-
-    let allowed = false;
-    for (const allowedPath of config.update.allowedPaths) {
+    // 白名单匹配：路径等于白名单项，或以白名单项为前缀（目录项自动递归覆盖其下所有文件）
+    const relNorm = normalized.replace(/\\/g, '/');
+    const list = whitelist || config.update.allowedPaths || [];
+    for (const allowedPath of list) {
       const allowedNorm = allowedPath.replace(/\\/g, '/');
-      const relNorm = normalized.replace(/\\/g, '/');
-      if (relNorm === allowedNorm ||
-        relNorm.startsWith(allowedNorm + '/') ||
-        (!allowedNorm.includes('.') && relNorm.startsWith(allowedNorm + '/'))) {
-        allowed = true;
-        break;
+      if (relNorm === allowedNorm || relNorm.startsWith(allowedNorm + '/')) {
+        return true;
       }
     }
-
-    if (!allowed && !normalized.includes('.')) {
-      for (const a of config.update.allowedPaths) {
-        if (!a.includes('.') && normalized.replace(/\\/g, '/').startsWith(a.replace(/\\/g, '/') + '/')) {
-          allowed = true;
-          break;
-        }
-      }
-    }
-
-    return allowed;
+    return false;
   }
 
   async saveUploadedChunk(chunkData, chunkIndex, totalChunks, uploadId) {
@@ -692,6 +700,9 @@ class UpdateManager {
     const operations = [];
     const extractDir = this.extractDir;
 
+    // 加载合并白名单（优先取更新包内的新白名单文件，使本次更新即放行新增目录）
+    this._whitelist = this._loadWhitelist(extractDir);
+
     const walkDir = (dir, basePath = '') => {
       const entries = fs.readdirSync(dir, { withFileTypes: true });
       for (const entry of entries) {
@@ -703,7 +714,7 @@ class UpdateManager {
           if (config.update.skipDirsInDiff.includes(entry.name)) continue;
           walkDir(fullPath, relPath);
         } else {
-          if (!this._isPathSafe(relPath)) {
+          if (!this._isPathSafe(relPath, this._whitelist)) {
             this._pushLog('warn', `跳过非白名单路径: ${relPathUnix}`);
             continue;
           }
@@ -736,7 +747,7 @@ class UpdateManager {
           if (config.update.skipDirsInDiff.includes(entry.name)) continue;
           scanDeletions(fullPath, relPath);
         } else {
-          if (!this._isPathSafe(relPath)) continue;
+          if (!this._isPathSafe(relPath, this._whitelist)) continue;
           // 额外检查：跳过 runtime 数据目录（如 server/data/、server/logs/ 等）
           const parts = relPath.replace(/\\/g, '/').split('/');
           if (parts.some(p => config.update.blockedPaths.includes(p))) continue;
@@ -747,7 +758,8 @@ class UpdateManager {
         }
       }
     };
-    for (const allowedPath of config.update.allowedPaths) {
+    // 反向扫描：遍历合并白名单中的顶层路径（目录递归检查，文件检查存在性），包中没有的标记删除
+    for (const allowedPath of this._whitelist) {
       const installPath = path.join(this.storageRoot, allowedPath);
       if (fs.existsSync(installPath) && !config.update.blockedPaths.includes(allowedPath)) {
         const stat = fs.statSync(installPath);

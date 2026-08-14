@@ -1,0 +1,15 @@
+{
+  "description": "更新白名单（独立于 config.js，可随更新包自动同步，无需手动改服务器配置）。新增目录/文件时在此添加，打包上传后本次更新即生效。",
+  "paths": [
+    "server",
+    "client",
+    "client-v2",
+    "package.json",
+    "package-lock.json",
+    "version.json",
+    "start.bat",
+    "start.ps1",
+    "package.bat",
+    "updater"
+  ]
+}
