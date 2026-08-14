@@ -1528,6 +1528,20 @@
       font-family: "KaiTi", "楷体", serif;
     }
 
+    /* 黑方视角翻转：棋盘 180° 旋转，黑棋显示在下方（内部坐标不变，走子协议不受影响） */
+    .chess-board.chess-flipped {
+      transform: rotate(180deg);
+    }
+
+    .chess-board.chess-flipped .chess-piece {
+      transform: translate(-50%, -50%) rotate(180deg);
+    }
+
+    .chess-board.chess-flipped .chess-river::before,
+    .chess-board.chess-flipped .chess-river::after {
+      transform: rotate(180deg);
+    }
+
     .chess-position {
       width: 8px;
       height: 8px;
@@ -7636,8 +7650,21 @@
       renderChessPieces();
     }
 
+    // 象棋棋子 transform：黑方视角棋盘已翻转，棋子需反向旋转保持文字可读（内联样式优先级高于 CSS 类，必须 JS 计算）
+    function getChessPieceTransform() {
+      return (currentGame === 'chinese-chess' && gameState.me === 2 && !isSpectating)
+        ? 'translate(-50%, -50%) rotate(180deg)'
+        : 'translate(-50%, -50%)';
+    }
+
     // 渲染象棋棋子
     function renderChessPieces() {
+      // 黑方视角：棋盘 180° 旋转，黑棋显示在下方（联机象棋黑方；红方/AI/观战保持默认）
+      const flipped = currentGame === 'chinese-chess' && gameState.me === 2 && !isSpectating;
+      chessBoard.classList.toggle('chess-flipped', flipped);
+      // 棋子内联 transform 需含反向旋转
+      const pieceTransform = getChessPieceTransform();
+
       // 清除现有棋子
       const existingPieces = chessBoard.querySelectorAll('.chess-piece');
       existingPieces.forEach(piece => piece.remove());
@@ -7654,7 +7681,7 @@
         pieceEl.style.position = 'absolute';
         pieceEl.style.left = (piece.c * 40 + 20) + 'px';
         pieceEl.style.top = (piece.r * 40 + 20) + 'px';
-        pieceEl.style.transform = 'translate(-50%, -50%)';
+        pieceEl.style.transform = pieceTransform;
         pieceEl.onclick = () => handleChessPieceClick(piece.r, piece.c, piece.name, 'red');
         chessBoard.appendChild(pieceEl);
       });
@@ -7671,7 +7698,7 @@
         pieceEl.style.position = 'absolute';
         pieceEl.style.left = (piece.c * 40 + 20) + 'px';
         pieceEl.style.top = (piece.r * 40 + 20) + 'px';
-        pieceEl.style.transform = 'translate(-50%, -50%)';
+        pieceEl.style.transform = pieceTransform;
         pieceEl.onclick = () => handleChessPieceClick(piece.r, piece.c, piece.name, 'black');
         chessBoard.appendChild(pieceEl);
       });
@@ -8770,7 +8797,7 @@
       piece.dataset.c = toC;
       piece.style.top = `${toR * 40 + 20}px`;
       piece.style.left = `${toC * 40 + 20}px`;
-      piece.style.transform = 'translate(-50%, -50%)';
+      piece.style.transform = getChessPieceTransform();
 
       // 4. 同步 gameState.board
       gameState.board = convertFrontendPiecesToBackend();
@@ -11134,9 +11161,10 @@
         chessBoard.style.display = 'block';
       }
 
+      gameState.me = color;
+
       initGameBoard();
 
-      gameState.me = color;
       gameState.turn = 1;
       gameState.gameOver = false;
       gameState.moveCount = 0;
@@ -12610,7 +12638,7 @@
       piece.dataset.c = toC;
       piece.style.top = `${toR * 40 + 20}px`;
       piece.style.left = `${toC * 40 + 20}px`;
-      piece.style.transform = 'translate(-50%, -50%)';
+      piece.style.transform = getChessPieceTransform();
 
       // 4. 同步 gameState.board
       gameState.board = convertFrontendPiecesToBackend();

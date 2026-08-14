@@ -147,7 +147,11 @@ export function startMatch(container, matchData) {
       content: msg,
       confirmText: '返回大厅',
       showCancel: false,
-      onConfirm: () => go('lobby'),
+      onConfirm: () => {
+        // 通知服务端释放用户状态（否则停留 playing，无法再次匹配）
+        emit('return_lobby');
+        go('lobby');
+      },
     });
   }));
 
@@ -165,13 +169,16 @@ export function startMatch(container, matchData) {
       content: msg,
       confirmText: '返回大厅',
       showCancel: false,
-      onConfirm: () => go('lobby'),
+      onConfirm: () => {
+        emit('return_lobby');
+        go('lobby');
+      },
     });
   }));
 
   // 返回大厅按钮
   leaveBtn.addEventListener('click', () => {
-    if (gameOver) { go('lobby'); return; }
+    if (gameOver) { emit('return_lobby'); go('lobby'); return; }
     modal.show({
       title: '返回大厅',
       content: '确定要退出当前对局吗？',

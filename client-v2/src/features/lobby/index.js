@@ -90,11 +90,27 @@ export function renderLobby(container) {
     statusEl.textContent = '匹配超时，请重试';
   });
 
+  // 贪吃蛇匹配走独立事件（snake_match_found），不走 match_success → pendingMatch 机制
+  const offSnakeFound = eventBus.on('snake:matchFound', (data) => {
+    isMatching = false;
+    console.log('[Lobby] 贪吃蛇匹配成功:', data);
+    store.set('pendingMatch', { ...data, game: 'snake' });
+    go('snake');
+  });
+  const offSnakeCancelled = eventBus.on('snake:matchCancelled', () => {
+    isMatching = false;
+    matchBtn.style.display = '';
+    cancelBtn.style.display = 'none';
+    statusEl.textContent = '已取消匹配';
+  });
+
   // cleanup
   return () => {
     if (isMatching) emit('cancel_match');
     offSuccess();
     offTimeout();
+    offSnakeFound();
+    offSnakeCancelled();
     container.innerHTML = '';
   };
 }

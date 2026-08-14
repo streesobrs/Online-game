@@ -598,6 +598,14 @@ class GameManager {
       timestamp: Date.now()
     };
 
+    // 象棋：记录被吃棋子（悔棋 revertMove 时需恢复，否则吃掉的棋子丢失）
+    if (data.fromR !== undefined && game.board) {
+      const target = game.board[data.toR] && game.board[data.toR][data.toC];
+      if (target && target !== 0) {
+        move.captured = target;
+      }
+    }
+
     game.moves.push(move);
     game.lastMoveTime = Date.now();
 

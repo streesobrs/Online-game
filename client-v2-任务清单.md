@@ -729,55 +729,123 @@ AI 完成任务时填写：
 
 ### 3.2 中国象棋 [0/4]
 
-- [ ] **3.2.1** 实现 chinese-chess/board.js（9×10 棋盘渲染）
+- [x] **3.2.1** 实现 chinese-chess/board.js（9×10 棋盘渲染）
   - 依赖：阶段 2
   - 验证：棋盘 9 列 10 行正确；楚河汉界显示
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：新建 client-v2/src/games/chinese-chess/board.js、styles.css、index.js；修改 main.js（注册 chinese-chess 路由）、index.html（引入象棋样式）
+    - 实现内容：
+      - board.js：`createChessBoard` 渲染 9×10 棋盘——SVG 网格线（复刻 v1：边线连续、中间竖线河界断开、九宫斜线）、90 个交叉点、楚河汉界文字、兵位标记；数据模型 board[r][c] = {name, color} | null；标准布局 defaultLayout 与 v1 chessPieces 完全一致（红下黑上）；API：init/reset/get/movePiece/select/clearSelection/setValidMoves/setLastMove/destroy
+      - styles.css：移植 v1 象棋视觉（木色棋盘 360×400、圆形汉字棋子红/黑渐变、last-move 红色脉冲、valid-move 蓝点、河界楷体文字、兵位小黑点）
+      - index.js：本地模式渲染标准开局，点击棋子高亮选中并提示；对局模式预留 pendingMatch 入口（3.2.3 接入）
+    - 自测方式：F5 刷新访问 `#/chinese-chess`，看到 9 列 × 10 行棋盘、楚河汉界、双方 16 子标准布局，点击棋子高亮
 
-- [ ] **3.2.2** 实现 chinese-chess/rules.js（走子规则）
+✅ 已验证（2026-08-13）
+（修复过程：棋盘 root 漏挂载、SVG 中间竖线河界断开、棋子缺 translate(-50%,-50%) 居中、棋盘 box-sizing 与 v1 不一致、兵位黑点缺居中定位、createChessBoard 创建时未渲染初始棋子、select 裸调用 clearSelection 报错、棋子 DOM 未绑 click 导致点不动——均已修复并与 v1 对齐）
+
+- [x] **3.2.2** 实现 chinese-chess/rules.js（走子规则）
   - 依赖：3.2.1
   - 验证：车马炮相士帅兵卒走子规则正确；蹩马腿、塞象眼等限制正确
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/games/chinese-chess/rules.js（新建）、client-v2/src/games/chinese-chess/index.js（本地模式接入规则）
+    - 实现内容：
+      - rules.js 纯函数模块（不依赖 DOM）：`getChessMoves(board, r, c)` 返回全部合法走位，`isValidMove` 判断单步
+      - 复刻 v1 calculateChessMoves 全部规则：车直线遇子挡路、炮翻山隔子吃、马日字+蹩马腿（腿位置 leg=(r+legR,c+legC) 与 v1 一致）、相/象田字+塞象眼+不过河、仕/士九宫斜线、帅/将九宫直线+白脸将同列对将可吃、兵/卒过河前直行过河后可左右
+      - index.js 本地模式接入：点击己方棋子选中并显示合法走位（蓝点），点击合法走位走子（本地红黑交替）
+    - 自测方式：Node 运行 17 个断言用例全部通过（车直行挡子/马蹩腿双向共用腿/塞象眼/帅白脸将/兵过河前后/炮翻山吃隔子/isValidMove 合法非法），已删除临时测试文件
 
-- [ ] **3.2.3** 实现象棋联机对战
+- [x] **3.2.3** 实现象棋联机对战
   - 依赖：3.2.2
   - 验证：v2 vs v1 象棋对弈正常
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/games/chinese-chess/play.js（新建）、client-v2/src/games/chinese-chess/index.js（对局模式接入 startMatch）、client-v2/src/games/chinese-chess/styles.css（提示标记样式）
+    - 实现内容：
+      - play.js 联机控制器（仿 gobang/play.js）：信息栏（回合红/黑、对手、计时器、认输、返回大厅）、选子/走子/吃子同步
+      - 协议与 v1 一致：走子 `emit('move', {game:'chinese-chess', fromR, fromC, toR, toC, color, piece, to})`（color=当前回合 1 红/2 黑，服务端校验回合后原样转发）；接收 game:move 渲染对手走子
+      - 回合控制：红先（服务端 color 1 先行），本地 turn 1↔2；game:ended / lobby:opponentLeft 结束弹窗返回大厅；将死由服务端 checkGameOver 判定广播 game_ended；认输走 game_result（服务端无 resign 事件）
+      - 悔棋：undo_request → 对手弹窗确认 → undo_response → undo_accepted 恢复棋盘（后端 board 为 'r-ju'/'b-jiang' 格式，写 backendBoardToV2 转换函数转 {name,color} 模型，黑方象/士区分）
+      - 提示：request_hint → 服务端 AI 计算 → hint_result 在棋盘高亮起点📤/目标💡标记（复刻 v1 hint-marker CSS，点击💡直接走子）
+      - 重置：reset → 对方确认 → 服务端广播 reset → 双方重建标准开局（红先）
+    - 自测方式：v1 大厅选「象棋」匹配 + v2 大厅选「象棋」匹配 → 双方对弈：落子同步、吃子一致、回合交替、认输或将死结束；悔棋/提示/重置与 v1 互操作验证
 
-- [ ] **3.2.4** 实现将军/将死判定
+✅ 已验证（2026-08-14）
+（用户验证 v2 vs v1 对战至将死 checkmate 正常；补全悔棋/提示/重置三功能；修复服务端悔棋不返还被吃棋子 bug——handleMove 记录走子时补充 move.captured 字段）
+
+- [x] **3.2.4** 实现将军/将死判定
   - 依赖：3.2.2
   - 验证：将军提示正确；将死结束游戏
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/games/chinese-chess/rules.js（新增 isInCheck / isCheckmate）、client-v2/src/games/chinese-chess/play.js（将军提示）
+    - 实现内容：
+      - rules.js 新增 `isInCheck(board, color)`：定位己方将/帅，遍历对方全部棋子，任一合法走位（getChessMoves）能攻击到将/帅即被将军；将/帅被吃视为被将军
+      - rules.js 新增 `isCheckmate(board, color)`：先判断被将军，再逐一模拟己方每枚棋子的每个合法走位，若存在能解除将军的走法则非将死
+      - play.js 接入将军提示：自己走子后检查对方是否被将军（toast「⚔️ 将军！」）；收到对手走子后检查我方是否被将军（toast「⚔️ 你被将军了！」）；将死结束仍由服务端 checkGameOver 判定并广播 game_ended（reason: checkmate），客户端显示获胜弹窗
+    - 自测方式：Node 运行 9 个断言全部通过（初始无将军、红车直将、卧槽马+双马将死、缺一马非将死、无将军非将死、白脸将将军），已删除临时测试文件
 
-### 3.3 贪吃蛇 [0/4]
+✅ 已验证（2026-08-14）
+（v2 vs v1 对弈中将军提示正常、将死正常结束；后续追加黑方视角翻转——黑方棋盘 180° 旋转黑棋在下方（v1/v2 同步，修 v1 gameState.me 时序 bug 与走子后棋子 transform 覆盖）；并修复 v2 对局结束后未 emit return_lobby 导致服务端状态停留 playing 无法再次匹配的问题，同步修复五子棋/围棋）
 
-- [ ] **3.3.1** 实现 snake/board.js（游戏区域渲染）
+### 3.3 贪吃蛇 [4/4]
+
+- [x] **3.3.1** 实现 snake/board.js（游戏区域渲染）
   - 依赖：阶段 2
   - 验证：游戏区域显示；蛇身、食物正确渲染
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：新建 client-v2/src/games/snake/board.js、index.js、styles.css；修改 main.js（import + registerRoute('snake')）、index.html（引入 snake 样式）
+    - 实现内容：
+      - board.js：`createSnakeBoard(container, {mode})` 创建 canvas 并返回渲染 API——`render(state)`（背景/网格线/圆形食物/蛇身批量 rect/蛇头单独填充）、`resize(mode)`（画布尺寸切换）、`destroy`
+      - 配置与 v1 完全一致：solo 20×20/cellSize 20/canvas 400×400/初始食物 3；dual 30×30/cellSize 18/canvas 540×540（3.3.3 联机用）；配色复刻 v1（头 #4ecdc4、身 #45b7d1、食物 #ff6b6b/#ffd93d、网格 #2d2d44、背景 #1a1a2e）
+      - 渲染支持双蛇模式：传入 snake2 即按 dual 配色（head1/body1、head2/body2）绘制对手蛇
+      - index.js 本地演示：渲染 3 节蛇（头朝右）+ 3 个食物；styles.css 复刻 v1 #snake-canvas（深色背景/圆角/投影）
+    - 自测方式：F5 刷新访问 `#/snake`，看到 400×400 深色棋盘、网格线、3 个圆形食物（红/黄交替）、青色蛇身；控制台 `window.snakeBoard.render({snake:[...], foods:[...]})` 可验证任意状态渲染
 
-- [ ] **3.3.2** 实现 snake 控制逻辑（方向键 + 虚拟按键）
+✅ 已验证（2026-08-14）
+
+- [x] **3.3.2** 实现 snake 控制逻辑（方向键 + 虚拟按键）
   - 依赖：3.3.1
   - 验证：键盘方向键和虚拟按键都能控制蛇移动
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/games/snake/index.js（单机游戏完整逻辑）、styles.css（HUD/虚拟按键样式）
+    - 实现内容：
+      - 键盘控制：方向键 + WASD（preventDefault），与 v1 handleSnakeKeydown 一致
+      - 虚拟按键：▲◀▼▶ 网格布局（grid-area 定位，3×3 十字），点击触发 setDirection，与 v1 handleVirtualKey 一致
+      - 防 180° 反转：方向改变时与当前 direction 比较，反向直接忽略（与 v1 逻辑一致）
+      - gameLoop：requestAnimationFrame 按 speed（初始 150ms）tick 移动蛇；吃食物 +10 分/加长/补食物（上限 8 个）；每 100 分速度 -10（下限 50ms）；撞墙/撞自己结束（完整死亡流程 3.3.4 接入）
+      - 开始/重新开始按钮；路由离开时清理（取消 RAF、移除键盘监听）
+    - 自测方式：F5 刷新访问 `#/snake`，点「开始游戏」，键盘方向键/WASD 与虚拟按键均能转向；蛇持续前进、吃食物加分加长、撞墙/撞自己后提示结束得分
 
-- [ ] **3.3.3** 实现贪吃蛇联机对战
+✅ 已验证（2026-08-14）
+
+- [x] **3.3.3** 实现贪吃蛇联机对战
   - 依赖：3.3.2
   - 验证：v2 vs v1 贪吃蛇对战正常，食物同步、状态同步
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：新建 client-v2/src/games/snake/play.js；修改 snake/index.js（联机入口）、snake/board.js（SNAKE_DIRS）、features/lobby/index.js（snake_match_found 路由）
+    - 实现内容：
+      - play.js `startDualMatch(container, matchData)`：完整双人实时对局控制器，协议与 v1 一致——`snake_match_found` 进入对局（30×30、速度 120ms、时长 120s），每 tick 通过 `snake_update` 全量上报（snake/direction/score/foods/gameTimeLeft）
+      - 对手同步：监听 `snake:opponentUpdate`（每 tick 转发）/`snake:fullStateSync`（开局 + 每 2s 定期 `snake_request_full_state`）/`snake:foodSync`；吃食物补食后 `snake_food_update` 通知对手
+      - 碰撞：撞墙/撞自己/撞对方蛇 → 1s 后回初始点无限复活（P1 左半场 `{x:5,y:15}` 方向 right / P2 右半场 `{x:24,y:15}` 方向 left），与 v1 respawnPlayer 一致
+      - 倒计时 120s 归零本地判定胜负；服务端 `snake:gameOver` 以 winner 判定；结束弹窗 + `emit('return_lobby')` 释放服务端用户状态（否则 status 卡 playing 无法再匹配）
+      - 「返回大厅」按钮：确认后 `emit('return_lobby')` + 清理对局 + 回大厅
+      - 界面：HUD（我/对手分数、倒计时、对手昵称）、虚拟按键、键盘 WASD/方向键、防 180° 反转
+    - 接线：lobby 监听 `snake:matchFound`（贪吃蛇不走 match_success，独立事件）→ 写 pendingMatch + `go('snake')`；snake/index.js 检测 pendingMatch 启动双人对局（否则进入单机模式）
+    - 自测方式：F5 刷新后大厅选「贪吃蛇」点「开始匹配」，另一浏览器 v1（或 v2 第二标签）同时匹配 → 进入 540×540 双人对局；双方移动/吃食物实时同步，撞墙 1s 后复活，120s 倒计时结束弹胜负弹窗回到大厅，可再次匹配
 
-- [ ] **3.3.4** 实现蛇死亡/游戏结束逻辑
+✅ 已验证（2026-08-14）
+
+- [x] **3.3.4** 实现蛇死亡/游戏结束逻辑
   - 依赖：3.3.3
   - 验证：撞墙/撞自己判定正确；游戏结束流程正确
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 修改文件：client-v2/src/games/snake/index.js（单机模式死亡/结束流程完善）
+    - 实现内容：
+      - 结束上报：撞墙/撞自己时 `emit('snake_game_end', {score, highScore, gameType:'snake', moveHistory, maxLength, foodEaten})`，与 v1 endSnakeGame 一致（服务端记战绩/统计/经验/成就）
+      - 对局开始：`emit('snake_game_start', {gameType:'snake'})`
+      - 最高分：localStorage `snakeHighScore` 持久化 + 进入页面 `snake_sync_highscore` 同步服务端；HUD 显示「最高」；吃食物超越时实时更新
+      - 统计：moveHistory（v1 超紧凑格式 `[方向,新头x,新头y,是否吃食]`，吃食附食物列表）、maxLength、foodEaten
+      - 动态食物：初始食物数量随最高分增长（每 200 分 +1，上限 8），与 v1 startSnakeGame 一致
+      - 结束弹窗：modal 显示得分/最高分，破纪录显示 🎉 新纪录，可「再来一局」
+    - 自测方式：F5 刷新访问 `#/snake` 点「开始游戏」，蛇吃食物后 HUD 最高分同步刷新；撞墙/撞自己弹出结算弹窗（得分/最高分）；刷新页面后最高分保留；控制台可见 `snake_game_start`/`snake_game_end` 上报（登录账号时服务端记战绩、经验+成就检查）
 
 ---
 

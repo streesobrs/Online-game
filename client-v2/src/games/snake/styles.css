@@ -1,0 +1,57 @@
+/**
+ * 贪吃蛇样式（任务 3.3.1）
+ * 复刻 v1 #snake-canvas 视觉：深色背景、圆角边框、投影。
+ */
+.snake-canvas {
+  background: var(--theme-snake-canvas-bg, #1a1a2e);
+  border: 3px solid #2d2d44;
+  border-radius: 10px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
+  display: block;
+  margin: 0 auto;
+}
+
+.snake-hud {
+  text-align: center;
+  margin-bottom: 10px;
+  font-size: 15px;
+  color: var(--theme-text);
+}
+
+.snake-hud-value {
+  font-weight: bold;
+  color: var(--theme-accent, #4ecdc4);
+}
+
+.snake-virtual-controls {
+  display: grid;
+  grid-template-areas:
+    '. up .'
+    'left down right';
+  grid-template-columns: repeat(3, 64px);
+  grid-template-rows: repeat(3, 64px);
+  gap: 8px;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.snake-virtual-btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  border: 2px solid #2d2d44;
+  background: linear-gradient(145deg, #2a2a3e, #1e1e2e);
+  color: #e2e2f0;
+  font-size: 20px;
+  cursor: pointer;
+  transition: transform 0.1s, background 0.2s;
+}
+
+.snake-virtual-btn:hover {
+  background: linear-gradient(145deg, #3a3a52, #2a2a3e);
+  transform: scale(1.05);
+}
+
+.snake-virtual-btn:active {
+  transform: scale(0.95);
+}

@@ -3276,35 +3276,35 @@ io.on('connection', (socket) => {
               gameTypeHighScores[gk] = gd.highScore || 0;
             }
           }
-        }
 
-        await gameManager.achievementManager.checkAchievements(accountId, {
-          ...postAccount.stats,
-          ...(postAccount.stats?.flags || {}),
-          // 用当前游戏时间覆盖持久标志位
-          nightGame: (() => { const h = new Date().getHours(); return h >= 2 && h <= 6; })(),
-          weekendGame: (() => { const d = new Date().getDay(); return d === 0 || d === 6; })(),
-          ...(postAccount.account?.activity || {}),
-          gameType: 'snake',
-          score: score,
-          level: snakeLevel,
-          streak: snakeBestStreak,
-          maxStreak: snakeBestMaxStreak,
-          result: isWinner ? 'win' : 'loss',
-          silentWin: true,
-          lonerWin: true,
-          allGameTypes: playedGameTypes >= 3,
-          singleGameType: playedGameTypes === 1 && (postAccount.stats?.totalGames || 0) > 1,
-          quickGame: score < 50,
-          slowGame: score > 300,
-          maxMoves: moveHistory ? moveHistory.length : 0,
-          wins: postAccount.stats?.totalWins || 0,
-          losses: postAccount.stats?.totalLosses || 0,
-          draws: postAccount.stats?.totalDraws || 0,
-          gameTypeWins,
-          gameTypeHighScores,
-          timestamp: Date.now()
-        });
+          await gameManager.achievementManager.checkAchievements(accountId, {
+            ...postAccount.stats,
+            ...(postAccount.stats?.flags || {}),
+            // 用当前游戏时间覆盖持久标志位
+            nightGame: (() => { const h = new Date().getHours(); return h >= 2 && h <= 6; })(),
+            weekendGame: (() => { const d = new Date().getDay(); return d === 0 || d === 6; })(),
+            ...(postAccount.account?.activity || {}),
+            gameType: 'snake',
+            score: score,
+            level: snakeLevel,
+            streak: snakeBestStreak,
+            maxStreak: snakeBestMaxStreak,
+            result: isWinner ? 'win' : 'loss',
+            silentWin: true,
+            lonerWin: true,
+            allGameTypes: playedGameTypes >= 3,
+            singleGameType: playedGameTypes === 1 && (postAccount.stats?.totalGames || 0) > 1,
+            quickGame: score < 50,
+            slowGame: score > 300,
+            maxMoves: moveHistory ? moveHistory.length : 0,
+            wins: postAccount.stats?.totalWins || 0,
+            losses: postAccount.stats?.totalLosses || 0,
+            draws: postAccount.stats?.totalDraws || 0,
+            gameTypeWins,
+            gameTypeHighScores,
+            timestamp: Date.now()
+          });
+        }
       }
 
 
