@@ -261,6 +261,241 @@ a.nav-btn.nav-btn--legacy:hover {
     color: var(--theme-shortcut-color);
 }
 
+/* ---- 顶部悬浮账号条（复刻 v1 account-bar：未登录顶部居中，已登录右上角收起、hover 展开） ---- */
+/* 容器占满页面宽度（body 为 flex 居中，需显式撑满，收起态才能贴右上角） */
+#account-root {
+    width: 100%;
+}
+
+.account-bar {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    max-width: 1000px;
+    margin: 0 auto 10px;
+    position: sticky;
+    top: 10px;
+    z-index: 100;
+    transition: all 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.account-bar.collapsed {
+    justify-content: flex-end;
+    max-width: 100%;
+    padding-right: 10px;
+}
+
+.account-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 14px;
+    background: var(--theme-account-bar-bg, rgba(255, 255, 255, 0.98));
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    width: 1000px;
+    height: 48px;
+    min-height: 48px;
+    max-height: 48px;
+    border: 1px solid var(--theme-account-bar-border, rgba(226, 232, 240, 0.8));
+    transition: all 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+    box-sizing: border-box;
+    overflow: visible;
+    position: relative;
+    z-index: 1;
+}
+
+.account-bar.collapsed .account-info {
+    width: 56px;
+    padding: 8px;
+    opacity: 0.65;
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: 12px;
+    justify-content: center;
+    align-items: center;
+}
+
+.account-bar.collapsed .account-info:hover {
+    opacity: 1;
+    width: 620px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    justify-content: space-between;
+    z-index: 101;
+}
+
+/* 收起态：user-section 绝对居中只显示头像 */
+.account-bar.collapsed .account-user-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: auto;
+    height: auto;
+}
+
+.account-bar.collapsed .account-user-details {
+    display: none !important;
+}
+
+.account-bar.collapsed .account-buttons {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+.account-bar.collapsed .account-info:hover .account-user-section {
+    position: relative;
+    left: auto;
+    top: auto;
+    transform: none;
+    width: auto;
+    height: auto;
+}
+
+.account-bar.collapsed .account-info:hover .account-user-details {
+    display: flex !important;
+}
+
+.account-bar.collapsed .account-info:hover .account-buttons {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.account-info:hover {
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.account-user-section {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.account-user-details,
+.account-buttons {
+    transition: opacity 0.3s ease 0.15s;
+    opacity: 1;
+}
+
+.account-user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.account-nickname {
+    font-weight: bold;
+    color: var(--theme-account-nickname-color, #2d3748);
+    font-size: 14px;
+    white-space: nowrap;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.account-stats {
+    display: flex;
+    gap: 6px;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+}
+
+.account-level {
+    font-size: 11px;
+    color: var(--theme-accent, #4299e1);
+    background: var(--theme-shortcut-bg, #edf2f7);
+    padding: 2px 6px;
+    border-radius: 8px;
+    white-space: nowrap;
+}
+
+.account-exp {
+    font-size: 11px;
+    color: #718096;
+    white-space: nowrap;
+}
+
+.account-starcoins {
+    background: var(--theme-account-coin-gradient, linear-gradient(135deg, #f6ad55, #dd6b20));
+    color: white;
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+    white-space: nowrap;
+}
+
+.account-buttons {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.account-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 14px;
+    transition: all 0.2s;
+    background: #4a5568;
+    color: white;
+    white-space: nowrap;
+}
+
+.account-btn:hover {
+    background: #2d3748;
+    transform: translateY(-1px);
+}
+
+.account-btn--primary {
+    background: var(--theme-accent, #4299e1);
+}
+
+.account-btn--primary:hover {
+    background: #2b6cb0;
+}
+
+.account-btn--success {
+    background: #48bb78;
+}
+
+.account-btn--success:hover {
+    background: #2f855a;
+}
+
+.account-btn--info {
+    background: var(--theme-accent, #4299e1);
+}
+
+.account-btn--info:hover {
+    background: #2b6cb0;
+}
+
+.account-btn--danger {
+    background: #e53e3e;
+}
+
+.account-btn--danger:hover {
+    background: #c53030;
+}
+
 /* ---- 视图内容容器 ---- */
 #view-root {
     width: 100%;

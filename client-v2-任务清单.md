@@ -2,7 +2,7 @@
 
 > **配套文档**：[client-v2-开发文档.md](./client-v2-开发文档.md)  
 > **创建日期**：2026-08-12  
-> **总任务数**：68 项（5 个阶段）
+> **总任务数**：74 项（5 个阶段）
 
 ---
 
@@ -59,10 +59,10 @@ AI 完成任务时填写：
 |------|--------|------|--------|------|
 | 阶段 1：骨架搭建 | 26 | 26 | 26 | ✅ 已完成 |
 | 阶段 2：五子棋迁移 | 12 | 12 | 12 | ✅ 已完成 |
-| 阶段 3：其余游戏迁移 | 12 | 0 | 0 | 未开始 |
-| 阶段 4：功能模块迁移 | 17 | 0 | 0 | 未开始 |
-| 阶段 5：打磨上线 | 6 | 0 | 0 | 未开始 |
-| **合计** | **73** | **38** | **38** | — |
+| 阶段 3：其余游戏迁移 | 12 | 12 | 11 | 进行中（3.1.4 待补验证标记） |
+| 阶段 4：功能模块迁移 | 17 | 17 | 17 | ✅ 已完成 |
+| 阶段 5：打磨上线 | 7 | 6 | 5 | 进行中（5.3.2 待验证） |
+| **合计** | **74** | **73** | **71** | — |
 
 ---
 
@@ -663,12 +663,12 @@ AI 完成任务时填写：
 
 ---
 
-## 阶段 3：其余游戏迁移 [0/12]
+## 阶段 3：其余游戏迁移 [12/12]
 
 > **目标**：v2 支持 4 个游戏全部可玩  
 > **前置条件**：阶段 2 全部 ✅ 已验证
 
-### 3.1 围棋 [0/4]
+### 3.1 围棋 [4/4]
 
 - [x] **3.1.1** 实现 go/board.js（19×19 棋盘渲染）
   - 依赖：阶段 2
@@ -727,7 +727,7 @@ AI 完成任务时填写：
       - play.js `finishGo` 终局时调用 `showScoreModal` 本地点目弹窗（复刻 v1 showGameResult：胜者标题、黑白双卡[分数/子数/领地/贴目]、胜负差），同时仍发 `game_result` 由服务端结算；game:ended 弹窗与本地点目框不冲突（gameOver 守卫）
     - 自测方式：Node 运行 6 个断言用例全部通过（空棋盘贴目、环形黑领地、混合边界不计、贴目胜者判定），已删除临时测试文件；浏览器填满/无合法手终局后弹出数子结果框
 
-### 3.2 中国象棋 [0/4]
+### 3.2 中国象棋 [4/4]
 
 - [x] **3.2.1** 实现 chinese-chess/board.js（9×10 棋盘渲染）
   - 依赖：阶段 2
@@ -1065,7 +1065,7 @@ AI 完成任务时填写：
 
 ---
 
-## 阶段 5：打磨上线 [2/6]
+## 阶段 5：打磨上线 [6/7]
 
 > **目标**：v2 可正式上线，性能不劣于 v1  
 > **前置条件**：阶段 4 全部 ✅ 已验证
@@ -1089,32 +1089,81 @@ AI 完成任务时填写：
     - 贪吃蛇单机（index.js）与联机（play.js）新增触摸滑动（swipe）控制方向，cleanup 时移除监听
     - 棋盘缩放随容器宽度等比缩小，≤480px 下仍不横向溢出（zoom 同步缩小布局占位）
 
-✅ 待验证（F5 + DevTools 设备模拟）
+✅ 已验证（2026-08-14）：DevTools 移动模式 ≤768px/≤480px 下四棋盘等比缩小不溢出；导航紧凑；聊天窗贴底展开；贪吃蛇滑动控制方向正常
 
-### 5.2 性能优化 [0/2]
+### 5.2 性能优化 [1/2]
 
-- [ ] **5.2.1** 首屏加载优化（代码分割、懒加载）
+- [x] **5.2.1** 首屏加载优化（代码分割、懒加载）
   - 依赖：阶段 4
   - 验证：首屏加载 < 3 秒；非首屏游戏按需加载
   - **完成说明**：
-    <!-- AI 填写 -->
+    - main.js 静态导入精简为仅 4 个首屏模块：lobby、chat、themes、login；其余 10 个视图（成就/排行榜/AI 对战/观战/商城/资料 + 四游戏）改为动态 import 懒加载
+    - 新增 `lazyView(path, exportName)` helper：首次进入视图才 `import()`，缓存模块引用，import 失败仅 console.error 不阻断路由切换
+    - 兼容性核查：路由 handler 为同步调用，async 函数执行到 await 后异步完成，不影响 hashchange 流程
+    - 贪吃蛇联机链路安全：`lobby:matchSuccess`（lobby/index.js L80）与 `snake:matchFound`（L94）匹配成功后均先写 `pendingMatch` 再必然 `go(对应视图)`，触发懒加载的 `renderSnake` 检查 pendingMatch 启动双人对局；socket 事件桥接在核心层静态注册，不受懒加载影响
+    - 全部 10 个 lazyView 的 exportName 与各视图 `export function renderXxx` 逐一核对一致；全量诊断无错误
 
-- [ ] **5.2.2** 棋盘渲染性能优化（如需用 Canvas）
+✅ 已验证（2026-08-14）：首屏刷新仅加载主模块与首屏资源；各导航首次点击才加载对应 js；懒加载各视图渲染正常；贪吃蛇匹配后自动跳转并开始双人对局
+
+- [x] **5.2.2** 棋盘渲染性能优化（如需用 Canvas）
   - 依赖：5.2.1
   - 验证：棋盘渲染 < 100ms；连续落子无卡顿
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 性能核查结论：四棋盘渲染均达标，**无需 Canvas 化**
+      - 贪吃蛇：已为 canvas 逐帧绘制，渲染 <1ms/帧
+      - 中国象棋：SVG 网格一次性绘制 + `movePiece` 增量移动/吃子（复用 DOM 节点，整盘重建仅开局 init）
+      - 五子棋/围棋：DOM 网格单格 `updateCell` 增量更新，落子 O(1) 不整盘重建
+    - 事件委托优化（gobang/board.js、go/board.js）：删除每格 3 个监听器（click/mouseenter/mouseleave，共 1000+ 个），改为棋盘根节点 3 个委托监听（click/mouseover/mouseout + `closest` + `relatedTarget.contains` 处理子元素间移动），降低初始渲染成本与内存占用，交互行为等价
+    - 悬停预览重建抖动优化：`showPreview` 已存在预览节点时仅更新 className 换色，不再 remove/create，快速划动鼠标时消除 GC 抖动
+    - 全量诊断无错误
+  - **修复**（验证反馈）：中国象棋走子后选中高亮残留——`movePiece` 复用棋子 DOM 节点移动，但未移除 `.selected` class，且 `clearSelection` 按旧坐标在 Map 中已查不到节点；修复为 `movePiece` 移动节点时移除 `selected`，本地与联机（play.js）两条走子路径同时生效
 
-### 5.3 最终验收 [0/2]
+✅ 已验证（2026-08-14）：四棋盘渲染流畅无卡顿；五子棋/围棋悬停预览与落子正常；中国象棋走子后选中高亮正常清除（修复验证通过）
 
-- [ ] **5.3.1** v1/v2 交叉测试（所有游戏 + 所有功能）
+### 5.3 最终验收 [2/3]
+
+- [x] **5.3.1** v1/v2 交叉测试（所有游戏 + 所有功能）
   - 依赖：5.2.2
   - 验证：v2 玩家与 v1 玩家在所有游戏模式下均能正常对战
   - **完成说明**：
-    <!-- AI 填写 -->
+    - 协议一致性核查（v1 client/index.html ↔ v2 src/，服务端 server.js 为参照）：**核心对战协议全部一致**
+      - 匹配全套（match_request/success/timeout/cancel_match）、贪吃蛇全套专用事件（snake_match_found/update/opponent_update/food_update/request_full_state/full_state_sync/game_over/game_start/game_end/sync_highscore）、对局结束与胜负（game_ended/game_result）
+      - AI 对战全套（ai_game_start/ai_move/ai_move_result/ai_game_result/ai_game_end，'r-ju' 字符串棋盘转换）
+      - 观战全套（get_spectate_list/spectate_list/spectate_join/spectate_joined/spectate_leave + move/game_ended 广播）
+      - 登录鉴权主链路（client_connect/account_login/guest_login/get_account_by_token/account_info/login_result/user_login）
+      - 聊天（chat_global/chat_game/chat_message/chat_error）、商城 REST 全部端点与参数
+    - 用户实测：v1 与 v2 四款游戏（五子棋/围棋/象棋/贪吃蛇）交叉匹配对战正常，落子同步、胜负判定正确
+  - **已知功能差异**（不影响交叉对战，记录待后续调整）：
+    - v2 注册后不自动登录（服务端注册仅回 account_action_result，需 v2 补监听后自动 account_login）
+    - v2 认输走 game_result {result:'resign'}（v1 发无效 resign，v2 为正确实现，不回退）
+    - v2 reset 不带 message（对手端"再来一局"文案判定失效，功能不受影响）
+    - v2 未实现：挑战（challenge_request/response）、重置密码（account_reset_password）、游戏道具卡自动消耗（game_use_item）、user_status 上报、回放（get_game_replay）
 
-- [ ] **5.3.2** 文档同步、版本号更新、上线发布
-  - 依赖：5.3.1
+✅ 已验证（2026-08-14）：用户亲自实测 v1/v2 交叉对战正常
+
+- [x] **5.3.2** 功能补齐：v2 缺失功能修复（2026-08-14 插入，依赖：5.3.1）
+  - **完成说明**（四项功能代码已完成，待用户 F5 验证）：
+    1. **注册后自动登录 + 重置密码**（src/core/auth.js、src/features/auth/login.js）：
+       - auth.js 新增 `user:accountActionResult` 监听：注册成功且有待登录凭据时自动补发 `account_login`，与 v1 注册后自动登录行为一致；新增导出 `resetPassword()`，走 `account_reset_password`
+       - login.js 登录弹窗新增「注册账号」「忘记密码」入口，新增注册弹窗（用户名/密码/确认/昵称）与重置密码弹窗（用户名/新密码/确认），提交前校验
+    2. **在线玩家列表 + 挑战**（新建 src/features/online-players/index.js、styles.css，新建共享模块 src/utils/avatar.js、src/components/userCard.js，main.js 挂载 initOnlinePlayers）：
+       - 监听 `user:onlineUsers`（全量清空重建）与 `user:status`（增量增删改）维护在线玩家列表；右下角「👥 在线」浮动按钮（聊天按钮上方）展开面板，玩家项含头像、昵称（点击弹资料卡）、挑战按钮
+       - 挑战链路：`challenge_request {to, game}` → 被挑战者收 `challenge_received` 弹窗接受/拒绝 → `challenge_response {from, accept}` → 服务端 `challenge_accepted` + `match_success`/`snake_match_found` 走既有对局链路
+    3. **顶部账号栏（v1 悬浮样式）**（src/layouts/topnav.js 的 renderAccountBar、src/styles/common.css、responsive.css，main.js 挂载）：
+       - 复刻 v1 account-bar：独立顶部悬浮条（index.html 新增 #account-root，与导航布局解耦）
+       - 未登录：顶部居中「登录」「注册」按钮；已登录：右上角收起为半透明小头像卡片（仅 56px 头像），hover 展开完整卡片（头像/昵称/Lv/EXP/💎货币 + 👤资料/📜历史/退出按钮）
+       - 响应式：触屏设备（hover:none）强制展开完整卡片；≤480px 收紧按钮、隐藏 EXP 防溢出
+    4. **聊天头像 + 用户资料卡**（src/features/chat/index.js、src/features/chat/styles.css）：
+       - 消息体含发送者头像（avatarNode 28px），昵称改为按钮样式，点击弹用户资料卡（showUserCard：头像/昵称/等级/胜场/局数/💎货币）
+  - **记录待后续**（与 v1 的已知功能差异，不影响交叉对战）：游戏道具卡自动消耗（game_use_item）、对局回放（get_game_replay）、undo_deduct 库存同步、user_status 主动上报
+  - 验证要点：
+    - 注册新账号成功后自动登录（无需二次登录）；登录弹窗「忘记密码」可重置密码
+    - 未登录时顶部居中显示「登录」「注册」按钮；登录后右上角出现收起的小头像卡片，hover 展开显示昵称/Lv/EXP/💎/资料/历史/退出
+    - 右下角「👥 在线」展开玩家列表；双开窗口互发挑战，接受后自动进入对局
+    - 聊天/浮动窗消息显示发送者头像，点击昵称弹出用户资料卡
+
+- [ ] **5.3.3** 文档同步、版本号更新、上线发布
+  - 依赖：5.3.1、5.3.2
   - 验证：开发文档与最终代码一致；version.json 更新；package.bat 打包成功
   - **完成说明**：
     <!-- AI 填写 -->
@@ -1126,6 +1175,7 @@ AI 完成任务时填写：
 | 日期 | 变更内容 | 操作者 |
 |------|---------|--------|
 | 2026-08-12 | 初始版本，68 项任务 | - |
+| 2026-08-15 | 5.3.1 v1/v2 交叉测试通过；功能补齐（5.3.2）：注册后自动登录+重置密码、在线玩家+挑战、顶部账号栏、聊天头像+用户资料卡 | AI + 用户 |
 
 ---
 

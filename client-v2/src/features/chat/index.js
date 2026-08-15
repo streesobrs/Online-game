@@ -11,6 +11,8 @@ import { eventBus } from '../../core/eventBus.js';
 import { emit } from '../../core/socket.js';
 import { el, viewRoot } from '../../utils/dom.js';
 import { toast } from '../../components/toast.js';
+import { avatarNode } from '../../utils/avatar.js';
+import { showUserCard } from '../../components/userCard.js';
 
 const MAX_HISTORY = 100; // 每频道保留上限（与 v1 一致）
 
@@ -108,11 +110,17 @@ function createChatView() {
     const isSelf = msg.userId != null && String(msg.userId) === String(myId);
     messagesEl.append(
       el('div', { class: `chat-message ${isSelf ? 'self' : 'other'}` }, [
-        el('div', { class: 'chat-sender' }, [
-          el('span', { class: `chat-scope chat-scope--${channel}` }, channel === 'global' ? '大厅' : '局内'),
-          el('span', { class: 'chat-nickname' }, msg.nickname),
+        el('div', { class: 'chat-message-avatar' }, avatarNode(msg.userId, 28)),
+        el('div', { class: 'chat-message-body' }, [
+          el('div', { class: 'chat-sender' }, [
+            el('span', { class: `chat-scope chat-scope--${channel}` }, channel === 'global' ? '大厅' : '局内'),
+            el('button', {
+              class: 'chat-nickname',
+              onClick: () => showUserCard(msg.userId),
+            }, msg.nickname),
+          ]),
+          el('div', { class: 'chat-text' }, msg.message),
         ]),
-        el('div', { class: 'chat-text' }, msg.message),
       ])
     );
     messagesEl.scrollTop = messagesEl.scrollHeight;

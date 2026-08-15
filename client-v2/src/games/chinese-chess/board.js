@@ -218,6 +218,7 @@ export function createChessBoard(container, options = {}) {
             // 再移动棋子 DOM
             const node = pieceEls.get(`${fromR},${fromC}`);
             if (node) {
+                node.classList.remove('selected'); // 移动后取消选中（复用节点仍带旧选中态，需移除）
                 node.dataset.r = toR;
                 node.dataset.c = toC;
                 node.style.left = `${toC * CELL + 20}px`;

@@ -6,18 +6,49 @@
 
 /* ---- 触屏设备：禁用鼠标悬停效果（避免触屏误触闪动） ---- */
 @media (hover: none) {
+
   .gobang-cell:hover,
   .go-cell:hover {
     background: transparent;
     transform: none;
   }
+
   .chess-intersection:hover {
     background: transparent;
+  }
+
+  /* 账号条：触屏无 hover，强制展开为完整卡片 */
+  .account-bar.collapsed .account-info {
+    width: auto;
+    max-width: calc(100vw - 16px);
+    opacity: 1;
+    padding: 8px 14px;
+    border-radius: 10px;
+    justify-content: space-between;
+  }
+
+  .account-bar.collapsed .account-user-section {
+    position: relative;
+    left: auto;
+    top: auto;
+    transform: none;
+    width: auto;
+    height: auto;
+  }
+
+  .account-bar.collapsed .account-user-details {
+    display: flex !important;
+  }
+
+  .account-bar.collapsed .account-buttons {
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 
 /* ===== 5.1.1 移动端（≤768px） ===== */
 @media (max-width: 768px) {
+
   /* 页面留白收紧 */
   body {
     padding: 10px;
@@ -29,11 +60,13 @@
     gap: 6px;
     margin-bottom: 10px;
   }
+
   .nav-btn {
     padding: 5px 10px;
     font-size: 13px;
     gap: 4px;
   }
+
   .nav-btn__shortcut {
     display: none;
   }
@@ -59,13 +92,29 @@
   body {
     padding: 6px;
   }
+
   .nav-layout {
     padding: 6px 8px;
     gap: 5px;
   }
+
   .nav-btn {
     padding: 5px 8px;
     font-size: 12px;
+  }
+
+  /* 账号条：小屏收紧，避免横向溢出 */
+  .account-bar .account-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .account-bar .account-buttons {
+    gap: 4px;
+  }
+
+  .account-bar .account-exp {
+    display: none;
   }
 
   /* 浮动聊天窗：全宽贴底展开 */
@@ -78,6 +127,7 @@
     max-height: 62vh;
     border-radius: 14px 14px 0 0;
   }
+
   .chat-float-btn {
     right: 12px;
     bottom: 12px;
@@ -88,6 +138,7 @@
     grid-template-columns: repeat(3, 68px);
     grid-template-rows: repeat(3, 68px);
   }
+
   .snake-virtual-btn {
     width: 68px;
     height: 68px;

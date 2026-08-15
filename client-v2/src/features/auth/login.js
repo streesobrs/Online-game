@@ -40,6 +40,10 @@ export function showLoginModal() {
       style: 'width:100%;background:var(--theme-accent);color:#fff;',
       onClick: () => auth.guestLogin(),
     }, '游客登录'),
+    el('div', { style: 'display:flex;justify-content:space-between;font-size:12px;margin-top:2px;' }, [
+      el('a', { style: 'cursor:pointer;color:var(--theme-accent,#007bff);', onClick: () => { modal.close(); showRegisterModal(); } }, '注册账号'),
+      el('a', { style: 'cursor:pointer;color:var(--theme-accent,#007bff);', onClick: () => { modal.close(); showResetPasswordModal(); } }, '忘记密码'),
+    ]),
     el('p', { class: 'text-muted', style: 'font-size:12px;text-align:center;' }, '支持 v1 账号，登录后自动保存进度'),
   ]);
 
@@ -60,6 +64,60 @@ export function showLoginModal() {
     onConfirm: handleLogin,
     showCancel: false,
     onCancel: () => { modalShown = false; },
+  });
+}
+
+/** 展示注册弹窗（注册成功由 auth 层自动登录，登录后自动关闭） */
+export function showRegisterModal() {
+  modalShown = true;
+  const u = el('input', { class: 'input', placeholder: '用户名', autocomplete: 'username' });
+  const p = el('input', { class: 'input', type: 'password', placeholder: '密码（至少 6 位）', autocomplete: 'new-password' });
+  const p2 = el('input', { class: 'input', type: 'password', placeholder: '确认密码', autocomplete: 'new-password' });
+  const n = el('input', { class: 'input', placeholder: '昵称（可选）' });
+  const content = el('div', { class: 'flex-col', style: 'gap:12px;' }, [u, p, p2, n]);
+
+  function handleRegister() {
+    const username = u.value.trim();
+    const password = p.value;
+    if (!username || !password) { toast.error('请输入用户名和密码'); return; }
+    if (password.length < 6) { toast.error('密码至少 6 位'); return; }
+    if (password !== p2.value) { toast.error('两次输入的密码不一致'); return; }
+    auth.register(username, password, n.value.trim() || null);
+  }
+
+  modal.show({
+    title: '注册账号',
+    content,
+    confirmText: '注 册',
+    onConfirm: handleRegister,
+    cancelText: '返回登录',
+    onCancel: () => { modalShown = false; showLoginModal(); },
+  });
+}
+
+/** 展示重置密码弹窗 */
+function showResetPasswordModal() {
+  modalShown = true;
+  const u = el('input', { class: 'input', placeholder: '用户名' });
+  const p = el('input', { class: 'input', type: 'password', placeholder: '新密码（至少 6 位）' });
+  const p2 = el('input', { class: 'input', type: 'password', placeholder: '确认新密码' });
+  const content = el('div', { class: 'flex-col', style: 'gap:12px;' }, [u, p, p2]);
+
+  function handleReset() {
+    const username = u.value.trim();
+    const password = p.value;
+    if (!username || !password) { toast.error('请输入用户名和新密码'); return; }
+    if (password.length < 6) { toast.error('密码至少 6 位'); return; }
+    if (password !== p2.value) { toast.error('两次输入的密码不一致'); return; }
+    auth.resetPassword(username, password);
+  }
+
+  modal.show({
+    title: '重置密码',
+    content,
+    confirmText: '重 置',
+    cancelText: '返回登录',
+    onCancel: () => { modalShown = false; showLoginModal(); },
   });
 }
 

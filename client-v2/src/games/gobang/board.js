@@ -53,10 +53,14 @@ export function createBoard(container, options = {}) {
     const cell = cells[r][c];
     if (board[r][c] !== EMPTY) return;
     const color = turn;
+    const cls = 'stone-preview ' + (color === BLACK ? 'preview-black' : 'preview-white');
     const prev = cell.querySelector('.stone-preview');
-    if (prev) prev.remove();
+    if (prev) {
+      if (prev.className !== cls) prev.className = cls; // 已有预览仅换色，避免重建抖动
+      return;
+    }
     const p = document.createElement('div');
-    p.className = 'stone-preview ' + (color === BLACK ? 'preview-black' : 'preview-white');
+    p.className = cls;
     cell.appendChild(p);
   }
 
@@ -146,13 +150,27 @@ export function createBoard(container, options = {}) {
     cells[r] = [];
     for (let c = 0; c < size; c++) {
       const cell = el('div', { class: 'gobang-cell', 'data-r': r, 'data-c': c });
-      cell.addEventListener('click', () => handleClick(r, c));
-      cell.addEventListener('mouseenter', () => showPreview(r, c));
-      cell.addEventListener('mouseleave', () => hidePreview(r, c));
       cells[r][c] = cell;
       root.append(cell);
     }
   }
+  // 事件委托（5.2.2 性能优化：3 个委托监听替代 361×3 个单元格监听，降低初始渲染成本）
+  root.addEventListener('click', (e) => {
+    const cell = e.target.closest('.gobang-cell');
+    if (!cell || destroyed) return;
+    handleClick(Number(cell.dataset.r), Number(cell.dataset.c));
+  });
+  root.addEventListener('mouseover', (e) => {
+    const cell = e.target.closest('.gobang-cell');
+    if (!cell || destroyed) return;
+    showPreview(Number(cell.dataset.r), Number(cell.dataset.c));
+  });
+  root.addEventListener('mouseout', (e) => {
+    const cell = e.target.closest('.gobang-cell');
+    if (!cell || destroyed) return;
+    if (e.relatedTarget && cell.contains(e.relatedTarget)) return; // 在 cell 内部子元素间移动，不隐藏
+    hidePreview(Number(cell.dataset.r), Number(cell.dataset.c));
+  });
   container.append(root);
   const fit = fitBoard(root, container);
 

@@ -107,11 +107,34 @@ export function initAuth() {
     }
   });
 
+  // 注册/重置密码结果（服务端统一回 account_action_result；注册成功不自动登录，需补一步）
+  eventBus.on('user:accountActionResult', (data) => {
+    if (!data) return;
+    if (data.action === 'register') {
+      if (data.success && pendingRegister) {
+        // 注册成功 → 自动登录（对齐 v1：重发 account_login）
+        emit('account_login', {
+          username: pendingRegister.username,
+          password: pendingRegister.password,
+        });
+      } else if (!data.success && data.message) {
+        toast.error(data.message || '注册失败');
+      }
+      pendingRegister = null;
+    } else if (data.action === 'reset_password') {
+      if (data.success) toast.success(data.message || '密码已重置，请使用新密码登录');
+      else toast.error(data.message || '密码重置失败');
+    }
+  });
+
   // 注意：登录态恢复已由 socket.js 的 client_connect 统一处理（对齐 v1），
   // 服务端会回发 login_result / 自动登录，不再单独调用 get_account_by_token。
 
   return { loggedIn: !!token, token: token || null };
 }
+
+// 待自动登录的注册凭据（服务端注册成功仅回 account_action_result，需客户端补发 account_login）
+let pendingRegister = null;
 
 /** 账号密码登录 */
 export function login(username, password) {
@@ -130,7 +153,17 @@ export function guestLogin() {
  * @param {string} [nickname]
  */
 export function register(username, password, nickname = null) {
+  pendingRegister = { username, password };
   emit('account_register', { username, password, nickname });
+}
+
+/**
+ * 重置密码（account_reset_password → account_action_result action='reset_password'）
+ * @param {string} username
+ * @param {string} newPassword
+ */
+export function resetPassword(username, newPassword) {
+  emit('account_reset_password', { username, password: newPassword });
 }
 
 /** 按 token 获取账号信息（自动登录） */

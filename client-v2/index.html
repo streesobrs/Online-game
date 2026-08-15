@@ -25,10 +25,13 @@
   <link rel="stylesheet" href="./src/features/shop/styles.css">
   <link rel="stylesheet" href="./src/features/profile/styles.css">
   <link rel="stylesheet" href="./src/features/themes/styles.css">
+  <link rel="stylesheet" href="./src/features/online-players/styles.css">
   <!-- 动态主题 CSS 由 src/features/themes/index.js 运行时注入（<style id="theme-dynamic-css">） -->
 </head>
 
 <body>
+  <!-- 顶部悬浮账号条（复刻 v1 account-bar，独立于导航布局） -->
+  <div id="account-root"></div>
   <div id="app">
     <div id="nav-root"></div>
     <div id="view-root"></div>
