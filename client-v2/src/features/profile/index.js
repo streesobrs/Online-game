@@ -17,7 +17,9 @@ import { api } from '../../core/api.js';
 import { el } from '../../utils/dom.js';
 import { toast } from '../../components/toast.js';
 import { modal } from '../../components/modal.js';
-import { go } from '../../core/router.js';
+import { store } from '../../core/store.js';
+import { eventBus } from '../../core/eventBus.js';
+import { NAV_ITEMS } from '../../data/navItems.js';
 
 /** 游戏类型展示元数据 */
 const GAME_META = {
@@ -68,13 +70,17 @@ function formatDuration(sec) {
  * @returns {Function} cleanup 函数
  */
 export function renderProfile(container) {
-  let activeTab = 'info'; // info | avatar | history
+  const PROFILE_TAB_KEYS = ['info', 'avatar', 'history', 'achievements', 'shop', 'themes', 'shortcuts'];
+  const INIT_TAB = store.get('profile.initTab');
+  let activeTab = PROFILE_TAB_KEYS.includes(INIT_TAB) ? INIT_TAB : 'info';
+  store.set('profile.initTab', null); // 初始 Tab 已消费，避免下次进入仍停留在上次 Tab
   let profileData = null;
   let expMap = {};
   let cosmetics = null;
   let cosmeticConfig = null;
   let historyData = [];
   let historyFilter = { type: 'all', result: 'all' };
+  let embeddedCleanup = null; // 嵌入视图（成就/商城/主题）的清理函数
 
   const asideEl = el('aside', { class: 'panel profile-aside' });
   const tabsEl = el('div', { class: 'profile-tabs' });
@@ -158,12 +164,12 @@ export function renderProfile(container) {
         asideStat('↩️', d.inventory?.undoCount ?? 0, '悔棋'),
         asideStat('💡', d.inventory?.hintCount ?? 0, '提示'),
       ]),
-      // 快捷入口（相关个人模块整合，减少跳转往返）
+      // 快捷入口（统一在个人资料页内切换，减少跳转往返）
       el('div', { class: 'profile-aside-actions' }, [
         el('button', { class: 'profile-aside-btn primary', onClick: () => switchTab('avatar') }, '✏️ 编辑头像'),
-        el('button', { class: 'profile-aside-btn', onClick: () => go('achievements') }, '🏆 我的成就'),
-        el('button', { class: 'profile-aside-btn', onClick: () => go('shop') }, '🛒 我的商城'),
-        el('button', { class: 'profile-aside-btn', onClick: () => go('themes') }, '🎨 主题设置'),
+        el('button', { class: 'profile-aside-btn', onClick: () => switchTab('achievements') }, '🏆 我的成就'),
+        el('button', { class: 'profile-aside-btn', onClick: () => switchTab('shop') }, '🛒 我的商城'),
+        el('button', { class: 'profile-aside-btn', onClick: () => switchTab('themes') }, '🎨 主题设置'),
       ]),
     );
   }
@@ -183,6 +189,10 @@ export function renderProfile(container) {
       { key: 'info', label: '📄 资料概览' },
       { key: 'avatar', label: '🖼 头像装扮' },
       { key: 'history', label: '📜 对战历史' },
+      { key: 'achievements', label: '🏆 我的成就' },
+      { key: 'shop', label: '🛒 商城' },
+      { key: 'themes', label: '🎨 主题' },
+      { key: 'shortcuts', label: '⌨ 快捷键' },
     ];
     tabs.forEach((t) => {
       const btn = el('button', {
@@ -195,15 +205,62 @@ export function renderProfile(container) {
 
   // ---- 内容分发 ----
   async function renderContent() {
+    // 切换前先清理上一个嵌入视图的监听/订阅（成就/商城/主题）
+    if (embeddedCleanup) { embeddedCleanup(); embeddedCleanup = null; }
     contentEl.innerHTML = '';
-    if (!profileData && activeTab !== 'history') {
+    const needsProfile = activeTab === 'info' || activeTab === 'avatar';
+    if (!profileData && needsProfile) {
       contentEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:40px;' }, '⏳ 加载中...'));
       return;
     }
     if (activeTab === 'info') contentEl.append(renderInfoTab());
     else if (activeTab === 'avatar') contentEl.append(renderAvatarTab());
     else if (activeTab === 'history') await renderHistoryTab();
+    else if (activeTab === 'achievements') await renderEmbedded('../achievements/index.js', 'renderAchievements');
+    else if (activeTab === 'shop') await renderEmbedded('../shop/index.js', 'renderShop');
+    else if (activeTab === 'themes') await renderEmbedded('../themes/index.js', 'renderThemePanel');
+    else if (activeTab === 'shortcuts') contentEl.append(renderShortcutsTab());
     flashContent();
+  }
+
+  /**
+   * 渲染嵌入模块（成就/商城/主题）到内容区
+   * 子模块 render 会自行清空容器并挂载，返回的 cleanup 函数由本页统一管理
+   */
+  async function renderEmbedded(modulePath, exportName) {
+    contentEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:40px;' }, '⏳ 加载中...'));
+    try {
+      const mod = await import(modulePath);
+      const render = mod[exportName];
+      if (typeof render !== 'function') {
+        contentEl.innerHTML = '';
+        contentEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:40px;' }, '模块加载失败'));
+        return;
+      }
+      const ret = render(contentEl);
+      if (typeof ret === 'function') embeddedCleanup = ret;
+    } catch (err) {
+      console.error('[Profile] 嵌入模块加载失败:', modulePath, err);
+      contentEl.innerHTML = '';
+      contentEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:40px;' }, '模块加载失败'));
+    }
+  }
+
+  // ---- 快捷键 Tab ----
+  function renderShortcutsTab() {
+    const rows = NAV_ITEMS
+      .filter((i) => i.shortcut)
+      .map((item) => el('div', { class: 'profile-shortcut-row' }, [
+        el('kbd', { class: 'profile-shortcut-key' }, item.shortcut.toUpperCase()),
+        el('span', { class: 'profile-shortcut-icon' }, item.icon),
+        el('span', { class: 'profile-shortcut-name' }, item.inProfile ? `个人资料 · ${item.name}` : item.name),
+      ]));
+    return el('div', { class: 'panel profile-card' }, [
+      el('div', { class: 'profile-section-title' }, '⌨️ 全局快捷键'),
+      el('div', { class: 'profile-shortcut-list' }, rows),
+      el('p', { class: 'text-muted', style: 'margin-top:12px;font-size:12px;' },
+        '在输入框内按键不会触发；按 Ctrl / Alt / 组合键不会触发。'),
+    ]);
   }
 
   /** Tab 切换淡入（减少切换跳跃感） */
@@ -609,7 +666,12 @@ export function renderProfile(container) {
   container.append(el('div', { class: 'profile-page' }, [asideEl, mainEl]));
   loadAll();
 
+  // 已迁移模块的快捷键/旧路由入口：已在个人资料页时直接切 Tab（见 router.go）
+  const offOpenTab = eventBus.on('profile:openTab', (tab) => switchTab(tab));
+
   return () => {
+    if (embeddedCleanup) { embeddedCleanup(); embeddedCleanup = null; }
+    offOpenTab();
     container.innerHTML = '';
   };
 }

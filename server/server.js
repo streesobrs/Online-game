@@ -1903,6 +1903,41 @@ io.on('connection', (socket) => {
     }
   }
 
+  // 构建"进行中对局"快照（重连恢复 / 主动查询 get_current_game 共用）
+  function buildGameReconnectSnapshot(userSession) {
+    if (!userSession || !userSession.accountId) return null;
+    if (userSession.game === 'ai') {
+      const aiGame = gameManager.aiGames.get(userSession.accountId);
+      if (!aiGame || aiGame.status !== 'playing') return null;
+      return {
+        mode: 'ai',
+        gameId: aiGame.gameId || userSession.game,
+        gameType: aiGame.gameType,
+        difficulty: aiGame.difficulty,
+        board: aiGame.board,
+        currentPlayer: aiGame.currentPlayer,
+        moves: aiGame.moves,
+        reconnected: true,
+      };
+    }
+    const game = gameManager.games.get(userSession.game);
+    if (!game || game.status !== 'playing') return null;
+    return {
+      mode: 'pvp',
+      gameId: game.gameId,
+      gameType: game.gameType,
+      board: game.board,
+      currentPlayer: game.currentPlayer,
+      player1: game.player1,
+      player2: game.player2,
+      player1Nickname: game.player1Nickname,
+      player2Nickname: game.player2Nickname,
+      moves: game.moves,
+      yourTurn: game.currentPlayer === (game.player1 === userSession.accountId ? 1 : 2),
+      reconnected: true,
+    };
+  }
+
   // 处理客户端连接事件（包含版本号和token）
   socket.on('client_connect', async (data) => {
     logger.info('收到客户端连接请求', {
@@ -1949,47 +1984,15 @@ io.on('connection', (socket) => {
     // 重连时恢复游戏状态
     if (userSession.accountId && userSession.status === 'playing' && userSession.game) {
       try {
-        if (userSession.game === 'ai') {
-          // 恢复AI对战
-          const aiGame = gameManager.aiGames.get(userSession.accountId);
-          if (aiGame && aiGame.status === 'playing') {
-            socket.emit('ai_game_start', {
-              gameType: aiGame.gameType,
-              difficulty: aiGame.difficulty,
-              board: aiGame.board,
-              currentPlayer: aiGame.currentPlayer,
-              moves: aiGame.moves,
-              reconnected: true
-            });
-            logger.info('重连恢复AI对战', { accountId: userSession.accountId, gameType: aiGame.gameType });
-          } else {
-            // AI游戏已不存在，重置用户状态
-            userSession.status = 'online';
-            userSession.game = null;
-            userSession.gameType = null;
-          }
+        const snapshot = buildGameReconnectSnapshot(userSession);
+        if (snapshot) {
+          socket.emit(snapshot.mode === 'ai' ? 'ai_game_start' : 'game_reconnected', snapshot);
+          logger.info('重连恢复游戏', { accountId: userSession.accountId, gameId: snapshot.gameId, mode: snapshot.mode });
         } else {
-          // 恢复PvP游戏
-          const game = gameManager.games.get(userSession.game);
-          if (game && game.status === 'playing') {
-            socket.emit('game_reconnected', {
-              gameId: game.gameId,
-              gameType: game.gameType,
-              board: game.board,
-              currentPlayer: game.currentPlayer,
-              player1: game.player1,
-              player2: game.player2,
-              player1Nickname: game.player1Nickname,
-              player2Nickname: game.player2Nickname,
-              moves: game.moves,
-              yourTurn: game.currentPlayer === (game.player1 === userSession.accountId ? 1 : 2)
-            });
-            logger.info('重连恢复PvP游戏', { accountId: userSession.accountId, gameId: game.gameId });
-          } else {
-            userSession.status = 'online';
-            userSession.game = null;
-            userSession.gameType = null;
-          }
+          // 游戏已不存在，重置用户状态（避免卡在 playing 无法匹配）
+          userSession.status = 'online';
+          userSession.game = null;
+          userSession.gameType = null;
         }
       } catch (err) {
         logger.error('重连恢复游戏状态失败', { accountId: userSession.accountId, error: err.message });
@@ -2934,6 +2937,22 @@ io.on('connection', (socket) => {
   // 返回大厅
   socket.on('return_lobby', () => {
     gameManager.handleReturnLobby(socket.id, io);
+  });
+
+  // 客户端主动查询当前进行中的对局（战局内刷新后恢复对局用）
+  socket.on('get_current_game', () => {
+    const userSession = userManager.getUserBySocketId(socket.id);
+    const snapshot = buildGameReconnectSnapshot(userSession);
+    socket.emit('current_game', snapshot);
+  });
+
+  // 放弃恢复当前对局：结束对局并复位用户状态，解除"无法匹配"的卡死状态
+  socket.on('discard_current_game', () => {
+    const success = gameManager.handleReturnLobby(socket.id, io, '放弃恢复对局');
+    socket.emit('discard_game_result', {
+      success,
+      message: success ? '已放弃对局，状态已恢复' : '放弃对局失败',
+    });
   });
 
   // ========== 贪吃蛇游戏相关事件 ==========

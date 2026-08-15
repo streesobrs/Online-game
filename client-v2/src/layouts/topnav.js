@@ -104,7 +104,8 @@ export function renderTopNav(container) {
   container.append(
     el('div', { class: 'nav-group nav-group--games' }, navButton(gamesNav)),
     el('div', { class: 'nav-divider' }),
-    el('div', { class: 'nav-group nav-group--features' }, FEATURES.map(navButton)),
+    // 已迁移进个人资料页的模块（成就/商城/主题/快捷键）不再出现在导航栏
+    el('div', { class: 'nav-group nav-group--features' }, FEATURES.filter((i) => !i.inProfile).map(navButton)),
     el('div', { class: 'nav-divider' }),
     el('a', { class: 'nav-btn nav-btn--legacy', href: '/', title: '切换回旧版客户端' }, [
       el('span', { class: 'nav-btn__icon' }, '🕰️'),

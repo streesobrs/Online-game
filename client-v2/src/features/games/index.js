@@ -62,7 +62,11 @@ export function renderGames(container) {
     selectedGame: GAMES[0].id,
     difficulty: 'easy',
     isMatching: false,
+    reconnectGame: store.get('reconnectGame') || null, // 战局内刷新后的对局快照
   };
+
+  // socket 断开时点击「放弃对局」：标记待放弃，重连成功后自动重发
+  let pendingDiscard = false;
 
   // 从 store 读取初始状态（路由跳转带过来的）
   const initialMode = store.get('games.initMode');
@@ -141,6 +145,12 @@ export function renderGames(container) {
     runCleanup();
     mainEl.innerHTML = '';
 
+    // 战局内刷新后的对局快照：优先展示恢复/放弃入口
+    if (state.reconnectGame) {
+      mainEl.append(renderReconnectPanel(state.reconnectGame));
+      return;
+    }
+
     if (state.isMatching) {
       mainEl.append(renderMatchingUI());
       return;
@@ -163,6 +173,7 @@ export function renderGames(container) {
 
     const startBtn = el('button', { class: 'btn btn-primary btn-lg', style: 'width:100%;' }, '🎯 开始匹配');
     startBtn.addEventListener('click', () => {
+      if (state.reconnectGame) { toast.warn('存在未完成的对局，请先继续或放弃'); return; }
       if (!store.get('socketConnected')) { toast.error('未连接服务器'); return; }
       if (!store.get('user')) { toast.error('请先登录'); return; }
       state.isMatching = true;
@@ -227,8 +238,87 @@ export function renderGames(container) {
     ]);
   }
 
+  // ---- 战局重连恢复 UI（战局内刷新后：继续对局 / 放弃对局）----
+  function renderReconnectPanel(snapshot) {
+    const gameName = snapshot.gameType === 'gobang' ? '五子棋'
+      : snapshot.gameType === 'go' ? '围棋'
+        : snapshot.gameType === 'chinese-chess' ? '象棋'
+          : snapshot.gameType === 'snake' ? '贪吃蛇' : snapshot.gameType;
+    const modeLabel = snapshot.mode === 'ai' ? 'AI 对战' : '联机对局';
+    const opponentLabel = snapshot.mode === 'ai'
+      ? `难度：${snapshot.difficulty || '未知'}`
+      : (snapshot.player1Nickname && snapshot.player2Nickname
+        ? `👤 ${snapshot.player1Nickname} vs ${snapshot.player2Nickname}`
+        : '');
+
+    const resumeBtn = el('button', { class: 'btn btn-primary btn-lg', style: 'width:100%;' }, '▶️ 继续对局');
+    resumeBtn.addEventListener('click', () => resumeReconnectGame(snapshot));
+
+    const discardBtn = el('button', { class: 'btn btn-secondary btn-lg', style: 'width:100%;' }, '🚪 放弃对局');
+    discardBtn.addEventListener('click', () => {
+      if (!store.get('socketConnected')) {
+        // socket 未连接时 discard 事件会被 socket 层丢弃，标记待放弃，重连后自动重发
+        pendingDiscard = true;
+        toast.error('未连接服务器，重连后将自动放弃对局');
+        return;
+      }
+      emit('discard_current_game');
+      toast.info('正在放弃对局…');
+    });
+
+    return el('div', { class: 'games-panel' }, [
+      el('h2', { class: 'games-panel-title' }, '♻️ 发现未完成的对局'),
+      el('div', { class: 'games-info-box' }, [
+        el('div', { class: 'games-info-title' }, `${modeLabel} · ${gameName}`),
+        el('div', { class: 'games-info-desc' }, opponentLabel || '刷新前有对局尚未结束'),
+      ]),
+      el('div', { class: 'games-action-row', style: 'display:flex;flex-direction:column;gap:10px;' }, [
+        resumeBtn,
+        discardBtn,
+      ]),
+    ]);
+  }
+
+  // ---- 继续对局：将快照转为对局启动参数并恢复 ----
+  async function resumeReconnectGame(snapshot) {
+    const gameType = snapshot.gameType;
+    if (gameType === 'snake') {
+      toast.warn('贪吃蛇对局暂不支持中途恢复，请放弃对局');
+      return;
+    }
+
+    // 清理重连快照（本次已消费）
+    state.reconnectGame = null;
+    store.set('reconnectGame', null);
+    state.mode = snapshot.mode === 'ai' ? 'ai' : 'online';
+    state.selectedGame = gameType;
+    if (snapshot.difficulty) state.difficulty = snapshot.difficulty;
+    renderModeTabs();
+    renderSidebar();
+
+    if (snapshot.mode === 'ai') {
+      await startAIBattle(snapshot);
+      return;
+    }
+
+    // PvP：根据快照推导本人棋色与对手信息
+    const myId = localStorage.getItem('currentAccountId');
+    const isP1 = String(snapshot.player1) === String(myId);
+    const pending = {
+      game: gameType,
+      gameId: snapshot.gameId,
+      opponentId: isP1 ? snapshot.player2 : snapshot.player1,
+      color: isP1 ? 1 : 2,
+      opponentNickname: isP1 ? snapshot.player2Nickname : snapshot.player1Nickname,
+      opponentName: isP1 ? snapshot.player2Nickname : snapshot.player1Nickname,
+      snapshot: { board: snapshot.board, currentPlayer: snapshot.currentPlayer },
+    };
+    store.set('pendingMatch', pending);
+    startOnlineGame();
+  }
+
   // ---- 开始 AI 对战 ----
-  async function startAIBattle() {
+  async function startAIBattle(snapshot) {
     const gameType = state.selectedGame;
     const difficulty = state.difficulty;
     mainEl.innerHTML = '';
@@ -237,7 +327,7 @@ export function renderGames(container) {
       const mod = await import(`../ai-battle/play.js`);
       const container = el('div', { class: 'games-play-area' });
       mainEl.append(container);
-      const cleanupFn = mod.startAIBattle(container, { gameType, difficulty });
+      const cleanupFn = mod.startAIBattle(container, { gameType, difficulty, snapshot });
       const prevCleanup = currentCleanup;
       currentCleanup = () => {
         if (typeof cleanupFn === 'function') cleanupFn();
@@ -253,6 +343,9 @@ export function renderGames(container) {
   const offMatchSuccess = eventBus.on('lobby:matchSuccess', (data) => {
     if (data.game !== state.selectedGame) return;
     state.isMatching = false;
+    // 已开始新对局，清除可能残留的重连快照
+    state.reconnectGame = null;
+    store.set('reconnectGame', null);
     store.set('pendingMatch', data);
     startOnlineGame();
   });
@@ -270,14 +363,85 @@ export function renderGames(container) {
     startOnlineGame();
   });
 
+  // ---- 战局重连恢复事件 ----
+  // 服务端已恢复会话（game_reconnected / ai_game_start reconnected）或主动查询（get_current_game）
+  function applyReconnectSnapshot(data) {
+    if (!data || !data.gameType) return;
+    state.reconnectGame = data;
+    store.set('reconnectGame', data);
+    // 若正在对局/匹配中，不打断；否则展示恢复面板
+    if (state.isMatching) return;
+    if (currentCleanup) return; // 已在对局内（如对局中 socket 重连），不覆盖
+    renderMain();
+  }
+  const offReconnected = eventBus.on('game:reconnected', (data) => applyReconnectSnapshot(data));
+  const offCurrentGame = eventBus.on('game:currentGame', (data) => {
+    // 主动查询 get_current_game 的响应：data 为 null 表示服务端已无进行中对局
+    // （如对局已结束/被放弃），清除本地残留快照，避免误显示恢复面板
+    if (!data) {
+      if (currentCleanup) return; // 已在对局内，不打断
+      pendingDiscard = false; // 服务端已无进行中对局，无需再放弃
+      if (state.reconnectGame || store.get('reconnectGame')) {
+        state.reconnectGame = null;
+        store.set('reconnectGame', null);
+        renderMain();
+      }
+      return;
+    }
+    applyReconnectSnapshot(data);
+  });
+  const offDiscardResult = eventBus.on('game:discardResult', (data) => {
+    pendingDiscard = false;
+    state.reconnectGame = null;
+    store.set('reconnectGame', null);
+    toast.success(data?.message || '已放弃对局');
+    renderMain();
+  });
+
+  // 兜底 1：socket 连接（含重连）后主动查询当前对局。
+  // 解决挂载时 socket 未连接导致 get_current_game 未发出的缺口——
+  // 即使 game_reconnected 事件在懒加载订阅前到达丢失，也会在这里补上。
+  const offSocketConnect = eventBus.on('socket:connect', () => {
+    emit('get_current_game');
+    // socket 断开期间点击过「放弃对局」：重连后自动重发
+    if (pendingDiscard) {
+      pendingDiscard = false;
+      toast.info('已重连，正在放弃对局…');
+      emit('discard_current_game');
+    }
+  });
+
+  // 兜底 2：匹配请求被服务端拒绝（如仍处于 playing 状态）时，退出匹配中
+  // 界面并主动查询当前对局，自动切回恢复面板，避免"卡在匹配中无法操作"。
+  const offSystemError = eventBus.on('system:error', (data) => {
+    if (!state.isMatching) return;
+    const msg = data?.message || '';
+    if (!msg.includes('匹配')) return;
+    state.isMatching = false;
+    renderMain();
+    emit('get_current_game');
+  });
+
+  // 连接状态可见提示：socket 断开时明确告知，避免操作被静默丢弃
+  let disconnectNoticeShown = false;
+  const offSocketDisconnect = eventBus.on('socket:disconnect', () => {
+    if (disconnectNoticeShown) return; // 断开期间只提示一次，避免刷屏
+    disconnectNoticeShown = true;
+    toast.warn('连接已断开，正在自动重连…');
+  });
+  const offSocketReconnect = eventBus.on('socket:reconnect', () => {
+    disconnectNoticeShown = false;
+    toast.success('已重新连接');
+  });
+
   // ---- 启动联机游戏 ----
   async function startOnlineGame() {
     const gameId = state.selectedGame;
     const gameModulePath = {
-      'gobang': '../games/gobang/index.js',
-      'go': '../games/go/index.js',
-      'chinese-chess': '../games/chinese-chess/index.js',
-      'snake': '../games/snake/index.js',
+      'gobang': '../../games/gobang/index.js',
+      'go': '../../games/go/index.js',
+      'chinese-chess': '../../games/chinese-chess/index.js',
+      'snake': '../../games/snake/index.js',
     }[gameId];
 
     const exportName = {
@@ -328,6 +492,12 @@ export function renderGames(container) {
   renderSidebar();
   renderMain();
 
+  // 主动查询服务端当前进行中的对局（双保险：事件可能在懒加载挂载前到达，
+  // 或客户端手动放弃了本地的 reconnectGame 但服务端仍处于 playing 状态）
+  if (store.get('socketConnected')) {
+    emit('get_current_game');
+  }
+
   // ---- 页面内快捷键 ----
   function handlePageKeydown(e) {
     const tag = (e.target.tagName || '').toLowerCase();
@@ -361,6 +531,7 @@ export function renderGames(container) {
       }
     } else if (e.key === 'Enter') {
       if (!state.isMatching && state.mode === 'online') {
+        if (state.reconnectGame) { toast.warn('存在未完成的对局，请先继续或放弃'); return; }
         if (!store.get('socketConnected')) { toast.error('未连接服务器'); return; }
         if (!store.get('user')) { toast.error('请先登录'); return; }
         state.isMatching = true;
@@ -384,6 +555,13 @@ export function renderGames(container) {
     offMatchSuccess();
     offMatchTimeout();
     offSnakeFound();
+    offReconnected();
+    offCurrentGame();
+    offDiscardResult();
+    offSocketConnect();
+    offSystemError();
+    offSocketDisconnect();
+    offSocketReconnect();
     runCleanup();
     container.innerHTML = '';
   };

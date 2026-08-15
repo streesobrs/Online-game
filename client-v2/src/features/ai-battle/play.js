@@ -59,9 +59,11 @@ const DIFF_LABEL = { easy: '简单', medium: '中等', hard: '困难' };
 /**
  * 开始 AI 对局
  * @param {HTMLElement} container - 内容容器（#view-root）
- * @param {{ gameType: string, difficulty: 'easy'|'medium'|'hard' }} opts
+ * @param {{ gameType: string, difficulty: 'easy'|'medium'|'hard', snapshot?: Object }} opts
+ *        snapshot 为重连快照（战局内刷新后恢复）：提供时不再向服务端创建新对局，
+ *        直接用快照重建棋盘与回合状态。
  */
-export function startAIBattle(container, { gameType, difficulty }) {
+export function startAIBattle(container, { gameType, difficulty, snapshot }) {
   cleanupBattle(); // 清理旧对局
 
   const me = 1; // 玩家始终 color 1
@@ -166,8 +168,54 @@ export function startAIBattle(container, { gameType, difficulty }) {
     boardEl
   );
 
-  // 通知服务端开始 AI 对战
-  emit('ai_game_start', { gameType, difficulty });
+  // 恢复后同步最新对局状态（get_current_game 返回服务端实时快照）
+  let stateSyncOff = null;
+  let stateSyncTimer = null;
+
+  if (snapshot && snapshot.board) {
+    // 重连恢复：服务端对局仍在，直接重建棋盘与回合，不再创建新对局
+    if (gameType === 'chinese-chess') {
+      const layout = convertBackendBoardToFrontend(snapshot.board);
+      if (layout) board.init(layout);
+    } else {
+      board.restore(snapshot.board, snapshot.currentPlayer);
+    }
+    myTurn = (snapshot.currentPlayer === me);
+    updateTurn();
+    // 快照可能在重连窗口内过期：主动向服务端确认最新棋盘与回合，用权威状态校正
+    syncLatestState();
+  } else {
+    // 通知服务端开始 AI 对战
+    emit('ai_game_start', { gameType, difficulty });
+  }
+
+  function syncLatestState() {
+    if (stateSyncOff) return; // 已在同步中
+    stateSyncOff = eventBus.on('game:currentGame', (data) => {
+      if (!data || data.gameType !== gameType) return;
+      if (data.board && Array.isArray(data.board)) {
+        if (gameType === 'chinese-chess') {
+          const layout = convertBackendBoardToFrontend(data.board);
+          if (layout) board.init(layout);
+        } else {
+          board.restore(data.board, data.currentPlayer);
+        }
+      }
+      if (data.currentPlayer) {
+        myTurn = data.currentPlayer === me;
+        updateTurn();
+      }
+      if (stateSyncTimer) clearTimeout(stateSyncTimer);
+      stateSyncTimer = null;
+      if (stateSyncOff) { stateSyncOff(); stateSyncOff = null; }
+    });
+    emit('get_current_game');
+    // 兜底：响应超时则移除监听，避免残留
+    stateSyncTimer = setTimeout(() => {
+      if (stateSyncOff) { stateSyncOff(); stateSyncOff = null; }
+      stateSyncTimer = null;
+    }, 3000);
+  }
 
   // ---- socket 事件 ----
   const offs = [];
@@ -294,6 +342,8 @@ export function startAIBattle(container, { gameType, difficulty }) {
     container,
     gameType,
     cleanup() {
+      if (stateSyncOff) { stateSyncOff(); stateSyncOff = null; }
+      if (stateSyncTimer) clearTimeout(stateSyncTimer);
       offs.forEach((off) => off());
       if (timerHandle) clearInterval(timerHandle);
       if (board && typeof board.destroy === 'function') board.destroy();

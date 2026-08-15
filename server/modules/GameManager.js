@@ -119,6 +119,8 @@ class GameManager {
         user.matchTimeout = null;
       }
 
+      const gameType = user.gameType; // 记录原值，日志/操作日志使用（清空后无法获取）
+
       // 从等待列表移除
       if (this.waitingUsers.has(user.gameType)) {
         this.waitingUsers.get(user.gameType).delete(user.accountId);
@@ -134,7 +136,7 @@ class GameManager {
       user.gameType = null;
       user.lastActivity = Date.now();
 
-      logger.matchEvent(user.accountId, '取消匹配', { gameType: user.gameType });
+      logger.matchEvent(user.accountId, '取消匹配', { gameType });
 
       // 记录操作日志
       if (this.operationLogger) {
@@ -143,7 +145,7 @@ class GameManager {
           username: user.nickname || user.username,
           action: 'match_cancel',
           category: 'game',
-          targetName: user.gameType
+          targetName: gameType
         });
       }
 
@@ -1391,6 +1393,8 @@ class GameManager {
     }
 
     // 更新用户状态（必须在游戏结束逻辑之后）
+    const prevGameId = user.game;      // 记录原值，操作日志使用
+    const prevGameType = user.gameType;
     user.status = 'online';
     user.game = null;
     user.gameType = null;
@@ -1415,14 +1419,14 @@ class GameManager {
 
     // 记录操作日志
     if (this.operationLogger) {
-      const game = this.games.get(user.game);
+      const game = this.games.get(prevGameId);
       this.operationLogger.log({
         userId: user.accountId,
         username: user.nickname || user.username,
         action: 'return_lobby',
         category: 'game',
-        targetId: user.game,
-        targetName: game?.gameType || user.gameType,
+        targetId: prevGameId,
+        targetName: game?.gameType || prevGameType,
         details: { gameEnded, result: gameResult, reason }
       });
     }

@@ -90,6 +90,42 @@ export function startMatch(container, matchData) {
   });
   board.turn = BLACK; // 黑先（服务端约定 1 黑先行）
 
+  // 恢复后同步最新对局状态（get_current_game 返回服务端实时快照）
+  let stateSyncOff = null;
+  let stateSyncTimer = null;
+
+  // 对局重连恢复：用服务端快照重建棋盘与当前回合
+  if (matchData.snapshot && matchData.snapshot.board) {
+    board.restore(matchData.snapshot.board, matchData.snapshot.currentPlayer);
+    // 快照可能在重连窗口内过期：对方恰好在这期间落子时，game:move 事件
+    // 因尚未订阅而丢失，恢复出的回合会停留在"等对方落子"，造成双方互等。
+    // 主动向服务端确认最新棋盘与回合，用权威状态校正。
+    syncLatestState();
+  }
+
+  function syncLatestState() {
+    if (stateSyncOff) return; // 已在同步中
+    stateSyncOff = eventBus.on('game:currentGame', (data) => {
+      if (!data || data.gameType !== 'gobang') return;
+      if (data.gameId != null && String(data.gameId) !== String(gameId)) return;
+      if (data.board && Array.isArray(data.board)) {
+        board.restore(data.board, data.currentPlayer);
+      } else if (data.currentPlayer) {
+        board.turn = data.currentPlayer;
+      }
+      updateTurn();
+      if (stateSyncTimer) clearTimeout(stateSyncTimer);
+      stateSyncTimer = null;
+      if (stateSyncOff) { stateSyncOff(); stateSyncOff = null; }
+    });
+    emit('get_current_game');
+    // 兜底：响应超时则移除监听，避免残留
+    stateSyncTimer = setTimeout(() => {
+      if (stateSyncOff) { stateSyncOff(); stateSyncOff = null; }
+      stateSyncTimer = null;
+    }, 3000);
+  }
+
   container.innerHTML = '';
   container.append(infoBar(), boardEl);
 
@@ -310,6 +346,8 @@ export function startMatch(container, matchData) {
     me,
     get gameOver() { return gameOver; },
     cleanup() {
+      if (stateSyncOff) { stateSyncOff(); stateSyncOff = null; }
+      if (stateSyncTimer) clearTimeout(stateSyncTimer);
       offs.forEach((off) => off());
       if (timerHandle) clearInterval(timerHandle);
       container.innerHTML = '';

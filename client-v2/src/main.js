@@ -68,13 +68,11 @@ function lazyView(path, exportName) {
 // 统一游戏大厅（整合联机匹配 + AI对战 + 4 棋种）
 registerRoute('games', () => renderGames(viewRoot()));
 registerRoute('chat', () => renderChat(viewRoot()));
-registerRoute('themes', () => themes.renderThemePanel(viewRoot()));
 
 // 其余视图按需懒加载
-registerRoute('achievements', lazyView('./features/achievements/index.js', 'renderAchievements'));
+// 已迁移模块（成就/商城/主题/快捷键）不再注册独立路由，旧路由经 ROUTE_ALIASES 重定向到个人资料页对应 Tab
 registerRoute('leaderboard', lazyView('./features/leaderboard/index.js', 'renderLeaderboard'));
 registerRoute('spectate', lazyView('./features/spectate/index.js', 'renderSpectate'));
-registerRoute('shop', lazyView('./features/shop/index.js', 'renderShop'));
 registerRoute('profile', lazyView('./features/profile/index.js', 'renderProfile'));
 
 // 4. 初始化路由（hashchange 监听 + 处理当前 hash）

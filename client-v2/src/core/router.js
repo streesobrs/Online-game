@@ -29,17 +29,34 @@ export function registerRoute(id, handler) {
 export function go(id) {
   const alias = ROUTE_ALIASES[id];
   if (alias) {
-    if (alias.mode) store.set('games.initMode', alias.mode);
-    else store.set('games.initMode', null);
-    if (alias.game) store.set('games.initGame', alias.game);
-    else store.set('games.initGame', null);
-    id = 'games';
+    if (alias.tab) {
+      // 已迁移模块：跳转到个人资料页对应 Tab；已在个人资料页时直接切换
+      store.set('profile.initTab', alias.tab);
+      if (window.location.hash === '#/profile') {
+        eventBus.emit('profile:openTab', alias.tab);
+        return;
+      }
+      id = 'profile';
+    } else {
+      if (alias.mode) store.set('games.initMode', alias.mode);
+      else store.set('games.initMode', null);
+      if (alias.game) store.set('games.initGame', alias.game);
+      else store.set('games.initGame', null);
+      id = 'games';
+    }
   }
   if (!NAV_ITEMS.find((i) => i.id === id)) {
     console.warn(`[Router] 未知路由: ${id}`);
     return;
   }
-  window.location.hash = `#/${id}`;
+  const target = `#/${id}`;
+  if (window.location.hash === target) {
+    // hash 未变化：如统一大厅内从对局返回大厅时 hash 始终为 #/games，
+    // 浏览器不会触发 hashchange，需手动重新挂载视图（含退出当前对局）
+    handleHashChange();
+    return;
+  }
+  window.location.hash = target;
 }
 
 /** 处理 hash 变化 */
@@ -47,9 +64,16 @@ function handleHashChange() {
   const hash = window.location.hash.slice(2);
   let id = hash || DEFAULT_ROUTE;
 
-  // 路由别名处理：旧路由重定向到统一游戏大厅
+  // 路由别名处理：旧路由重定向到统一入口
   const alias = ROUTE_ALIASES[id];
   if (alias) {
+    if (alias.tab) {
+      // 已迁移模块 → 个人资料页对应 Tab
+      store.set('profile.initTab', alias.tab);
+      id = 'profile';
+      window.location.hash = '#/profile';
+      return;
+    }
     if (alias.mode) store.set('games.initMode', alias.mode);
     if (alias.game) store.set('games.initGame', alias.game);
     id = 'games';

@@ -18,7 +18,7 @@ export const socket = io({
   transports: ['websocket', 'polling'],
   autoConnect: true,
   reconnection: true,
-  reconnectionAttempts: 5,
+  reconnectionAttempts: 30,
   reconnectionDelay: 1000,
   reconnectionDelayMax: 5000,
   timeout: 20000,
@@ -114,6 +114,9 @@ const EVENT_MAP = {
   game_item_used: 'game:itemUsed',
   hint_result: 'game:hintResult',
   hint_deduct: 'game:hintDeduct',
+  // 对局重连与放弃（战局内刷新后的恢复机制）
+  current_game: 'game:currentGame',
+  discard_game_result: 'game:discardResult',
 
   // 贪吃蛇专属
   snake_match_found: 'snake:matchFound',
@@ -165,6 +168,24 @@ Object.entries(EVENT_MAP).forEach(([socketEvent, busEvent]) => {
   });
 });
 
+// 对局重连快照：战局内刷新后服务端下发，暂存到 store 供游戏大厅恢复。
+// 游戏大厅是懒加载模块，事件可能在它挂载前到达，直接监听会丢失。
+socket.on('game_reconnected', (data) => {
+  store.set('reconnectGame', data);
+  eventBus.emit('game:reconnected', data);
+});
+
+// AI 对战重连快照：与 game_reconnected 同理（服务端重连时通过 ai_game_start 下发）
+socket.on('ai_game_start', (data) => {
+  if (data && data.reconnected) {
+    store.set('reconnectGame', data);
+    eventBus.emit('game:reconnected', data);
+  }
+});
+
+// 未连接时被丢弃的事件，按类型只警告一次，避免刷屏
+const droppedEventWarned = new Set();
+
 /**
  * 主动发送 socket 事件
  * @param {string} event - 事件名（与 v1 一致，见附录 A）
@@ -173,7 +194,8 @@ Object.entries(EVENT_MAP).forEach(([socketEvent, busEvent]) => {
 export function emit(event, data) {
   if (socket.connected) {
     socket.emit(event, data);
-  } else {
-    console.warn('[Socket] 未连接，事件已丢弃:', event);
+  } else if (!droppedEventWarned.has(event)) {
+    droppedEventWarned.add(event);
+    console.warn(`[Socket] 未连接，事件已丢弃: ${event}（连接后将自动恢复）`);
   }
 }

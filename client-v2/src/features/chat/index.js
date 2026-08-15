@@ -10,6 +10,7 @@
  */
 import { eventBus } from '../../core/eventBus.js';
 import { emit } from '../../core/socket.js';
+import { store } from '../../core/store.js';
 import { el, viewRoot } from '../../utils/dom.js';
 import { toast } from '../../components/toast.js';
 import { avatarNode } from '../../utils/avatar.js';
@@ -67,8 +68,9 @@ eventBus.on('chat:history', (data) => {
   floatViews.forEach((v) => { if (v.channel === scope) v.renderHistory(); });
 });
 
-// 进入应用即加载全局聊天历史；socket 未连接时 emit 会丢弃，故连接成功后补拉一次。
+// 进入应用即加载全局聊天历史；socket 未连接时不发（连接成功后由 socket:connect 补拉）。
 function loadGlobalHistory() {
+  if (!store.get('socketConnected')) return;
   emit('get_chat_history', { scope: 'global' });
 }
 loadGlobalHistory();
