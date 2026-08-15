@@ -22,8 +22,10 @@
     width: auto;
     max-width: calc(100vw - 16px);
     opacity: 1;
-    padding: 8px 14px;
-    border-radius: 10px;
+    padding: 4px 10px;
+    height: auto;
+    min-height: 36px;
+    border-radius: 8px;
     justify-content: space-between;
   }
 
@@ -79,8 +81,8 @@
     gap: 6px;
   }
 
-  /* 浮动聊天窗适配（避免固定 340px 溢出） */
-  .chat-float-panel {
+  /* 悬浮坞适配（避免固定 340px 溢出） */
+  .float-dock-panel {
     right: 10px;
     width: calc(100vw - 20px);
     max-width: 340px;
@@ -117,18 +119,19 @@
     display: none;
   }
 
-  /* 浮动聊天窗：全宽贴底展开 */
-  .chat-float-panel {
+  /* 悬浮坞：全宽贴底展开 */
+  .float-dock-panel {
     right: 0;
     left: 0;
     bottom: 0;
     width: 100vw;
     max-width: 100vw;
     max-height: 62vh;
+    height: 62vh;
     border-radius: 14px 14px 0 0;
   }
 
-  .chat-float-btn {
+  .float-dock-btn {
     right: 12px;
     bottom: 12px;
   }

@@ -43,11 +43,30 @@ eventBus.on('user:status', (data) => {
 });
 
 function refresh() {
-  views.forEach((v) => v.render());
+  views.forEach((fn) => fn());
+}
+
+/**
+ * 获取在线用户快照（供聊天页等模块复用）
+ * @returns {Array<Object>} 在线用户数组
+ */
+export function getOnlineUsers() {
+  return Array.from(users.values());
+}
+
+/**
+ * 订阅在线用户变化（数据更新时调用 fn）
+ * @param {Function} fn - 渲染回调
+ * @returns {Function} 取消订阅
+ */
+export function subscribeOnlineUsers(fn) {
+  views.add(fn);
+  return () => views.delete(fn);
 }
 
 // ===== 挑战 =====
-function sendChallenge(accountId) {
+/** 发起挑战（供聊天页/悬浮坞等复用） */
+export function sendChallenge(accountId) {
   if (myId && String(accountId) === String(myId)) { toast.error('不能挑战自己'); return; }
   const items = GAMES.map((g) => el('button', {
     class: 'challenge-game-btn',
@@ -100,65 +119,4 @@ eventBus.on('lobby:challengeRejected', (data) => {
   toast.error(`❌ ${name} 拒绝了你的挑战`);
 });
 
-// ===== 浮动面板 =====
-/**
- * 挂载在线玩家浮动面板（右下角按钮，任意页面随时查看/挑战）
- */
-export function initOnlinePlayers() {
-  if (document.querySelector('.online-btn')) return; // 防重复挂载
-
-  const btn = el('button', { class: 'online-btn', title: '在线玩家', onClick: toggle }, '👥 在线');
-  const countEl = el('span', { class: 'online-count' }, '0');
-  const header = el('div', { class: 'online-panel-header' }, [
-    el('span', { class: 'online-panel-title' }, '👥 在线玩家'),
-    countEl,
-  ]);
-  const listEl = el('div', { class: 'online-list' });
-  const panelEl = el('div', { class: 'online-panel', style: { display: 'none' } }, [header, listEl]);
-
-  function statusText(u) {
-    if (u.status === 'playing') return '游戏中';
-    if (u.status === 'waiting') return '等待中';
-    return '在线';
-  }
-
-  function render() {
-    listEl.innerHTML = '';
-    countEl.textContent = String(users.size);
-    if (users.size === 0) {
-      listEl.append(el('div', { class: 'online-empty' }, '暂无在线玩家'));
-      return;
-    }
-    users.forEach((u, key) => {
-      const isMe = myId && key === String(myId);
-      const name = u.nickname || `玩家${key.slice(0, 4)}`;
-      const item = el('div', { class: 'online-item' }, [
-        avatarNode(u.accountId, 30),
-        el('div', { class: 'online-item-info' }, [
-          el('button', {
-            class: 'online-item-name',
-            onClick: () => showUserCard(u.accountId),
-          }, `${name}${isMe ? ' (我)' : ''}`),
-          el('div', { class: 'online-item-meta' }, `Lv.${u.level || 1} · ${statusText(u)}`),
-        ]),
-        isMe ? null : el('button', {
-          class: 'online-item-btn',
-          onClick: () => sendChallenge(u.accountId),
-        }, '挑战'),
-      ]);
-      listEl.append(item);
-    });
-  }
-
-  function toggle() {
-    const visible = panelEl.style.display !== 'none';
-    panelEl.style.display = visible ? 'none' : 'block';
-    btn.classList.toggle('active', !visible);
-    if (!visible) render();
-  }
-
-  const viewRef = { render };
-  views.add(viewRef);
-
-  document.body.append(btn, panelEl);
-}
+// ===== 浮动面板已合并进悬浮坞（见 features/chat/index.js initFloatingChat）=====

@@ -221,7 +221,7 @@ class UserManager {
       }
 
       // 发送在线用户列表
-      this.sendOnlineUsers(socket, io);
+      this.sendOnlineUsers(socket);
 
       // 发送系统统计
       socket.emit('system_stats', {
@@ -320,9 +320,9 @@ class UserManager {
     }
   }
 
-  // 发送在线用户列表
-  sendOnlineUsers(socket, io) {
-    const onlineUsers = Array.from(this.onlineUsers.values())
+  // 构建在线用户列表数据
+  getOnlineUsersData() {
+    return Array.from(this.onlineUsers.values())
       .filter(userSession => {
         if (!userSession.accountId) return false;
         if (!userSession.socket) return false; // 已断开但在宽限期内的用户不显示在线
@@ -337,8 +337,33 @@ class UserManager {
         accountType: userSession.accountData?.account?.type || 'guest',
         level: userSession.accountData?.account?.profile?.level || 1
       }));
+  }
 
-    socket.emit('online_users', onlineUsers);
+  // 发送在线用户列表（给单个 socket）
+  sendOnlineUsers(socket) {
+    socket.emit('online_users', this.getOnlineUsersData());
+  }
+
+  // 广播在线用户列表到所有在线 socket
+  broadcastOnlineUsers(io) {
+    io.emit('online_users', this.getOnlineUsersData());
+  }
+
+  // 同步账号数据（等级/经验等变化后调用）：刷新会话中的账号缓存，并广播最新在线列表
+  async syncAccountData(accountId, io, account = null) {
+    if (!accountId || !this.accountManager) return;
+    const userSession = this.onlineUsers.get(String(accountId));
+    if (!userSession) return;
+    try {
+      const fresh = account || await this.accountManager.getAccount(String(accountId));
+      if (fresh) {
+        userSession.accountData = fresh;
+        userSession.nickname = fresh.account?.nickname || userSession.nickname;
+      }
+      this.broadcastOnlineUsers(io);
+    } catch (err) {
+      logger.warn('同步账号数据失败', { accountId, error: err.message });
+    }
   }
 
   // 处理用户断开连接

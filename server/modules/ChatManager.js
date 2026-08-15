@@ -1,4 +1,6 @@
 // ChatManager.js - 聊天管理模块
+const fs = require('fs').promises;
+const path = require('path');
 const config = require('../config');
 const logger = require('../utils/logger');
 const dataStore = require('../utils/dataStore');
@@ -11,6 +13,13 @@ class ChatManager {
     this.operationLogger = null;
     this.globalChatHistory = []; // 全局聊天记录
     this.gameChatHistory = new Map(); // gameId -> 聊天记录
+    // 私聊存储结构（data/chats/private/）：
+    //   index.json          用户ID -> 会话key列表（用户与聊天记录文件的关系）
+    //   <pairKey>.json      每对会话独立文件 { messages: [...] }
+    this.privateChatDir = path.join(config.paths.data, 'chats', 'private');
+    this.privateChatIndex = {}; // 用户ID -> [pairKey, ...]
+    this.privateChatHistory = new Map(); // pairKey -> messages[]
+    this.privateWriteTimers = new Map(); // pairKey -> 落盘防抖定时器
     this.maxHistoryLength = config.chat.maxHistoryMessages; // 最大保存消息数
     this.muteList = new Map(); // 被禁言用户列表 -> { reason, expiresAt, timeoutId }
     this.messageRateLimit = new Map(); // 用户消息频率限制
@@ -37,8 +46,64 @@ class ChatManager {
           this.gameChatHistory.set(gameId, messages);
         }
       }
+
+      await this.loadPrivateChats();
     } catch (err) {
       logger.error('加载聊天记录失败', { error: err.message });
+    }
+  }
+
+  // 加载私聊记录：index.json 索引 + 每对会话独立文件；并兼容迁移旧版 privateChats.json
+  async loadPrivateChats() {
+    try {
+      await fs.mkdir(this.privateChatDir, { recursive: true });
+
+      // 1. 读取索引（用户ID -> 会话key列表）
+      try {
+        const indexRaw = await fs.readFile(path.join(this.privateChatDir, 'index.json'), 'utf8');
+        this.privateChatIndex = JSON.parse(indexRaw) || {};
+      } catch (err) {
+        if (err.code !== 'ENOENT') throw err;
+        this.privateChatIndex = {};
+      }
+
+      // 2. 按索引逐个加载会话文件
+      const seenKeys = new Set();
+      for (const pairKeys of Object.values(this.privateChatIndex)) {
+        for (const pairKey of pairKeys) {
+          if (seenKeys.has(pairKey)) continue;
+          seenKeys.add(pairKey);
+          try {
+            const raw = await fs.readFile(path.join(this.privateChatDir, `${pairKey}.json`), 'utf8');
+            const parsed = JSON.parse(raw);
+            this.privateChatHistory.set(pairKey, parsed.messages || []);
+          } catch (err) {
+            logger.error('加载私聊会话失败', { pairKey, error: err.message });
+          }
+        }
+      }
+
+      // 3. 兼容旧版：迁移 data/chats/privateChats.json（旧单文件结构）到新目录结构
+      const legacyFile = path.join(this.privateChatDir, '..', 'privateChats.json');
+      try {
+        const legacyRaw = await fs.readFile(legacyFile, 'utf8');
+        const legacy = JSON.parse(legacyRaw) || {};
+        let migrated = false;
+        for (const [pairKey, messages] of Object.entries(legacy)) {
+          if (!Array.isArray(messages)) continue;
+          this.privateChatHistory.set(pairKey, messages);
+          migrated = true;
+        }
+        if (migrated) {
+          await this.savePrivateChats();
+          await fs.unlink(legacyFile);
+          logger.info('私聊记录已从旧版文件迁移到新目录结构', { legacyFile });
+        }
+      } catch (err) {
+        if (err.code !== 'ENOENT') logger.error('迁移旧私聊记录失败', { error: err.message });
+      }
+    } catch (err) {
+      logger.error('加载私聊记录失败', { error: err.message });
     }
   }
 
@@ -53,6 +118,53 @@ class ChatManager {
       await dataStore.write('gameChats', gameChatsObj);
     } catch (err) {
       logger.error('保存聊天记录失败', { error: err.message });
+    }
+  }
+
+  // 重建私聊索引（用户ID -> 会话key列表）
+  rebuildPrivateIndex() {
+    this.privateChatIndex = {};
+    for (const pairKey of this.privateChatHistory.keys()) {
+      const [idA, idB] = pairKey.split('-');
+      if (!this.privateChatIndex[idA]) this.privateChatIndex[idA] = [];
+      this.privateChatIndex[idA].push(pairKey);
+      if (!this.privateChatIndex[idB]) this.privateChatIndex[idB] = [];
+      this.privateChatIndex[idB].push(pairKey);
+    }
+  }
+
+  // 保存单个私聊会话文件
+  async savePrivateConversation(pairKey) {
+    await fs.mkdir(this.privateChatDir, { recursive: true });
+    await fs.writeFile(
+      path.join(this.privateChatDir, `${pairKey}.json`),
+      JSON.stringify({ messages: this.privateChatHistory.get(pairKey) || [] }, null, 2),
+      'utf8'
+    );
+  }
+
+  // 保存私聊索引
+  async savePrivateIndex() {
+    this.rebuildPrivateIndex();
+    await fs.mkdir(this.privateChatDir, { recursive: true });
+    await fs.writeFile(
+      path.join(this.privateChatDir, 'index.json'),
+      JSON.stringify(this.privateChatIndex, null, 2),
+      'utf8'
+    );
+  }
+
+  // 保存全部私聊数据（索引 + 所有会话）
+  async savePrivateChats() {
+    try {
+      this.rebuildPrivateIndex();
+      await fs.mkdir(this.privateChatDir, { recursive: true });
+      await this.savePrivateIndex();
+      for (const pairKey of this.privateChatHistory.keys()) {
+        await this.savePrivateConversation(pairKey);
+      }
+    } catch (err) {
+      logger.error('保存私聊记录失败', { error: err.message });
     }
   }
 
@@ -294,6 +406,30 @@ class ChatManager {
       timestamp: Date.now()
     };
 
+    // 保存私聊历史（双方共享一条会话记录）
+    const pairKey = this.privateKey(user.accountId, targetUserId);
+    if (!this.privateChatHistory.has(pairKey)) {
+      this.privateChatHistory.set(pairKey, []);
+    }
+    const pairHistory = this.privateChatHistory.get(pairKey);
+    pairHistory.push(chatMessage);
+    if (pairHistory.length > this.maxHistoryLength) {
+      pairHistory.shift();
+    }
+
+    // 落盘：该会话文件 + 索引（200ms 防抖，避免每一条消息都全量写库）
+    const pendingTimer = this.privateWriteTimers.get(pairKey);
+    if (pendingTimer) clearTimeout(pendingTimer);
+    this.privateWriteTimers.set(pairKey, setTimeout(async () => {
+      this.privateWriteTimers.delete(pairKey);
+      try {
+        await this.savePrivateConversation(pairKey);
+        await this.savePrivateIndex();
+      } catch (err) {
+        logger.error('保存私聊会话失败', { pairKey, error: err.message });
+      }
+    }, 200));
+
     // 发送给目标用户
     targetSocket.emit('private_message', chatMessage);
 
@@ -318,6 +454,38 @@ class ChatManager {
   getGameChatHistory(gameId, limit = config.chat.defaultHistoryLimit) {
     const history = this.gameChatHistory.get(gameId);
     return history ? history.slice(-limit) : [];
+  }
+
+  // 私聊会话 key（两侧账号 ID 排序拼接，保证双方共享同一条记录）
+  privateKey(idA, idB) {
+    return [String(idA), String(idB)].sort().join('-');
+  }
+
+  // 获取与某人的私聊历史
+  getPrivateHistory(accountId, targetUserId, limit = config.chat.defaultHistoryLimit) {
+    const key = this.privateKey(accountId, targetUserId);
+    const history = this.privateChatHistory.get(key);
+    return history ? history.slice(-limit) : [];
+  }
+
+  // 获取某用户的私聊会话列表（通过索引快速定位，按最近消息时间倒序）
+  getPrivateConversations(accountId, limit = 50) {
+    const pairKeys = this.privateChatIndex[String(accountId)] || [];
+    const result = [];
+    for (const pairKey of pairKeys) {
+      const messages = this.privateChatHistory.get(pairKey) || [];
+      const last = messages[messages.length - 1];
+      if (!last) continue;
+      const [idA, idB] = pairKey.split('-');
+      const partnerId = String(accountId) === idA ? idB : idA;
+      result.push({
+        partnerId,
+        lastMessage: last,
+        lastTimestamp: last.timestamp
+      });
+    }
+    result.sort((a, b) => b.lastTimestamp - a.lastTimestamp);
+    return result.slice(0, limit);
   }
 
   // 禁言用户

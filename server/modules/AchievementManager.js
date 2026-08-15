@@ -803,6 +803,8 @@ class AchievementManager {
           // 获取更新后的账号信息
           const updatedAccount = await this.accountManager.getAccount(id);
           userSession.socket.emit('account_updated', { account: updatedAccount });
+          // 同步会话中的账号缓存，保证在线列表等级为最新
+          userSession.accountData = updatedAccount;
         }
       }
     }

@@ -1076,6 +1076,8 @@ class GameManager {
               if (s) {
                 s.emit('exp_gained', { expResult });
               }
+              // 同步账号数据并广播最新在线列表（等级变化对其他玩家可见）
+              await this.userManager.syncAccountData(accountId, io);
             }
           }
 
@@ -2347,6 +2349,8 @@ class GameManager {
           const updatedAccount = await this.accountManager.getAccount(accountId);
           userSocket.emit('account_updated', { account: updatedAccount });
           userSocket.emit('exp_gained', { expResult });
+          // 同步账号数据并广播最新在线列表（等级变化对其他玩家可见）
+          await this.userManager.syncAccountData(accountId, io, updatedAccount);
         }
       }
 

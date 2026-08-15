@@ -1,66 +1,14 @@
 /**
- * 在线玩家浮动面板 + 挑战（功能补齐）
- * 右下角按钮展开；面板列出在线玩家（头像/昵称/等级/状态），昵称点击看资料卡，按钮发起挑战。
+ * 在线玩家列表样式（供悬浮坞「在线」Tab 与挑战弹窗复用）
+ * 数据/状态见 index.js；浮动面板 UI 已合并进悬浮坞（features/chat）。
  */
 
-/* 触发按钮（置于浮动聊天按钮上方） */
-.online-btn {
-  position: fixed;
-  right: 20px;
-  bottom: 96px;
-  z-index: 9990;
-  padding: 10px 14px;
-  border: none;
-  border-radius: 24px;
-  background: var(--theme-accent, #4299e1);
-  color: #fff;
+.online-empty {
+  padding: 20px;
+  text-align: center;
+  color: #a0aec0;
   font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 4px 14px rgba(66, 153, 225, 0.35);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
-.online-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(66, 153, 225, 0.45); }
-.online-btn.active { background: #2b6cb0; }
-
-/* 面板 */
-.online-panel {
-  position: fixed;
-  right: 20px;
-  bottom: 148px;
-  z-index: 9989;
-  width: 300px;
-  max-height: 60vh;
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
-  overflow: hidden;
-}
-.online-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 14px;
-  border-bottom: 1px solid #edf2f7;
-  background: #f7fafc;
-}
-.online-panel-title { font-size: 14px; font-weight: 600; color: #2d3748; }
-.online-count {
-  font-size: 12px;
-  color: #718096;
-  background: #edf2f7;
-  padding: 2px 8px;
-  border-radius: 10px;
-}
-.online-list {
-  overflow-y: auto;
-  padding: 8px;
-  flex: 1;
-}
-.online-empty { padding: 20px; text-align: center; color: #a0aec0; font-size: 13px; }
 
 /* 列表项 */
 .online-item {
@@ -71,8 +19,16 @@
   border-radius: 8px;
   transition: background 0.15s ease;
 }
-.online-item:hover { background: #f7fafc; }
-.online-item-info { flex: 1; min-width: 0; }
+
+.online-item:hover {
+  background: #f7fafc;
+}
+
+.online-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
 .online-item-name {
   border: none;
   background: none;
@@ -87,8 +43,18 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.online-item-name:hover { color: var(--theme-accent, #4299e1); text-decoration: underline; }
-.online-item-meta { font-size: 11px; color: #a0aec0; margin-top: 2px; }
+
+.online-item-name:hover {
+  color: var(--theme-accent, #4299e1);
+  text-decoration: underline;
+}
+
+.online-item-meta {
+  font-size: 11px;
+  color: #a0aec0;
+  margin-top: 2px;
+}
+
 .online-item-btn {
   border: none;
   border-radius: 6px;
@@ -100,10 +66,18 @@
   flex-shrink: 0;
   transition: background 0.15s ease;
 }
-.online-item-btn:hover { background: #2b6cb0; }
+
+.online-item-btn:hover {
+  background: #2b6cb0;
+}
 
 /* 挑战游戏选择列表 */
-.challenge-game-list { display: flex; flex-direction: column; gap: 8px; }
+.challenge-game-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .challenge-game-btn {
   border: 1px solid #e2e8f0;
   border-radius: 8px;
@@ -115,13 +89,39 @@
   text-align: left;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
-.challenge-game-btn:hover { border-color: var(--theme-accent, #4299e1); background: #ebf8ff; }
+
+.challenge-game-btn:hover {
+  border-color: var(--theme-accent, #4299e1);
+  background: #ebf8ff;
+}
 
 /* 用户资料卡 */
-.user-card-body { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px 0; }
-.user-card-name { font-size: 16px; font-weight: 600; color: #2d3748; }
-.user-card-meta { font-size: 12px; color: #718096; }
-.user-card-stats { display: flex; gap: 16px; margin-top: 10px; font-size: 13px; color: #4a5568; }
+.user-card-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.user-card-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.user-card-meta {
+  font-size: 12px;
+  color: #718096;
+}
+
+.user-card-stats {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: #4a5568;
+}
 
 /* 头像（通用，账号栏/在线玩家/聊天/资料卡共用） */
 .v2-avatar {
@@ -134,12 +134,25 @@
   padding: 3px;
   box-sizing: content-box;
 }
-.v2-avatar--placeholder { background: #edf2f7; color: #a0aec0; }
-.v2-avatar-img { border-radius: 50%; object-fit: cover; display: block; }
-.v2-avatar-emoji { line-height: 1; }
+
+.v2-avatar--placeholder {
+  background: #edf2f7;
+  color: #a0aec0;
+}
+
+.v2-avatar-img {
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.v2-avatar-emoji {
+  line-height: 1;
+}
 
 /* 触屏：隐藏 hover 效果 */
 @media (hover: none) {
-  .online-btn:hover { transform: none; }
-  .online-item:hover { background: transparent; }
+  .online-item:hover {
+    background: transparent;
+  }
 }

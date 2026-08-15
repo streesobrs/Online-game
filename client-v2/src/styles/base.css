@@ -15,15 +15,20 @@ body {
 body {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
     font-family: 'PingFang SC', 'Microsoft Yahei', Arial, sans-serif;
-    padding: 20px;
+    padding: 16px;
     min-height: 100vh;
     background: var(--theme-bg);
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
     transition: background 0.3s ease;
+}
+
+#app {
+    width: 100%;
+    max-width: none;
 }
 
 /* 仅对交互元素添加过渡，避免全局性能问题 */

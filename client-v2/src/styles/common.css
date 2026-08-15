@@ -164,7 +164,8 @@
 .leaderboard-page,
 .theme-container,
 .spectate-container,
-.snake-game-container {
+.snake-game-container,
+.profile-page {
     transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
@@ -177,28 +178,33 @@
 
 /* ---- 布局：导航容器 ---- */
 .nav-layout {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 8px;
-    width: 100%;
-    max-width: 960px;
-    padding: 10px 14px;
-    margin-bottom: 16px;
+    gap: 6px;
+    width: auto;
+    padding: 6px 10px;
+    margin-bottom: 10px;
     background: var(--theme-nav-bg);
     box-shadow: var(--theme-nav-shadow);
-    border-radius: 10px;
+    border-radius: 8px;
+}
+
+#nav-root {
+    display: flex;
+    justify-content: flex-start;
+    width: 100%;
 }
 
 .nav-group {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 6px;
 }
 
 .nav-divider {
     width: 1px;
-    height: 24px;
+    height: 20px;
     background: var(--theme-border-color);
     margin: 0 4px;
 }
@@ -206,13 +212,13 @@
 .nav-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    font-size: 14px;
+    gap: 4px;
+    padding: 4px 10px;
+    font-size: 13px;
     color: var(--theme-nav-btn-color);
     background: var(--theme-nav-btn-bg);
     border: none;
-    border-radius: 8px;
+    border-radius: 6px;
     cursor: pointer;
     transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
@@ -245,7 +251,7 @@ a.nav-btn.nav-btn--legacy:hover {
 }
 
 .nav-btn__icon {
-    font-size: 16px;
+    font-size: 14px;
     line-height: 1;
 }
 
@@ -255,30 +261,32 @@ a.nav-btn.nav-btn--legacy:hover {
 
 .nav-btn__shortcut {
     font-size: 10px;
-    padding: 1px 5px;
-    border-radius: 6px;
+    padding: 0 4px;
+    border-radius: 4px;
     background: var(--theme-shortcut-bg);
     color: var(--theme-shortcut-color);
+    margin-left: 2px;
 }
 
-/* ---- 顶部悬浮账号条（复刻 v1 account-bar：未登录顶部居中，已登录右上角收起、hover 展开） ---- */
-/* 容器占满页面宽度（body 为 flex 居中，需显式撑满，收起态才能贴右上角） */
+/* ---- 顶部悬浮账号条（紧凑版） ---- */
 #account-root {
     width: 100%;
+    margin-bottom: 6px;
 }
 
 .account-bar {
     display: flex;
-    justify-content: center;
+    justify-content: flex-end;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     width: 100%;
-    max-width: 1000px;
-    margin: 0 auto 10px;
+    max-width: 100%;
+    margin: 0;
+    padding: 0 10px;
     position: sticky;
-    top: 10px;
+    top: 0;
     z-index: 100;
-    transition: all 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.3s ease;
 }
 
 .account-bar.collapsed {
@@ -291,19 +299,17 @@ a.nav-btn.nav-btn--legacy:hover {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    padding: 8px 14px;
-    background: var(--theme-account-bar-bg, rgba(255, 255, 255, 0.98));
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border-radius: 10px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-    width: 1000px;
-    height: 48px;
-    min-height: 48px;
-    max-height: 48px;
-    border: 1px solid var(--theme-account-bar-border, rgba(226, 232, 240, 0.8));
-    transition: all 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+    gap: 10px;
+    padding: 4px 10px;
+    background: var(--theme-nav-bg);
+    border-radius: 8px;
+    box-shadow: none;
+    width: auto;
+    height: 36px;
+    min-height: 36px;
+    max-height: 36px;
+    border: none;
+    transition: all 0.3s ease;
     box-sizing: border-box;
     overflow: visible;
     position: relative;
@@ -311,22 +317,24 @@ a.nav-btn.nav-btn--legacy:hover {
 }
 
 .account-bar.collapsed .account-info {
-    width: 56px;
-    padding: 8px;
-    opacity: 0.65;
-    background: rgba(255, 255, 255, 0.92);
-    border-radius: 12px;
+    width: 40px;
+    padding: 4px;
+    opacity: 0.85;
+    background: var(--theme-nav-bg);
+    border-radius: 6px;
     justify-content: center;
     align-items: center;
 }
 
 .account-bar.collapsed .account-info:hover {
     opacity: 1;
-    width: 620px;
-    padding: 8px 14px;
-    border-radius: 10px;
+    width: auto;
+    min-width: 180px;
+    padding: 4px 10px;
+    border-radius: 8px;
     justify-content: space-between;
     z-index: 101;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* 收起态：user-section 绝对居中只显示头像 */
@@ -377,7 +385,7 @@ a.nav-btn.nav-btn--legacy:hover {
 .account-user-section {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     white-space: nowrap;
     flex-shrink: 0;
 }
@@ -399,31 +407,31 @@ a.nav-btn.nav-btn--legacy:hover {
 .account-nickname {
     font-weight: bold;
     color: var(--theme-account-nickname-color, #2d3748);
-    font-size: 14px;
+    font-size: 13px;
     white-space: nowrap;
-    max-width: 180px;
+    max-width: 150px;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .account-stats {
     display: flex;
-    gap: 6px;
+    gap: 4px;
     flex-wrap: nowrap;
     white-space: nowrap;
 }
 
 .account-level {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--theme-accent, #4299e1);
     background: var(--theme-shortcut-bg, #edf2f7);
-    padding: 2px 6px;
-    border-radius: 8px;
+    padding: 1px 5px;
+    border-radius: 6px;
     white-space: nowrap;
 }
 
 .account-exp {
-    font-size: 11px;
+    font-size: 10px;
     color: #718096;
     white-space: nowrap;
 }
@@ -431,9 +439,9 @@ a.nav-btn.nav-btn--legacy:hover {
 .account-starcoins {
     background: var(--theme-account-coin-gradient, linear-gradient(135deg, #f6ad55, #dd6b20));
     color: white;
-    padding: 3px 8px;
-    border-radius: 10px;
-    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 6px;
+    font-size: 10px;
     font-weight: bold;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
     white-space: nowrap;
@@ -442,17 +450,17 @@ a.nav-btn.nav-btn--legacy:hover {
 .account-buttons {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     flex-shrink: 0;
 }
 
 .account-btn {
-    padding: 8px 16px;
+    padding: 4px 10px;
     border: none;
     border-radius: 6px;
     cursor: pointer;
     font-weight: 500;
-    font-size: 14px;
+    font-size: 12px;
     transition: all 0.2s;
     background: #4a5568;
     color: white;
@@ -499,9 +507,12 @@ a.nav-btn.nav-btn--legacy:hover {
 /* ---- 视图内容容器 ---- */
 #view-root {
     width: 100%;
+    max-width: none;
+    margin: 0 auto;
+    padding: 0 12px;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
 }
 
 /* ---- 通用按钮：次要（灰色） ---- */

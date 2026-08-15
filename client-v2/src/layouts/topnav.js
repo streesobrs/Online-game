@@ -1,10 +1,9 @@
 /**
  * 顶部导航布局
- * 导航栏由 NAV_ITEMS 元数据驱动：左侧游戏（4）+ 分隔线 + 右侧功能（6）。
+ * 导航栏由 NAV_ITEMS 元数据驱动：统一游戏（1）+ 功能（若干）+ 旧版入口。
  * 点击按钮 → 路由切换；currentView 变化 → active 高亮同步。
- * 参照开发文档第十章 10.3。
  */
-import { GAMES, FEATURES } from '../data/navItems.js';
+import { FEATURES } from '../data/navItems.js';
 import { handleNavClick, isActive, go } from '../core/router.js';
 import { store } from '../core/store.js';
 import { el } from '../utils/dom.js';
@@ -27,11 +26,8 @@ function navButton(item) {
 }
 
 /**
- * 顶部悬浮账号条（复刻 v1 account-bar，功能补齐 5.3.2）
- * - 未登录：顶部居中「登录」「注册」按钮
- * - 已登录：右上角收起为小头像卡片（半透明），hover 展开完整账号信息（头像/昵称/Lv/EXP/💎 + 资料/历史/退出）
- * 挂载到独立 #account-root，与导航布局解耦；store.user 变化时重渲染。
- * @param {HTMLElement} container - 挂载容器（#account-root）
+ * 顶部悬浮账号条
+ * @param {HTMLElement} container - 挂载容器
  * @returns {Function} cleanup 函数
  */
 export function renderAccountBar(container) {
@@ -57,17 +53,16 @@ export function renderAccountBar(container) {
         ]),
       ]);
       const userSection = el('div', { class: 'account-user-section' }, [
-        avatarNode(userId, 40),
+        avatarNode(userId, 32),
         details,
       ]);
       const buttons = el('div', { class: 'account-buttons' }, [
         el('button', { class: 'account-btn account-btn--info', onClick: () => go('profile') }, '👤 资料'),
-        el('button', { class: 'account-btn', onClick: () => go('profile') }, '📜 历史'),
+        el('button', { class: 'account-btn', onClick: () => go('games') }, '🎮 游戏'),
         el('button', { class: 'account-btn account-btn--danger', onClick: () => auth.logout() }, '退出'),
       ]);
       bar.append(el('div', { class: 'account-info' }, [userSection, buttons]));
 
-      // 异步加载等级/经验/货币，填充占位
       api.profile.get(userId)
         .then((res) => {
           const d = res?.data;
@@ -102,8 +97,12 @@ export function renderAccountBar(container) {
  * @returns {Function} cleanup 函数
  */
 export function renderTopNav(container) {
+  // GAMES 现在是游戏元数据（非导航项），需映射回导航项
+  // 使用 FEATURES 中的第一个导航项 'games' 作为入口
+  const gamesNav = { id: 'games', name: '游戏', icon: '🎮', shortcut: 'G' };
+
   container.append(
-    el('div', { class: 'nav-group nav-group--games' }, GAMES.map(navButton)),
+    el('div', { class: 'nav-group nav-group--games' }, navButton(gamesNav)),
     el('div', { class: 'nav-divider' }),
     el('div', { class: 'nav-group nav-group--features' }, FEATURES.map(navButton)),
     el('div', { class: 'nav-divider' }),
@@ -115,12 +114,10 @@ export function renderTopNav(container) {
 
   const buttons = Array.from(container.querySelectorAll('[data-nav]'));
 
-  // 订阅状态变化，更新 active（路由切换/快捷键触发均会同步）
   const unsubscribe = store.subscribe('currentView', (view) => {
     buttons.forEach((btn) => btn.classList.toggle('active', btn.dataset.nav === view));
   });
 
-  // 返回 cleanup：取消订阅 + 销毁 DOM（按钮事件监听随元素销毁自动释放）
   return () => {
     unsubscribe();
     container.innerHTML = '';

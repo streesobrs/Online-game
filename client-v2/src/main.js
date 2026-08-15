@@ -1,6 +1,8 @@
 /**
  * 应用入口（v2 客户端）
  * 初始化顺序：eventBus → store → socket → api → auth → theme → router(含视图注册) → shortcut → layout → 登录检测。
+ *
+ * 统一游戏大厅：五子棋/围棋/象棋/贪吃蛇/AI对战/联机匹配已整合为单一「游戏」入口。
  */
 import { eventBus } from './core/eventBus.js';
 import { store } from './core/store.js';
@@ -17,9 +19,8 @@ import * as themes from './features/themes/index.js';
 import { switchLayout, renderAccountBar } from './layouts/registry.js';
 import { viewRoot } from './utils/dom.js';
 import * as login from './features/auth/login.js';
-import { renderLobby } from './features/lobby/index.js';
+import { renderGames } from './features/games/index.js';
 import { renderChat, initFloatingChat } from './features/chat/index.js';
-import { initOnlinePlayers } from './features/online-players/index.js';
 
 console.log('[v2] main.js 已加载');
 
@@ -63,45 +64,38 @@ function lazyView(path, exportName) {
   };
 }
 
-// 3. 注册业务视图路由（须在 initRouter 之前，保证当前 hash 首次处理即命中）
-registerRoute('lobby', () => renderLobby(viewRoot()));
+// 3. 注册业务视图路由
+// 统一游戏大厅（整合联机匹配 + AI对战 + 4 棋种）
+registerRoute('games', () => renderGames(viewRoot()));
 registerRoute('chat', () => renderChat(viewRoot()));
 registerRoute('themes', () => themes.renderThemePanel(viewRoot()));
 
-// 其余视图按需懒加载（5.2.1 首屏优化：非首屏模块首次进入时才动态 import）
+// 其余视图按需懒加载
 registerRoute('achievements', lazyView('./features/achievements/index.js', 'renderAchievements'));
 registerRoute('leaderboard', lazyView('./features/leaderboard/index.js', 'renderLeaderboard'));
-registerRoute('ai-battle', lazyView('./features/ai-battle/index.js', 'renderAIBattle'));
 registerRoute('spectate', lazyView('./features/spectate/index.js', 'renderSpectate'));
 registerRoute('shop', lazyView('./features/shop/index.js', 'renderShop'));
 registerRoute('profile', lazyView('./features/profile/index.js', 'renderProfile'));
-registerRoute('gobang', lazyView('./games/gobang/index.js', 'renderGobang'));
-registerRoute('go', lazyView('./games/go/index.js', 'renderGo'));
-registerRoute('chinese-chess', lazyView('./games/chinese-chess/index.js', 'renderChess'));
-registerRoute('snake', lazyView('./games/snake/index.js', 'renderSnake'));
 
 // 4. 初始化路由（hashchange 监听 + 处理当前 hash）
 initRouter();
 
-// 5. 初始化快捷键（元数据驱动，按 1/2/3/4 切换游戏）
+// 5. 初始化快捷键（元数据驱动）
 initShortcuts();
 
 // 6. 渲染布局（导航栏；读取本地保存的布局，默认 topnav）
 switchLayout(localStorage.getItem('nav-layout') || 'topnav');
 
-// 6.1 初始化顶部悬浮账号条（复刻 v1 account-bar，登录/注册/账号信息，独立于导航布局）
+// 6.1 初始化顶部悬浮账号条
 renderAccountBar(document.getElementById('account-root') || document.body);
 
-// 7. 初始化常驻浮动聊天窗（任意页面随时聊天）
+// 7. 初始化常驻悬浮坞（合并聊天 + 在线玩家）
 initFloatingChat();
 
-// 7.1 初始化在线玩家浮动面板（在线列表 + 挑战，任意页面可用）
-initOnlinePlayers();
-
-// 8. 自动登录检测：未登录（无 token / token 失效）时弹出登录框
+// 8. 自动登录检测
 login.initLoginCheck();
 
-// 校验挂载点是否存在
+// 校验挂载点
 const app = document.getElementById('app');
 if (!app) {
   console.error('[v2] 未找到 #app 挂载点');

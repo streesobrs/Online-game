@@ -1,0 +1,294 @@
+/**
+ * 统一游戏大厅样式
+ * 整合五子棋/围棋/象棋/贪吃蛇/AI对战/联机匹配为单一页面。
+ */
+
+.games-page {
+  width: 100%;
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ---- 模式 Tab ---- */
+.games-mode-tabs {
+  display: inline-flex;
+  gap: 8px;
+  background: var(--surface, #fff);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: var(--theme-shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.08));
+}
+
+.games-mode-tab {
+  padding: 10px 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #4a5568);
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.games-mode-tab:hover {
+  background: var(--surface-alt, #f7fafc);
+  color: var(--text-primary, #1a202c);
+}
+
+.games-mode-tab.active {
+  background: var(--theme-primary, #4299e1);
+  color: #fff;
+}
+
+/* ---- 主体：侧边栏 + 主区域 ---- */
+.games-body {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+/* ---- 侧边栏：游戏选择 ---- */
+.games-sidebar {
+  background: var(--surface, #fff);
+  border-radius: 10px;
+  padding: 14px;
+  box-shadow: var(--theme-shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.08));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.games-sidebar-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary, #718096);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  margin-bottom: 4px;
+}
+
+.games-game-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 2px solid transparent;
+}
+
+.games-game-card:hover {
+  background: var(--surface-alt, #f7fafc);
+}
+
+.games-game-card.active {
+  background: var(--theme-primary-light, rgba(66, 153, 225, 0.1));
+  border-color: var(--theme-primary, #4299e1);
+}
+
+.games-game-icon {
+  font-size: 22px;
+}
+
+.games-game-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.games-sidebar-tip {
+  font-size: 12px;
+  color: var(--text-secondary, #a0aec0);
+  margin-top: 8px;
+  padding: 8px;
+  background: var(--surface-alt, #f7fafc);
+  border-radius: 6px;
+  line-height: 1.5;
+}
+
+.games-sidebar-shortcuts {
+  font-size: 11px;
+  color: var(--text-secondary, #a0aec0);
+  padding: 6px 8px;
+  background: var(--surface-alt, #f7fafc);
+  border-radius: 6px;
+  border: 1px dashed var(--border-color, #e2e8f0);
+  line-height: 1.4;
+  text-align: center;
+}
+
+/* ---- 主区域 ---- */
+.games-main {
+  background: var(--surface, #fff);
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: var(--theme-shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.08));
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+}
+
+.games-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: none;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.games-panel-title {
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.games-info-box {
+  background: var(--surface-alt, #f7fafc);
+  border-radius: 10px;
+  padding: 20px;
+  text-align: center;
+}
+
+.games-info-title {
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.games-info-desc {
+  font-size: 14px;
+  color: var(--text-secondary, #718096);
+}
+
+.games-action-row {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* ---- 匹配中 ---- */
+.games-matching {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.games-matching-spinner {
+  font-size: 48px;
+  animation: games-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes games-pulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.15);
+    opacity: 0.7;
+  }
+}
+
+.games-matching-dots {
+  font-size: 14px;
+  color: var(--text-secondary, #a0aec0);
+}
+
+/* ---- AI 难度选择 ---- */
+.games-difficulties {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.games-difficulty-card {
+  border: 2px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--surface, #fff);
+}
+
+.games-difficulty-card:hover {
+  border-color: var(--text-secondary, #a0aec0);
+}
+
+.games-difficulty-card.active {
+  background: var(--theme-primary-light, rgba(66, 153, 225, 0.05));
+}
+
+.games-difficulty-label {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.games-difficulty-desc {
+  font-size: 13px;
+  color: var(--text-secondary, #718096);
+}
+
+/* ---- 游戏对战区域 ---- */
+.games-play-area {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+/* ---- 响应式 ---- */
+@media (max-width: 900px) {
+  .games-body {
+    grid-template-columns: 1fr;
+  }
+
+  .games-sidebar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .games-sidebar-title {
+    width: 100%;
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+  }
+
+  .games-game-card {
+    flex: 1;
+    min-width: 120px;
+    justify-content: center;
+  }
+
+  .games-sidebar-tip {
+    width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .games-mode-tab {
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+
+  .games-main {
+    padding: 14px;
+  }
+
+  .games-panel-title {
+    font-size: 18px;
+  }
+}

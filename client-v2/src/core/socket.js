@@ -132,6 +132,10 @@ const EVENT_MAP = {
   chat_message: 'chat:message',
   chat_error: 'chat:error',
   chat_history: 'chat:history',
+  private_message: 'chat:privateMessage',
+  private_message_sent: 'chat:privateMessageSent',
+  private_history: 'chat:privateHistory',
+  private_conversations: 'chat:privateConversations',
 
   // 成就与排行
   achievements_unlocked: 'achievement:unlocked',

@@ -2206,7 +2206,7 @@ io.on('connection', (socket) => {
         }
 
         // 刷新在线用户列表给此客户端（清除旧的匿名条目）
-        userManager.sendOnlineUsers(socket, io);
+        userManager.sendOnlineUsers(socket);
 
         // 广播用户上线
         userManager.broadcastUserStatus(newAccountId, 'online', io);
@@ -3242,6 +3242,8 @@ io.on('connection', (socket) => {
               const expResult = await gameManager.accountManager.addExp(accountId, expReward);
               if (expResult.success) {
                 socket.emit('exp_gained', { expResult });
+                // 同步账号数据并广播最新在线列表（等级变化对其他玩家可见）
+                await userManager.syncAccountData(accountId, io);
               }
             }
           }
@@ -3493,6 +3495,31 @@ io.on('connection', (socket) => {
     socket.emit('chat_history', { scope, gameId, history });
   });
 
+  // 获取与某人的私聊历史
+  socket.on('get_private_history', (data) => {
+    const { targetUserId } = data || {};
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user) {
+      // client_connect 尚未完成绑定的瞬时状态，按空历史兜底，不报错打扰
+      socket.emit('private_history', { targetUserId, history: [] });
+      return;
+    }
+    const history = chatManager.getPrivateHistory(user.accountId, targetUserId);
+    socket.emit('private_history', { targetUserId, history });
+  });
+
+  // 获取私聊会话列表
+  socket.on('get_private_conversations', () => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user) {
+      // client_connect 尚未完成绑定的瞬时状态，按空列表兜底，不报错打扰
+      socket.emit('private_conversations', { conversations: [] });
+      return;
+    }
+    const conversations = chatManager.getPrivateConversations(user.accountId);
+    socket.emit('private_conversations', { conversations });
+  });
+
   // ========== 错误处理 ==========
 
   socket.on('error', (err) => {
@@ -3517,6 +3544,7 @@ io.on('connection', (socket) => {
     'snake_game_start', 'snake_game_end', 'snake_sync_highscore', 'snake_request_full_state',
     // 聊天
     'chat_global', 'chat_game', 'chat_private',
+    'get_private_history', 'get_private_conversations',
     // 反馈
     'submit_feedback', 'vote_feedback', 'add_comment', 'reply_comment', 'like_comment', 'delete_comment'
   ]);

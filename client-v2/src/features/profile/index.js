@@ -1,21 +1,23 @@
 /**
- * 个人资料模块（任务 4.7）
- * - 4.7.1 资料展示：基础信息 + 等级经验条 + 战绩统计 + 各棋种统计
- * - 4.7.2 头像管理（预设装备/自定义上传/替换/改名/删除）+ 对战历史查看
+ * 个人资料模块（任务 4.7，全面优化）
  *
- * 数据来源（REST）：
- * - GET /api/profile/:accountId → {account, profile, currency, levelRewards, achievements, stats, games, inventory}
- * - GET /api/config/levelExp → {level: 升到下一级所需经验}
- * - GET /api/shop/cosmetics?userId= → {owned, equipped}（头像/头像框）
- * - GET /api/shop/cosmetics/config → 全部外观配置
- * - GET /api/games/history?accountId=&limit= → 对战历史
- * - POST /api/avatar/upload|delete|rename → 自定义头像管理
- * - POST /api/shop/cosmetics/equip → 装备头像/头像框
+ * 布局优化（PC 宽屏双栏）：
+ * - 左侧固定信息栏（sticky）：头像/昵称/等级/经验条/资产概览/快捷入口，所有 Tab 下常驻可见
+ * - 右侧主区：Tab（资料概览 / 头像装扮 / 对战历史）+ 内容
+ * - 资料概览 Tab 内：账号信息 + 战绩统计 双栏并排，各棋种统计通栏网格
+ *
+ * 信息层级：
+ * - 一级：头像、昵称、等级、经验、星钻/成就/悔棋/提示（常驻左侧）
+ * - 二级：账号信息、战绩统计、各棋种统计（资料 Tab 双栏）
+ * - 三级：头像装扮、对战历史（Tab 切换，按需加载）
+ *
+ * 响应式：≤1000px 收起为单栏（信息栏变顶部摘要），≤768px 进一步堆叠
  */
 import { api } from '../../core/api.js';
 import { el } from '../../utils/dom.js';
 import { toast } from '../../components/toast.js';
 import { modal } from '../../components/modal.js';
+import { go } from '../../core/router.js';
 
 /** 游戏类型展示元数据 */
 const GAME_META = {
@@ -74,8 +76,10 @@ export function renderProfile(container) {
   let historyData = [];
   let historyFilter = { type: 'all', result: 'all' };
 
+  const asideEl = el('aside', { class: 'panel profile-aside' });
   const tabsEl = el('div', { class: 'profile-tabs' });
   const contentEl = el('div', { class: 'profile-content' });
+  const mainEl = el('div', { class: 'profile-main' }, [tabsEl, contentEl]);
 
   // ---- 数据加载 ----
   async function loadAll() {
@@ -95,26 +99,95 @@ export function renderProfile(container) {
       toast.error(err.message || '加载个人资料失败');
       profileData = null;
     }
+    renderAll();
+  }
+
+  /** 整体重渲染（信息栏 + Tab + 内容） */
+  function renderAll() {
+    renderAside();
     renderTabs();
     renderContent();
+  }
+
+  /** 切换 Tab（Tab 栏 / 快捷按钮复用） */
+  function switchTab(key) {
+    activeTab = key;
+    renderTabs();
+    renderContent();
+  }
+
+  // ---- 左侧信息栏（sticky，常驻） ----
+  function renderAside() {
+    asideEl.innerHTML = '';
+    if (!profileData) {
+      asideEl.append(el('div', { class: 'profile-aside-placeholder' }, '⏳'));
+      return;
+    }
+    const d = profileData;
+    const account = d.account || {};
+    const { level, exp, nextExp } = calcLevelExp(d.profile?.exp, expMap);
+    const expPercent = Math.min(100, nextExp > 0 ? Math.round((exp / nextExp) * 100) : 0);
+    const ach = d.achievements?.progress || {};
+    const accountTag = account.type === 'guest' ? '游客账号' : (account.isAdmin ? '管理员' : '正式账号');
+
+    asideEl.append(
+      // 头像 + 身份
+      el('div', { class: 'profile-aside-head' }, [
+        avatarPreview(88),
+        el('div', { class: 'profile-aside-name', title: account.nickname || account.username }, account.nickname || account.username || '未命名'),
+        el('div', { class: 'profile-aside-meta' }, [
+          el('span', { class: 'profile-aside-id' }, `ID ${account.id || '-'}`),
+          el('span', { class: 'profile-aside-tag' }, accountTag),
+        ]),
+      ]),
+      // 等级 + 经验条
+      el('div', { class: 'profile-aside-level' }, [
+        el('div', { class: 'profile-aside-level-row' }, [
+          el('span', { class: 'profile-aside-level-badge' }, `Lv.${level}`),
+          el('span', { class: 'profile-aside-exp-pct' }, `${expPercent}%`),
+        ]),
+        el('div', { class: 'profile-exp-bar' }, [
+          el('div', { class: 'profile-exp-fill', style: `width:${expPercent}%;` }),
+        ]),
+        el('div', { class: 'profile-aside-exp-text' }, `经验 ${exp} / ${nextExp}`),
+      ]),
+      // 资产概览
+      el('div', { class: 'profile-aside-stats' }, [
+        asideStat('💎', d.currency ?? 0, '星钻'),
+        asideStat('🏆', `${ach.unlocked ?? 0}/${ach.total ?? 0}`, '成就'),
+        asideStat('↩️', d.inventory?.undoCount ?? 0, '悔棋'),
+        asideStat('💡', d.inventory?.hintCount ?? 0, '提示'),
+      ]),
+      // 快捷入口（相关个人模块整合，减少跳转往返）
+      el('div', { class: 'profile-aside-actions' }, [
+        el('button', { class: 'profile-aside-btn primary', onClick: () => switchTab('avatar') }, '✏️ 编辑头像'),
+        el('button', { class: 'profile-aside-btn', onClick: () => go('achievements') }, '🏆 我的成就'),
+        el('button', { class: 'profile-aside-btn', onClick: () => go('shop') }, '🛒 我的商城'),
+        el('button', { class: 'profile-aside-btn', onClick: () => go('themes') }, '🎨 主题设置'),
+      ]),
+    );
+  }
+
+  function asideStat(icon, value, label) {
+    return el('div', { class: 'profile-aside-stat' }, [
+      el('div', { class: 'profile-aside-stat-icon' }, icon),
+      el('div', { class: 'profile-aside-stat-value' }, value),
+      el('div', { class: 'profile-aside-stat-label' }, label),
+    ]);
   }
 
   // ---- Tab 栏 ----
   function renderTabs() {
     tabsEl.innerHTML = '';
     const tabs = [
-      { key: 'info', label: '📄 资料' },
-      { key: 'avatar', label: '🖼 头像' },
+      { key: 'info', label: '📄 资料概览' },
+      { key: 'avatar', label: '🖼 头像装扮' },
       { key: 'history', label: '📜 对战历史' },
     ];
     tabs.forEach((t) => {
       const btn = el('button', {
         class: 'profile-tab' + (t.key === activeTab ? ' active' : ''),
-        onClick: () => {
-          activeTab = t.key;
-          renderTabs();
-          renderContent();
-        },
+        onClick: () => switchTab(t.key),
       }, t.label);
       tabsEl.appendChild(btn);
     });
@@ -130,23 +203,28 @@ export function renderProfile(container) {
     if (activeTab === 'info') contentEl.append(renderInfoTab());
     else if (activeTab === 'avatar') contentEl.append(renderAvatarTab());
     else if (activeTab === 'history') await renderHistoryTab();
+    flashContent();
   }
 
-  // ============ 4.7.1 资料 Tab ============
+  /** Tab 切换淡入（减少切换跳跃感） */
+  function flashContent() {
+    contentEl.classList.remove('profile-content--enter');
+    void contentEl.offsetWidth;
+    contentEl.classList.add('profile-content--enter');
+  }
+
+  // ============ 资料概览 Tab ============
   function renderInfoTab() {
     const d = profileData;
     const account = d.account || {};
-    const profile = d.profile || {};
     const stats = d.stats || {};
-    const { level, exp, nextExp } = calcLevelExp(profile.exp, expMap);
-    const expPercent = Math.min(100, nextExp > 0 ? Math.round((exp / nextExp) * 100) : 0);
-    const av = avatarInfo();
 
     const infoCards = [
       { label: '账号类型', value: account.type === 'guest' ? '游客' : (account.isAdmin ? '管理员' : '正式账号') },
       { label: '账号 ID', value: account.id || '-' },
       { label: '注册时间', value: formatDate(account.createdAt) },
       { label: '登录次数', value: account.loginCount || 0 },
+      { label: '密码状态', value: account.hasPassword ? '已设置' : '未设置' },
     ];
 
     const statCards = [
@@ -154,67 +232,35 @@ export function renderProfile(container) {
       { label: '胜利', value: stats.totalWins ?? 0, color: '#48bb78' },
       { label: '平局', value: stats.totalDraws ?? 0 },
       { label: '失败', value: stats.totalLosses ?? 0, color: '#e53e3e' },
-      { label: '胜率', value: `${stats.winRate ?? 0}%` },
+      { label: '胜率', value: `${stats.winRate ?? 0}%`, highlight: true },
       { label: '最佳连胜', value: stats.bestStreak ?? 0 },
     ];
 
     return el('div', { class: 'profile-stack' }, [
-      // 基础信息卡
-      el('div', { class: 'panel profile-card' }, [
-        el('div', { class: 'profile-head' }, [
-          avatarPreview(56),
-          el('div', { class: 'profile-id-block' }, [
-            el('div', { class: 'profile-nickname' }, account.nickname || account.username || '未命名'),
-            el('div', { class: 'profile-meta-line' }, `Lv.${level} · ${account.type === 'guest' ? '游客账号' : '正式账号'}${account.hasPassword ? '' : ' · 未设密码'}`),
-          ]),
+      // 账号信息 + 战绩统计 双栏并排（充分利用横向空间）
+      el('div', { class: 'profile-duo-grid' }, [
+        el('div', { class: 'panel profile-card' }, [
+          el('div', { class: 'profile-section-title' }, '📄 账号信息'),
+          el('div', { class: 'profile-info-grid' },
+            infoCards.map((c) => el('div', { class: 'profile-info-item' }, [
+              el('div', { class: 'profile-info-label' }, c.label),
+              el('div', { class: 'profile-info-value' }, c.value),
+            ]))),
         ]),
-        el('div', { class: 'profile-exp-section' }, [
-          el('div', { class: 'profile-exp-labels' }, [
-            el('span', {}, `经验 ${exp} / ${nextExp}`),
-            el('span', { class: 'text-muted' }, `${expPercent}%`),
-          ]),
-          el('div', { class: 'profile-exp-bar' }, [
-            el('div', { class: 'profile-exp-fill', style: `width:${expPercent}%;` }),
-          ]),
-        ]),
-        el('div', { class: 'profile-info-grid' },
-          infoCards.map((c) => el('div', { class: 'profile-info-item' }, [
-            el('div', { class: 'profile-info-label' }, c.label),
-            el('div', { class: 'profile-info-value' }, c.value),
-          ]))),
-      ]),
-
-      // 货币/成就/背包
-      el('div', { class: 'profile-summary-grid' }, [
-        el('div', { class: 'panel profile-summary-item' }, [
-          el('div', { class: 'profile-summary-value' }, `💎 ${d.currency ?? 0}`),
-          el('div', { class: 'profile-summary-label' }, '星钻余额'),
-        ]),
-        el('div', { class: 'panel profile-summary-item' }, [
-          el('div', { class: 'profile-summary-value' }, `${d.achievements?.progress?.unlocked ?? 0}/${d.achievements?.progress?.total ?? 0}`),
-          el('div', { class: 'profile-summary-label' }, '成就解锁'),
-        ]),
-        el('div', { class: 'panel profile-summary-item' }, [
-          el('div', { class: 'profile-summary-value' }, `${d.inventory?.undoCount ?? 0}`),
-          el('div', { class: 'profile-summary-label' }, '悔棋次数'),
-        ]),
-        el('div', { class: 'panel profile-summary-item' }, [
-          el('div', { class: 'profile-summary-value' }, `${d.inventory?.hintCount ?? 0}`),
-          el('div', { class: 'profile-summary-label' }, '提示次数'),
+        el('div', { class: 'panel profile-card' }, [
+          el('div', { class: 'profile-section-title' }, '🏆 战绩统计'),
+          el('div', { class: 'profile-stat-grid' },
+            statCards.map((c) => el('div', { class: 'profile-stat-item' }, [
+              el('div', {
+                class: 'profile-stat-value' + (c.highlight ? ' highlight' : ''),
+                style: c.color ? `color:${c.color};` : '',
+              }, c.value),
+              el('div', { class: 'profile-stat-label' }, c.label),
+            ]))),
         ]),
       ]),
 
-      // 战绩统计
-      el('div', { class: 'panel profile-card' }, [
-        el('div', { class: 'profile-section-title' }, '🏆 战绩统计'),
-        el('div', { class: 'profile-stat-grid' },
-          statCards.map((c) => el('div', { class: 'profile-stat-item' }, [
-            el('div', { class: 'profile-stat-value', style: c.color ? `color:${c.color};` : '' }, c.value),
-            el('div', { class: 'profile-stat-label' }, c.label),
-          ]))),
-      ]),
-
-      // 各棋种统计
+      // 各棋种统计（通栏）
       el('div', { class: 'panel profile-card' }, [
         el('div', { class: 'profile-section-title' }, '🎮 各棋种统计'),
         el('div', { class: 'profile-game-grid' },
@@ -233,7 +279,7 @@ export function renderProfile(container) {
     ]);
   }
 
-  // ============ 4.7.2 头像 Tab ============
+  // ============ 头像装扮 Tab ============
   function renderAvatarTab() {
     const owned = cosmetics?.owned || {};
     const equipped = cosmetics?.equipped || {};
@@ -317,7 +363,7 @@ export function renderProfile(container) {
     ]);
   }
 
-  // ============ 4.7.2 对战历史 Tab ============
+  // ============ 对战历史 Tab ============
   async function renderHistoryTab() {
     const userId = currentUserId();
     contentEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:40px;' }, '⏳ 加载中...'));
@@ -415,7 +461,7 @@ export function renderProfile(container) {
       toast.success(res.message || '装备成功！');
       const cosRes = await api.shop.getCosmetics(userId);
       cosmetics = cosRes.cosmetics || cosmetics;
-      renderContent();
+      renderAll();
     } catch (err) {
       toast.error(err.message || '装备失败');
     }
@@ -429,7 +475,7 @@ export function renderProfile(container) {
       toast.success(res.message || '装备成功！');
       const cosRes = await api.shop.getCosmetics(userId);
       cosmetics = cosRes.cosmetics || cosmetics;
-      renderContent();
+      renderAll();
     } catch (err) {
       toast.error(err.message || '装备失败');
     }
@@ -463,7 +509,7 @@ export function renderProfile(container) {
       toast.success(res.message || '上传成功！');
       const cosRes = await api.shop.getCosmetics(currentUserId());
       cosmetics = cosRes.cosmetics || cosmetics;
-      renderContent();
+      renderAll();
     } catch (err) {
       toast.error(err.message || '上传失败');
     }
@@ -499,7 +545,7 @@ export function renderProfile(container) {
       toast.success('改名成功');
       const cosRes = await api.shop.getCosmetics(currentUserId());
       cosmetics = cosRes.cosmetics || cosmetics;
-      renderContent();
+      renderAll();
     } catch (err) {
       toast.error(err.message || '改名失败');
     }
@@ -522,7 +568,7 @@ export function renderProfile(container) {
       toast.success('删除成功');
       const cosRes = await api.shop.getCosmetics(currentUserId());
       cosmetics = cosRes.cosmetics || cosmetics;
-      renderContent();
+      renderAll();
     } catch (err) {
       toast.error(err.message || '删除失败');
     }
@@ -560,11 +606,7 @@ export function renderProfile(container) {
 
   // ---- 组装视图 ----
   container.innerHTML = '';
-  container.append(el('div', { class: 'profile-container panel', style: 'max-width:880px;width:100%;' }, [
-    el('h2', { class: 'panel-title' }, '👤 个人资料'),
-    tabsEl,
-    contentEl,
-  ]));
+  container.append(el('div', { class: 'profile-page' }, [asideEl, mainEl]));
   loadAll();
 
   return () => {

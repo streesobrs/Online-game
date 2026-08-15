@@ -3,7 +3,7 @@
  * 复刻 v1 成就页：总进度、分类标签、成就卡片。
  */
 .achievements-page {
-  max-width: 860px;
+  max-width: none;
   margin: 0 auto;
   padding: 0 16px 32px;
 }

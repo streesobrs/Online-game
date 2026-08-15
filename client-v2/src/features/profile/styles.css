@@ -1,13 +1,181 @@
 /**
- * 个人资料样式（任务 4.7.1/4.7.2）
- * 资料 Tab + 头像管理 Tab + 对战历史 Tab，浅色卡片风对齐 v1。
+ * 个人资料样式（任务 4.7，全面优化）
+ * PC 宽屏双栏：左侧 sticky 信息栏 + 右侧 Tab 内容区；≤1000px 单栏自适应。
  */
+
+/* ===== 页面骨架：双栏 ===== */
+.profile-page {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 20px;
+  width: 100%;
+  max-width: none;
+  align-items: start;
+  padding: 0 0 24px;
+}
+
+.profile-main {
+  min-width: 0;
+}
+
+/* ===== 左侧信息栏（sticky） ===== */
+.profile-aside {
+  position: sticky;
+  top: 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 16px;
+}
+
+.profile-aside-placeholder {
+  text-align: center;
+  padding: 40px 0;
+  font-size: 28px;
+}
+
+.profile-aside-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.profile-aside-name {
+  font-size: 18px;
+  font-weight: 700;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-aside-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.profile-aside-id {
+  font-size: 12px;
+  color: var(--text-secondary, #718096);
+}
+
+.profile-aside-tag {
+  font-size: 11px;
+  color: #6366f1;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 10px;
+  padding: 1px 8px;
+}
+
+/* 等级 + 经验条 */
+.profile-aside-level {
+  background: var(--surface-alt, #f7fafc);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.profile-aside-level-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.profile-aside-level-badge {
+  font-size: 15px;
+  font-weight: 700;
+  color: #6366f1;
+}
+
+.profile-aside-exp-pct {
+  font-size: 12px;
+  font-weight: 600;
+  color: #48bb78;
+}
+
+.profile-aside-exp-text {
+  font-size: 12px;
+  color: var(--text-secondary, #718096);
+  margin-top: 6px;
+}
+
+/* 资产概览 2x2 */
+.profile-aside-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.profile-aside-stat {
+  background: var(--surface-alt, #f7fafc);
+  border-radius: 10px;
+  padding: 12px 8px;
+  text-align: center;
+}
+
+.profile-aside-stat-icon {
+  font-size: 18px;
+}
+
+.profile-aside-stat-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #6366f1;
+  margin-top: 4px;
+  word-break: break-all;
+}
+
+.profile-aside-stat-label {
+  font-size: 11px;
+  color: var(--text-secondary, #718096);
+  margin-top: 2px;
+}
+
+/* 快捷入口 */
+.profile-aside-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-aside-btn {
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--surface, #fff);
+  color: var(--text-secondary, #4a5568);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.profile-aside-btn:hover {
+  border-color: #6366f1;
+  color: #6366f1;
+}
+
+.profile-aside-btn.primary {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: #fff;
+}
+
+.profile-aside-btn.primary:hover {
+  background: #4f46e5;
+  color: #fff;
+}
 
 /* ===== Tab ===== */
 .profile-tabs {
   display: flex;
   gap: 8px;
-  margin: 8px 0 16px;
+  margin: 0 0 16px;
 }
 
 .profile-tab {
@@ -32,6 +200,23 @@
   color: #fff;
 }
 
+/* Tab 内容切换淡入 */
+@keyframes profile-content-fade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.profile-content--enter {
+  animation: profile-content-fade 0.25s ease;
+}
+
 .profile-stack {
   display: flex;
   flex-direction: column;
@@ -48,14 +233,14 @@
   margin-bottom: 14px;
 }
 
-/* ===== 基础信息卡 ===== */
-.profile-head {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
+/* ===== 资料概览：双栏并排 ===== */
+.profile-duo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
 
+/* ===== 头像 ===== */
 .profile-avatar-wrap {
   border-radius: 50%;
   display: flex;
@@ -80,30 +265,7 @@
   justify-content: center;
 }
 
-.profile-nickname {
-  font-size: 20px;
-  font-weight: 700;
-}
-
-.profile-meta-line {
-  font-size: 13px;
-  color: var(--text-secondary, #718096);
-  margin-top: 4px;
-}
-
-/* ===== 经验条 ===== */
-.profile-exp-section {
-  margin-bottom: 14px;
-}
-
-.profile-exp-labels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--text-secondary, #4a5568);
-  margin-bottom: 6px;
-}
-
+/* ===== 经验条（信息栏/通用） ===== */
 .profile-exp-bar {
   height: 10px;
   background: var(--surface-alt, #edf2f7);
@@ -121,7 +283,7 @@
 /* ===== 信息网格 ===== */
 .profile-info-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 10px;
 }
 
@@ -143,35 +305,11 @@
   word-break: break-all;
 }
 
-/* ===== 概要卡片 ===== */
-.profile-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
-}
-
-.profile-summary-item {
-  padding: 16px;
-  text-align: center;
-}
-
-.profile-summary-value {
-  font-size: 22px;
-  font-weight: 700;
-  color: #6366f1;
-}
-
-.profile-summary-label {
-  font-size: 12px;
-  color: var(--text-secondary, #718096);
-  margin-top: 6px;
-}
-
 /* ===== 战绩统计 ===== */
 .profile-stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 10px;
 }
 
 .profile-stat-item {
@@ -184,6 +322,12 @@
 .profile-stat-value {
   font-size: 22px;
   font-weight: 700;
+}
+
+/* 关键指标（胜率）突出显示 */
+.profile-stat-value.highlight {
+  color: #6366f1;
+  font-size: 24px;
 }
 
 .profile-stat-label {
@@ -421,4 +565,95 @@
   font-size: 12px;
   color: var(--text-secondary, #718096);
   margin-top: 4px;
+}
+
+/* ===== 响应式 ===== */
+/* 中等 PC：信息栏收窄 */
+@media (max-width: 1200px) {
+  .profile-page {
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 16px;
+  }
+}
+
+/* 窄屏/平板：单栏，信息栏变顶部摘要（不再 sticky） */
+@media (max-width: 1000px) {
+  .profile-page {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .profile-aside {
+    position: static;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 14px 20px;
+    align-items: center;
+  }
+
+  .profile-aside-head {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    min-width: 120px;
+  }
+
+  .profile-aside-level {
+    grid-column: 2;
+  }
+
+  .profile-aside-stats {
+    grid-column: 2;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .profile-aside-actions {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .profile-aside-btn {
+    flex: 1;
+    min-width: 130px;
+  }
+
+  .profile-duo-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 移动端：进一步堆叠 */
+@media (max-width: 768px) {
+  .profile-page {
+    padding: 0 0 16px;
+  }
+
+  .profile-aside {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-aside-head {
+    grid-column: 1;
+    grid-row: auto;
+    min-width: 0;
+  }
+
+  .profile-aside-level,
+  .profile-aside-stats {
+    grid-column: 1;
+  }
+
+  .profile-aside-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .profile-tabs {
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .profile-tab {
+    flex-shrink: 0;
+    padding: 8px 14px;
+  }
 }
