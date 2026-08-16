@@ -4253,6 +4253,157 @@
       const savedAdminToken = localStorage.getItem('adminToken');
       const savedUserToken = localStorage.getItem('userToken');
 
+      // 统一注册管理员 socket 监听器（消除三个登录路径的重复代码）
+      // 注意：必须定义在 if (savedAdminToken) 外层。块内函数声明在未进入该块时
+      // 绑定保持 undefined，首次打开页面（只有 userToken）时调用会报 is not a function
+      function setupAdminSocketListeners(socket) {
+        socket.on('admin_update', (data) => {
+          adminData.stats = data.stats || {};
+          adminData.users = data.users || [];
+          adminData.games = data.games || [];
+          if (data.accounts) {
+            adminData.accounts = data.accounts;
+          }
+          renderStats();
+          renderSystemInfo(adminData.stats?.system);
+          if (currentView === 'users') renderOnlineUsers();
+          if (currentView === 'games') renderGames();
+          if (currentView === 'matches') loadLiveMatches();
+          if (currentView === 'accounts') renderAccounts();
+          if (currentView === 'dashboard') {
+            renderUserBreakdown();
+            renderGameDistribution();
+            renderRecentGames();
+            renderOnlineUsersDetail();
+            loadRecentGames();
+          }
+        });
+
+        // 操作结果反馈
+        socket.on('admin_action_result', (data) => {
+          if (data.success) {
+            showToast(data.message || '操作成功', 'success');
+            if (data.action === 'maintenance_mode') {
+              loadSystemStats();
+            }
+          } else {
+            showToast(data.message || '操作失败', 'error');
+          }
+        });
+
+        // 账号列表更新事件
+        socket.on('admin_accounts_updated', () => {
+          loadAccounts();
+        });
+
+        // 排行榜数据（仪表盘已移除排行榜卡片，仅保留数据缓存）
+        socket.on('admin_leaderboard', (data) => {
+          adminData.leaderboard = data.leaderboard || [];
+        });
+
+        // 游戏历史
+        socket.on('admin_game_history', (data) => {
+          showGameHistoryModal(data.history || []);
+        });
+        socket.on('admin_recent_games', (data) => {
+          adminData.recentGames = data.games || [];
+          if (currentView === 'dashboard') renderRecentGames();
+        });
+
+        // 系统配置
+        socket.on('admin_config', (data) => {
+          showConfigModal(data.config || {});
+        });
+
+        // 用户详情
+        socket.on('admin_user_detail', (data) => {
+          showUserDetailModal(data);
+        });
+
+        // 聊天记录
+        socket.on('admin_chat_history', (data) => {
+          adminData.chatMessages = data.history || [];
+          if (currentView === 'chat') renderChatMessages();
+        });
+
+        // 日志数据
+        socket.on('admin_logs', (data) => {
+          showLogsModal(data.logs || []);
+        });
+
+        // 账号列表
+        socket.on('admin_accounts_list', (data) => {
+          adminData.accounts = data.accounts || [];
+          if (currentView === 'accounts') renderAccounts();
+        });
+
+        // 等级经验配置
+        socket.on('level_exp_config', (data) => {
+          adminData.levelExpConfig = data.levelExp || {};
+        });
+
+        // 系统统计
+        socket.on('admin_system_stats', (data) => {
+          if (data) {
+            adminData.stats = { ...adminData.stats };
+            if (data.totalUsers !== undefined) adminData.stats.totalUsers = data.totalUsers;
+            if (data.onlineUsers !== undefined) adminData.stats.onlineUsers = data.onlineUsers;
+            if (data.activeGames !== undefined) adminData.stats.activeGames = data.activeGames;
+            if (data.todayUsers !== undefined) adminData.stats.todayUsers = data.todayUsers;
+            if (data.peakOnline !== undefined) adminData.stats.peakOnline = data.peakOnline;
+            if (data.totalConnections !== undefined) adminData.stats.totalConnections = data.totalConnections;
+            if (data.totalRegisteredUsers !== undefined) adminData.stats.totalRegisteredUsers = data.totalRegisteredUsers;
+            if (data.totalGamesPlayed !== undefined) adminData.stats.totalGamesPlayed = data.totalGamesPlayed;
+            renderStats();
+            renderSystemInfo(adminData.stats?.system);
+            if (data.maintenance) {
+              updateMaintenanceUI(data.maintenance.enabled, data.maintenance);
+            }
+          }
+        });
+
+        // 物品列表
+        socket.on('admin_items_list', (data) => {
+          debugLog('收到 admin_items_list:', data);
+          if (data.success) {
+            mailItemList = data.items || [];
+            mailPackList = data.packs || [];
+            mailCosmeticList = data.cosmetics || [];
+            mailVipList = data.vip || [];
+            renderMailItems(mailItemList);
+            renderMailPacks(mailPackList);
+            renderMailCosmetics(mailCosmeticList);
+            renderMailVip(mailVipList);
+            renderGrantItems(mailItemList);
+          }
+        });
+
+        // 用户选择列表
+        socket.on('admin_users_select_list', (data) => {
+          if (data.success && pendingUserListId) {
+            renderUserList(data.users, pendingUserListId);
+          }
+        });
+
+        // 经验记录数据
+        socket.on('admin_exp_records', (data) => {
+          handleExpRecordsData(data);
+        });
+
+        // 星钻记录数据
+        socket.on('admin_coin_records', (data) => {
+          handleCoinRecordsData(data);
+        });
+
+        // 邮件记录数据
+        socket.on('admin_mail_records', (data) => {
+          handleMailRecordsData(data);
+        });
+
+        // 系统设置事件
+        bindSettingsSocketEvents();
+      }
+
       // 优先使用 adminToken
       if (savedAdminToken) {
         socket = io('/admin', {
@@ -4316,156 +4467,6 @@
           showToast(`重新连接成功 (尝试 ${attemptNumber})`, 'success');
           loadDashboardData();
         });
-
-        // 统一注册管理员 socket 监听器（消除三个登录路径的重复代码）
-        function setupAdminSocketListeners(socket) {
-          socket.on('admin_update', (data) => {
-            adminData.stats = data.stats || {};
-            adminData.users = data.users || [];
-            adminData.games = data.games || [];
-            if (data.accounts) {
-              adminData.accounts = data.accounts;
-            }
-            renderStats();
-            renderSystemInfo(adminData.stats?.system);
-            if (currentView === 'users') renderOnlineUsers();
-            if (currentView === 'games') renderGames();
-            if (currentView === 'matches') loadLiveMatches();
-            if (currentView === 'accounts') renderAccounts();
-            if (currentView === 'dashboard') {
-              renderUserBreakdown();
-              renderGameDistribution();
-              renderRecentGames();
-              renderOnlineUsersDetail();
-              loadRecentGames();
-            }
-          });
-
-          // 操作结果反馈
-          socket.on('admin_action_result', (data) => {
-            if (data.success) {
-              showToast(data.message || '操作成功', 'success');
-              if (data.action === 'maintenance_mode') {
-                loadSystemStats();
-              }
-            } else {
-              showToast(data.message || '操作失败', 'error');
-            }
-          });
-
-          // 账号列表更新事件
-          socket.on('admin_accounts_updated', () => {
-            loadAccounts();
-          });
-
-          // 排行榜数据
-          socket.on('admin_leaderboard', (data) => {
-            adminData.leaderboard = data.leaderboard || [];
-            if (currentView === 'dashboard') renderLeaderboard();
-          });
-
-          // 游戏历史
-          socket.on('admin_game_history', (data) => {
-            showGameHistoryModal(data.history || []);
-          });
-          socket.on('admin_recent_games', (data) => {
-            adminData.recentGames = data.games || [];
-            if (currentView === 'dashboard') renderRecentGames();
-          });
-
-          // 系统配置
-          socket.on('admin_config', (data) => {
-            showConfigModal(data.config || {});
-          });
-
-          // 用户详情
-          socket.on('admin_user_detail', (data) => {
-            showUserDetailModal(data);
-          });
-
-          // 聊天记录
-          socket.on('admin_chat_history', (data) => {
-            adminData.chatMessages = data.history || [];
-            if (currentView === 'chat') renderChatMessages();
-          });
-
-          // 日志数据
-          socket.on('admin_logs', (data) => {
-            showLogsModal(data.logs || []);
-          });
-
-          // 账号列表
-          socket.on('admin_accounts_list', (data) => {
-            adminData.accounts = data.accounts || [];
-            if (currentView === 'accounts') renderAccounts();
-          });
-
-          // 等级经验配置
-          socket.on('level_exp_config', (data) => {
-            adminData.levelExpConfig = data.levelExp || {};
-          });
-
-          // 系统统计
-          socket.on('admin_system_stats', (data) => {
-            if (data) {
-              adminData.stats = { ...adminData.stats };
-              if (data.totalUsers !== undefined) adminData.stats.totalUsers = data.totalUsers;
-              if (data.onlineUsers !== undefined) adminData.stats.onlineUsers = data.onlineUsers;
-              if (data.activeGames !== undefined) adminData.stats.activeGames = data.activeGames;
-              if (data.todayUsers !== undefined) adminData.stats.todayUsers = data.todayUsers;
-              if (data.peakOnline !== undefined) adminData.stats.peakOnline = data.peakOnline;
-              if (data.totalConnections !== undefined) adminData.stats.totalConnections = data.totalConnections;
-              if (data.totalRegisteredUsers !== undefined) adminData.stats.totalRegisteredUsers = data.totalRegisteredUsers;
-              if (data.totalGamesPlayed !== undefined) adminData.stats.totalGamesPlayed = data.totalGamesPlayed;
-              renderStats();
-              renderSystemInfo(adminData.stats?.system);
-              if (data.maintenance) {
-                updateMaintenanceUI(data.maintenance.enabled, data.maintenance);
-              }
-            }
-          });
-
-          // 物品列表
-          socket.on('admin_items_list', (data) => {
-            debugLog('收到 admin_items_list:', data);
-            if (data.success) {
-              mailItemList = data.items || [];
-              mailPackList = data.packs || [];
-              mailCosmeticList = data.cosmetics || [];
-              mailVipList = data.vip || [];
-              renderMailItems(mailItemList);
-              renderMailPacks(mailPackList);
-              renderMailCosmetics(mailCosmeticList);
-              renderMailVip(mailVipList);
-              renderGrantItems(mailItemList);
-            }
-          });
-
-          // 用户选择列表
-          socket.on('admin_users_select_list', (data) => {
-            if (data.success && pendingUserListId) {
-              renderUserList(data.users, pendingUserListId);
-            }
-          });
-
-          // 经验记录数据
-          socket.on('admin_exp_records', (data) => {
-            handleExpRecordsData(data);
-          });
-
-          // 星钻记录数据
-          socket.on('admin_coin_records', (data) => {
-            handleCoinRecordsData(data);
-          });
-
-          // 邮件记录数据
-          socket.on('admin_mail_records', (data) => {
-            handleMailRecordsData(data);
-          });
-
-          // 系统设置事件
-          bindSettingsSocketEvents();
-        }
 
         setupAdminSocketListeners(socket);
       } else if (savedUserToken) {
