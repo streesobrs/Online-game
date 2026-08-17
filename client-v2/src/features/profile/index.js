@@ -20,6 +20,8 @@ import { modal } from '../../components/modal.js';
 import { store } from '../../core/store.js';
 import { eventBus } from '../../core/eventBus.js';
 import { NAV_ITEMS } from '../../data/navItems.js';
+import * as auth from '../../core/auth.js';
+import { requestReplay, showReplay } from '../replay/index.js';
 
 /** 游戏类型展示元数据 */
 const GAME_META = {
@@ -74,6 +76,37 @@ function formatDate(ts) {
 function formatDuration(sec) {
   if (!sec && sec !== 0) return '-';
   return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+}
+
+/**
+ * 修改/设置密码弹窗（对齐 v1 profile.html 账号设置 changePassword / setPassword）
+ * 校验失败时复用输入框元素重开弹窗，避免输入内容丢失。
+ * @param {boolean} hasPassword - 账号是否已设置密码（决定「修改密码」还是「设置密码」）
+ */
+function openPasswordModal(hasPassword) {
+  const oldEl = el('input', { type: 'password', class: 'input', placeholder: '当前密码' });
+  const newEl = el('input', { type: 'password', class: 'input', placeholder: '新密码（至少6位）' });
+  const new2El = el('input', { type: 'password', class: 'input', placeholder: '再次输入新密码' });
+  const inputs = hasPassword ? [oldEl, newEl, new2El] : [newEl, new2El];
+  inputs.forEach((i) => { i.style.width = '100%'; i.style.marginBottom = '10px'; });
+
+  const show = () => modal.show({
+    title: hasPassword ? '🔑 修改密码' : '🔑 设置密码',
+    content: el('div', { style: 'padding:4px 0;' }, inputs),
+    confirmText: '确认',
+    showCancel: true,
+    cancelText: '取消',
+    onConfirm: () => {
+      if (hasPassword && !oldEl.value.trim()) { toast.warn('请输入当前密码'); show(); return; }
+      const p = newEl.value;
+      if (p.length < 6) { toast.warn('新密码至少6位'); show(); return; }
+      if (p !== new2El.value) { toast.warn('两次密码输入不一致'); show(); return; }
+      if (hasPassword) auth.changePassword(oldEl.value, p);
+      else auth.setPassword(p);
+      toast.info('正在提交...');
+    },
+  });
+  show();
 }
 
 /**
@@ -329,6 +362,13 @@ export function renderProfile(container) {
               el('div', { class: 'profile-info-label' }, c.label),
               el('div', { class: 'profile-info-value' }, c.value),
             ]))),
+          // 修改/设置密码入口（对齐 v1 账号设置）
+          el('div', { style: 'margin-top:14px;text-align:center;' },
+            el('button', {
+              class: 'btn btn-secondary',
+              style: 'padding:6px 18px;font-size:13px;',
+              onClick: () => openPasswordModal(!!account.hasPassword),
+            }, account.hasPassword ? '🔑 修改密码' : '🔑 设置密码')),
         ]),
         el('div', { class: 'panel profile-card' }, [
           el('div', { class: 'profile-section-title' }, '🏆 战绩统计'),
@@ -871,6 +911,21 @@ export function renderProfile(container) {
         el('div', { class: 'profile-history-meta' },
           `🎯 对手 ${g.opponent || 'AI'} · 📍 ${g.moves || 0} 回合 · ⏱ ${formatDuration(g.duration)} · 📅 ${formatDate(g.date)}`),
       ]),
+      // 回放按钮（对齐 v1 games-history.html「🎬 回放」）
+      el('button', {
+        class: 'profile-history-replay',
+        title: '查看本局回放',
+        onClick: async () => {
+          if (!g.gameId) { toast.warn('该对局无回放记录'); return; }
+          toast.info('⏳ 加载回放中...');
+          try {
+            const replay = await requestReplay(g.gameId);
+            showReplay(replay);
+          } catch (e) {
+            toast.error(e.message || '回放加载失败');
+          }
+        },
+      }, '🎬 回放'),
     ]);
   }
 

@@ -17,6 +17,7 @@ import { createBoard as createGoBoard } from '../../games/go/board.js';
 import { createChessBoard } from '../../games/chinese-chess/board.js';
 import { checkWin } from '../../games/gobang/rules.js';
 import { getChessMoves, isValidMove, isCheckmate } from '../../games/chinese-chess/rules.js';
+import { requestUndo, requestHint, clearHintMarkers, showHintMarker } from '../../games/board-actions.js';
 import { emit } from '../../core/socket.js';
 import { eventBus } from '../../core/eventBus.js';
 import { el } from '../../utils/dom.js';
@@ -78,6 +79,8 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
   const turnEl = el('span', { class: 'ai-info-tag' });
   const timerEl = el('span', { class: 'ai-info-tag' });
   const diffEl = el('span', { class: 'ai-info-tag' });
+  const undoBtn = el('button', { class: 'btn btn-secondary', style: 'padding:4px 12px;font-size:13px;' }, '⏪ 悔棋');
+  const hintBtn = el('button', { class: 'btn btn-secondary', style: 'padding:4px 12px;font-size:13px;' }, '💡 提示');
   const backBtn = el('button', { class: 'btn btn-secondary', style: 'padding:4px 12px;font-size:13px;margin-left:auto;' }, '返回AI入口');
 
   function updateTurn() {
@@ -101,6 +104,7 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
     board = createBoard(boardEl, {
       onPlace: (r, c) => {
         if (gameOver || !myTurn) { toast.warn('还没轮到你落子'); return; }
+        clearHintMarkers(boardEl); // 落子后清除提示标记
         board.place(r, c, me);
         myTurn = false;
         updateTurn();
@@ -116,6 +120,7 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
     board = createGoBoard(boardEl, {
       onPlace: (r, c) => {
         if (gameOver || !myTurn) { toast.warn('还没轮到你落子'); return; }
+        clearHintMarkers(boardEl); // 落子后清除提示标记
         board.place(r, c, me);
         myTurn = false;
         updateTurn();
@@ -140,6 +145,7 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
           if (isValidMove(board.board, selected.r, selected.c, r, c)) {
             const fromR = selected.r, fromC = selected.c;
             const pieceName = board.get(fromR, fromC).name;
+            clearHintMarkers(boardEl); // 走子后清除提示标记
             board.movePiece(fromR, fromC, r, c);
             board.setLastMove(r, c);
             board.clearSelection();
@@ -164,7 +170,7 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
 
   container.innerHTML = '';
   container.append(
-    el('div', { class: 'ai-match-info', style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;max-width:724px;width:100%;' }, [turnEl, diffEl, timerEl, backBtn]),
+    el('div', { class: 'ai-match-info', style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;max-width:724px;width:100%;' }, [turnEl, diffEl, timerEl, undoBtn, hintBtn, backBtn]),
     boardEl
   );
 
@@ -287,6 +293,56 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
   offs.push(eventBus.on('ai:gameEnd', (data) => {
     if (gameOver || resultSent) return;
     finishGame(data.result === 'win' ? 'win' : 'loss');
+  }));
+
+  // ---- 悔棋（对齐 v1：AI 对局由服务端直接执行悔棋，无需对手确认）----
+  undoBtn.addEventListener('click', () => {
+    if (gameOver) { toast.warn('游戏已结束，无法悔棋'); return; }
+    if (!myTurn) { toast.warn('AI 思考中，暂时无法悔棋'); return; }
+    requestUndo(() => {
+      emit('undo_request');
+      toast.info('⏪ 悔棋请求已发送…');
+    });
+  });
+
+  // 悔棋成功：用服务端棋盘恢复（撤销玩家与 AI 各一步）
+  offs.push(eventBus.on('game:undoAccepted', (data) => {
+    if (data.isAI === false) return; // 只处理 AI 对局的悔棋回执
+    if (!data.board) return;
+    if (gameType === 'chinese-chess') {
+      const layout = convertBackendBoardToFrontend(data.board);
+      if (layout) board.init(layout);
+      board.clearSelection();
+      selected = null;
+    } else {
+      board.restore(data.board, data.currentPlayer);
+    }
+    gameOver = false;
+    myTurn = true; // 悔棋后轮到玩家
+    updateTurn();
+    toast.success('✅ 悔棋成功，轮到你了');
+  }));
+
+  // ---- 提示（对齐 v1：request_hint → hint_result 高亮推荐位置）----
+  hintBtn.addEventListener('click', () => {
+    if (gameOver) { toast.warn('游戏已结束'); return; }
+    if (!myTurn) { toast.warn('AI 思考中，暂时无法提示'); return; }
+    requestHint(() => {
+      emit('request_hint');
+      toast.info('💡 正在计算最佳位置...');
+    });
+  });
+
+  // 提示结果：高亮推荐位置（gobang/go 落子点 / 象棋起点+目标）
+  offs.push(eventBus.on('game:hintResult', (data) => {
+    if (data.gameType && data.gameType !== gameType) return;
+    showHintMarker(boardEl, data.move);
+    toast.info(data.reason || '💡 建议位置');
+  }));
+
+  // 提示次数不足
+  offs.push(eventBus.on('game:hintDeduct', (data) => {
+    if (data && data.success === false && data.message) toast.warn(data.message);
   }));
 
   // ---- 结束流程 ----

@@ -55,3 +55,68 @@
 .snake-virtual-btn:active {
   transform: scale(0.95);
 }
+
+/* ===== 贪吃蛇道具栏（对齐 v1 snake-item-bar）===== */
+.snake-item-bar {
+  margin: 10px auto;
+  padding: 8px 12px;
+  max-width: 500px;
+  background: var(--theme-panel-bg, #ffffff);
+  border: 1px solid var(--theme-border, #e9ecef);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.snake-item-bar-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.snake-item-bar-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--theme-text);
+}
+
+.snake-item-bar-hint {
+  font-size: 12px;
+  color: var(--theme-text-secondary, #6c757d);
+}
+
+.snake-item-bar-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 36px;
+}
+
+.snake-item-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #f0f4ff;
+  border: 1px solid #d0d8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.2s, border-color 0.2s;
+  user-select: none;
+}
+
+.snake-item-chip:hover {
+  background: #e0e8ff;
+  border-color: #9ab0e8;
+}
+
+.snake-item-chip-name {
+  font-weight: 600;
+  color: #495057;
+}
+
+.snake-item-chip-count {
+  color: #007bff;
+  font-weight: 700;
+}

@@ -568,6 +568,28 @@
   margin-top: 4px;
 }
 
+/* 历史回放按钮 */
+.profile-history-replay {
+  margin-left: auto;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  background: #9b59b6;
+  color: #fff;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+
+.profile-history-replay:hover {
+  filter: brightness(1.1);
+}
+
+.profile-history-replay:active {
+  transform: scale(0.96);
+}
+
 /* ===== 快捷键 Tab ===== */
 .profile-shortcut-list {
   display: flex;

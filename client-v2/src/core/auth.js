@@ -124,6 +124,12 @@ export function initAuth() {
     } else if (data.action === 'reset_password') {
       if (data.success) toast.success(data.message || '密码已重置，请使用新密码登录');
       else toast.error(data.message || '密码重置失败');
+    } else if (data.action === 'change_password') {
+      if (data.success) toast.success(data.message || '✅ 密码修改成功！');
+      else toast.error(data.message || '❌ 密码修改失败');
+    } else if (data.action === 'set_password') {
+      if (data.success) toast.success(data.message || '✅ 密码设置成功！');
+      else toast.error(data.message || '❌ 密码设置失败');
     }
   });
 
@@ -164,6 +170,23 @@ export function register(username, password, nickname = null) {
  */
 export function resetPassword(username, newPassword) {
   emit('account_reset_password', { username, password: newPassword });
+}
+
+/**
+ * 修改密码（已设置密码的账号，需旧密码校验 → account_action_result action='change_password'）
+ * @param {string} oldPassword
+ * @param {string} newPassword
+ */
+export function changePassword(oldPassword, newPassword) {
+  emit('account_change_password', { oldPassword, newPassword });
+}
+
+/**
+ * 设置密码（未设置密码的账号，如游客升级 → account_action_result action='set_password'）
+ * @param {string} password
+ */
+export function setPassword(password) {
+  emit('account_set_password', { password });
 }
 
 /** 按 token 获取账号信息（自动登录） */

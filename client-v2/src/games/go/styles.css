@@ -136,6 +136,12 @@
   z-index: 10;
 }
 
+/* 提示位置高亮（对齐 v1 hint-highlight，配合全局 .hint-marker 使用） */
+.go-cell.hint-highlight {
+  background: radial-gradient(circle, rgba(255, 220, 50, 0.45) 0%, rgba(255, 165, 0, 0.25) 100%);
+  border-radius: 50%;
+}
+
 @keyframes go-pulse {
 
   0%,

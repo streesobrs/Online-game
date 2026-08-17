@@ -13,6 +13,7 @@
  */
 import { createBoard, BLACK, WHITE } from './board.js';
 import { checkWin } from './rules.js';
+import { requestUndo, requestHint, clearHintMarkers, showHintMarker } from '../board-actions.js';
 import { emit } from '../../core/socket.js';
 import { eventBus } from '../../core/eventBus.js';
 import { el } from '../../utils/dom.js';
@@ -78,6 +79,7 @@ export function startMatch(container, matchData) {
     onPlace: (r, c) => {
       if (gameOver) return;
       if (board.turn !== me) { toast.warn('还没轮到你落子'); return; }
+      clearHintMarkers(boardEl); // 落子后清除提示标记（对齐 v1）
       board.place(r, c, me);
       emit('move', { r, c, game: 'gobang' }); // 2.3.1 发送落子
       board.turn = 3 - me; // 切换到对方回合
@@ -133,7 +135,7 @@ export function startMatch(container, matchData) {
     const bar = el('div', {
       class: 'gobang-match-info',
       style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;max-width:724px;width:100%;',
-    }, [turnEl, oppEl, timerEl, undoBtn, resignBtn, resetBtn, leaveBtn]);
+    }, [turnEl, oppEl, timerEl, undoBtn, hintBtn, resignBtn, resetBtn, leaveBtn]);
     return bar;
   }
 
@@ -227,12 +229,36 @@ export function startMatch(container, matchData) {
     });
   });
 
-  // ---- 悔棋（2.4.1）----
+  // ---- 悔棋（2.4.1，含库存检查与道具卡消耗，对齐 v1 requestUndo）----
   undoBtn.addEventListener('click', () => {
     if (gameOver) { toast.warn('游戏已结束，无法悔棋'); return; }
-    emit('undo_request');
-    toast.info('⏪ 已发送悔棋请求…');
+    requestUndo(() => {
+      emit('undo_request');
+      toast.info('⏪ 已发送悔棋请求…');
+    });
   });
+
+  // ---- 提示（对齐 v1 requestHint：库存检查 + 道具卡消耗 → request_hint → hint_result 高亮）----
+  hintBtn.addEventListener('click', () => {
+    if (gameOver) { toast.warn('游戏已结束'); return; }
+    if (board.turn !== me) { toast.warn('还没轮到你落子'); return; }
+    requestHint(() => {
+      emit('request_hint');
+      toast.info('💡 正在计算最佳位置...');
+    });
+  });
+
+  // 提示结果：高亮推荐落子位置
+  offs.push(eventBus.on('game:hintResult', (data) => {
+    if (data.gameType && data.gameType !== 'gobang') return;
+    showHintMarker(boardEl, data.move);
+    toast.info(data.reason || '💡 建议位置');
+  }));
+
+  // 提示次数不足
+  offs.push(eventBus.on('game:hintDeduct', (data) => {
+    if (data && data.success === false && data.message) toast.warn(data.message);
+  }));
 
   // 收到对方悔棋请求
   offs.push(eventBus.on('game:undoRequest', (data) => {

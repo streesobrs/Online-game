@@ -13,6 +13,7 @@
  */
 import { createBoard, BLACK, WHITE, EMPTY } from './board.js';
 import { tryPlace, countScore } from './rules.js';
+import { requestUndo, requestHint, clearHintMarkers, showHintMarker } from '../board-actions.js';
 import { emit } from '../../core/socket.js';
 import { eventBus } from '../../core/eventBus.js';
 import { el } from '../../utils/dom.js';
@@ -53,6 +54,8 @@ export function startMatch(container, matchData) {
   const turnEl = el('span', { class: 'go-info-tag' });
   const oppEl = el('span', { class: 'go-info-tag' });
   const timerEl = el('span', { class: 'go-info-tag' });
+  const undoBtn = el('button', { class: 'btn btn-secondary', style: 'padding:4px 12px;font-size:13px;' }, '⏪ 悔棋');
+  const hintBtn = el('button', { class: 'btn btn-secondary', style: 'padding:4px 12px;font-size:13px;' }, '💡 提示');
   const resignBtn = el('button', { class: 'btn btn-secondary', style: 'padding:4px 12px;font-size:13px;' }, '🏳️ 认输');
   const leaveBtn = el('button', { class: 'btn btn-secondary', style: 'margin-left:auto;padding:4px 12px;font-size:13px;' }, '返回大厅');
 
@@ -101,6 +104,7 @@ export function startMatch(container, matchData) {
     onPlace: (r, c) => {
       if (gameOver) return;
       if (board.turn !== me) { toast.warn('还没轮到你落子'); return; }
+      clearHintMarkers(boardEl); // 落子后清除提示标记（对齐 v1）
       const mv = applyMove(r, c, me);
       if (!mv.ok) {
         if (mv.ko) toast.warn('❌ 打劫，不能立即回提');
@@ -159,7 +163,7 @@ export function startMatch(container, matchData) {
     const bar = el('div', {
       class: 'go-match-info',
       style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;max-width:762px;width:100%;',
-    }, [turnEl, oppEl, timerEl, resignBtn, leaveBtn]);
+    }, [turnEl, oppEl, timerEl, undoBtn, hintBtn, resignBtn, leaveBtn]);
     return bar;
   }
 
@@ -247,6 +251,7 @@ export function startMatch(container, matchData) {
     if (data.r == null || data.c == null) return;
     if (board.board[data.r]?.[data.c] !== EMPTY) return; // 位置已占用（服务端只落子，双方本地提子应一致）
 
+    clearHintMarkers(boardEl); // 对手落子同样清除提示标记
     const color = data.color === WHITE ? WHITE : BLACK;
     const mv = applyMove(data.r, data.c, color);
     if (!mv.ok) return; // 对方合法落子理论上不应出现，防御性跳过
@@ -309,6 +314,71 @@ export function startMatch(container, matchData) {
         go('lobby');
       },
     });
+  }));
+
+  // ---- 悔棋（对齐 v1：库存检查 → undo_request → 对方同意 → undo_accepted 恢复棋盘）----
+  undoBtn.addEventListener('click', () => {
+    if (gameOver) { toast.warn('游戏已结束，无法悔棋'); return; }
+    requestUndo(() => {
+      emit('undo_request');
+      toast.info('⏪ 已发送悔棋请求…');
+    });
+  });
+
+  // 收到对方悔棋请求
+  offs.push(eventBus.on('game:undoRequest', (data) => {
+    if (gameOver) return;
+    modal.show({
+      title: '悔棋请求',
+      content: `玩家 ${data.fromNickname || '对手'} 请求悔棋，是否同意？`,
+      confirmText: '同意',
+      showCancel: true,
+      onConfirm: () => emit('undo_response', { accepted: true }),
+      onCancel: () => emit('undo_response', { accepted: false }),
+    });
+  }));
+
+  // 悔棋请求已发出
+  offs.push(eventBus.on('game:undoRequestSent', (data) => {
+    toast.info(data?.message || '已发送悔棋请求，等待对手回应');
+  }));
+
+  // 悔棋成功：用服务端完整棋盘数据恢复（打劫状态重置）
+  offs.push(eventBus.on('game:undoAccepted', (data) => {
+    if (data.gameType && data.gameType !== 'go') return;
+    toast.success('✅ 悔棋成功！');
+    if (data.board) board.restore(data.board, data.currentPlayer);
+    koPosition = null;
+    koColor = null;
+    gameOver = false;
+    updateTurn();
+  }));
+
+  // 悔棋被拒绝
+  offs.push(eventBus.on('game:undoRejected', (data) => {
+    toast.error(data?.message || '悔棋请求被拒绝');
+  }));
+
+  // ---- 提示（对齐 v1：库存检查 → request_hint → hint_result 高亮推荐落子）----
+  hintBtn.addEventListener('click', () => {
+    if (gameOver) { toast.warn('游戏已结束'); return; }
+    if (board.turn !== me) { toast.warn('还没轮到你落子'); return; }
+    requestHint(() => {
+      emit('request_hint');
+      toast.info('💡 正在计算最佳位置...');
+    });
+  });
+
+  // 提示结果：高亮推荐落子位置
+  offs.push(eventBus.on('game:hintResult', (data) => {
+    if (data.gameType && data.gameType !== 'go') return;
+    showHintMarker(boardEl, data.move);
+    toast.info(data.reason || '💡 建议位置');
+  }));
+
+  // 提示次数不足
+  offs.push(eventBus.on('game:hintDeduct', (data) => {
+    if (data && data.success === false && data.message) toast.warn(data.message);
   }));
 
   // 认输（与五子棋一致：服务端无 resign 事件，走 game_result）

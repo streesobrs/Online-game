@@ -104,6 +104,7 @@ export function createSnakeBoard(container, options = {}) {
    * @param {Array<{x:number,y:number}>} [state.snake] - 己方蛇身（下标 0 为头）
    * @param {Array<{x:number,y:number}>} [state.snake2] - 对手蛇身（联机模式传入即进入双人渲染）
    * @param {Array<{x:number,y:number}>} [state.foods] - 食物数组
+   * @param {boolean} [state.invincible] - 无敌状态（复活卡 5 秒保护，金色闪烁发光，对齐 v1）
    */
   function render(state = {}) {
     if (destroyed) return;
@@ -148,9 +149,21 @@ export function createSnakeBoard(container, options = {}) {
     if (dual && Array.isArray(state.snake2) && state.snake2.length) {
       drawSnake(state.snake2, colors.head2, colors.body2);
     }
-    // 己方蛇
+    // 己方蛇（无敌时金色 + 闪烁发光，复刻 v1 renderSnakeGame）
     if (Array.isArray(state.snake) && state.snake.length) {
-      drawSnake(state.snake, dual ? colors.head1 : colors.head, dual ? colors.body1 : colors.body);
+      const invincible = !!state.invincible;
+      const blinkOn = !invincible || Math.floor(Date.now() / 150) % 2 === 0;
+      if (blinkOn) {
+        if (invincible) {
+          ctx.save();
+          ctx.shadowColor = '#ffd700';
+          ctx.shadowBlur = 15;
+          drawSnake(state.snake, '#ffd700', '#ffeb3b');
+          ctx.restore();
+        } else {
+          drawSnake(state.snake, dual ? colors.head1 : colors.head, dual ? colors.body1 : colors.body);
+        }
+      }
     }
   }
 

@@ -13,6 +13,7 @@
  */
 import { createChessBoard } from './board.js';
 import { getChessMoves, isInCheck } from './rules.js';
+import { requestUndo, requestHint } from '../board-actions.js';
 import { emit } from '../../core/socket.js';
 import { eventBus } from '../../core/eventBus.js';
 import { el } from '../../utils/dom.js';
@@ -355,11 +356,13 @@ export function startMatch(container, matchData) {
     });
   });
 
-  // ---- 悔棋（与 v1 一致：undo_request → 对手同意 → undo_accepted 恢复棋盘）----
+  // ---- 悔棋（与 v1 一致：undo_request → 对手同意 → undo_accepted 恢复棋盘；含库存检查与道具卡消耗）----
   undoBtn.addEventListener('click', () => {
     if (gameOver) { toast.warn('游戏已结束，无法悔棋'); return; }
-    emit('undo_request');
-    toast.info('⏪ 已发送悔棋请求…');
+    requestUndo(() => {
+      emit('undo_request');
+      toast.info('⏪ 已发送悔棋请求…');
+    });
   });
 
   // 收到对方悔棋请求
@@ -397,12 +400,14 @@ export function startMatch(container, matchData) {
     toast.error(data?.message || '悔棋请求被拒绝');
   }));
 
-  // ---- 提示（与 v1 一致：request_hint → 服务端 AI 计算 → hint_result 高亮走法）----
+  // ---- 提示（与 v1 一致：request_hint → 服务端 AI 计算 → hint_result 高亮走法；含库存检查与道具卡消耗）----
   hintBtn.addEventListener('click', () => {
     if (gameOver) { toast.warn('游戏已结束'); return; }
     if (turn !== me) { toast.warn('还没轮到你走子'); return; }
-    emit('request_hint');
-    toast.info('💡 正在计算最佳走法…');
+    requestHint(() => {
+      emit('request_hint');
+      toast.info('💡 正在计算最佳走法…');
+    });
   });
 
   // 提示结果：高亮起点（📤）与目标（💡）

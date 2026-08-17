@@ -151,6 +151,12 @@ const EVENT_MAP = {
   spectate_list: 'spectate:list',
   spectate_joined: 'spectate:joined',
 
+  // 帮助/反馈（提交/投票/评论等操作后服务端会广播 feedbacks_list）
+  feedbacks_list: 'feedback:list',
+  feedback_submitted: 'feedback:submitted',
+  feedback_voted: 'feedback:voted',
+  comment_added: 'feedback:commentAdded',
+
   // 系统与维护
   error: 'system:error',
   system_broadcast: 'system:broadcast',

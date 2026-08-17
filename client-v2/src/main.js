@@ -12,6 +12,7 @@ import { modal } from './components/modal.js';
 import { api } from './core/api.js';
 import { socket } from './core/socket.js';
 import * as auth from './core/auth.js';
+import { initSystemEvents } from './core/system.js';
 import { initRouter, registerRoute, go, isActive } from './core/router.js';
 import { initShortcuts } from './utils/shortcut.js';
 import { NAV_ITEMS, GAMES, FEATURES, findItem } from './data/navItems.js';
@@ -48,6 +49,9 @@ auth.initAuth();
 // 2. 初始化主题（应用 v1/v2 共享的 selectedTheme）
 themes.initThemes();
 
+// 2.1 注册全局系统事件监听（维护横幅/版本检查/管理消息/警告，补齐 v1 行为）
+initSystemEvents();
+
 /**
  * 路由懒加载（5.2.1 首屏优化）
  * 首次进入视图时才动态 import 对应模块，import 失败时不阻断路由切换
@@ -73,6 +77,7 @@ registerRoute('chat', () => renderChat(viewRoot()));
 // 已迁移模块（成就/商城/主题/快捷键）不再注册独立路由，旧路由经 ROUTE_ALIASES 重定向到个人资料页对应 Tab
 registerRoute('leaderboard', lazyView('./features/leaderboard/index.js', 'renderLeaderboard'));
 registerRoute('spectate', lazyView('./features/spectate/index.js', 'renderSpectate'));
+registerRoute('feedback', lazyView('./features/feedback/index.js', 'renderFeedback'));
 registerRoute('profile', lazyView('./features/profile/index.js', 'renderProfile'));
 
 // 4. 初始化路由（hashchange 监听 + 处理当前 hash）
