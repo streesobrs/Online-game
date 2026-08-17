@@ -613,6 +613,479 @@
   display: none;
 }
 
+/* ===== 资产明细（星钻/经验记录） ===== */
+.profile-tx-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.profile-tx-tab {
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--surface, #fff);
+  color: var(--text-secondary, #4a5568);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.profile-tx-tab:hover {
+  border-color: #6366f1;
+  color: #6366f1;
+}
+
+.profile-tx-tab.active {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: #fff;
+}
+
+.profile-tx-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-tx-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-alt, #f7fafc);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.profile-tx-icon {
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
+.profile-tx-reason {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text, #2d3748);
+}
+
+.profile-tx-amount {
+  flex-shrink: 0;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.profile-tx-amount.earn {
+  color: #48bb78;
+}
+
+.profile-tx-amount.spend {
+  color: #e53e3e;
+}
+
+.profile-tx-time {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-secondary, #718096);
+  white-space: nowrap;
+}
+
+/* ===== 等级奖励 ===== */
+.profile-reward-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.profile-reward-claim-all {
+  border: none;
+  background: #f6ad55;
+  color: #fff;
+  border-radius: 14px;
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.profile-reward-claim-all:hover {
+  background: #ed8936;
+}
+
+.profile-reward-progress {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.profile-reward-line {
+  flex: 1;
+  height: 3px;
+  background: var(--border-color, #e2e8f0);
+}
+
+.profile-reward-line.claimed {
+  background: #48bb78;
+}
+
+.profile-reward-dot {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-alt, #edf2f7);
+  border: 2px solid var(--border-color, #cbd5e0);
+  color: var(--text-secondary, #718096);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: default;
+}
+
+.profile-reward-dot.active {
+  border-color: #6366f1;
+  color: #6366f1;
+}
+
+.profile-reward-dot.available {
+  background: #f6ad55;
+  border-color: #ed8936;
+  color: #fff;
+  cursor: pointer;
+  animation: reward-dot-pulse 1.2s ease infinite;
+}
+
+.profile-reward-dot.claimed {
+  background: #48bb78;
+  border-color: #38a169;
+  color: #fff;
+}
+
+@keyframes reward-dot-pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(246, 173, 85, 0.5);
+  }
+
+  50% {
+    box-shadow: 0 0 0 6px rgba(246, 173, 85, 0);
+  }
+}
+
+.profile-reward-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-reward-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface-alt, #f7fafc);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+
+.profile-reward-row.available {
+  background: #fffaf0;
+  border: 1px solid #fbd38d;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.profile-reward-row.available:hover {
+  border-color: #ed8936;
+}
+
+.profile-reward-row.claimed {
+  opacity: 0.6;
+}
+
+.profile-reward-lv {
+  flex-shrink: 0;
+  min-width: 44px;
+  font-weight: 700;
+  color: #6366f1;
+}
+
+.profile-reward-desc {
+  flex: 1;
+  min-width: 0;
+  color: var(--text, #2d3748);
+}
+
+.profile-reward-badge {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  border: none;
+  background: none;
+}
+
+.profile-reward-badge.grab {
+  color: #fff;
+  background: #48bb78;
+  border-radius: 12px;
+  padding: 3px 12px;
+  cursor: pointer;
+}
+
+.profile-reward-badge.grab:hover {
+  background: #38a169;
+}
+
+.profile-reward-badge.claimed {
+  color: #48bb78;
+}
+
+.profile-reward-badge.locked {
+  color: var(--text-secondary, #a0aec0);
+}
+
+/* ===== 勋章 ===== */
+.profile-badge-count {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary, #718096);
+}
+
+.profile-badge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 12px;
+}
+
+.profile-badge-item {
+  background: var(--surface-alt, #f7fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  padding: 12px 8px;
+  text-align: center;
+  cursor: default;
+  transition: transform 0.15s;
+}
+
+.profile-badge-item:hover {
+  transform: translateY(-2px);
+}
+
+.profile-badge-icon {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  margin: 0 auto 6px;
+  display: block;
+}
+
+.profile-badge-emoji {
+  font-size: 34px;
+  line-height: 44px;
+}
+
+.profile-badge-name {
+  font-size: 11px;
+  color: var(--text-secondary, #4a5568);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ===== 邮箱 ===== */
+.profile-mail-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.profile-mail-tab {
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--surface, #fff);
+  color: var(--text-secondary, #4a5568);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.profile-mail-tab:hover {
+  border-color: #6366f1;
+  color: #6366f1;
+}
+
+.profile-mail-tab.active {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: #fff;
+}
+
+.profile-mail-spacer {
+  flex: 1;
+}
+
+.profile-mail-action {
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--surface, #fff);
+  color: var(--text-secondary, #4a5568);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.profile-mail-action:hover {
+  border-color: #48bb78;
+  color: #48bb78;
+}
+
+.profile-mail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-mail-item {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border-color, #dee2e6);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.profile-mail-item.unread {
+  border-left: 3px solid #6366f1;
+  background: #f8faff;
+}
+
+.profile-mail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.profile-mail-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text, #2d3748);
+}
+
+.profile-mail-status {
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.profile-mail-content {
+  font-size: 12px;
+  color: var(--text, #4a5568);
+  margin-bottom: 6px;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.profile-mail-rewards {
+  margin: 6px 0;
+  padding: 8px 10px;
+  background: #f0f9ff;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.profile-mail-reward-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.profile-mail-reward-row:last-child {
+  margin-bottom: 0;
+}
+
+.profile-mail-reward-label {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 700;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
+.profile-mail-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #fff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  font-size: 11px;
+  color: #1e40af;
+  white-space: nowrap;
+}
+
+.profile-mail-meta {
+  font-size: 11px;
+  color: #a0aec0;
+  margin-top: 4px;
+}
+
+.profile-mail-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.profile-mail-btn {
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--surface, #fff);
+  color: var(--text-secondary, #4a5568);
+  border-radius: 6px;
+  padding: 4px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.profile-mail-btn:hover:not(:disabled) {
+  border-color: #6366f1;
+  color: #6366f1;
+}
+
+.profile-mail-btn.primary {
+  background: #48bb78;
+  border-color: #48bb78;
+  color: #fff;
+}
+
+.profile-mail-btn.primary:hover:not(:disabled) {
+  background: #38a169;
+  color: #fff;
+}
+
+.profile-mail-btn.danger:hover:not(:disabled) {
+  border-color: #e53e3e;
+  color: #e53e3e;
+}
+
+.profile-mail-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ===== 响应式 ===== */
 /* 中等 PC：信息栏收窄 */
 @media (max-width: 1200px) {
@@ -702,5 +1175,19 @@
   .profile-tab {
     flex-shrink: 0;
     padding: 8px 14px;
+  }
+
+  /* 小屏：记录/邮件布局收紧 */
+  .profile-tx-item,
+  .profile-reward-row {
+    flex-wrap: wrap;
+  }
+
+  .profile-tx-time {
+    display: none;
+  }
+
+  .profile-mail-btn {
+    padding: 4px 10px;
   }
 }

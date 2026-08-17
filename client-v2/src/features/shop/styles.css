@@ -38,6 +38,38 @@
   margin: 8px 0 16px;
 }
 
+/* 一级视图（商城 / 背包） */
+.shop-view-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--border-color, #e2e8f0);
+}
+
+.shop-view-tab {
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--surface, #fff);
+  color: var(--text-secondary, #4a5568);
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.shop-view-tab:hover {
+  border-color: #6366f1;
+  color: #6366f1;
+}
+
+.shop-view-tab.active {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-color: transparent;
+  color: #fff;
+}
+
 .shop-tab {
   border: 1px solid var(--border-color, #e2e8f0);
   background: var(--surface, #fff);
@@ -86,6 +118,22 @@
   font-size: 36px;
   text-align: center;
   margin-bottom: 8px;
+  position: relative;
+}
+
+.shop-tradable-badge {
+  position: absolute;
+  top: -8px;
+  right: -6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #718096;
+  background: #edf2f7;
+  border: 1px solid #cbd5e0;
+  border-radius: 10px;
+  padding: 1px 7px;
+  white-space: nowrap;
+  line-height: 1.5;
 }
 
 .shop-card-name {
@@ -164,6 +212,12 @@
   background: #4f46e5;
 }
 
+.shop-buy-btn:disabled {
+  background: #e2e8f0;
+  color: #a0aec0;
+  cursor: not-allowed;
+}
+
 .shop-use-btn {
   background: #48bb78;
   color: #fff;
@@ -218,4 +272,101 @@
 
 .shop-qty-input:focus {
   border-color: #6366f1;
+}
+
+/* ===== 会员特权横向对比表（对齐 v1 商城） ===== */
+.shop-vip-compare {
+  margin-top: 24px;
+  overflow-x: auto;
+}
+
+.vip-compare-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text, #2d3748);
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.vip-compare-table {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-color, #dee2e6);
+  border-radius: 8px;
+  overflow: hidden;
+  min-width: 640px;
+}
+
+.vip-compare-row {
+  display: grid;
+  grid-template-columns: 180px repeat(5, 1fr);
+  background: var(--surface, #fff);
+}
+
+.vip-compare-row:nth-child(even) {
+  background: var(--surface-alt, #f8f9fa);
+}
+
+.vip-compare-row.header {
+  background: #f1f3f5;
+  font-weight: 700;
+  border-bottom: 2px solid #ced4da;
+}
+
+.vip-compare-row.header .vip-compare-cell {
+  color: #495057;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.vip-compare-cell {
+  padding: 12px 10px;
+  font-size: 13px;
+  text-align: center;
+  color: var(--text, #495057);
+  border-right: 1px solid var(--border-color, #e9ecef);
+  border-bottom: 1px solid var(--border-color, #e9ecef);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.4;
+}
+
+.vip-compare-row:last-child .vip-compare-cell {
+  border-bottom: none;
+}
+
+.vip-compare-cell:last-child {
+  border-right: none;
+}
+
+.vip-compare-cell.cell-label {
+  text-align: left;
+  font-weight: 600;
+  justify-content: flex-start;
+  padding-left: 16px;
+  background: #f8f9fa;
+  color: var(--text, #495057);
+}
+
+.vip-compare-row:nth-child(even) .vip-compare-cell.cell-label {
+  background: #e9ecef;
+}
+
+/* ===== 背包视图 ===== */
+.shop-inventory {
+  margin-top: 4px;
+}
+
+.shop-inv-section {
+  margin-bottom: 24px;
+}
+
+.shop-inv-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text, #2d3748);
+  margin-bottom: 12px;
+  padding-left: 8px;
+  border-left: 3px solid #6366f1;
 }

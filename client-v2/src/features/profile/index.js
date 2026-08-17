@@ -29,6 +29,18 @@ const GAME_META = {
   snake: { name: '贪吃蛇', icon: '🐍' },
 };
 
+/** 等级里程碑奖励（对齐服务端 config.levelRewards.milestones） */
+const LEVEL_REWARD_MILESTONES = [
+  { level: 5, desc: '获得100💎 + 🧪经验药水×3 + ↩️悔棋卡×1' },
+  { level: 10, desc: '获得250💎 + 🧪经验药水×5 + ✨双倍经验卡×2 + 💡提示卡×3 + 💎7天月卡' },
+  { level: 15, desc: '获得500💎 + 🧪经验药水×10 + ✨双倍经验卡×3 + ↩️悔棋卡×3' },
+  { level: 20, desc: '获得800💎 + 限定徽章 + 🧪经验药水×10 + ✨双倍经验卡×5 + 💡提示卡×5 + 🍀幸运符×1 + 💎30天月卡' },
+  { level: 25, desc: '获得1200💎 + 称号"棋坛精英" + 🌟三倍经验卡×2 + ↩️悔棋卡×5 + 💡提示卡×5' },
+  { level: 30, desc: '获得1800💎 + 限定徽章 + 🌟三倍经验卡×3 + 🧪经验药水×20 + 🍀幸运符×3 + 💎30天月卡' },
+  { level: 40, desc: '获得3000💎 + 称号"传奇大师" + 🌟三倍经验卡×5 + 🧪经验药水×30 + 🚀等级直升券×1 + 💎30天月卡' },
+  { level: 50, desc: '获得5000💎 + 限定徽章 + 称号"至尊棋圣" + 🌟三倍经验卡×10 + 🧪经验药水×50 + 🚀等级直升券×3 + 🍀幸运符×5 + 💎30天月卡' },
+];
+
 /** 当前用户 ID（与 v1 一致） */
 function currentUserId() {
   return localStorage.getItem('currentAccountId') || '';
@@ -70,7 +82,7 @@ function formatDuration(sec) {
  * @returns {Function} cleanup 函数
  */
 export function renderProfile(container) {
-  const PROFILE_TAB_KEYS = ['info', 'avatar', 'history', 'achievements', 'shop', 'themes', 'shortcuts'];
+  const PROFILE_TAB_KEYS = ['info', 'avatar', 'history', 'mail', 'assets', 'rewards', 'achievements', 'shop', 'themes', 'shortcuts'];
   const INIT_TAB = store.get('profile.initTab');
   let activeTab = PROFILE_TAB_KEYS.includes(INIT_TAB) ? INIT_TAB : 'info';
   store.set('profile.initTab', null); // 初始 Tab 已消费，避免下次进入仍停留在上次 Tab
@@ -81,6 +93,11 @@ export function renderProfile(container) {
   let historyData = [];
   let historyFilter = { type: 'all', result: 'all' };
   let embeddedCleanup = null; // 嵌入视图（成就/商城/主题）的清理函数
+  // 邮箱 / 资产明细
+  let mails = null; // null = 尚未加载
+  let mailFilter = 'unread'; // 'unread' | 'all'
+  let txCache = { currency: null, exp: null }; // 星钻/经验记录缓存
+  let txTab = 'currency'; // 'currency' | 'exp'
 
   const asideEl = el('aside', { class: 'panel profile-aside' });
   const tabsEl = el('div', { class: 'profile-tabs' });
@@ -91,16 +108,18 @@ export function renderProfile(container) {
   async function loadAll() {
     const userId = currentUserId();
     try {
-      const [proRes, expRes, cosRes, cfgRes] = await Promise.all([
+      const [proRes, expRes, cosRes, cfgRes, mailRes] = await Promise.all([
         api.profile.get(userId),
         api.profile.levelExp(),
         api.shop.getCosmetics(userId),
         api.shop.getCosmeticsConfig(),
+        api.mails.get(userId),
       ]);
       profileData = proRes.data || null;
       expMap = expRes.data || {};
       cosmetics = cosRes.cosmetics || null;
       cosmeticConfig = cfgRes.cosmetics || null;
+      mails = mailRes.mails || [];
     } catch (err) {
       toast.error(err.message || '加载个人资料失败');
       profileData = null;
@@ -185,10 +204,14 @@ export function renderProfile(container) {
   // ---- Tab 栏 ----
   function renderTabs() {
     tabsEl.innerHTML = '';
+    const unreadMail = mails ? mails.filter((m) => !m.read || (!m.claimed && mailHasRewards(m))).length : 0;
     const tabs = [
       { key: 'info', label: '📄 资料概览' },
       { key: 'avatar', label: '🖼 头像装扮' },
       { key: 'history', label: '📜 对战历史' },
+      { key: 'mail', label: `📬 邮箱${unreadMail > 0 ? ` (${unreadMail})` : ''}` },
+      { key: 'assets', label: '💰 资产明细' },
+      { key: 'rewards', label: '🎁 等级奖励' },
       { key: 'achievements', label: '🏆 我的成就' },
       { key: 'shop', label: '🛒 商城' },
       { key: 'themes', label: '🎨 主题' },
@@ -208,7 +231,7 @@ export function renderProfile(container) {
     // 切换前先清理上一个嵌入视图的监听/订阅（成就/商城/主题）
     if (embeddedCleanup) { embeddedCleanup(); embeddedCleanup = null; }
     contentEl.innerHTML = '';
-    const needsProfile = activeTab === 'info' || activeTab === 'avatar';
+    const needsProfile = activeTab === 'info' || activeTab === 'avatar' || activeTab === 'assets' || activeTab === 'rewards';
     if (!profileData && needsProfile) {
       contentEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:40px;' }, '⏳ 加载中...'));
       return;
@@ -216,6 +239,9 @@ export function renderProfile(container) {
     if (activeTab === 'info') contentEl.append(renderInfoTab());
     else if (activeTab === 'avatar') contentEl.append(renderAvatarTab());
     else if (activeTab === 'history') await renderHistoryTab();
+    else if (activeTab === 'mail') await renderMailTab();
+    else if (activeTab === 'assets') contentEl.append(renderAssetsTab());
+    else if (activeTab === 'rewards') contentEl.append(renderLevelRewardsTab());
     else if (activeTab === 'achievements') await renderEmbedded('../achievements/index.js', 'renderAchievements');
     else if (activeTab === 'shop') await renderEmbedded('../shop/index.js', 'renderShop');
     else if (activeTab === 'themes') await renderEmbedded('../themes/index.js', 'renderThemePanel');
@@ -333,7 +359,373 @@ export function renderProfile(container) {
             ]);
           })),
       ]),
+
+      // 勋章
+      renderBadgesCard(),
     ]);
+  }
+
+  // ============ 资产明细 Tab（星钻/经验记录） ============
+  function renderAssetsTab() {
+    const listEl = el('div', { class: 'profile-tx-list' });
+    const switchTx = (key) => {
+      txTab = key;
+      renderTxSubTabs(tabsEl);
+      renderTxList(listEl, key);
+    };
+    const tabsEl = el('div', { class: 'profile-tx-tabs' }, [
+      el('button', { class: 'profile-tx-tab' + (txTab === 'currency' ? ' active' : ''), onClick: () => switchTx('currency') }, '💎 星钻记录'),
+      el('button', { class: 'profile-tx-tab' + (txTab === 'exp' ? ' active' : ''), onClick: () => switchTx('exp') }, '📈 经验记录'),
+    ]);
+    renderTxList(listEl, txTab);
+    return el('div', { class: 'profile-stack' }, [
+      el('div', { class: 'panel profile-card' }, [
+        el('div', { class: 'profile-section-title' }, '💰 资产明细'),
+        tabsEl,
+        listEl,
+      ]),
+    ]);
+  }
+
+  function renderTxSubTabs(tabsEl) {
+    tabsEl.querySelectorAll('.profile-tx-tab').forEach((b) => b.classList.remove('active'));
+    const idx = txTab === 'exp' ? 1 : 0;
+    const target = tabsEl.querySelectorAll('.profile-tx-tab')[idx];
+    if (target) target.classList.add('active');
+  }
+
+  async function renderTxList(listEl, type) {
+    listEl.innerHTML = '<div class="text-muted" style="text-align:center;padding:24px;">⏳ 加载中...</div>';
+    if (!txCache[type]) {
+      try {
+        txCache[type] = type === 'currency'
+          ? await api.currency.transactions(currentUserId(), 30)
+          : await api.currency.expTransactions(currentUserId(), 30);
+      } catch (e) {
+        txCache[type] = { success: false, transactions: [] };
+      }
+    }
+    const tx = txCache[type].transactions || [];
+    listEl.innerHTML = '';
+    if (tx.length === 0) {
+      listEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:24px;' }, '暂无记录'));
+      return;
+    }
+    tx.forEach((t) => listEl.append(txItem(t, type)));
+  }
+
+  function txItem(tx, type) {
+    if (type === 'currency') {
+      const earn = tx.type === 'earn';
+      return el('div', { class: 'profile-tx-item' }, [
+        el('span', { class: 'profile-tx-icon' }, earn ? '💰' : '💸'),
+        el('span', { class: 'profile-tx-reason' }, tx.reason || tx.source || '未知'),
+        el('span', { class: 'profile-tx-amount ' + (earn ? 'earn' : 'spend') }, `${earn ? '+' : '-'}${tx.amount}💎`),
+        el('span', { class: 'profile-tx-time' }, formatDate(tx.timestamp)),
+      ]);
+    }
+    // 经验记录：兼容多种字段格式（对齐 v1）
+    const base = tx.baseExp || tx.amount || 0;
+    const bonus = tx.bonusExp || 0;
+    const final = tx.finalExp || tx.amount || base || 0;
+    const eventLabel = tx.eventLabel || '';
+    const reason = tx.reason || '';
+    let reasonText = '';
+    if (reason) {
+      reasonText = reason;
+    } else {
+      let detail = `基础 ${base}`;
+      if (bonus > 0) detail += ` + 额外 ${bonus}`;
+      if (eventLabel) detail += `（含${eventLabel}）`;
+      reasonText = detail;
+    }
+    if (reason && eventLabel && reason !== eventLabel) reasonText = `${reason}（${eventLabel}）`;
+    return el('div', { class: 'profile-tx-item' }, [
+      el('span', { class: 'profile-tx-icon' }, '⭐'),
+      el('span', { class: 'profile-tx-reason' }, reasonText),
+      el('span', { class: 'profile-tx-amount earn' }, `+${final}EXP`),
+      el('span', { class: 'profile-tx-time' }, formatDate(tx.timestamp)),
+    ]);
+  }
+
+  // ============ 等级奖励 Tab ============
+  function renderLevelRewardsTab() {
+    const rw = profileData.levelRewards || {};
+    const claimed = rw.claimedLevels || [];
+    const availableSet = new Set((rw.available || []).map((r) => r.level));
+    const curLevel = calcLevelExp(profileData.profile?.exp, expMap).level;
+    const anyAvailable = availableSet.size > 0;
+
+    const progressSteps = [];
+    LEVEL_REWARD_MILESTONES.forEach((r, i) => {
+      if (i > 0) progressSteps.push(el('div', { class: 'profile-reward-line' + (claimed.includes(r.level) ? ' claimed' : '') }));
+      const isClaimed = claimed.includes(r.level);
+      const isAvail = availableSet.has(r.level);
+      const isPast = curLevel >= r.level;
+      let cls = 'profile-reward-dot';
+      if (isClaimed) cls += ' claimed';
+      else if (isAvail) cls += ' available';
+      else if (isPast) cls += ' active';
+      const tip = isClaimed ? '✓' : (isAvail ? '!' : r.level);
+      progressSteps.push(el('div', { class: cls, title: `Lv.${r.level}: ${r.desc}` }, tip));
+    });
+
+    const rows = LEVEL_REWARD_MILESTONES.map((r) => {
+      const isClaimed = claimed.includes(r.level);
+      const isAvail = availableSet.has(r.level);
+      const isFuture = curLevel < r.level;
+      let badge;
+      if (isClaimed) badge = el('span', { class: 'profile-reward-badge claimed' }, '✓ 已领取');
+      else if (isAvail) badge = el('button', { class: 'profile-reward-badge grab', onClick: () => claimLevelRewards() }, '点击领取');
+      else badge = el('span', { class: 'profile-reward-badge locked' }, `Lv.${r.level}解锁`);
+      return el('div', {
+        class: 'profile-reward-row' + (isClaimed ? ' claimed' : isAvail ? ' available' : isFuture ? ' future' : ''),
+        onClick: isAvail ? () => claimLevelRewards() : undefined,
+      }, [
+        el('div', { class: 'profile-reward-lv' }, `Lv.${r.level}`),
+        el('div', { class: 'profile-reward-desc' }, r.desc),
+        badge,
+      ]);
+    });
+
+    return el('div', { class: 'profile-stack' }, [
+      el('div', { class: 'panel profile-card' }, [
+        el('div', { class: 'profile-section-title profile-reward-head' }, [
+          '🎁 等级奖励',
+          anyAvailable ? el('button', { class: 'profile-reward-claim-all', onClick: () => claimLevelRewards() }, '领取全部') : null,
+        ]),
+        el('div', { class: 'profile-reward-progress' }, progressSteps),
+        el('div', { class: 'profile-reward-list' }, rows),
+      ]),
+    ]);
+  }
+
+  async function claimLevelRewards() {
+    try {
+      const res = await api.levelRewards.claim(currentUserId());
+      if (!res.success) { toast.error(res.message || '没有可领取的奖励'); return; }
+      toast.success(`🎉 成功领取 ${(res.rewards || []).length} 项等级奖励！`);
+      await refreshProfileData();
+      renderAll();
+    } catch (err) {
+      toast.error(err.message || '领取失败，请稍后重试');
+    }
+  }
+
+  // ============ 勋章 ============
+  function renderBadgesCard() {
+    const ach = profileData.achievements || {};
+    const badges = ach.badges || [];
+    const defs = ach.badgeDefinitions || {};
+    const items = badges.map((id) => {
+      const def = defs[id] || { name: id, icon: '' };
+      return el('div', { class: 'profile-badge-item', title: def.name }, [
+        def.icon
+          ? el('img', { class: 'profile-badge-icon', src: def.icon, alt: def.name })
+          : el('div', { class: 'profile-badge-icon profile-badge-emoji' }, '🏅'),
+        el('div', { class: 'profile-badge-name' }, def.name),
+      ]);
+    });
+    return el('div', { class: 'panel profile-card' }, [
+      el('div', { class: 'profile-section-title profile-reward-head' }, [
+        '🏅 勋章',
+        el('span', { class: 'profile-badge-count' }, `${badges.length} 个`),
+      ]),
+      items.length === 0
+        ? el('div', { class: 'text-muted', style: 'text-align:center;padding:20px;' }, '暂无勋章')
+        : el('div', { class: 'profile-badge-grid' }, items),
+    ]);
+  }
+
+  // ============ 邮箱 Tab ============
+  function mailHasRewards(m) {
+    return (m.starCoins && m.starCoins > 0) ||
+      (m.exp && m.exp > 0) ||
+      (m.items && m.items.length > 0) ||
+      (m.cosmetics && m.cosmetics.length > 0) ||
+      !!m.vip;
+  }
+
+  async function renderMailTab() {
+    if (mails === null) {
+      contentEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:40px;' }, '⏳ 加载中...'));
+      try {
+        const res = await api.mails.get(currentUserId());
+        mails = res.mails || [];
+      } catch (err) {
+        mails = [];
+      }
+      contentEl.innerHTML = '';
+    }
+    contentEl.append(buildMailView());
+  }
+
+  function buildMailView() {
+    const listEl = el('div', { class: 'profile-mail-list' });
+    const switchFilter = (f) => { mailFilter = f; refreshMailView(listEl); renderTabs(); };
+    const toolbar = el('div', { class: 'profile-mail-toolbar' }, [
+      el('button', { class: 'profile-mail-tab' + (mailFilter === 'unread' ? ' active' : ''), onClick: () => switchFilter('unread') }, '未读'),
+      el('button', { class: 'profile-mail-tab' + (mailFilter === 'all' ? ' active' : ''), onClick: () => switchFilter('all') }, '全部'),
+      el('div', { class: 'profile-mail-spacer' }),
+      el('button', { class: 'profile-mail-action', onClick: () => claimAllMails() }, '一键领取'),
+      el('button', { class: 'profile-mail-action', onClick: () => doReload() }, '刷新'),
+    ]);
+    refreshMailView(listEl);
+    return el('div', { class: 'panel profile-card' }, [
+      el('div', { class: 'profile-section-title' }, '📬 我的邮箱'),
+      toolbar,
+      listEl,
+    ]);
+  }
+
+  function refreshMailView(listEl) {
+    listEl.innerHTML = '';
+    let list = mails || [];
+    if (mailFilter === 'unread') list = list.filter((m) => !m.claimed && !m.read);
+    if (list.length === 0) {
+      listEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:30px;' }, '暂无邮件'));
+      return;
+    }
+    [...list]
+      .sort((a, b) => (b.timestamp || b.createdAt || 0) - (a.timestamp || a.createdAt || 0))
+      .slice(0, 100)
+      .forEach((m) => listEl.append(mailItem(m)));
+  }
+
+  function mailItem(mail) {
+    const isClaimed = !!mail.claimed;
+    const isRead = !!mail.read;
+    const hasRewards = mailHasRewards(mail);
+    let statusText, statusColor;
+    if (isClaimed) { statusText = '已领取'; statusColor = '#6c757d'; }
+    else if (hasRewards) { statusText = '待领取'; statusColor = '#48bb78'; }
+    else { statusText = isRead ? '已读' : '未读'; statusColor = '#007bff'; }
+
+    const actionBtn = isClaimed
+      ? el('button', { class: 'profile-mail-btn', disabled: true }, '已领取')
+      : hasRewards
+        ? el('button', { class: 'profile-mail-btn primary', onClick: () => mailClaim(mail.id) }, '领取')
+        : el('button', { class: 'profile-mail-btn', onClick: () => mailRead(mail.id) }, '标记已读');
+    const deleteBtn = el('button', { class: 'profile-mail-btn danger', onClick: () => mailDelete(mail.id) }, '删除');
+
+    return el('div', { class: 'profile-mail-item' + (isRead ? '' : ' unread') }, [
+      el('div', { class: 'profile-mail-head' }, [
+        el('div', { class: 'profile-mail-title' }, mail.title || '邮件'),
+        el('span', { class: 'profile-mail-status', style: `color:${statusColor};` }, statusText),
+      ]),
+      mail.content ? el('div', { class: 'profile-mail-content' }, mail.content) : null,
+      mailRewardsSection(mail),
+      el('div', { class: 'profile-mail-meta' }, `${mail.from || '系统'} · ${formatDate(mail.timestamp || mail.createdAt)}`),
+      el('div', { class: 'profile-mail-actions' }, [actionBtn, deleteBtn]),
+    ]);
+  }
+
+  function mailRewardsSection(mail) {
+    if (!mailHasRewards(mail)) return null;
+    const sections = [];
+    const currencyTags = [];
+    if (mail.starCoins > 0) currencyTags.push(el('span', { class: 'profile-mail-tag' }, `💎 ${mail.starCoins} 星钻`));
+    if (mail.exp > 0) currencyTags.push(el('span', { class: 'profile-mail-tag' }, `⭐ ${mail.exp} 经验`));
+    if (currencyTags.length) sections.push(mailRewardRow('货币', currencyTags));
+
+    const regular = [];
+    const packs = [];
+    for (const it of mail.items || []) {
+      if (it.category === 'pack' || (it.name && (it.name.includes('礼包') || it.name.includes('包')))) packs.push(it);
+      else regular.push(it);
+    }
+    if (regular.length) sections.push(mailRewardRow('物品', regular.map((it) => el('span', { class: 'profile-mail-tag' }, `${it.icon || '📦'} ${it.name || it.id} ×${it.count || 1}`))));
+    if (packs.length) sections.push(mailRewardRow('礼包', packs.map((it) => el('span', { class: 'profile-mail-tag' }, `${it.icon || '🎁'} ${it.name || it.id} ×${it.count || 1}`))));
+    if (mail.cosmetics && mail.cosmetics.length) sections.push(mailRewardRow('外观', mail.cosmetics.map((c) => el('span', { class: 'profile-mail-tag' }, `${c.icon || '🎨'} ${c.name || c.id}`))));
+    if (mail.vip) sections.push(mailRewardRow('会员', [el('span', { class: 'profile-mail-tag' }, `${mail.vip.icon || '💎'} ${mail.vip.name || '会员'} ${mail.vip.days || ''}天`)]));
+
+    return el('div', { class: 'profile-mail-rewards' }, sections);
+  }
+
+  function mailRewardRow(label, tags) {
+    return el('div', { class: 'profile-mail-reward-row' }, [
+      el('span', { class: 'profile-mail-reward-label' }, label),
+      ...tags,
+    ]);
+  }
+
+  async function mailClaim(mailId) {
+    try {
+      const res = await api.mails.claim(currentUserId(), mailId);
+      if (!res.success) { toast.error(res.message || '领取失败'); return; }
+      toast.success('🎉 领取成功！');
+      await reloadMails();
+      await refreshProfileData();
+      renderAll();
+    } catch (err) {
+      toast.error(err.message || '领取失败');
+    }
+  }
+
+  async function mailRead(mailId) {
+    try {
+      const res = await api.mails.read(currentUserId(), mailId);
+      if (!res.success) { toast.error(res.message || '操作失败'); return; }
+      await reloadMails();
+      renderAll();
+    } catch (err) {
+      toast.error(err.message || '操作失败');
+    }
+  }
+
+  function mailDelete(mailId) {
+    modal.show({
+      title: '删除邮件',
+      content: '确定删除这封邮件吗？',
+      confirmText: '删除',
+      showCancel: true,
+      onConfirm: async () => {
+        try {
+          const res = await api.mails.remove(currentUserId(), mailId);
+          if (!res.success) { toast.error(res.message || '删除失败'); return; }
+          toast.success('已删除');
+          await reloadMails();
+          renderAll();
+        } catch (err) {
+          toast.error(err.message || '删除失败');
+        }
+      },
+    });
+  }
+
+  async function claimAllMails() {
+    try {
+      const res = await api.mails.claimAll(currentUserId());
+      if (!res.success) { toast.error(res.message || '操作失败'); return; }
+      toast.success('🎉 已一键领取全部邮件！');
+      await reloadMails();
+      await refreshProfileData();
+      renderAll();
+    } catch (err) {
+      toast.error(err.message || '操作失败');
+    }
+  }
+
+  async function doReload() {
+    await reloadMails();
+    renderAll();
+  }
+
+  async function reloadMails() {
+    try {
+      const res = await api.mails.get(currentUserId());
+      mails = res.mails || [];
+    } catch (err) {
+      mails = mails || [];
+    }
+  }
+
+  /** 仅刷新个人资料数据（邮件领取/等级奖励后同步余额与等级） */
+  async function refreshProfileData() {
+    try {
+      const res = await api.profile.get(currentUserId());
+      if (res?.data) profileData = res.data;
+    } catch (err) { /* 保留旧数据 */ }
   }
 
   // ============ 头像装扮 Tab ============

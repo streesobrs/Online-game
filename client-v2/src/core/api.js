@@ -89,6 +89,35 @@ export const api = {
     levelExp: () => api.get('/api/config/levelExp'),
   },
 
+  mails: {
+    /** 邮件列表 @param {string} accountId */
+    get: (accountId) => api.get(`/api/mails/${encodeURIComponent(accountId)}`),
+    /** 领取单封邮件 */
+    claim: (accountId, mailId) => api.post(`/api/mails/${encodeURIComponent(accountId)}/claim/${encodeURIComponent(mailId)}`),
+    /** 一键领取所有邮件 */
+    claimAll: (accountId) => api.post(`/api/mails/${encodeURIComponent(accountId)}/claim-all`),
+    /** 标记单封邮件为已读 */
+    read: (accountId, mailId) => api.post(`/api/mails/${encodeURIComponent(accountId)}/read/${encodeURIComponent(mailId)}`),
+    /** 标记全部已读 */
+    readAll: (accountId) => api.post(`/api/mails/${encodeURIComponent(accountId)}/read-all`),
+    /** 删除单封邮件 */
+    remove: (accountId, mailId) => api.delete(`/api/mails/${encodeURIComponent(accountId)}/${encodeURIComponent(mailId)}`),
+  },
+
+  currency: {
+    /** 星钻交易记录 @param {string} accountId @param {number} [limit=30] */
+    transactions: (accountId, limit = 30) => api.get(`/api/currency/${encodeURIComponent(accountId)}/transactions?limit=${limit}`),
+    /** 经验记录 @param {string} accountId @param {number} [limit=30] */
+    expTransactions: (accountId, limit = 30) => api.get(`/api/currency/${encodeURIComponent(accountId)}/exp-transactions?limit=${limit}`),
+  },
+
+  levelRewards: {
+    /** 可领取的等级奖励列表 @param {string} accountId */
+    get: (accountId) => api.get(`/api/level-rewards/${encodeURIComponent(accountId)}`),
+    /** 领取所有可领取的等级奖励 */
+    claim: (accountId) => api.post(`/api/level-rewards/${encodeURIComponent(accountId)}/claim`),
+  },
+
   avatar: {
     /** 上传自定义头像 @param {string} avatar - base64 dataURL @param {number} [replaceIndex] @param {string} [name] */
     upload: (userId, avatar, replaceIndex, name) => api.post('/api/avatar/upload', { userId, avatar, replaceIndex, name }),
