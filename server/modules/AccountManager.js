@@ -1558,7 +1558,8 @@ class AccountManager {
   // 添加经验值
   // applyEventMult: false 表示不应用任何倍率（如经验药水、等级直升券）
   // source: 经验来源标识，用于后台记录统计
-  async addExp(id, exp, applyEventMult = true, source = 'battle') {
+  // gameType: 若经验来自对局，记录具体游戏类型（gobang/go/chinese-chess/snake）
+  async addExp(id, exp, applyEventMult = true, source = 'battle', gameType = null) {
     try {
       const account = await dataStore.findOne('accounts', { 'account.id': id });
       if (!account) {
@@ -1644,7 +1645,7 @@ class AccountManager {
         currencyReward = Math.floor(currencyReward * 2); // 双倍星钻奖励
       }
       if (currencyReward > 0) {
-        await this.addCurrency(id, currencyReward, `获得${finalExp}经验值奖励`, 'exp_reward');
+        await this.addCurrency(id, currencyReward, `获得${finalExp}经验值奖励`, 'exp_reward', gameType);
       }
 
       // 升级时额外奖励星钻并检查等级奖励
@@ -1677,6 +1678,7 @@ class AccountManager {
           finalExp,
           levelMult,
           source,
+          gameType,
           eventLabel: eventLabel || null,
           oldLevel,
           newLevel: level,
@@ -2339,7 +2341,8 @@ class AccountManager {
   }
 
   // 添加星钻（带交易记录）
-  async addCurrency(accountId, amount, reason, source = 'system') {
+  // gameType: 若交易来自对局（经验兑换），记录具体游戏类型
+  async addCurrency(accountId, amount, reason, source = 'system', gameType = null) {
     try {
       if (amount <= 0) return { success: false, message: '数量必须大于0' };
 
@@ -2360,6 +2363,7 @@ class AccountManager {
         amount,
         balance: newBalance,
         source,
+        gameType,
         reason,
         timestamp: Date.now()
       });

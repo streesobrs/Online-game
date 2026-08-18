@@ -1071,7 +1071,7 @@ class GameManager {
           }
 
           if (expReward > 0) {
-            const expResult = await this.accountManager.addExp(accountId, expReward);
+            const expResult = await this.accountManager.addExp(accountId, expReward, true, 'battle', game.gameType);
             // 通知经验明细
             if (expResult.success) {
               const s = this.userManager.getSocketByAccountId(accountId);
@@ -2346,7 +2346,7 @@ class GameManager {
 
       // 添加经验值
       if (expReward > 0) {
-        const expResult = await this.accountManager.addExp(accountId, expReward);
+        const expResult = await this.accountManager.addExp(accountId, expReward, true, 'battle', aiGame.gameType);
 
         // 通知客户端
         if (expResult.success && userSocket) {

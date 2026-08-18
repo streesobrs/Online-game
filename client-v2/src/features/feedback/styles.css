@@ -2,8 +2,8 @@
    复刻 v1 feedback.html 的布局与配色，类名前缀 fb- 避免冲突。 */
 
 .fb-page {
-  max-width: 960px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
   padding: 16px;
 }
 
@@ -237,16 +237,38 @@
 }
 
 /* 类型标签 */
-.fb-type.type-bug { background: #e74c3c; }
-.fb-type.type-feature { background: #3498db; }
-.fb-type.type-question { background: #f39c12; }
-.fb-type.type-other { background: #95a5a6; }
+.fb-type.type-bug {
+  background: #e74c3c;
+}
+
+.fb-type.type-feature {
+  background: #3498db;
+}
+
+.fb-type.type-question {
+  background: #f39c12;
+}
+
+.fb-type.type-other {
+  background: #95a5a6;
+}
 
 /* 状态标签 */
-.fb-status.status-pending { background: #f39c12; }
-.fb-status.status-processing { background: #3498db; }
-.fb-status.status-resolved { background: #27ae60; }
-.fb-status.status-closed { background: #95a5a6; }
+.fb-status.status-pending {
+  background: #f39c12;
+}
+
+.fb-status.status-processing {
+  background: #3498db;
+}
+
+.fb-status.status-resolved {
+  background: #27ae60;
+}
+
+.fb-status.status-closed {
+  background: #95a5a6;
+}
 
 /* ===== 评论区 ===== */
 .fb-comments {

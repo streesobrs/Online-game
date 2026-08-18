@@ -129,8 +129,10 @@ export function renderProfile(container) {
   // 邮箱 / 资产明细
   let mails = null; // null = 尚未加载
   let mailFilter = 'unread'; // 'unread' | 'all'
+  let selectedMailId = null; // 邮箱当前选中的邮件 id
   let txCache = { currency: null, exp: null }; // 星钻/经验记录缓存
   let txTab = 'currency'; // 'currency' | 'exp'
+  let selectedTxIdx = 0; // 资产明细当前选中的记录下标
 
   const asideEl = el('aside', { class: 'panel profile-aside' });
   const tabsEl = el('div', { class: 'profile-tabs' });
@@ -405,24 +407,26 @@ export function renderProfile(container) {
     ]);
   }
 
-  // ============ 资产明细 Tab（星钻/经验记录） ============
+  // ============ 资产明细 Tab（星钻/经验记录，左右分栏） ============
   function renderAssetsTab() {
-    const listEl = el('div', { class: 'profile-tx-list' });
+    const sideEl = el('div', { class: 'profile-tx-side' });
+    const detailEl = el('div', { class: 'profile-tx-detail' });
     const switchTx = (key) => {
       txTab = key;
+      selectedTxIdx = 0;
       renderTxSubTabs(tabsEl);
-      renderTxList(listEl, key);
+      renderTxLayout(sideEl, detailEl, key);
     };
     const tabsEl = el('div', { class: 'profile-tx-tabs' }, [
       el('button', { class: 'profile-tx-tab' + (txTab === 'currency' ? ' active' : ''), onClick: () => switchTx('currency') }, '💎 星钻记录'),
       el('button', { class: 'profile-tx-tab' + (txTab === 'exp' ? ' active' : ''), onClick: () => switchTx('exp') }, '📈 经验记录'),
     ]);
-    renderTxList(listEl, txTab);
+    renderTxLayout(sideEl, detailEl, txTab);
     return el('div', { class: 'profile-stack' }, [
       el('div', { class: 'panel profile-card' }, [
         el('div', { class: 'profile-section-title' }, '💰 资产明细'),
         tabsEl,
-        listEl,
+        el('div', { class: 'profile-tx-layout' }, [sideEl, detailEl]),
       ]),
     ]);
   }
@@ -434,8 +438,10 @@ export function renderProfile(container) {
     if (target) target.classList.add('active');
   }
 
-  async function renderTxList(listEl, type) {
-    listEl.innerHTML = '<div class="text-muted" style="text-align:center;padding:24px;">⏳ 加载中...</div>';
+  /** 渲染左侧记录列表 + 右侧选中记录详情 */
+  async function renderTxLayout(sideEl, detailEl, type) {
+    sideEl.innerHTML = '<div class="text-muted" style="text-align:center;padding:24px;">⏳ 加载中...</div>';
+    detailEl.innerHTML = '';
     if (!txCache[type]) {
       try {
         txCache[type] = type === 'currency'
@@ -446,22 +452,89 @@ export function renderProfile(container) {
       }
     }
     const tx = txCache[type].transactions || [];
-    listEl.innerHTML = '';
+    sideEl.innerHTML = '';
     if (tx.length === 0) {
-      listEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:24px;' }, '暂无记录'));
+      sideEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:24px;' }, '暂无记录'));
+      detailEl.innerHTML = '';
       return;
     }
-    tx.forEach((t) => listEl.append(txItem(t, type)));
+    if (selectedTxIdx >= tx.length) selectedTxIdx = 0;
+    tx.forEach((t, i) => {
+      sideEl.append(el('div', {
+        class: 'profile-tx-side-item' + (i === selectedTxIdx ? ' active' : ''),
+        onClick: () => { selectedTxIdx = i; renderTxLayout(sideEl, detailEl, type); },
+      }, txSideRow(t, type)));
+    });
+    detailEl.innerHTML = '';
+    detailEl.append(txDetail(tx[selectedTxIdx], type));
   }
 
-  function txItem(tx, type) {
+  const TX_GAME_NAMES = { gobang: '五子棋', go: '围棋', 'chinese-chess': '象棋', snake: '贪吃蛇' };
+
+  /** 交易来源分类：把后端 source 码转成可读标签，并补充具体游戏 */
+  function txSourceInfo(source, gameType) {
+    const map = {
+      battle: { icon: '⚔️', label: '游戏对局' },
+      achievement: { icon: '🏆', label: '成就奖励' },
+      item_use: { icon: '🧪', label: '道具使用' },
+      compensation: { icon: '🎁', label: '系统补偿' },
+      mail_reward: { icon: '📬', label: '邮箱奖励' },
+      mail_reward_batch: { icon: '📬', label: '邮箱奖励' },
+      system: { icon: '⚙️', label: '系统' },
+      admin_grant: { icon: '🛠️', label: '管理员发放' },
+      admin_revoke_achievement: { icon: '🛠️', label: '管理员操作' },
+      exp_reward: { icon: '⭐', label: '经验奖励' },
+      level_up: { icon: '⬆️', label: '升级奖励' },
+      level_reward: { icon: '🎯', label: '等级奖励' },
+      spend: { icon: '🛒', label: '消费' },
+      shop: { icon: '🛒', label: '商城' },
+    };
+    const info = map[source] || { icon: '📄', label: source || '其他' };
+    if (gameType && TX_GAME_NAMES[gameType]) {
+      return { icon: info.icon, label: `${info.label}（${TX_GAME_NAMES[gameType]}）` };
+    }
+    return info;
+  }
+
+  /** 左侧列表条目（图标 + 原因 + 金额 + 时间） */
+  function txSideRow(tx, type) {
+    const src = txSourceInfo(tx.source, tx.gameType);
+    const meta = `${src.icon} ${src.label} · ${formatDate(tx.timestamp)}`;
     if (type === 'currency') {
       const earn = tx.type === 'earn';
-      return el('div', { class: 'profile-tx-item' }, [
-        el('span', { class: 'profile-tx-icon' }, earn ? '💰' : '💸'),
-        el('span', { class: 'profile-tx-reason' }, tx.reason || tx.source || '未知'),
-        el('span', { class: 'profile-tx-amount ' + (earn ? 'earn' : 'spend') }, `${earn ? '+' : '-'}${tx.amount}💎`),
-        el('span', { class: 'profile-tx-time' }, formatDate(tx.timestamp)),
+      return [
+        el('div', { class: 'profile-tx-side-main' }, [
+          el('span', { class: 'profile-tx-icon' }, earn ? '💰' : '💸'),
+          el('span', { class: 'profile-tx-reason' }, tx.reason || tx.source || '未知'),
+          el('span', { class: 'profile-tx-amount ' + (earn ? 'earn' : 'spend') }, `${earn ? '+' : '-'}${tx.amount}💎`),
+        ]),
+        el('div', { class: 'profile-tx-side-meta' }, meta),
+      ];
+    }
+    return [
+      el('div', { class: 'profile-tx-side-main' }, [
+        el('span', { class: 'profile-tx-icon' }, '⭐'),
+        el('span', { class: 'profile-tx-reason' }, txReasonText(tx)),
+        el('span', { class: 'profile-tx-amount earn' }, `+${tx.finalExp || tx.amount || 0}EXP`),
+      ]),
+      el('div', { class: 'profile-tx-side-meta' }, meta),
+    ];
+  }
+
+  /** 右侧详情：金额 + 记录明细行 */
+  function txDetail(tx, type) {
+    const src = txSourceInfo(tx.source, tx.gameType);
+    if (type === 'currency') {
+      const earn = tx.type === 'earn';
+      return el('div', { class: 'profile-tx-detail-body' }, [
+        el('div', { class: 'profile-tx-detail-head' }, [
+          el('div', { class: 'profile-tx-detail-title' }, tx.reason || tx.source || '未知'),
+          el('span', { class: 'profile-tx-detail-amount ' + (earn ? 'earn' : 'spend') }, `${earn ? '+' : '-'}${tx.amount}💎`),
+        ]),
+        txRow('来源', `${src.icon} ${src.label}`),
+        txRow('类型', earn ? '入账' : '支出'),
+        tx.balance != null ? txRow('余额', `${tx.balance}💎`) : null,
+        txRow('时间', formatDate(tx.timestamp)),
       ]);
     }
     // 经验记录：兼容多种字段格式（对齐 v1）
@@ -469,23 +542,39 @@ export function renderProfile(container) {
     const bonus = tx.bonusExp || 0;
     const final = tx.finalExp || tx.amount || base || 0;
     const eventLabel = tx.eventLabel || '';
-    const reason = tx.reason || '';
-    let reasonText = '';
-    if (reason) {
-      reasonText = reason;
-    } else {
-      let detail = `基础 ${base}`;
-      if (bonus > 0) detail += ` + 额外 ${bonus}`;
-      if (eventLabel) detail += `（含${eventLabel}）`;
-      reasonText = detail;
-    }
-    if (reason && eventLabel && reason !== eventLabel) reasonText = `${reason}（${eventLabel}）`;
-    return el('div', { class: 'profile-tx-item' }, [
-      el('span', { class: 'profile-tx-icon' }, '⭐'),
-      el('span', { class: 'profile-tx-reason' }, reasonText),
-      el('span', { class: 'profile-tx-amount earn' }, `+${final}EXP`),
-      el('span', { class: 'profile-tx-time' }, formatDate(tx.timestamp)),
+    return el('div', { class: 'profile-tx-detail-body' }, [
+      el('div', { class: 'profile-tx-detail-head' }, [
+        el('div', { class: 'profile-tx-detail-title' }, txReasonText(tx)),
+        el('span', { class: 'profile-tx-detail-amount earn' }, `+${final} EXP`),
+      ]),
+      txRow('来源', `${src.icon} ${src.label}`),
+      txRow('基础', `${base} EXP`),
+      bonus > 0 ? txRow('额外奖励', `+${bonus} EXP`) : null,
+      eventLabel ? txRow('事件', eventLabel) : null,
+      tx.totalExp != null ? txRow('累计经验', `${tx.totalExp} EXP`) : null,
+      txRow('时间', formatDate(tx.timestamp)),
     ]);
+  }
+
+  function txRow(label, value) {
+    return el('div', { class: 'profile-tx-detail-row' }, [
+      el('span', { class: 'profile-tx-detail-label' }, label),
+      el('span', { class: 'profile-tx-detail-value' }, value),
+    ]);
+  }
+
+  /** 经验记录原因文本（兼容多种字段格式，对齐 v1） */
+  function txReasonText(tx) {
+    const base = tx.baseExp || tx.amount || 0;
+    const bonus = tx.bonusExp || 0;
+    const eventLabel = tx.eventLabel || '';
+    const reason = tx.reason || '';
+    if (reason && eventLabel && reason !== eventLabel) return `${reason}（${eventLabel}）`;
+    if (reason) return reason;
+    let detail = `基础 ${base}`;
+    if (bonus > 0) detail += ` + 额外 ${bonus}`;
+    if (eventLabel) detail += `（含${eventLabel}）`;
+    return detail;
   }
 
   // ============ 等级奖励 Tab ============
@@ -601,38 +690,67 @@ export function renderProfile(container) {
   }
 
   function buildMailView() {
-    const listEl = el('div', { class: 'profile-mail-list' });
-    const switchFilter = (f) => { mailFilter = f; refreshMailView(listEl); renderTabs(); };
+    const sideEl = el('div', { class: 'profile-mail-side' });
+    const detailEl = el('div', { class: 'profile-mail-detail' });
+    const unreadTab = el('button', { class: 'profile-mail-tab' + (mailFilter === 'unread' ? ' active' : ''), onClick: () => switchFilter('unread') }, '未读');
+    const allTab = el('button', { class: 'profile-mail-tab' + (mailFilter === 'all' ? ' active' : ''), onClick: () => switchFilter('all') }, '全部');
+    const switchFilter = (f) => {
+      mailFilter = f;
+      unreadTab.classList.toggle('active', f === 'unread');
+      allTab.classList.toggle('active', f === 'all');
+      renderMailList(sideEl, detailEl);
+      renderTabs();
+    };
     const toolbar = el('div', { class: 'profile-mail-toolbar' }, [
-      el('button', { class: 'profile-mail-tab' + (mailFilter === 'unread' ? ' active' : ''), onClick: () => switchFilter('unread') }, '未读'),
-      el('button', { class: 'profile-mail-tab' + (mailFilter === 'all' ? ' active' : ''), onClick: () => switchFilter('all') }, '全部'),
+      unreadTab,
+      allTab,
       el('div', { class: 'profile-mail-spacer' }),
       el('button', { class: 'profile-mail-action', onClick: () => claimAllMails() }, '一键领取'),
       el('button', { class: 'profile-mail-action', onClick: () => doReload() }, '刷新'),
     ]);
-    refreshMailView(listEl);
+    renderMailList(sideEl, detailEl);
     return el('div', { class: 'panel profile-card' }, [
       el('div', { class: 'profile-section-title' }, '📬 我的邮箱'),
       toolbar,
-      listEl,
+      el('div', { class: 'profile-mail-layout' }, [sideEl, detailEl]),
     ]);
   }
 
-  function refreshMailView(listEl) {
-    listEl.innerHTML = '';
+  /** 渲染左侧标题列表 + 右侧选中邮件详情（左右分栏） */
+  function renderMailList(sideEl, detailEl) {
     let list = mails || [];
     if (mailFilter === 'unread') list = list.filter((m) => !m.claimed && !m.read);
+    list = [...list]
+      .sort((a, b) => (b.timestamp || b.createdAt || 0) - (a.timestamp || a.createdAt || 0))
+      .slice(0, 100);
+
+    sideEl.innerHTML = '';
     if (list.length === 0) {
-      listEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:30px;' }, '暂无邮件'));
+      sideEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:30px;' }, '暂无邮件'));
+      detailEl.innerHTML = '';
       return;
     }
-    [...list]
-      .sort((a, b) => (b.timestamp || b.createdAt || 0) - (a.timestamp || a.createdAt || 0))
-      .slice(0, 100)
-      .forEach((m) => listEl.append(mailItem(m)));
+    // 选中项不在当前列表时回退到第一条
+    if (!list.some((m) => m.id === selectedMailId)) selectedMailId = list[0].id;
+
+    list.forEach((m) => {
+      sideEl.append(el('div', {
+        class: 'profile-mail-list-item' +
+          (m.id === selectedMailId ? ' active' : '') +
+          (!m.claimed && !m.read ? ' unread' : ''),
+        onClick: () => { selectedMailId = m.id; renderMailList(sideEl, detailEl); },
+      }, [
+        el('div', { class: 'profile-mail-list-title' }, m.title || '邮件'),
+        el('div', { class: 'profile-mail-list-meta' }, `${m.from || '系统'} · ${formatDate(m.timestamp || m.createdAt)}`),
+      ]));
+    });
+
+    const selected = list.find((m) => m.id === selectedMailId) || list[0];
+    detailEl.innerHTML = '';
+    detailEl.append(mailDetail(selected));
   }
 
-  function mailItem(mail) {
+  function mailDetail(mail) {
     const isClaimed = !!mail.claimed;
     const isRead = !!mail.read;
     const hasRewards = mailHasRewards(mail);
@@ -648,14 +766,14 @@ export function renderProfile(container) {
         : el('button', { class: 'profile-mail-btn', onClick: () => mailRead(mail.id) }, '标记已读');
     const deleteBtn = el('button', { class: 'profile-mail-btn danger', onClick: () => mailDelete(mail.id) }, '删除');
 
-    return el('div', { class: 'profile-mail-item' + (isRead ? '' : ' unread') }, [
-      el('div', { class: 'profile-mail-head' }, [
-        el('div', { class: 'profile-mail-title' }, mail.title || '邮件'),
+    return el('div', { class: 'profile-mail-detail-body' }, [
+      el('div', { class: 'profile-mail-detail-head' }, [
+        el('div', { class: 'profile-mail-detail-title' }, mail.title || '邮件'),
         el('span', { class: 'profile-mail-status', style: `color:${statusColor};` }, statusText),
       ]),
+      el('div', { class: 'profile-mail-detail-meta' }, `${mail.from || '系统'} · ${formatDate(mail.timestamp || mail.createdAt)}`),
       mail.content ? el('div', { class: 'profile-mail-content' }, mail.content) : null,
       mailRewardsSection(mail),
-      el('div', { class: 'profile-mail-meta' }, `${mail.from || '系统'} · ${formatDate(mail.timestamp || mail.createdAt)}`),
       el('div', { class: 'profile-mail-actions' }, [actionBtn, deleteBtn]),
     ]);
   }
@@ -762,6 +880,8 @@ export function renderProfile(container) {
 
   /** 仅刷新个人资料数据（邮件领取/等级奖励后同步余额与等级） */
   async function refreshProfileData() {
+    // 余额/等级已变化，清空交易缓存，资产明细下次访问时重新拉取
+    txCache = { currency: null, exp: null };
     try {
       const res = await api.profile.get(currentUserId());
       if (res?.data) profileData = res.data;

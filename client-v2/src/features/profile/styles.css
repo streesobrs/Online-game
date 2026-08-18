@@ -664,20 +664,119 @@
   color: #fff;
 }
 
-.profile-tx-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.profile-tx-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
 }
 
-.profile-tx-item {
+.profile-tx-side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 520px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  padding: 6px;
+  background: var(--surface, #fff);
+}
+
+.profile-tx-side-item {
+  padding: 9px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+}
+
+.profile-tx-side-item:hover {
+  background: #f1f5f9;
+}
+
+.profile-tx-side-item.active {
+  background: #eef2ff;
+  border-color: #6366f1;
+}
+
+.profile-tx-side-main {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--surface-alt, #f7fafc);
+}
+
+.profile-tx-side-meta {
+  font-size: 11px;
+  color: #a0aec0;
+  margin-top: 3px;
+}
+
+.profile-tx-detail {
+  border: 1px solid var(--border-color, #e2e8f0);
   border-radius: 8px;
-  padding: 10px 12px;
+  background: var(--surface, #fff);
+  padding: 16px;
+  min-height: 220px;
+}
+
+.profile-tx-detail-body {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-tx-detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.profile-tx-detail-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text, #2d3748);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-tx-detail-amount {
+  font-size: 18px;
+  font-weight: 800;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.profile-tx-detail-amount.earn {
+  color: #48bb78;
+}
+
+.profile-tx-detail-amount.spend {
+  color: #e53e3e;
+}
+
+.profile-tx-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 13px;
+  padding: 5px 0;
+}
+
+.profile-tx-detail-label {
+  width: 64px;
+  flex-shrink: 0;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.profile-tx-detail-value {
+  color: var(--text, #2d3748);
 }
 
 .profile-tx-icon {
@@ -706,13 +805,6 @@
 
 .profile-tx-amount.spend {
   color: #e53e3e;
-}
-
-.profile-tx-time {
-  flex-shrink: 0;
-  font-size: 12px;
-  color: var(--text-secondary, #718096);
-  white-space: nowrap;
 }
 
 /* ===== 等级奖励 ===== */
@@ -974,36 +1066,104 @@
   color: #48bb78;
 }
 
-.profile-mail-list {
+.profile-mail-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.profile-mail-side {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
-
-.profile-mail-item {
-  background: var(--surface, #fff);
-  border: 1px solid var(--border-color, #dee2e6);
+  gap: 6px;
+  max-height: 520px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color, #e2e8f0);
   border-radius: 8px;
-  padding: 12px 14px;
+  padding: 6px;
+  background: var(--surface, #fff);
 }
 
-.profile-mail-item.unread {
-  border-left: 3px solid #6366f1;
-  background: #f8faff;
+.profile-mail-list-item {
+  padding: 9px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s;
 }
 
-.profile-mail-head {
+.profile-mail-list-item:hover {
+  background: #f1f5f9;
+}
+
+.profile-mail-list-item.active {
+  background: #eef2ff;
+  border-color: #6366f1;
+}
+
+.profile-mail-list-item.unread .profile-mail-list-title::before {
+  content: '●';
+  color: #6366f1;
+  font-size: 10px;
+  margin-right: 6px;
+  vertical-align: 1px;
+}
+
+.profile-mail-list-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text, #2d3748);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-mail-list-item.unread .profile-mail-list-title {
+  font-weight: 700;
+}
+
+.profile-mail-list-meta {
+  font-size: 11px;
+  color: #a0aec0;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-mail-detail {
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  padding: 16px;
+  min-height: 220px;
+}
+
+.profile-mail-detail-body {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-mail-detail-head {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 8px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
-.profile-mail-title {
-  font-size: 14px;
+.profile-mail-detail-title {
+  font-size: 15px;
   font-weight: 700;
   color: var(--text, #2d3748);
+}
+
+.profile-mail-detail-meta {
+  font-size: 11px;
+  color: #a0aec0;
+  margin-bottom: 10px;
 }
 
 .profile-mail-status {
@@ -1057,12 +1217,6 @@
   font-size: 11px;
   color: #1e40af;
   white-space: nowrap;
-}
-
-.profile-mail-meta {
-  font-size: 11px;
-  color: #a0aec0;
-  margin-top: 4px;
 }
 
 .profile-mail-actions {
@@ -1200,16 +1354,27 @@
   }
 
   /* 小屏：记录/邮件布局收紧 */
-  .profile-tx-item,
   .profile-reward-row {
     flex-wrap: wrap;
   }
 
-  .profile-tx-time {
-    display: none;
-  }
-
   .profile-mail-btn {
     padding: 4px 10px;
+  }
+
+  .profile-mail-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .profile-mail-side {
+    max-height: 260px;
+  }
+
+  .profile-tx-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .profile-tx-side {
+    max-height: 260px;
   }
 }

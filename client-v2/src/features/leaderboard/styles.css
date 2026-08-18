@@ -3,8 +3,8 @@
  * 复刻 v1 排行榜：类型筛选按钮、榜单条目（奖牌/名次/玩家/明细/胜率条）。
  */
 .leaderboard-page {
+  width: 100%;
   max-width: none;
-  margin: 0 auto;
   padding: 0 16px 32px;
 }
 
