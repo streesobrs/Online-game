@@ -7,6 +7,7 @@ import { modal } from './modal.js';
 import { el } from '../utils/dom.js';
 import { api } from '../core/api.js';
 import { avatarEl, fetchAvatarData } from '../utils/avatar.js';
+import { goPlayer } from '../features/player/index.js';
 
 /**
  * 展示用户资料卡
@@ -42,6 +43,10 @@ export function showUserCard(userId) {
           el('span', {}, `🏆 胜 ${stats.totalWins ?? 0}`),
           el('span', {}, `⚔️ 局 ${stats.totalGames ?? 0}`),
           el('span', {}, `💎 ${currency}`),
+        ]),
+        // 查看他人主页（部分公开数据）
+        el('div', { class: 'user-card-footer' }, [
+          el('button', { class: 'user-card-profile-btn', onClick: () => { modal.close(); goPlayer(userId); } }, '查看主页 ›'),
         ]),
       );
     })

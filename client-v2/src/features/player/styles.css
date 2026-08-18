@@ -1,0 +1,36 @@
+/* 他人主页（v2）— 路由 #/player，复用个人资料页样式类 */
+
+.player-page {
+  padding: 0 0 24px;
+}
+
+.player-back {
+  border: none;
+  background: none;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: #4a5568;
+  cursor: pointer;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  transition: background 0.15s ease;
+}
+
+.player-back:hover {
+  background: #edf2f7;
+  color: var(--theme-accent, #4299e1);
+}
+
+.player-state {
+  padding: 40px;
+  text-align: center;
+  color: #a0aec0;
+  font-size: 14px;
+}
+
+.player-empty {
+  padding: 14px;
+  text-align: center;
+  color: #a0aec0;
+  font-size: 13px;
+}

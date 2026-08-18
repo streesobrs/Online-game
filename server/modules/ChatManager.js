@@ -393,10 +393,9 @@ class ChatManager {
       return { success: false, message: '消息内容无效' };
     }
 
+    // 对方可能在线或离线：离线私信照常保存，待其上线后在会话历史中可见
     const targetSocket = this.userManager.getSocketByAccountId(targetUserId);
-    if (!targetSocket) {
-      return { success: false, message: '对方不在线' };
-    }
+    const targetOnline = !!targetSocket;
 
     const chatMessage = {
       messageId: this.generateMessageId(),
@@ -430,19 +429,22 @@ class ChatManager {
       }
     }, 200));
 
-    // 发送给目标用户
-    targetSocket.emit('private_message', chatMessage);
+    // 发送给目标用户（对方在线才实时送达，离线消息留待其上线后从历史中查看）
+    if (targetOnline) {
+      targetSocket.emit('private_message', chatMessage);
+    }
 
-    // 发送给自己（确认发送成功）
+    // 发送给自己（确认发送成功；offline 标识用于前端提示离线送达）
     const senderSocket = this.userManager.getSocketByAccountId(user.accountId);
     if (senderSocket) {
       senderSocket.emit('private_message_sent', {
         toUserId: targetUserId,
+        offline: !targetOnline,
         ...chatMessage
       });
     }
 
-    return { success: true };
+    return { success: true, offline: !targetOnline };
   }
 
   // 获取全局聊天记录

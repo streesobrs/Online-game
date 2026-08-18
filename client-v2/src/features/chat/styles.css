@@ -197,6 +197,77 @@
   background: #2b6cb0;
 }
 
+/* 玩家行操作区（加好友 + 私信） */
+.chat-online-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.chat-online-add {
+  border: none;
+  border-radius: 6px;
+  width: 24px;
+  height: 24px;
+  font-size: 14px;
+  line-height: 1;
+  background: transparent;
+  color: #a0aec0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chat-online-add:hover {
+  color: var(--theme-accent, #4299e1);
+  background: #ebf8ff;
+}
+
+/* 玩家列表：搜索框 + 离线提示 */
+.chat-sidebar-note {
+  font-size: 11px;
+  color: #a0aec0;
+  margin-top: -6px;
+}
+
+.chat-sidebar-search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 12px;
+  background: #fff;
+  color: #2d3748;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.chat-sidebar-search:focus {
+  border-color: var(--theme-accent, #4299e1);
+}
+
+/* 离线玩家：置灰 + 虚线边框的幽灵私信按钮 */
+.chat-online-item.offline {
+  opacity: 0.72;
+}
+
+.chat-online-item.offline:hover {
+  opacity: 1;
+}
+
+.chat-online-btn.ghost {
+  background: transparent;
+  color: #718096;
+  border: 1px solid #cbd5e0;
+}
+
+.chat-online-btn.ghost:hover {
+  color: var(--theme-accent, #4299e1);
+  border-color: var(--theme-accent, #4299e1);
+  background: transparent;
+}
+
 /* 右侧消息区占满 */
 .chat-main {
   min-width: 0;

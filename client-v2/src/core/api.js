@@ -134,7 +134,21 @@ export const api = {
 
   users: {
     online: () => api.get('/api/users/online'),
+    /** 全部玩家公开信息（含离线，供聊天页离线私聊） */
+    all: () => api.get('/api/users/all'),
     search: (query) => api.get(`/api/users/search?q=${encodeURIComponent(query)}`),
+  },
+
+  /** 好友系统（MVP） */
+  friends: {
+    /** 好友状态：好友列表 + 收到的申请 + 已发出的申请 */
+    get: (accountId) => api.get(`/api/friends/${accountId}`),
+    /** 发起好友申请 */
+    request: (fromUserId, toUserId) => api.post('/api/friends/request', { fromUserId, toUserId }),
+    /** 同意/拒绝好友申请 */
+    respond: (userId, fromUserId, accept) => api.post('/api/friends/respond', { userId, fromUserId, accept }),
+    /** 删除好友 */
+    remove: (accountId, friendId) => api.delete(`/api/friends/${accountId}/${friendId}`),
   },
 
   chat: {

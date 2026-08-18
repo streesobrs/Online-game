@@ -14,9 +14,11 @@ import { toast } from '../../components/toast.js';
 import { avatarNode } from '../../utils/avatar.js';
 import { showUserCard } from '../../components/userCard.js';
 import { GAMES } from '../../data/navItems.js';
+import { api } from '../../core/api.js';
 
 // ===== 模块级状态（常驻，跨视图保留）=====
 const users = new Map(); // String(accountId) -> {accountId, nickname, status, gameType, level}
+let allPlayers = null;   // 全部玩家快照（含离线）：[{accountId, nickname, level, lastLogin}]
 const views = new Set(); // 活动面板视图（render 回调）
 let myId = null;
 
@@ -62,6 +64,43 @@ export function getOnlineUsers() {
 export function subscribeOnlineUsers(fn) {
   views.add(fn);
   return () => views.delete(fn);
+}
+
+/**
+ * 拉取全部玩家公开信息（含离线），用于离线私信等场景
+ * 加载完成后会刷新所有已订阅视图
+ */
+export async function loadAllPlayers() {
+  try {
+    const res = await api.users.all();
+    allPlayers = (Array.isArray(res?.data) ? res.data : []).map((p) => ({
+      accountId: p.accountId,
+      nickname: p.nickname,
+      level: p.level || 1,
+      lastLogin: p.lastLogin || null,
+    }));
+  } catch (err) {
+    allPlayers = allPlayers || [];
+  }
+  refresh();
+}
+
+/**
+ * 获取全部玩家（在线在前，离线在后），离线项带 status:'offline'
+ * @returns {Array<Object>}
+ */
+export function getAllPlayers() {
+  const online = Array.from(users.values());
+  const onlineKeys = new Set(online.map((u) => String(u.accountId)));
+  const offline = (allPlayers || [])
+    .filter((p) => !onlineKeys.has(String(p.accountId)))
+    .map((p) => ({ ...p, status: 'offline' }));
+  return [...online, ...offline];
+}
+
+/** 判断某玩家当前是否在线 */
+export function isPlayerOnline(accountId) {
+  return users.has(String(accountId));
 }
 
 // ===== 挑战 =====

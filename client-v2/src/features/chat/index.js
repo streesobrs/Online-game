@@ -15,7 +15,8 @@ import { el, viewRoot } from '../../utils/dom.js';
 import { toast } from '../../components/toast.js';
 import { avatarNode } from '../../utils/avatar.js';
 import { showUserCard } from '../../components/userCard.js';
-import { getOnlineUsers, subscribeOnlineUsers, sendChallenge } from '../online-players/index.js';
+import { getOnlineUsers, getAllPlayers, loadAllPlayers, subscribeOnlineUsers, sendChallenge } from '../online-players/index.js';
+import { isFriend, isRequested, requestFriend, loadFriends, subscribeFriends } from '../friends/index.js';
 
 const MAX_HISTORY = 100; // 每会话保留上限
 const myId = localStorage.getItem('currentAccountId');
@@ -26,6 +27,12 @@ const privateHistory = new Map();                // String(userId) -> { rawId, n
 let myStatus = 'online';                         // 自己的用户状态（online/playing/spectating）
 const floatViews = new Set();                    // 悬浮坞内 createChatView 实例
 const pageViews = new Set();                     // #/chat 独立页视图
+let pendingOpenPrivate = null;                   // 好友页跳转过来时待打开的私聊会话
+
+/** 好友页「私信」→ 跳转聊天页并自动打开对应会话 */
+eventBus.on('chat:openPrivate', (data) => {
+  pendingOpenPrivate = data;
+});
 
 /** 往频道历史推一条消息（按 messageId 去重 + 超限裁剪 + 通知浮窗） */
 function pushChannelMessage(scope, msg) {
@@ -126,6 +133,10 @@ eventBus.on('chat:privateMessageSent', (data) => {
     message: data.message,
     timestamp: data.timestamp || Date.now(),
   }, data.toUserId);
+  // 对方离线：提示离线送达（后端已存为离线消息）
+  if (data.offline) {
+    toast.info('对方离线，消息已离线送达，上线后可查看');
+  }
 });
 
 /** 服务端返回的私聊会话列表（跨刷新恢复历史会话） */
@@ -290,15 +301,23 @@ export function renderChat(container = viewRoot()) {
   container.innerHTML = '';
 
   let currentTarget = null; // null → 大厅（全局聊天）
+  let playerKeyword = '';   // 玩家列表搜索关键词
 
   // ---- 左侧栏 ----
   const convBox = el('div', { class: 'chat-sidebar-section' });
-  const onlineBox = el('div', { class: 'chat-sidebar-section' });
+  const playerSearch = el('input', {
+    class: 'chat-sidebar-search',
+    placeholder: '搜索玩家昵称...',
+    onInput: (e) => { playerKeyword = e.target.value.trim().toLowerCase(); renderPlayers(); },
+  });
+  const playerBox = el('div', { class: 'chat-sidebar-section' });
   const sidebar = el('aside', { class: 'chat-sidebar' }, [
     el('div', { class: 'chat-sidebar-title' }, '💌 私信'),
     convBox,
-    el('div', { class: 'chat-sidebar-title' }, '👥 在线玩家'),
-    onlineBox,
+    el('div', { class: 'chat-sidebar-title' }, '👥 玩家（在线 + 离线）'),
+    el('div', { class: 'chat-sidebar-note' }, '离线玩家也可私信，消息在其上线后可查看'),
+    playerSearch,
+    playerBox,
   ]);
 
   // ---- 右侧主区 ----
@@ -355,25 +374,35 @@ export function renderChat(container = viewRoot()) {
     });
   }
 
-  function renderOnline() {
-    onlineBox.innerHTML = '';
-    const list = getOnlineUsers();
+  function renderPlayers() {
+    playerBox.innerHTML = '';
+    let list = getAllPlayers();
+    if (playerKeyword) {
+      list = list.filter((u) => (u.nickname || '').toLowerCase().includes(playerKeyword));
+    }
     if (!list.length) {
-      onlineBox.append(el('div', { class: 'chat-online-empty' }, '暂无在线玩家'));
+      playerBox.append(el('div', { class: 'chat-online-empty' }, playerKeyword ? '没有匹配的玩家' : '暂无玩家'));
       return;
     }
     list.forEach((u) => {
       const key = String(u.accountId);
       const isMe = myId && key === String(myId);
       const name = u.nickname || `玩家${key.slice(0, 4)}`;
-      const status = u.status === 'playing' ? '游戏中' : u.status === 'waiting' ? '等待中' : '在线';
-      onlineBox.append(el('div', { class: 'chat-online-item' }, [
+      const offline = u.status === 'offline';
+      const status = offline
+        ? '离线'
+        : (u.status === 'playing' ? '游戏中' : u.status === 'waiting' ? '等待中' : '在线');
+      const isFriendOrRequested = isFriend(key) || isRequested(key);
+      playerBox.append(el('div', { class: 'chat-online-item' + (offline ? ' offline' : '') }, [
         avatarNode(u.accountId, 28),
         el('div', { class: 'chat-online-info' }, [
           el('button', { class: 'chat-online-name', onClick: () => showUserCard(u.accountId) }, `${name}${isMe ? ' (我)' : ''}`),
           el('div', { class: 'chat-online-meta' }, `Lv.${u.level || 1} · ${status}`),
         ]),
-        isMe ? null : el('button', { class: 'chat-online-btn', onClick: () => openPrivate(u.accountId, name) }, '💬 私信'),
+        el('div', { class: 'chat-online-actions' }, [
+          isMe ? null : isFriendOrRequested ? null : el('button', { class: 'chat-online-add', title: '加好友', onClick: () => requestFriend(u.accountId, name) }, '＋'),
+          isMe ? null : el('button', { class: 'chat-online-btn' + (offline ? ' ghost' : ''), onClick: () => openPrivate(u.accountId, name) }, '💬 私信'),
+        ]),
       ]));
     });
   }
@@ -430,15 +459,26 @@ export function renderChat(container = viewRoot()) {
   };
   pageViews.add(viewRef);
 
-  renderOnline();
-  const unsubscribeOnline = subscribeOnlineUsers(renderOnline);
+  renderPlayers();
+  loadFriends(); // 同步好友状态，刷新玩家列表的“＋加好友”按钮
+  const unsubscribePlayers = subscribeOnlineUsers(renderPlayers);
+  const unsubscribeFriends = subscribeFriends(renderPlayers); // 好友/申请状态变化 → 刷新加好友按钮
+  loadAllPlayers(); // 异步拉取全部玩家（含离线），完成后通过订阅回调刷新列表
   emit('get_private_conversations'); // 拉取历史会话列表，恢复刷新前的私信记录
   openGlobal();
+
+  // 好友页跳转而来：自动打开对应私聊会话
+  if (pendingOpenPrivate) {
+    const p = pendingOpenPrivate;
+    pendingOpenPrivate = null;
+    openPrivate(p.targetId, p.nickname);
+  }
 
   return () => {
     offGlobalMsg();
     offGlobalHist();
-    unsubscribeOnline();
+    unsubscribePlayers();
+    unsubscribeFriends();
     pageViews.delete(viewRef);
     container.innerHTML = '';
   };

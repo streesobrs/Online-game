@@ -140,6 +140,10 @@ const EVENT_MAP = {
   private_history: 'chat:privateHistory',
   private_conversations: 'chat:privateConversations',
 
+  // 好友
+  friend_request_received: 'friend:request',
+  friend_request_accepted: 'friend:accepted',
+
   // 成就与排行
   achievements_unlocked: 'achievement:unlocked',
   achievements_list: 'achievement:list',

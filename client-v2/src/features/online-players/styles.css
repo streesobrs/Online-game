@@ -123,6 +123,28 @@
   color: #4a5568;
 }
 
+.user-card-footer {
+  margin-top: 14px;
+  width: 100%;
+  text-align: center;
+}
+
+.user-card-profile-btn {
+  border: 1px solid var(--theme-accent, #4299e1);
+  background: transparent;
+  color: var(--theme-accent, #4299e1);
+  border-radius: 8px;
+  padding: 6px 18px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.user-card-profile-btn:hover {
+  background: var(--theme-accent, #4299e1);
+  color: #fff;
+}
+
 /* 头像（通用，账号栏/在线玩家/聊天/资料卡共用） */
 .v2-avatar {
   border-radius: 50%;

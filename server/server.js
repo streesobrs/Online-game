@@ -26,6 +26,7 @@ const AIManager = require('./modules/AIManager');
 const ThemeManager = require('./modules/ThemeManager');
 const FeedbackManager = require('./modules/FeedbackManager');
 const ShopManager = require('./modules/ShopManager');
+const FriendsManager = require('./modules/FriendsManager');
 const OperationLogger = require('./modules/OperationLogger');
 const UpdateManager = require('./modules/UpdateManager');
 
@@ -1107,6 +1108,128 @@ app.get('/api/users/search', async (req, res) => {
   }
 });
 
+// 获取所有玩家公开信息（供聊天页展示离线玩家、发起离线私信）
+app.get('/api/users/all', async (req, res) => {
+  try {
+    const limit = Math.max(1, Math.min(parseInt(req.query.limit) || 200, 200));
+    const accounts = await accountManager.getAllAccounts();
+    const players = accounts
+      .map((a) => {
+        const { level } = accountManager.calculateLevelAndExp(a.account?.exp || 0);
+        return {
+          accountId: a.account?.id,
+          nickname: a.account?.nickname || a.username || `玩家${String(a.account?.id || '').slice(0, 4)}`,
+          level,
+          lastLogin: a.account?.lastLogin || null,
+        };
+      })
+      .sort((x, y) => (y.lastLogin || 0) - (x.lastLogin || 0))
+      .slice(0, limit);
+    res.json({
+      success: true,
+      data: players,
+      count: players.length
+    });
+  } catch (err) {
+    logger.error('获取所有玩家失败', { error: err.message });
+    res.status(500).json({
+      success: false,
+      message: '获取所有玩家失败'
+    });
+  }
+});
+
+// ========== 好友相关API ==========
+// 获取好友状态：好友列表 + 收到的申请 + 已发出的申请
+app.get('/api/friends/:accountId', async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    if (!accountId) {
+      return res.json({ success: false, message: '参数不完整' });
+    }
+    const data = await friendsManager.getFriendState(accountId);
+    res.json({ success: true, data });
+  } catch (err) {
+    logger.error('获取好友列表失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取好友列表失败' });
+  }
+});
+
+// 发起好友申请
+app.post('/api/friends/request', async (req, res) => {
+  try {
+    const { fromUserId, toUserId } = req.body || {};
+    if (!fromUserId || !toUserId) {
+      return res.json({ success: false, message: '参数不完整' });
+    }
+    const result = await friendsManager.request(fromUserId, toUserId);
+    // 通知对方（在线时实时推送）
+    if (result.success) {
+      const targetSocket = userManager.getSocketByAccountId(toUserId);
+      if (targetSocket) {
+        if (result.autoAccepted) {
+          targetSocket.emit('friend_request_accepted', {
+            withUserId: fromUserId,
+            withNickname: result.fromNickname,
+            timestamp: result.createdAt,
+          });
+        } else {
+          targetSocket.emit('friend_request_received', {
+            fromUserId,
+            fromNickname: result.fromNickname,
+            timestamp: result.createdAt,
+          });
+        }
+      }
+    }
+    res.json(result);
+  } catch (err) {
+    logger.error('发起好友申请失败', { error: err.message });
+    res.status(500).json({ success: false, message: '发起好友申请失败' });
+  }
+});
+
+// 同意/拒绝好友申请
+app.post('/api/friends/respond', async (req, res) => {
+  try {
+    const { userId, fromUserId, accept } = req.body || {};
+    if (!userId || !fromUserId) {
+      return res.json({ success: false, message: '参数不完整' });
+    }
+    const result = await friendsManager.respond(userId, fromUserId, !!accept);
+    // 同意后通知申请人
+    if (result.success && accept) {
+      const requesterSocket = userManager.getSocketByAccountId(fromUserId);
+      if (requesterSocket) {
+        requesterSocket.emit('friend_request_accepted', {
+          withUserId: userId,
+          withNickname: result.responderNickname,
+          timestamp: Date.now(),
+        });
+      }
+    }
+    res.json(result);
+  } catch (err) {
+    logger.error('处理好友申请失败', { error: err.message });
+    res.status(500).json({ success: false, message: '处理好友申请失败' });
+  }
+});
+
+// 删除好友
+app.delete('/api/friends/:accountId/:friendId', async (req, res) => {
+  try {
+    const { accountId, friendId } = req.params;
+    if (!accountId || !friendId) {
+      return res.json({ success: false, message: '参数不完整' });
+    }
+    const result = await friendsManager.remove(accountId, friendId);
+    res.json(result);
+  } catch (err) {
+    logger.error('删除好友失败', { error: err.message });
+    res.status(500).json({ success: false, message: '删除好友失败' });
+  }
+});
+
 // ========== 聊天相关API ==========
 
 // 获取聊天历史
@@ -1692,6 +1815,11 @@ const shopManager = new ShopManager();
 shopManager.operationLogger = operationLogger;
 // 注入accountManager到FeedbackManager用于实时查询昵称
 feedbackManager.accountManager = accountManager;
+
+const friendsManager = new FriendsManager();
+friendsManager.userManager = userManager;
+friendsManager.accountManager = accountManager;
+logger.info('好友系统初始化完成');
 
 // 服务器启动时增加构建版本号
 const newVersion = versionManager.incrementBuild();
