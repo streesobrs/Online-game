@@ -13,15 +13,17 @@ import { api } from './core/api.js';
 import { socket } from './core/socket.js';
 import * as auth from './core/auth.js';
 import { initSystemEvents } from './core/system.js';
-import { initRouter, registerRoute, go, isActive } from './core/router.js';
+import { initRouter, registerRoute, go, isActive, setRouteGuard } from './core/router.js';
 import { initShortcuts } from './utils/shortcut.js';
 import { NAV_ITEMS, GAMES, FEATURES, findItem } from './data/navItems.js';
 import * as themes from './features/themes/index.js';
 import { switchLayout, renderAccountBar } from './layouts/registry.js';
 import { viewRoot } from './utils/dom.js';
 import * as login from './features/auth/login.js';
+import { renderLoginPage } from './features/auth/login-page.js';
 import { renderGames } from './features/games/index.js';
 import { renderChat, initFloatingChat } from './features/chat/index.js';
+import { startOnboardingIfNeeded } from './components/onboarding.js';
 
 console.log('[v2] main.js 已加载');
 
@@ -81,9 +83,25 @@ registerRoute('spectate', lazyView('./features/spectate/index.js', 'renderSpecta
 registerRoute('feedback', lazyView('./features/feedback/index.js', 'renderFeedback'));
 registerRoute('profile', lazyView('./features/profile/index.js', 'renderProfile'));
 registerRoute('player', lazyView('./features/player/index.js', 'renderPlayerProfile'));
+registerRoute('login', () => renderLoginPage(viewRoot()));
+
+// 3.1 登录守卫：业务路由需登录；已登录访问登录页重定向回大厅
+setRouteGuard((id) => {
+  const hasUser = !!store.get('user');
+  if (id === 'login') return hasUser ? 'games' : null;
+  if (!hasUser && !auth.getToken()) return 'login';
+  return null;
+});
 
 // 4. 初始化路由（hashchange 监听 + 处理当前 hash）
 initRouter();
+
+// 4.1 新手引导：进入游戏大厅且已登录时自动触发（覆盖登录页登录 / 自动登录 / 刷新重进）
+store.subscribe('currentView', (id) => {
+  if (id === 'games' && store.get('user')) {
+    setTimeout(() => startOnboardingIfNeeded(), 600);
+  }
+});
 
 // 5. 初始化快捷键（元数据驱动）
 initShortcuts();

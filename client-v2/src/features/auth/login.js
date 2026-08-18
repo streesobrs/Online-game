@@ -1,156 +1,61 @@
 /**
- * 登录界面
- * 模态框形式：账号登录（用户名 + 密码） + 游客登录两种模式。
+ * 登录入口（v2）
+ * 负责「需要登录」场景的跳转：统一跳转到引导式登录页（#/login）。
+ * 登录页本体见 login-page.js（引导流程：欢迎/选择/表单/游客昵称/成功）。
  * 登录协议走 core/auth.js（account_login / guest_login → login_result）。
- * 登录成功（store.user 更新）后自动关闭弹窗。
  */
 import { store } from '../../core/store.js';
 import { eventBus } from '../../core/eventBus.js';
 import * as auth from '../../core/auth.js';
-import { modal } from '../../components/modal.js';
-import { el } from '../../utils/dom.js';
-import { toast } from '../../components/toast.js';
-
-let modalShown = false;
 
 /** 当前是否已登录 */
 export function isLoggedIn() {
   return !!store.get('user');
 }
 
-/** 展示登录弹窗（已登录或已弹出时忽略） */
+/** 跳转到登录页并指定初始步骤 */
+function goLoginStep(step) {
+  if (isLoggedIn()) return;
+  store.set('login.initStep', step || null);
+  if (window.location.hash !== '#/login') {
+    window.location.hash = '#/login';
+  }
+}
+
+/** 打开登录页（默认欢迎页；顶部「登录」按钮进登录表单） */
 export function showLoginModal() {
-  if (isLoggedIn() || modalShown) return;
-  modalShown = true;
-
-  const usernameInput = el('input', { class: 'input', placeholder: '用户名', autocomplete: 'username' });
-  const passwordInput = el('input', {
-    class: 'input',
-    type: 'password',
-    placeholder: '密码',
-    autocomplete: 'current-password',
-    onKeydown: (e) => { if (e.key === 'Enter') handleLogin(); },
-  });
-
-  const content = el('div', { class: 'flex-col', style: 'gap:12px;' }, [
-    usernameInput,
-    passwordInput,
-    el('button', {
-      class: 'btn btn--ghost',
-      style: 'width:100%;background:var(--theme-accent);color:#fff;',
-      onClick: () => auth.guestLogin(),
-    }, '游客登录'),
-    el('div', { style: 'display:flex;justify-content:space-between;font-size:12px;margin-top:2px;' }, [
-      el('a', { style: 'cursor:pointer;color:var(--theme-accent,#007bff);', onClick: () => { modal.close(); showRegisterModal(); } }, '注册账号'),
-      el('a', { style: 'cursor:pointer;color:var(--theme-accent,#007bff);', onClick: () => { modal.close(); showResetPasswordModal(); } }, '忘记密码'),
-    ]),
-    el('p', { class: 'text-muted', style: 'font-size:12px;text-align:center;' }, '支持 v1 账号，登录后自动保存进度'),
-  ]);
-
-  function handleLogin() {
-    const username = usernameInput.value.trim();
-    const password = passwordInput.value;
-    if (!username || !password) {
-      toast.error('请输入用户名和密码');
-      return;
-    }
-    auth.login(username, password);
-  }
-
-  modal.show({
-    title: '登录',
-    content,
-    confirmText: '登 录',
-    onConfirm: handleLogin,
-    showCancel: false,
-    onCancel: () => { modalShown = false; },
-  });
+  goLoginStep('login');
 }
 
-/** 展示注册弹窗（注册成功由 auth 层自动登录，登录后自动关闭） */
+/** 打开注册步骤 */
 export function showRegisterModal() {
-  modalShown = true;
-  const u = el('input', { class: 'input', placeholder: '用户名', autocomplete: 'username' });
-  const p = el('input', { class: 'input', type: 'password', placeholder: '密码（至少 6 位）', autocomplete: 'new-password' });
-  const p2 = el('input', { class: 'input', type: 'password', placeholder: '确认密码', autocomplete: 'new-password' });
-  const n = el('input', { class: 'input', placeholder: '昵称（可选）' });
-  const content = el('div', { class: 'flex-col', style: 'gap:12px;' }, [u, p, p2, n]);
-
-  function handleRegister() {
-    const username = u.value.trim();
-    const password = p.value;
-    if (!username || !password) { toast.error('请输入用户名和密码'); return; }
-    if (password.length < 6) { toast.error('密码至少 6 位'); return; }
-    if (password !== p2.value) { toast.error('两次输入的密码不一致'); return; }
-    auth.register(username, password, n.value.trim() || null);
-  }
-
-  modal.show({
-    title: '注册账号',
-    content,
-    confirmText: '注 册',
-    onConfirm: handleRegister,
-    cancelText: '返回登录',
-    onCancel: () => { modalShown = false; showLoginModal(); },
-  });
+  goLoginStep('register');
 }
 
-/** 展示重置密码弹窗 */
-function showResetPasswordModal() {
-  modalShown = true;
-  const u = el('input', { class: 'input', placeholder: '用户名' });
-  const p = el('input', { class: 'input', type: 'password', placeholder: '新密码（至少 6 位）' });
-  const p2 = el('input', { class: 'input', type: 'password', placeholder: '确认新密码' });
-  const content = el('div', { class: 'flex-col', style: 'gap:12px;' }, [u, p, p2]);
-
-  function handleReset() {
-    const username = u.value.trim();
-    const password = p.value;
-    if (!username || !password) { toast.error('请输入用户名和新密码'); return; }
-    if (password.length < 6) { toast.error('密码至少 6 位'); return; }
-    if (password !== p2.value) { toast.error('两次输入的密码不一致'); return; }
-    auth.resetPassword(username, password);
-  }
-
-  modal.show({
-    title: '重置密码',
-    content,
-    confirmText: '重 置',
-    cancelText: '返回登录',
-    onCancel: () => { modalShown = false; showLoginModal(); },
-  });
-}
-
-/** 未登录则弹出登录框；返回是否已登录 */
+/** 未登录则跳转登录页；返回是否已登录 */
 export function checkLogin() {
   if (isLoggedIn()) return true;
-  showLoginModal();
+  goLoginStep();
   return false;
 }
 
 /**
  * 自动登录检测（任务 1.8.1）
  * socket 连接后：
- * - 无 token → 直接弹出登录框（游客/账号登录）
- * - 有 token → auth.js 已发 get_account_by_token；若 account_info 失败（token 失效）→ 弹出登录框
+ * - 无 token → 跳转登录页（游客/账号登录）
+ * - 有 token → 已由 socket.js client_connect 自动恢复；若 account_info 失败 → 跳转登录页
  */
 export function initLoginCheck() {
   eventBus.on('socket:connect', () => {
-    if (!auth.getToken()) {
-      showLoginModal();
+    // 无 token 才需要去登录页；有 token 时由自动登录恢复 user，
+    // 若恢复失败会走 user:accountInfo 失败分支跳转，避免把已登录用户踢到登录页
+    if (!auth.getToken() && !isLoggedIn() && window.location.hash !== '#/login') {
+      window.location.hash = '#/login';
     }
   });
   eventBus.on('user:accountInfo', (data) => {
-    if (!(data && data.success)) {
-      showLoginModal();
+    if (!(data && data.success) && window.location.hash !== '#/login') {
+      window.location.hash = '#/login';
     }
   });
 }
-
-// 登录成功后自动关闭弹窗
-store.subscribe('user', (user) => {
-  if (user && modalShown) {
-    modal.close();
-    modalShown = false;
-  }
-});

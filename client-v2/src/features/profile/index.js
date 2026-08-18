@@ -22,6 +22,7 @@ import { eventBus } from '../../core/eventBus.js';
 import { NAV_ITEMS } from '../../data/navItems.js';
 import * as auth from '../../core/auth.js';
 import { requestReplay, showReplay } from '../replay/index.js';
+import { resetOnboarding, startOnboarding } from '../../components/onboarding.js';
 
 /** 游戏类型展示元数据 */
 const GAME_META = {
@@ -224,6 +225,14 @@ export function renderProfile(container) {
         el('button', { class: 'profile-aside-btn', onClick: () => switchTab('achievements') }, '🏆 我的成就'),
         el('button', { class: 'profile-aside-btn', onClick: () => switchTab('shop') }, '🛒 我的商城'),
         el('button', { class: 'profile-aside-btn', onClick: () => switchTab('themes') }, '🎨 主题设置'),
+        el('button', {
+          class: 'profile-aside-btn',
+          onClick: () => {
+            resetOnboarding();
+            window.location.hash = '#/games';
+            setTimeout(() => startOnboarding(), 500);
+          },
+        }, '🧭 新手指引'),
       ]),
     );
   }

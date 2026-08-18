@@ -130,6 +130,21 @@ export function initAuth() {
     } else if (data.action === 'set_password') {
       if (data.success) toast.success(data.message || '✅ 密码设置成功！');
       else toast.error(data.message || '❌ 密码设置失败');
+    } else if (data.action === 'update_profile') {
+      if (data.success) {
+        // 更新昵称成功后：同步本地存储与 store.user（保持 user 结构不变，只改昵称字段）
+        const newNick = data.account?.account?.nickname || data.account?.nickname;
+        if (newNick) localStorage.setItem(NICKNAME_KEY, newNick);
+        const current = store.get('user');
+        if (current) {
+          const inner = current.account?.account || current.account;
+          if (inner) inner.nickname = newNick || inner.nickname;
+          store.set('user', { ...current });
+        }
+        toast.success(data.message || '昵称已更新');
+      } else {
+        toast.error(data.message || '昵称更新失败');
+      }
     }
   });
 
@@ -196,8 +211,16 @@ export function fetchAccountByToken() {
   emit('get_account_by_token', { token });
 }
 
+/** 设置/修改昵称（account_update_profile → account_action_result action='update_profile'） */
+export function updateNickname(nickname) {
+  emit('account_update_profile', { nickname });
+}
+
 /** 退出登录 */
 export function logout() {
   clearAuth();
   toast.info('已退出登录');
+  if (window.location.hash !== '#/login') {
+    window.location.hash = '#/login';
+  }
 }

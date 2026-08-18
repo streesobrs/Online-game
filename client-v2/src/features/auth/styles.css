@@ -1,0 +1,352 @@
+/* 引导式登录页（v2）— 路由 #/login */
+
+.login-page {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  background: #f3f4f6;
+  font-size: 14px;
+}
+
+/* ===== 左侧品牌区 ===== */
+.login-hero {
+  flex: 1.2;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: #fff;
+  background: linear-gradient(135deg, #1e293b 0%, #3730a3 55%, #4c1d95 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.login-hero::before {
+  content: '';
+  position: absolute;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 70%);
+  top: -160px;
+  right: -160px;
+}
+
+.login-hero::after {
+  content: '';
+  position: absolute;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(129, 140, 248, 0.14) 0%, transparent 70%);
+  bottom: -140px;
+  left: -120px;
+}
+
+.login-hero-inner {
+  position: relative;
+  z-index: 1;
+  max-width: 560px;
+  width: 100%;
+}
+
+.login-logo {
+  font-size: 52px;
+  line-height: 1;
+  margin-bottom: 18px;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+}
+
+.login-hero-title {
+  font-size: 38px;
+  font-weight: 800;
+  margin: 0 0 10px;
+  letter-spacing: 2px;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.3);
+}
+
+.login-hero-sub {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.75);
+  margin: 0 0 30px;
+}
+
+.login-hero-features {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.login-feature {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(4px);
+}
+
+.login-feature-icon {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.login-feature-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+
+.login-feature-desc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.login-hero-footer {
+  margin-top: 34px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ===== 右侧登录卡片 ===== */
+.login-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 16px 50px rgba(30, 41, 59, 0.18);
+  padding: 36px 32px;
+}
+
+/* 进度指示 */
+.login-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 22px;
+  min-height: 16px;
+}
+
+.login-progress-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  transition: background 0.25s ease;
+}
+
+.login-progress-dot.active {
+  background: var(--theme-primary, #007bff);
+}
+
+.login-progress-label {
+  margin-left: 6px;
+  font-size: 12px;
+  color: #a0aec0;
+}
+
+/* 步骤内容 */
+.login-step-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.login-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a202c;
+  margin: 0;
+}
+
+.login-desc {
+  font-size: 13px;
+  color: #718096;
+  margin: -4px 0 6px;
+  line-height: 1.6;
+}
+
+.login-cta {
+  width: 100%;
+  padding: 11px;
+  font-size: 15px;
+  margin-top: 4px;
+}
+
+.login-input {
+  width: 100%;
+  padding: 11px 14px;
+  font-size: 14px;
+}
+
+/* 选择登录方式 */
+.login-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.login-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px 18px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.18s ease;
+}
+
+.login-option:hover {
+  border-color: var(--theme-primary, #007bff);
+  background: #f0f7ff;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0, 123, 255, 0.1);
+}
+
+.login-option-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.login-option-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.login-option-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #2d3748;
+  margin-bottom: 3px;
+}
+
+.login-option-desc {
+  font-size: 12px;
+  color: #a0aec0;
+}
+
+.login-option-arrow {
+  font-size: 22px;
+  color: #cbd5e0;
+  flex-shrink: 0;
+}
+
+/* 底部链接 */
+.login-links {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+
+.login-link {
+  border: none;
+  background: none;
+  padding: 4px 0;
+  font-size: 13px;
+  color: var(--theme-primary, #007bff);
+  cursor: pointer;
+}
+
+.login-link:hover {
+  text-decoration: underline;
+}
+
+.login-back {
+  border: none;
+  background: none;
+  padding: 6px 0;
+  font-size: 13px;
+  color: #a0aec0;
+  cursor: pointer;
+  margin-top: 2px;
+}
+
+.login-back:hover {
+  color: #718096;
+}
+
+/* 游客昵称 */
+.login-nick-avatar {
+  font-size: 44px;
+  text-align: center;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+/* 成功过渡 */
+.login-done {
+  align-items: center;
+  text-align: center;
+  padding: 16px 0;
+}
+
+.login-done-check {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #27ae60, #2ecc71);
+  color: #fff;
+  font-size: 34px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  box-shadow: 0 8px 24px rgba(39, 174, 96, 0.35);
+  animation: login-pop 0.45s cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+
+@keyframes login-pop {
+  0% { transform: scale(0.3); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* 响应式：窄屏收起品牌区 */
+@media (max-width: 900px) {
+  .login-page {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .login-hero {
+    flex: none;
+    padding: 28px 24px;
+  }
+
+  .login-hero-title {
+    font-size: 28px;
+  }
+
+  .login-hero-features {
+    display: none;
+  }
+
+  .login-hero-footer {
+    margin-top: 12px;
+  }
+
+  .login-panel {
+    padding: 24px 16px;
+  }
+
+  .login-card {
+    padding: 26px 20px;
+  }
+}

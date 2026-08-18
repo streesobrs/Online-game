@@ -1,0 +1,125 @@
+/* 登录后新手引导（v2）：遮罩高亮 + 气泡 */
+
+.onboarding-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  cursor: pointer;
+}
+
+/* 高亮目标（box-shadow 大扩散挖洞；定位由 JS 控制，避免破坏 fixed/sticky 元素） */
+.onboarding-target {
+  z-index: 99999 !important;
+  border-radius: 10px !important;
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.95),
+    0 0 0 9999px rgba(15, 23, 42, 0.55) !important;
+  transition: none;
+}
+
+/* 气泡 */
+.onboarding-pop {
+  position: fixed;
+  z-index: 100001;
+  width: 320px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.35);
+  padding: 16px 18px;
+  cursor: default;
+}
+
+.onboarding-pop-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+/* 指向箭头：气泡在目标下方时箭头朝上指向目标，反之朝下 */
+.onboarding-pop::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 8px solid transparent;
+}
+
+.onboarding-pop.arrow-up::before {
+  top: -16px;
+  border-top: none;
+  border-bottom-color: #fff;
+}
+
+.onboarding-pop.arrow-down::before {
+  bottom: -16px;
+  border-bottom: none;
+  border-top-color: #fff;
+}
+
+.onboarding-pop-icon {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.onboarding-pop-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a202c;
+}
+
+.onboarding-pop-text {
+  font-size: 13px;
+  color: #718096;
+  line-height: 1.7;
+  margin: 6px 0 14px;
+}
+
+.onboarding-pop-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.onboarding-pop-skip {
+  border: none;
+  background: none;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: #a0aec0;
+  cursor: pointer;
+}
+
+.onboarding-pop-skip:hover {
+  color: #718096;
+}
+
+.onboarding-pop-nav {
+  display: flex;
+  gap: 8px;
+}
+
+.onboarding-pop-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 7px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  background: var(--theme-primary, #007bff);
+  color: #fff;
+  transition: background 0.15s ease;
+}
+
+.onboarding-pop-btn:hover {
+  background: #0056b3;
+}
+
+.onboarding-pop-btn.ghost {
+  background: #e2e8f0;
+  color: #4a5568;
+}
+
+.onboarding-pop-btn.ghost:hover {
+  background: #cbd5e0;
+}

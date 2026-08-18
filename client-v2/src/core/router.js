@@ -14,6 +14,18 @@ const ROUTES = new Map();
 const DEFAULT_ROUTE = 'games';
 
 /**
+ * 路由守卫（由 main.js 注册）。
+ * @param {string} id - 目标路由 ID
+ * @returns {string|null} 返回 null/undefined 表示放行；返回路由 ID 表示重定向
+ */
+let routeGuard = null;
+
+/** 注册路由守卫（全局唯一，用于登录态拦截） */
+export function setRouteGuard(guard) {
+  routeGuard = guard;
+}
+
+/**
  * 注册路由处理器
  * @param {string} id - 视图 ID（须存在于 NAV_ITEMS，或为默认大厅 'games'）
  * @param {Function} handler - 挂载视图的函数
@@ -82,6 +94,15 @@ function handleHashChange() {
   }
 
   store.set('currentView', id);
+
+  // 登录守卫：业务页需登录，登录页对已登录用户重定向
+  if (routeGuard) {
+    const redirect = routeGuard(id);
+    if (redirect && redirect !== id) {
+      window.location.hash = `#/${redirect}`;
+      return;
+    }
+  }
 
   const handler = ROUTES.get(id);
   if (handler) {
