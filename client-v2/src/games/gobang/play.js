@@ -53,10 +53,11 @@ export function startMatch(container, matchData) {
   const turnEl = el('span', { class: 'gobang-info-tag' });
   const oppEl = el('span', { class: 'gobang-info-tag' });
   const timerEl = el('span', { class: 'gobang-info-tag' });
-  const undoBtn = el('button', { class: 'btn btn-secondary', style: 'padding:4px 12px;font-size:13px;' }, '⏪ 悔棋');
-  const resignBtn = el('button', { class: 'btn btn-secondary', style: 'padding:4px 12px;font-size:13px;' }, '🏳️ 认输');
-  const resetBtn = el('button', { class: 'btn btn-secondary', style: 'padding:4px 12px;font-size:13px;' }, '🔄 重置');
-  const leaveBtn = el('button', { class: 'btn btn-secondary', style: 'margin-left:auto;padding:4px 12px;font-size:13px;' }, '返回大厅');
+  const undoBtn = el('button', { class: 'btn btn-secondary' }, '⏪ 悔棋');
+  const hintBtn = el('button', { class: 'btn btn-secondary' }, '💡 提示');
+  const resignBtn = el('button', { class: 'btn btn-secondary' }, '🏳️ 认输');
+  const resetBtn = el('button', { class: 'btn btn-secondary' }, '🔄 重置');
+  const leaveBtn = el('button', { class: 'btn btn-secondary' }, '返回大厅');
 
   function updateTurn() {
     const name = board.turn === BLACK ? '黑棋' : '白棋';
@@ -129,15 +130,60 @@ export function startMatch(container, matchData) {
   }
 
   container.innerHTML = '';
-  container.append(infoBar(), boardEl);
+  container.append(
+    el('div', { class: 'game-stage' }, [
+      el('div', { class: 'game-status-bar' }, [
+        el('div', { class: 'game-status-group' }, [turnEl, oppEl, timerEl]),
+        el('div', { class: 'game-status-spacer' }),
+        leaveBtn,
+      ]),
+      el('div', { class: 'game-board-container' }, [boardEl]),
+      el('div', { class: 'game-tools-bar' }, [undoBtn, hintBtn, resignBtn, resetBtn]),
+    ])
+  );
 
-  function infoBar() {
-    const bar = el('div', {
-      class: 'gobang-match-info',
-      style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;max-width:724px;width:100%;',
-    }, [turnEl, oppEl, timerEl, undoBtn, hintBtn, resignBtn, resetBtn, leaveBtn]);
-    return bar;
-  }
+  // 自适应棋盘尺寸：以棋盘容器实际可用空间为准，兼容纵向（手机）和分栏（平板/桌面）布局
+  const fitBoardSize = () => {
+    const stage = container.querySelector('.game-stage');
+    const boardContainer = container.querySelector('.game-board-container');
+    const board = container.querySelector('.gobang-board');
+    if (!stage || !boardContainer || !board) return;
+
+    // 清除 board.js 中 fitBoard() 可能设置的 zoom，统一由本函数控制尺寸
+    board.style.zoom = '';
+
+    // 棋盘实际宽度公式：19 * cellSize + cellSize(两侧半格padding合计) + 8(边框) = 20 * cellSize + 8
+    // 使用容器 clientWidth，回退到 stage 或 container 宽度
+    const availableWidth = boardContainer.clientWidth || stage.clientWidth || container.clientWidth;
+    const availableHeight = boardContainer.clientHeight || stage.clientHeight || container.clientHeight;
+    if (availableWidth <= 0) return;
+
+    const padding = 8;
+    const cols = 20; // 19格 + 1格padding
+    const rows = 20;
+
+    const cellByWidth = Math.floor((availableWidth - padding) / cols);
+    const cellByHeight = Math.floor((availableHeight - padding) / rows);
+    let cellSize = Math.min(cellByWidth, cellByHeight);
+
+    // 限制范围：小屏不低于10px，大屏不超过42px
+    cellSize = Math.max(10, Math.min(cellSize, 42));
+    board.style.setProperty('--board-cell-size', cellSize + 'px');
+    // 显式设置棋盘总尺寸（border-box，含 padding + border）
+    board.style.width = `calc(${cols} * ${cellSize}px + ${padding}px)`;
+    board.style.height = `calc(${rows} * ${cellSize}px + ${padding}px)`;
+  };
+
+  // 初始计算 + 双重延迟计算（确保布局完成后再测量）
+  fitBoardSize();
+  requestAnimationFrame(() => { fitBoardSize(); });
+  requestAnimationFrame(() => { requestAnimationFrame(fitBoardSize); });
+  window.addEventListener('resize', fitBoardSize);
+  const resizeObserver = new ResizeObserver(fitBoardSize);
+  const stageEl = container.querySelector('.game-stage');
+  if (stageEl) resizeObserver.observe(stageEl);
+  const boardContainerEl = container.querySelector('.game-board-container');
+  if (boardContainerEl) resizeObserver.observe(boardContainerEl);
 
   // ---- socket 事件（2.3.1 / 2.3.3）----
   const offs = [];

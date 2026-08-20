@@ -6,7 +6,6 @@
  * 棋子 DOM 与 v1 一致：cell 内子元素 div.go-black / .go-white；星位为子元素 .go-star。
  */
 import { el } from '../../utils/dom.js';
-import { fitBoard } from '../../utils/responsive.js';
 
 export const GO_SIZE = 21;
 export const EMPTY = 0;
@@ -154,7 +153,6 @@ export function createBoard(container, options = {}) {
 
   function destroy() {
     destroyed = true;
-    fit.destroy();
     container.innerHTML = '';
   }
 
@@ -190,7 +188,6 @@ export function createBoard(container, options = {}) {
     hidePreview(Number(cell.dataset.r), Number(cell.dataset.c));
   });
   container.append(root);
-  const fit = fitBoard(root, container);
 
   return {
     size,

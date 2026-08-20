@@ -79,9 +79,9 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
   const turnEl = el('span', { class: 'ai-info-tag' });
   const timerEl = el('span', { class: 'ai-info-tag' });
   const diffEl = el('span', { class: 'ai-info-tag' });
-  const undoBtn = el('button', { class: 'btn btn-secondary', style: 'padding:4px 12px;font-size:13px;' }, '⏪ 悔棋');
-  const hintBtn = el('button', { class: 'btn btn-secondary', style: 'padding:4px 12px;font-size:13px;' }, '💡 提示');
-  const backBtn = el('button', { class: 'btn btn-secondary', style: 'padding:4px 12px;font-size:13px;margin-left:auto;' }, '返回AI入口');
+  const undoBtn = el('button', { class: 'btn btn-secondary' }, '⏪ 悔棋');
+  const hintBtn = el('button', { class: 'btn btn-secondary' }, '💡 提示');
+  const backBtn = el('button', { class: 'btn btn-secondary' }, '返回AI入口');
 
   function updateTurn() {
     if (gameOver) return;
@@ -170,9 +170,62 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
 
   container.innerHTML = '';
   container.append(
-    el('div', { class: 'ai-match-info', style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;max-width:724px;width:100%;' }, [turnEl, diffEl, timerEl, undoBtn, hintBtn, backBtn]),
-    boardEl
+    el('div', { class: 'game-stage' }, [
+      el('div', { class: 'game-status-bar' }, [
+        el('div', { class: 'game-status-group' }, [turnEl, diffEl, timerEl]),
+        el('div', { class: 'game-status-spacer' }),
+        backBtn,
+      ]),
+      el('div', { class: 'game-board-container' }, [boardEl]),
+      el('div', { class: 'game-tools-bar' }, [undoBtn, hintBtn]),
+    ])
   );
+
+  // 自适应棋盘尺寸 (根据游戏类型动态计算)：以棋盘容器实际可用空间为准
+  const fitBoardSize = () => {
+    const stage = container.querySelector('.game-stage');
+    const boardContainer = container.querySelector('.game-board-container');
+    if (!stage || !boardContainer) return;
+    const board = boardContainer.querySelector('.gobang-board, .go-board, .chess-board');
+    if (!board) return;
+
+    // 清除 board.js 中 fitBoard() 可能设置的 zoom
+    board.style.zoom = '';
+
+    const availableWidth = boardContainer.clientWidth || stage.clientWidth || container.clientWidth;
+    const availableHeight = boardContainer.clientHeight || stage.clientHeight || container.clientHeight;
+    if (availableWidth <= 0) return;
+
+    // 棋盘尺寸公式：
+    //   五子棋: 19*cell + cell(两侧半格padding) + 8(边框) = 20*cell + 8
+    //   围棋:  21*cell + cell + 8 = 22*cell + 8
+    //   象棋:  9*cell + 48 (padding 40 + border 8)，border-box
+    let cols = 20, rows = 20, padding = 8;
+    if (gameType === 'gobang') { cols = 20; rows = 20; padding = 8; }
+    else if (gameType === 'go') { cols = 22; rows = 22; padding = 8; }
+    else if (gameType === 'chinese-chess') { cols = 9; rows = 10; padding = 48; }
+
+    const cellByWidth = Math.floor((availableWidth - padding) / cols);
+    const cellByHeight = Math.floor((availableHeight - padding) / rows);
+    let cellSize = Math.min(cellByWidth, cellByHeight);
+
+    cellSize = Math.max(10, Math.min(cellSize, 42));
+    board.style.setProperty('--board-cell-size', cellSize + 'px');
+    // 显式设置棋盘总尺寸（border-box）
+    board.style.width = `calc(${cols} * ${cellSize}px + ${padding}px)`;
+    board.style.height = `calc(${rows} * ${cellSize}px + ${padding}px)`;
+  };
+
+  // 初始计算 + 双重延迟计算（确保布局完成后再测量）
+  fitBoardSize();
+  requestAnimationFrame(() => { fitBoardSize(); });
+  requestAnimationFrame(() => { requestAnimationFrame(fitBoardSize); });
+  window.addEventListener('resize', fitBoardSize);
+  const resizeObserver = new ResizeObserver(fitBoardSize);
+  const stageEl = container.querySelector('.game-stage');
+  if (stageEl) resizeObserver.observe(stageEl);
+  const boardContainerEl = container.querySelector('.game-board-container');
+  if (boardContainerEl) resizeObserver.observe(boardContainerEl);
 
   // 恢复后同步最新对局状态（get_current_game 返回服务端实时快照）
   let stateSyncOff = null;

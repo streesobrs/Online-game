@@ -23,6 +23,7 @@ import { store } from '../../core/store.js';
 import { eventBus } from '../../core/eventBus.js';
 import { GAMES } from '../../data/navItems.js';
 import { go } from '../../core/router.js';
+import { startGameTour } from '../../components/onboarding.js';
 
 const GAME_MAP = Object.fromEntries(GAMES.map((g) => [g.id, g]));
 
@@ -333,6 +334,8 @@ export function renderGames(container) {
         if (typeof cleanupFn === 'function') cleanupFn();
         if (typeof prevCleanup === 'function') prevCleanup();
       };
+      // 首次进入对局：落子/悔棋/认输操作引导
+      startGameTour();
     } catch (err) {
       console.error('[Games] AI 对战启动失败:', err);
       toast.error('AI 对战启动失败');
@@ -462,6 +465,8 @@ export function renderGames(container) {
         if (typeof cleanupFn === 'function') cleanupFn();
         if (typeof prevCleanup === 'function') prevCleanup();
       };
+      // 首次进入对局：落子/悔棋/认输操作引导
+      startGameTour();
     } catch (err) {
       console.error('[Games] 游戏启动失败:', err);
       toast.error('游戏启动失败');

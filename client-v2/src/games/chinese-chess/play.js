@@ -57,11 +57,11 @@ export function startMatch(container, matchData) {
   const turnEl = el('span', { class: 'gobang-info-tag' });
   const oppEl = el('span', { class: 'gobang-info-tag' });
   const timerEl = el('span', { class: 'gobang-info-tag' });
-  const undoBtn = el('button', { class: 'btn btn-secondary', style: 'padding:4px 12px;font-size:13px;' }, '⏪ 悔棋');
-  const hintBtn = el('button', { class: 'btn btn-secondary', style: 'padding:4px 12px;font-size:13px;' }, '💡 提示');
-  const resignBtn = el('button', { class: 'btn btn-secondary', style: 'padding:4px 12px;font-size:13px;' }, '🏳️ 认输');
-  const resetBtn = el('button', { class: 'btn btn-secondary', style: 'padding:4px 12px;font-size:13px;' }, '🔄 重置');
-  const leaveBtn = el('button', { class: 'btn btn-secondary', style: 'margin-left:auto;padding:4px 12px;font-size:13px;' }, '返回大厅');
+  const undoBtn = el('button', { class: 'btn btn-secondary' }, '⏪ 悔棋');
+  const hintBtn = el('button', { class: 'btn btn-secondary' }, '💡 提示');
+  const resignBtn = el('button', { class: 'btn btn-secondary' }, '🏳️ 认输');
+  const resetBtn = el('button', { class: 'btn btn-secondary' }, '🔄 重置');
+  const leaveBtn = el('button', { class: 'btn btn-secondary' }, '返回大厅');
 
   function turnName(t) {
     return t === RED ? '红方' : '黑方';
@@ -165,7 +165,55 @@ export function startMatch(container, matchData) {
   }
 
   container.innerHTML = '';
-  container.append(infoBar(), boardEl);
+  container.append(
+    el('div', { class: 'game-stage' }, [
+      el('div', { class: 'game-status-bar' }, [
+        el('div', { class: 'game-status-group' }, [turnEl, oppEl, timerEl]),
+        el('div', { class: 'game-status-spacer' }),
+        leaveBtn,
+      ]),
+      el('div', { class: 'game-board-container' }, [boardEl]),
+      el('div', { class: 'game-tools-bar' }, [undoBtn, hintBtn, resignBtn, resetBtn]),
+    ])
+  );
+
+  // 自适应棋盘尺寸：以棋盘容器实际可用空间为准
+  const fitBoardSize = () => {
+    const stage = container.querySelector('.game-stage');
+    const boardContainer = container.querySelector('.game-board-container');
+    const board = container.querySelector('.chess-board');
+    if (!stage || !boardContainer || !board) return;
+
+    // 清除 board.js 中 fitBoard() 可能设置的 zoom
+    board.style.zoom = '';
+
+    const availableWidth = boardContainer.clientWidth || stage.clientWidth || container.clientWidth;
+    const availableHeight = boardContainer.clientHeight || stage.clientHeight || container.clientHeight;
+    if (availableWidth <= 0) return;
+
+    // 象棋 9列 x 10行，CSS total = cellSize*9 + 48 (padding 40 + border 8)，border-box
+    const padding = 48;
+    const cellByWidth = Math.floor((availableWidth - padding) / 9);
+    const cellByHeight = Math.floor((availableHeight - padding) / 10);
+    let cellSize = Math.min(cellByWidth, cellByHeight);
+
+    cellSize = Math.max(10, Math.min(cellSize, 42));
+    board.style.setProperty('--board-cell-size', cellSize + 'px');
+    // 显式设置棋盘总尺寸（border-box）
+    board.style.width = `calc(9 * ${cellSize}px + 48px)`;
+    board.style.height = `calc(10 * ${cellSize}px + 48px)`;
+  };
+
+  // 初始计算 + 双重延迟计算（确保布局完成后再测量）
+  fitBoardSize();
+  requestAnimationFrame(() => { fitBoardSize(); });
+  requestAnimationFrame(() => { requestAnimationFrame(fitBoardSize); });
+  window.addEventListener('resize', fitBoardSize);
+  const resizeObserver = new ResizeObserver(fitBoardSize);
+  const stageEl = container.querySelector('.game-stage');
+  if (stageEl) resizeObserver.observe(stageEl);
+  const boardContainerEl = container.querySelector('.game-board-container');
+  if (boardContainerEl) resizeObserver.observe(boardContainerEl);
 
   // 恢复后同步最新对局状态（get_current_game 返回服务端实时快照）
   let stateSyncOff = null;
@@ -206,14 +254,6 @@ export function startMatch(container, matchData) {
       if (stateSyncOff) { stateSyncOff(); stateSyncOff = null; }
       stateSyncTimer = null;
     }, 3000);
-  }
-
-  function infoBar() {
-    const bar = el('div', {
-      class: 'gobang-match-info',
-      style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;max-width:724px;width:100%;',
-    }, [turnEl, oppEl, timerEl, undoBtn, hintBtn, resignBtn, resetBtn, leaveBtn]);
-    return bar;
   }
 
   // ---- 提示标记（与 v1 hint-marker / hint-source / hint-target 一致）----

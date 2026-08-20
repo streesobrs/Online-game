@@ -4,6 +4,12 @@ const logger = require('../utils/logger');
 const { Worker } = require('worker_threads');
 const path = require('path');
 
+// 象棋棋子中文名（用于提示讲解）
+const CHESS_NAMES = {
+  shuai: '帅', jiang: '将', ju: '车', pao: '炮', ma: '马',
+  xiang: '相', shi: '士', bing: '兵', zu: '卒',
+};
+
 class AIManager {
   constructor() {
     this.difficultyLevels = ['easy', 'medium', 'hard'];
@@ -880,44 +886,80 @@ class AIManager {
     return null;
   }
 
-  // 寻找活三移动
+  // 分析以 (r,c) 为落点、方向 (dr,dc) 上的连子情况（含刚落子的那枚）
+  // 返回 { count: 连续己方子数, ends: 两端空端数(0/1/2) }
+  analyzeLine(board, r, c, dr, dc, player) {
+    let count = 1;
+    let ends = 0;
+    // 正向
+    let i = 1;
+    for (; ; i++) {
+      const nr = r + dr * i;
+      const nc = c + dc * i;
+      if (nr < 0 || nr >= board.length || nc < 0 || nc >= board[0].length) break;
+      if (board[nr][nc] === player) { count++; continue; }
+      if (board[nr][nc] === 0) ends++;
+      break;
+    }
+    // 反向
+    for (i = 1; ; i++) {
+      const nr = r - dr * i;
+      const nc = c - dc * i;
+      if (nr < 0 || nr >= board.length || nc < 0 || nc >= board[0].length) break;
+      if (board[nr][nc] === player) { count++; continue; }
+      if (board[nr][nc] === 0) ends++;
+      break;
+    }
+    return { count, ends };
+  }
+
+  // 寻找活三移动（落子后在某方向形成 _AAA_：3连+两端空）
   findLiveThreeMove(board, player) {
     const emptyCells = this.getEmptyCells(board);
+    const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
     for (const cell of emptyCells) {
       board[cell.r][cell.c] = player;
-      if (this.hasLiveThree(board, player)) {
-        board[cell.r][cell.c] = 0;
-        return cell;
+      let hit = false;
+      for (const [dr, dc] of dirs) {
+        const { count, ends } = this.analyzeLine(board, cell.r, cell.c, dr, dc, player);
+        if (count === 3 && ends === 2) { hit = true; break; }
       }
       board[cell.r][cell.c] = 0;
+      if (hit) return cell;
     }
     return null;
   }
 
-  // 寻找活四移动
+  // 寻找活四移动（落子后在某方向形成 _AAAA_：4连+两端空）
   findLiveFourMove(board, player) {
     const emptyCells = this.getEmptyCells(board);
+    const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
     for (const cell of emptyCells) {
       board[cell.r][cell.c] = player;
-      if (this.hasLiveFour(board, player)) {
-        board[cell.r][cell.c] = 0;
-        return cell;
+      let hit = false;
+      for (const [dr, dc] of dirs) {
+        const { count, ends } = this.analyzeLine(board, cell.r, cell.c, dr, dc, player);
+        if (count === 4 && ends === 2) { hit = true; break; }
       }
       board[cell.r][cell.c] = 0;
+      if (hit) return cell;
     }
     return null;
   }
 
-  // 寻找冲四移动
+  // 寻找冲四移动（落子后在某方向形成 AAAA_ 或 _AAAA：4连+一端空）
   findRushFourMove(board, player) {
     const emptyCells = this.getEmptyCells(board);
+    const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
     for (const cell of emptyCells) {
       board[cell.r][cell.c] = player;
-      if (this.hasRushFour(board, player)) {
-        board[cell.r][cell.c] = 0;
-        return cell;
+      let hit = false;
+      for (const [dr, dc] of dirs) {
+        const { count, ends } = this.analyzeLine(board, cell.r, cell.c, dr, dc, player);
+        if (count === 4 && ends === 1) { hit = true; break; }
       }
       board[cell.r][cell.c] = 0;
+      if (hit) return cell;
     }
     return null;
   }
@@ -989,6 +1031,51 @@ class AIManager {
     }
 
     return bestMove;
+  }
+
+  // 对手在 (r,c) 可成四连时，返回四连的「开口端」位置
+  // - 活四（两端空）→ 返回 null（应堵中间，即原防守点）
+  // - 冲四（一端空一端封）→ 返回开口端（堵这里才真正阻止对手成五）
+  // - 两端封死 → 返回 null（死四，无需防守）
+  findFourOpenEnd(board, player, move) {
+    const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+    board[move.r][move.c] = player;
+
+    for (const [dr, dc] of dirs) {
+      const { count } = this.analyzeLine(board, move.r, move.c, dr, dc, player);
+      if (count !== 4) continue;
+
+      // 找到四连段的两端外侧位置
+      let r1 = move.r;
+      let c1 = move.c;
+      while (r1 - dr >= 0 && r1 - dr < board.length && c1 - dc >= 0 && c1 - dc < board[0].length && board[r1 - dr][c1 - dc] === player) {
+        r1 -= dr;
+        c1 -= dc;
+      }
+      const frontR = r1 - dr;
+      const frontC = c1 - dc;
+      const frontEmpty = frontR >= 0 && frontR < board.length && frontC >= 0 && frontC < board[0].length && board[frontR][frontC] === 0;
+
+      let r2 = move.r;
+      let c2 = move.c;
+      while (r2 + dr >= 0 && r2 + dr < board.length && c2 + dc >= 0 && c2 + dc < board[0].length && board[r2 + dr][c2 + dc] === player) {
+        r2 += dr;
+        c2 += dc;
+      }
+      const backR = r2 + dr;
+      const backC = c2 + dc;
+      const backEmpty = backR >= 0 && backR < board.length && backC >= 0 && backC < board[0].length && board[backR][backC] === 0;
+
+      board[move.r][move.c] = 0;
+
+      if (frontEmpty && backEmpty) return null; // 活四：堵中间（保持原防守点）
+      if (frontEmpty) return { r: frontR, c: frontC }; // 冲四：堵开口端
+      if (backEmpty) return { r: backR, c: backC };
+      return null; // 死四：无需防守
+    }
+
+    board[move.r][move.c] = 0;
+    return null;
   }
 
   // 寻找4连珠防守位置（检测并阻挡对手的4连珠）
@@ -1352,50 +1439,40 @@ class AIManager {
     return null;
   }
 
-  // 计算活三数量
+  // 计算活三数量（正确检测：3连 + 两端空，基于连续段不重复计数）
   countLiveThree(board, player) {
     let count = 0;
-    const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+    const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+    const seen = new Set();
 
     for (let r = 0; r < board.length; r++) {
       for (let c = 0; c < board[0].length; c++) {
         if (board[r][c] !== player) continue;
 
-        for (const [dr, dc] of directions) {
-          // 检查以(r,c)开始的5个格子
-          let playerCount = 0;
-          let emptyCount = 0;
-          let emptyPositions = [];
+        for (const [dr, dc] of dirs) {
+          const key = `${r},${c},${dr},${dc}`;
+          if (seen.has(key)) continue;
+          // 若前一格也是己方子，说明本段已从更早起点统计过
+          const pr = r - dr;
+          const pc = c - dc;
+          if (pr >= 0 && pr < board.length && pc >= 0 && pc < board[0].length && board[pr][pc] === player) continue;
 
-          for (let i = 0; i < 5; i++) {
-            const nr = r + dr * i;
-            const nc = c + dc * i;
-            if (nr < 0 || nr >= board.length || nc < 0 || nc >= board[0].length) break;
-
-            if (board[nr][nc] === player) {
-              playerCount++;
-            } else if (board[nr][nc] === 0) {
-              emptyCount++;
-              emptyPositions.push({ r: nr, c: nc });
-            } else {
-              break;
-            }
+          // 从段起点沿方向统计连续子数
+          let cr = r;
+          let cc = c;
+          let cnt = 0;
+          while (cr >= 0 && cr < board.length && cc >= 0 && cc < board[0].length && board[cr][cc] === player) {
+            cnt++;
+            seen.add(`${cr},${cc},${dr},${dc}`);
+            cr += dr;
+            cc += dc;
+            if (cnt > 5) break;
           }
 
-          // 活三：3个自己的棋子，2个空位，且两端都是空的
-          if (playerCount === 3 && emptyCount === 2) {
-            const beforeR = r - dr;
-            const beforeC = c - dc;
-            const afterR = r + dr * 5;
-            const afterC = c + dc * 5;
+          const endEmpty = (cr < 0 || cr >= board.length || cc < 0 || cc >= board[0].length) ? false : board[cr][cc] === 0;
+          const begEmpty = (r - dr < 0 || r - dr >= board.length || c - dc < 0 || c - dc >= board[0].length) ? false : board[r - dr][c - dc] === 0;
 
-            const beforeEmpty = beforeR < 0 || beforeR >= board.length || beforeC < 0 || beforeC >= board[0].length || board[beforeR][beforeC] === 0;
-            const afterEmpty = afterR < 0 || afterR >= board.length || afterC < 0 || afterC >= board[0].length || board[afterR][afterC] === 0;
-
-            if (beforeEmpty && afterEmpty) {
-              count++;
-            }
-          }
+          if (cnt === 3 && endEmpty && begEmpty) count++;
         }
       }
     }
@@ -1416,37 +1493,39 @@ class AIManager {
     return null;
   }
 
-  // 计算活二数量
+  // 计算活二数量（正确检测：2连 + 两端空，基于连续段不重复计数）
   countLiveTwo(board, player) {
     let count = 0;
-    const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+    const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+    const seen = new Set();
 
     for (let r = 0; r < board.length; r++) {
       for (let c = 0; c < board[0].length; c++) {
         if (board[r][c] !== player) continue;
 
-        for (const [dr, dc] of directions) {
-          let playerCount = 0;
-          let emptyCount = 0;
+        for (const [dr, dc] of dirs) {
+          const key = `${r},${c},${dr},${dc}`;
+          if (seen.has(key)) continue;
+          // 若前一格也是己方子，说明本段已从更早起点统计过
+          const pr = r - dr;
+          const pc = c - dc;
+          if (pr >= 0 && pr < board.length && pc >= 0 && pc < board[0].length && board[pr][pc] === player) continue;
 
-          for (let i = 0; i < 5; i++) {
-            const nr = r + dr * i;
-            const nc = c + dc * i;
-            if (nr < 0 || nr >= board.length || nc < 0 || nc >= board[0].length) break;
-
-            if (board[nr][nc] === player) {
-              playerCount++;
-            } else if (board[nr][nc] === 0) {
-              emptyCount++;
-            } else {
-              break;
-            }
+          let cr = r;
+          let cc = c;
+          let cnt = 0;
+          while (cr >= 0 && cr < board.length && cc >= 0 && cc < board[0].length && board[cr][cc] === player) {
+            cnt++;
+            seen.add(`${cr},${cc},${dr},${dc}`);
+            cr += dr;
+            cc += dc;
+            if (cnt > 5) break;
           }
 
-          // 活二：2个自己的棋子，3个空位
-          if (playerCount === 2 && emptyCount === 3) {
-            count++;
-          }
+          const endEmpty = (cr < 0 || cr >= board.length || cc < 0 || cc >= board[0].length) ? false : board[cr][cc] === 0;
+          const begEmpty = (r - dr < 0 || r - dr >= board.length || c - dc < 0 || c - dc >= board[0].length) ? false : board[r - dr][c - dc] === 0;
+
+          if (cnt === 2 && endEmpty && begEmpty) count++;
         }
       }
     }
@@ -2787,10 +2866,19 @@ class AIManager {
 
     const opponentFourInRow = this.findFourInRowMove(aiBoard, opponent);
     if (opponentFourInRow) {
+      // 若对手成四连的一端被封（冲四），应堵「开口端」才能真正阻止成五
+      const openEnd = this.findFourOpenEnd(aiBoard, opponent, opponentFourInRow);
+      if (openEnd) {
+        return {
+          move: openEnd,
+          reason: '🛡️ 防守：对手可在此形成四连，堵住开口端彻底阻止成五',
+          type: 'block-four',
+        };
+      }
       return {
         move: opponentFourInRow,
         reason: '🛡️ 防守：对手可以在此形成四连，需要提前阻止',
-        type: 'block-four'
+        type: 'block-four',
       };
     }
 
@@ -2875,11 +2963,28 @@ class AIManager {
     try {
       const hardMove = this.getGobangHardMove(aiBoard, currentPlayer);
       if (hardMove) {
-        return {
-          move: hardMove,
-          reason: '💡 综合分析：此处进攻和防守价值最高，适合稳步推进',
-          type: 'strategic'
-        };
+        // 判断该点的攻守属性：紧邻对方棋子多 → 防守；紧邻己方多 → 进攻
+        let nearOwn = 0;
+        let nearOp = 0;
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            if (dr === 0 && dc === 0) continue;
+            const nr = hardMove.r + dr;
+            const nc = hardMove.c + dc;
+            if (nr < 0 || nr >= aiBoard.length || nc < 0 || nc >= aiBoard[0].length) continue;
+            if (aiBoard[nr][nc] === currentPlayer) nearOwn++;
+            else if (aiBoard[nr][nc] === opponent) nearOp++;
+          }
+        }
+        let reason;
+        if (nearOp >= 2 && nearOwn <= 1) {
+          reason = '🛡️ 防守反击：紧邻对手多枚棋子，阻断其攻势的同时埋下自己的伏笔';
+        } else if (nearOwn >= 2) {
+          reason = '⚡ 乘胜追击：紧邻己方棋子，延续攻势、扩大控制区域';
+        } else {
+          reason = '💡 综合分析：此处攻守价值均衡，最适合稳步推进';
+        }
+        return { move: hardMove, reason, type: 'strategic' };
       }
     } catch (e) {
       // 回退到中等难度
@@ -2908,27 +3013,24 @@ class AIManager {
     return null;
   }
 
-  // 中国象棋智能提示
+  // 中国象棋智能提示（带意图讲解）
   getChessSmartHint(board, difficulty, currentPlayer) {
     try {
+      const aiCol = currentPlayer === 1 ? 'r' : 'b';
+      const opCol = aiCol === 'r' ? 'b' : 'r';
+
       // 使用困难模式AI获取最佳走法
       const move = this.getChessAIMove(board, 'hard', currentPlayer);
       if (move) {
-        return {
-          move: move,
-          reason: '💡 建议：这是当前局面下价值最高的走法',
-          type: 'strategic'
-        };
+        const hint = this.chessHintReason(board, move, aiCol, opCol);
+        return { move, reason: hint.text, type: hint.type };
       }
 
       // 兜底：中等难度
       const mediumMove = this.getChessAIMove(board, 'medium', currentPlayer);
       if (mediumMove) {
-        return {
-          move: mediumMove,
-          reason: '💡 推荐走法',
-          type: 'general'
-        };
+        const hint = this.chessHintReason(board, mediumMove, aiCol, opCol);
+        return { move: mediumMove, reason: hint.text, type: hint.type };
       }
     } catch (e) {
       logger.error('getChessSmartHint 出错', { error: e.message });
@@ -2937,43 +3039,213 @@ class AIManager {
     return null;
   }
 
-  // 围棋智能提示
-  getGoSmartHint(board, currentPlayer) {
-    try {
-      // 先看是否有第一步特殊处理
-      if (this.isFirstMove(board)) {
-        const centerR = Math.floor(board.length / 2);
-        const centerC = Math.floor(board[0].length / 2);
+  // 分析一步棋的意图：绝杀/将军/吃子/兑子/防守/威胁大子/战略
+  chessHintReason(board, move, aiCol, opCol) {
+    const { fromR, fromC, toR, toC } = move;
+    const tp = this.chessType(board[fromR][fromC]) || '兵';
+    const captured = board[toR][toC];
+    const selfName = CHESS_NAMES[tp] || '子';
+    const simBoard = this.chessSimMove(board, fromR, fromC, toR, toC);
+
+    // 1. 将军 / 绝杀
+    if (this.chessCheck(simBoard, opCol)) {
+      const opMoves = this.chessAllLegal(simBoard, opCol);
+      if (opMoves.length === 0) {
+        return { type: 'checkmate', text: `🚨 绝杀！${selfName}这一步直接将军并锁死对方，对方已无路可走` };
+      }
+      return { type: 'check', text: `🚨 将军！用${selfName}直逼对方主将，对手必须立即应对` };
+    }
+
+    // 2. 吃子
+    if (captured) {
+      const capTp = this.chessType(captured);
+      const capName = CHESS_NAMES[capTp] || '子';
+      const capVal = this.chessPieceValue(capTp);
+      // 走子后会被对方反吃 → 兑子
+      if (this.chessMoveWillBeCaptured(board, fromR, fromC, toR, toC, opCol)) {
         return {
-          move: { r: centerR, c: centerC },
-          reason: '💡 开局第一步，抢占天元控制全局',
-          type: 'opening'
+          type: 'exchange',
+          text: `⚖️ 兑子！吃掉对方${capName}（价值${capVal}），对方可反吃，本手等价交换、不吃亏`,
         };
       }
+      if (capVal >= 400) {
+        return { type: 'capture', text: `🛡️ 吃大子！白吃对方${capName}（价值${capVal}），子力优势大幅领先` };
+      }
+      return { type: 'capture', text: `🛡️ 吃子：白吃对方${capName}，稳步扩大子力优势` };
+    }
 
-      // 使用中等以上难度分析
-      const mediumMove = this.getGoMediumMove(board, currentPlayer);
+    // 3. 防守：本方棋子正被攻击，走到安全位置
+    if (this.chessIsAttacked(board, fromR, fromC, opCol)) {
+      if (!this.chessMoveWillBeCaptured(board, fromR, fromC, toR, toC, opCol)) {
+        return { type: 'defend', text: `🛡️ 防守：${selfName}正被对方威胁，这步走到安全位置并继续施压` };
+      }
+    }
+
+    // 4. 威胁对方大子：走子后攻击到车/炮/马
+    const threat = this.chessThreatenedByMove(board, move, opCol);
+    if (threat) {
+      return { type: 'threat', text: `⚔️ 攻击！这一步的${selfName}直指对方${threat}，逼对方防守、抢夺主动权` };
+    }
+
+    // 5. 战略走法
+    return { type: 'strategic', text: `📊 战略走法：调动${selfName}占据要点、改善阵型，为后续进攻蓄力` };
+  }
+
+  // 检查走子后是否攻击到对方的车/炮/马（返回最高价值被攻击棋子名）
+  chessThreatenedByMove(board, move, opCol) {
+    const sim = this.chessSimMove(board, move.fromR, move.fromC, move.toR, move.toC);
+    let bestName = null;
+    let bestVal = 0;
+    for (const t of this.chessRaw(sim, move.toR, move.toC)) {
+      const target = sim[t.r][t.c];
+      if (!target || this.chessColor(target) !== opCol) continue;
+      const val = this.chessPieceValue(this.chessType(target));
+      if (val > bestVal) {
+        bestVal = val;
+        bestName = CHESS_NAMES[this.chessType(target)] || '子';
+      }
+    }
+    return bestName;
+  }
+
+  // 围棋智能提示（带意图讲解）
+  getGoSmartHint(board, currentPlayer) {
+    try {
+      const opponent = currentPlayer === 1 ? 2 : 1;
+      const aiBoard = board.map(row => [...row]);
+      const empties = this.getEmptyCells(aiBoard);
+      if (empties.length === 0) return null;
+
+      // 开局第一步：天元
+      if (this.isFirstMove(aiBoard)) {
+        const centerR = Math.floor(aiBoard.length / 2);
+        const centerC = Math.floor(aiBoard[0].length / 2);
+        return { move: { r: centerR, c: centerC }, reason: '💡 开局第一步，抢占天元控制全局', type: 'opening' };
+      }
+
+      // 1. 提子：落子可提掉对方棋子
+      for (const cell of empties) {
+        if (this.canCapture(aiBoard, cell.r, cell.c, currentPlayer)) {
+          return {
+            move: { r: cell.r, c: cell.c },
+            reason: '⚔️ 提子！落在这里直接提掉对方棋子，收获实空并削弱对手',
+            type: 'capture',
+          };
+        }
+      }
+
+      // 2. 打吃：落子使对方棋子只剩一口气
+      for (const cell of empties) {
+        if (this.isAtariMove(aiBoard, cell.r, cell.c, currentPlayer, opponent)) {
+          return {
+            move: { r: cell.r, c: cell.c },
+            reason: '🔥 打吃！落子后对方棋子只剩一口气，下一手即可提子',
+            type: 'atari',
+          };
+        }
+      }
+
+      // 3. 逃子：己方棋子只剩一口气，先保命
+      const escape = this.findEscapeMove(aiBoard, currentPlayer);
+      if (escape) return escape;
+
+      // 4. 连接 / 分断
+      for (const cell of empties) {
+        const conn = this.isConnectionMove(aiBoard, cell.r, cell.c, currentPlayer, opponent);
+        if (conn) {
+          return { move: { r: cell.r, c: cell.c }, reason: conn.text, type: conn.type };
+        }
+      }
+
+      // 5. 星位 / 角部要点
+      for (const cell of empties) {
+        if (this.isNearStarPoint(cell.r, cell.c)) {
+          return {
+            move: { r: cell.r, c: cell.c },
+            reason: '🌐 抢占要点：这里是角部/星位附近，是布局的关键位置',
+            type: 'star',
+          };
+        }
+      }
+
+      // 6. 战略：综合评分最高的落点
+      const mediumMove = this.getGoMediumMove(aiBoard, currentPlayer);
       if (mediumMove) {
         return {
           move: mediumMove,
-          reason: '💡 建议：此处攻守价值较高',
-          type: 'strategic'
+          reason: '📊 战略落子：紧贴己方棋子巩固势力，兼顾攻防、稳步经营',
+          type: 'strategic',
         };
       }
 
       // 兜底：简单模式
-      const easyMove = this.getGoEasyMove(board);
+      const easyMove = this.getGoEasyMove(aiBoard);
       if (easyMove) {
-        return {
-          move: easyMove,
-          reason: '💡 推荐位置',
-          type: 'general'
-        };
+        return { move: easyMove, reason: '💡 推荐位置', type: 'general' };
       }
     } catch (e) {
       logger.error('getGoSmartHint 出错', { error: e.message });
     }
 
+    return null;
+  }
+
+  // 判断落子是否对相邻对方棋子形成「打吃」（落子后只剩一口气）
+  isAtariMove(board, r, c, player, opponent) {
+    const nb = board.map(row => [...row]);
+    nb[r][c] = player;
+    const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+    for (const [dr, dc] of dirs) {
+      const nr = r + dr;
+      const nc = c + dc;
+      if (nr >= 0 && nr < nb.length && nc >= 0 && nc < nb[0].length && nb[nr][nc] === opponent) {
+        if (this.countLiberties(nb, nr, nc) === 1) return true;
+      }
+    }
+    return false;
+  }
+
+  // 找己方只剩一口气的棋子，返回逃跑落点（带讲解）
+  findEscapeMove(board, player) {
+    const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+    for (let r = 0; r < board.length; r++) {
+      for (let c = 0; c < board[0].length; c++) {
+        if (board[r][c] === player && this.countLiberties(board, r, c) === 1) {
+          for (const [dr, dc] of dirs) {
+            const nr = r + dr;
+            const nc = c + dc;
+            if (nr >= 0 && nr < board.length && nc >= 0 && nc < board[0].length && board[nr][nc] === 0) {
+              return {
+                move: { r: nr, c: nc },
+                reason: '🏃 逃子！你的棋子只剩一口气了，落在这里延长气、避免被提',
+                type: 'escape',
+              };
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  // 判断落子意图：连接己方（≥2 邻己）或分断对方（≥2 邻敌）
+  isConnectionMove(board, r, c, player, opponent) {
+    const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+    let own = 0;
+    let op = 0;
+    for (const [dr, dc] of dirs) {
+      const nr = r + dr;
+      const nc = c + dc;
+      if (nr < 0 || nr >= board.length || nc < 0 || nc >= board[0].length) continue;
+      if (board[nr][nc] === player) own++;
+      else if (board[nr][nc] === opponent) op++;
+    }
+    if (own >= 2) {
+      return { text: '🔗 连接！把己方棋子连成一体，增强气数与韧性', type: 'connect' };
+    }
+    if (op >= 2) {
+      return { text: '✂️ 分断！切断对方棋子的联系，使其各自为战', type: 'cut' };
+    }
     return null;
   }
 }

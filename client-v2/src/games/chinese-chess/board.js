@@ -5,7 +5,6 @@
  * 棋子 DOM 与 v1 一致：绝对定位圆形汉字棋子（chess-red / chess-black）。
  */
 import { el } from '../../utils/dom.js';
-import { fitBoard } from '../../utils/responsive.js';
 
 export const BOARD_W = 9;   // 列
 export const BOARD_H = 10;  // 行
@@ -55,8 +54,10 @@ export function createChessBoard(container, options = {}) {
     const NS = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(NS, 'svg');
     svg.setAttribute('class', 'chess-grid');
-    const W = BOARD_W * CELL;   // 320
-    const H = BOARD_H * CELL;   // 360
+    const W = BOARD_W * CELL;   // 360
+    const H = BOARD_H * CELL;   // 400
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('preserveAspectRatio', 'none');
 
     // 竖线（9 条）：边线连续，中间线在河界上下分开（复刻 v1：上段 0-160、下段 200-360）
     for (let c = 0; c < BOARD_W; c++) {
@@ -107,8 +108,8 @@ export function createChessBoard(container, options = {}) {
             const cell = el('div', { class: 'chess-intersection' });
             cell.dataset.r = r;
             cell.dataset.c = c;
-            cell.style.left = `${c * CELL + 20}px`;
-            cell.style.top = `${r * CELL + 20}px`;
+            cell.style.left = `calc(${c} * var(--board-cell-size, 16px) + 20px)`;
+            cell.style.top = `calc(${r} * var(--board-cell-size, 16px) + 20px)`;
             cell.addEventListener('click', () => {
                 if (!destroyed && typeof onCellClick === 'function') onCellClick(r, c);
             });
@@ -131,7 +132,6 @@ export function createChessBoard(container, options = {}) {
 
     root.append(svg, river);
     container.appendChild(root); // 挂载到容器（与 gobang/go 一致）
-    const fit = fitBoard(root, container);
 
     // ========== 棋子渲染 ==========
     function makePieceEl(piece) {
@@ -154,8 +154,8 @@ export function createChessBoard(container, options = {}) {
                     const node = makePieceEl(piece);
                     node.dataset.r = r;
                     node.dataset.c = c;
-                    node.style.left = `${c * CELL + 20}px`;
-                    node.style.top = `${r * CELL + 20}px`;
+                    node.style.left = `calc(${c} * var(--board-cell-size, 16px) + 20px)`;
+                    node.style.top = `calc(${r} * var(--board-cell-size, 16px) + 20px)`;
                     node.style.transform = 'translate(-50%, -50%)'; // 居中到交叉点（与 v1 一致）
                     // 点击棋子同样触发选子（棋子覆盖在交叉点上方，需单独绑定，与 v1 棋子 onclick 对应）
                     node.addEventListener('click', () => {
@@ -221,8 +221,8 @@ export function createChessBoard(container, options = {}) {
                 node.classList.remove('selected'); // 移动后取消选中（复用节点仍带旧选中态，需移除）
                 node.dataset.r = toR;
                 node.dataset.c = toC;
-                node.style.left = `${toC * CELL + 20}px`;
-                node.style.top = `${toR * CELL + 20}px`;
+                node.style.left = `calc(${toC} * var(--board-cell-size, 16px) + 20px)`;
+                node.style.top = `calc(${toR} * var(--board-cell-size, 16px) + 20px)`;
                 pieceEls.set(`${toR},${toC}`, node);
                 pieceEls.delete(`${fromR},${fromC}`);
             }
@@ -269,7 +269,6 @@ export function createChessBoard(container, options = {}) {
         /** 销毁棋盘 DOM */
         destroy() {
             destroyed = true;
-            fit.destroy();
             root.remove();
         },
     };

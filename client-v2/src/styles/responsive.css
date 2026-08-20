@@ -73,9 +73,9 @@
     display: none;
   }
 
-  /* 对局信息栏收紧（gobang/chess 共用 gobang-match-info） */
-  .gobang-match-info,
-  .go-match-info,
+  /* 对局信息/操作条收紧（gobang/chess/go/AI 共用 game-status-bar/game-tools-bar） */
+  .game-status-bar,
+  .game-tools-bar,
   .spectate-match-info {
     max-width: 100%;
     gap: 6px;

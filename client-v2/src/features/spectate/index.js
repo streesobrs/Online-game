@@ -13,6 +13,7 @@ import { el } from '../../utils/dom.js';
 import { toast } from '../../components/toast.js';
 import { go } from '../../core/router.js';
 import { startSpectate, cleanupSpectate } from './play.js';
+import { startSpectateTour } from '../../components/onboarding.js';
 
 const GAME_TYPE_NAMES = {
   gobang: '🔴 五子棋',
@@ -99,6 +100,9 @@ export function renderSpectate(container) {
       '观看其他玩家的实时对局，学习高手操作！'),
     listEl,
   ]));
+
+  // 首次进入观战页：观战列表引导
+  startSpectateTour();
 
   // 监听 spectate_list；socket 未连接时补拉（connect 后重发）
   const offList = eventBus.on('spectate:list', renderGames);

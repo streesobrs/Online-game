@@ -4,15 +4,140 @@
  * 尺寸与 v1 一致（cell 34px、棋盘 padding 24px、border 4px #8b6914）。
  */
 
-/* ---- 对局信息栏（3.1.3）---- */
-.go-match-info {
+/* ---- 对局舞台（统一排版） ----
+   结构：状态条(对手/回合/计时 + 退出) → 居中棋盘 → 操作条(悔棋/提示/认输)
+   布局：flex-direction: column, height: 100%，让中间棋盘自适应填充剩余空间 */
+.game-stage {
   display: flex;
-  gap: 10px;
+  flex-direction: column;
   align-items: center;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-  max-width: none;
+  justify-content: space-between;
+  gap: 12px;
   width: 100%;
+  height: 100%;
+  max-width: none;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.game-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 800px;
+  padding: 10px 16px;
+  background: var(--surface-alt, rgba(255, 255, 255, 0.06));
+  border: 1px solid rgba(128, 128, 128, 0.15);
+  border-radius: 12px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.game-status-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.game-status-spacer {
+  flex: 1;
+}
+
+.game-board-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 平板/桌面分栏布局下，棋盘容器填满 grid 单元 */
+@media (min-width: 1024px),
+(min-width: 768px) and (orientation: landscape) {
+  .game-board-container {
+    flex: initial;
+    width: 100%;
+    height: 100%;
+    min-height: 420px;
+    max-height: calc(100vh - 180px);
+  }
+}
+
+.game-tools-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 800px;
+  padding: 10px 16px;
+  background: var(--surface-alt, rgba(255, 255, 255, 0.04));
+  border: 1px solid rgba(128, 128, 128, 0.12);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.game-status-bar .btn,
+.game-tools-bar .btn {
+  padding: 8px 20px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* ---- 响应式布局：平板/桌面端采用左右分栏 ----
+   手机端保持上中下纵向布局；>=1024px 或 (>=768px 横屏) 切换分栏 */
+@media (min-width: 1024px),
+(min-width: 768px) and (orientation: landscape) {
+  .game-stage {
+    display: grid;
+    grid-template-columns: minmax(200px, 240px) 1fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      'status status'
+      'tools board';
+    align-items: stretch;
+    justify-content: stretch;
+    gap: 16px;
+    padding: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .game-status-bar {
+    grid-area: status;
+    max-width: none;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .game-board-container {
+    grid-area: board;
+  }
+
+  .game-tools-bar {
+    grid-area: tools;
+    max-width: none;
+    width: 100%;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    align-items: stretch;
+    gap: 12px;
+    padding: 16px 12px;
+  }
+
+  .game-tools-bar .btn {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 15px;
+  }
 }
 
 .go-info-tag {
@@ -27,18 +152,21 @@
 /* ---- 棋盘容器 ---- */
 .go-board {
   display: grid;
-  grid-template-columns: repeat(21, 34px);
-  grid-template-rows: repeat(21, 34px);
+  grid-template-columns: repeat(21, calc(var(--board-cell-size, 14px)));
+  grid-template-rows: repeat(21, calc(var(--board-cell-size, 14px)));
   gap: 0;
   position: relative;
   background: var(--theme-board-go);
-  padding: 41px;
-  /* 24px + 17px（半格）：外圈网格线整体向中心缩半格 */
+  padding: calc(var(--board-cell-size, 14px) / 2);
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.3);
   border: 4px solid #8b6914;
   transform: translateZ(0);
   will-change: contents;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 1 / 1;
+  box-sizing: border-box;
 }
 
 /* 网格线：周期 34px，线画在周期内 16~17px 处。
@@ -51,9 +179,9 @@
   right: 0;
   bottom: 0;
   background-image:
-    repeating-linear-gradient(90deg, transparent 0 16px, rgba(0, 0, 0, 0.4) 16px 17px, transparent 17px 34px),
-    repeating-linear-gradient(0deg, transparent 0 16px, rgba(0, 0, 0, 0.4) 16px 17px, transparent 17px 34px);
-  background-position: 41px 41px, 41px 27px;
+    repeating-linear-gradient(90deg, transparent, transparent calc(var(--board-cell-size, 14px) - 1px), rgba(0, 0, 0, 0.4) calc(var(--board-cell-size, 14px) - 1px), rgba(0, 0, 0, 0.4) var(--board-cell-size, 14px)),
+    repeating-linear-gradient(0deg, transparent, transparent calc(var(--board-cell-size, 14px) - 1px), rgba(0, 0, 0, 0.4) calc(var(--board-cell-size, 14px) - 1px), rgba(0, 0, 0, 0.4) var(--board-cell-size, 14px));
+  background-position: calc(var(--board-cell-size, 14px) / 2) calc(var(--board-cell-size, 14px) / 2), calc(var(--board-cell-size, 14px) / 2) calc(var(--board-cell-size, 14px) / 2);
   background-repeat: repeat;
   pointer-events: none;
   z-index: 1;
@@ -63,10 +191,10 @@
 .go-board::after {
   content: '';
   position: absolute;
-  top: 41px;
-  left: 41px;
-  right: 41px;
-  bottom: 41px;
+  top: calc(var(--board-cell-size, 14px) / 2);
+  left: calc(var(--board-cell-size, 14px) / 2);
+  right: calc(var(--board-cell-size, 14px) / 2);
+  bottom: calc(var(--board-cell-size, 14px) / 2);
   background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.1) 0%, transparent 60%);
   pointer-events: none;
   z-index: 2;
@@ -74,8 +202,8 @@
 
 /* ---- 格子 ---- */
 .go-cell {
-  width: 34px;
-  height: 34px;
+  width: calc(var(--board-cell-size, 14px));
+  height: calc(var(--board-cell-size, 14px));
   background: transparent;
   display: flex;
   align-items: center;
@@ -94,8 +222,8 @@
 
 /* 星位（与 v1 一致：黑色小圆点） */
 .go-star {
-  width: 8px;
-  height: 8px;
+  width: calc(var(--board-cell-size, 14px) * 0.3);
+  height: calc(var(--board-cell-size, 14px) * 0.3);
   background: radial-gradient(circle at 30% 30%, #1a1a1a 0%, #000000 100%);
   border-radius: 50%;
   position: absolute;
@@ -106,8 +234,8 @@
 
 /* 悬停预览棋子 */
 .go-cell .stone-preview {
-  width: 26px;
-  height: 26px;
+  width: calc(var(--board-cell-size, 14px) * 0.8);
+  height: calc(var(--board-cell-size, 14px) * 0.8);
   border-radius: 50%;
   opacity: 0.4;
   pointer-events: none;
@@ -128,8 +256,8 @@
 .go-cell.last-move::before {
   content: '';
   position: absolute;
-  width: 38px;
-  height: 38px;
+  width: calc(var(--board-cell-size, 14px) * 1.2);
+  height: calc(var(--board-cell-size, 14px) * 1.2);
   background: radial-gradient(circle, rgba(255, 0, 0, 0.5) 0%, transparent 70%);
   border-radius: 50%;
   animation: go-pulse 1.5s ease-in-out infinite;

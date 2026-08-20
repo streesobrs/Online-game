@@ -22,7 +22,7 @@ import { eventBus } from '../../core/eventBus.js';
 import { NAV_ITEMS } from '../../data/navItems.js';
 import * as auth from '../../core/auth.js';
 import { requestReplay, showReplay } from '../replay/index.js';
-import { resetOnboarding, startOnboarding } from '../../components/onboarding.js';
+import { resetOnboarding, startOnboarding, startMailTour, startAssetsTour, startShopTour } from '../../components/onboarding.js';
 
 /** 游戏类型展示元数据 */
 const GAME_META = {
@@ -290,6 +290,12 @@ export function renderProfile(container) {
     else if (activeTab === 'shop') await renderEmbedded('../shop/index.js', 'renderShop');
     else if (activeTab === 'themes') await renderEmbedded('../themes/index.js', 'renderThemePanel');
     else if (activeTab === 'shortcuts') contentEl.append(renderShortcutsTab());
+
+    // 场景引导：首次进入邮件/资产/商城 Tab 时触发（内部带完成标记，不重复打扰）
+    if (activeTab === 'mail') startMailTour();
+    else if (activeTab === 'assets') startAssetsTour();
+    else if (activeTab === 'shop') startShopTour();
+
     flashContent();
   }
 

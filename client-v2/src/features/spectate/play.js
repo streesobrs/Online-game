@@ -55,14 +55,14 @@ export function startSpectate(container, game) {
   let board = null;
 
   if (gameType === 'gobang') {
-    board = createBoard(boardEl, { onPlace: () => {} }); // 观战禁止落子
+    board = createBoard(boardEl, { onPlace: () => { } }); // 观战禁止落子
   } else if (gameType === 'go') {
-    board = createGoBoard(boardEl, { onPlace: () => {} });
+    board = createGoBoard(boardEl, { onPlace: () => { } });
   } else if (gameType === 'chinese-chess') {
-    board = createChessBoard(boardEl, { onCellClick: () => {} }); // 观战禁止走子
+    board = createChessBoard(boardEl, { onCellClick: () => { } }); // 观战禁止走子
   } else {
     toast.warn('暂不支持观战该类型的游戏');
-    return () => {};
+    return () => { };
   }
 
   // 回放已有落子
@@ -84,6 +84,38 @@ export function startSpectate(container, game) {
     boardEl
   );
   updateStatus();
+
+  // ---- 自适应棋盘尺寸 ----
+  const fitBoardSize = () => {
+    const board = boardEl.querySelector('.gobang-board, .go-board, .chess-board');
+    if (!board) return;
+    // 清除 board.js 中 fitBoard() 可能设置的 zoom
+    board.style.zoom = '';
+
+    const availableWidth = boardEl.clientWidth || container.clientWidth || window.innerWidth;
+    const availableHeight = window.innerHeight * 0.7;
+
+    let cols = 20, rows = 20, padding = 8;
+    if (gameType === 'gobang') { cols = 20; rows = 20; padding = 8; }
+    else if (gameType === 'go') { cols = 22; rows = 22; padding = 8; }
+    else if (gameType === 'chinese-chess') { cols = 9; rows = 10; padding = 48; }
+
+    const cellByWidth = Math.floor((availableWidth - padding) / cols);
+    const cellByHeight = Math.floor((availableHeight - padding) / rows);
+    let cellSize = Math.min(cellByWidth, cellByHeight);
+    cellSize = Math.max(10, Math.min(cellSize, 42));
+    board.style.setProperty('--board-cell-size', cellSize + 'px');
+    // 显式设置棋盘总尺寸（border-box）
+    board.style.width = `calc(${cols} * ${cellSize}px + ${padding}px)`;
+    board.style.height = `calc(${rows} * ${cellSize}px + ${padding}px)`;
+  };
+
+  fitBoardSize();
+  requestAnimationFrame(() => { fitBoardSize(); });
+  requestAnimationFrame(() => { requestAnimationFrame(fitBoardSize); });
+  window.addEventListener('resize', fitBoardSize);
+  const spectateResizeObserver = new ResizeObserver(fitBoardSize);
+  spectateResizeObserver.observe(boardEl);
 
   // ---- socket 事件 ----
   const offs = [];
@@ -130,6 +162,8 @@ export function startSpectate(container, game) {
     gameType,
     cleanup() {
       offs.forEach((off) => off());
+      window.removeEventListener('resize', fitBoardSize);
+      spectateResizeObserver.disconnect();
       if (board && typeof board.destroy === 'function') board.destroy();
       container.innerHTML = '';
     },

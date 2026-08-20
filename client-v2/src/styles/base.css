@@ -10,6 +10,8 @@
 html,
 body {
     min-height: 100vh;
+    width: 100%;
+    overflow-x: hidden;
 }
 
 body {
@@ -19,6 +21,8 @@ body {
     font-family: 'PingFang SC', 'Microsoft Yahei', Arial, sans-serif;
     padding: 16px;
     min-height: 100vh;
+    width: 100%;
+    overflow-x: hidden;
     background: var(--theme-bg);
     background-size: cover;
     background-position: center;
