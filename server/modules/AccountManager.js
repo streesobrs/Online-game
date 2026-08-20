@@ -1206,9 +1206,10 @@ class AccountManager {
         updateData['account.updatedAt'] = Date.now();
       }
 
-      // 处理profile更新
+      // 处理profile更新（合并而非整体覆盖，避免丢失 exp/level/avatar 等字段）
       if (updates.profile !== undefined) {
-        updateData['account.profile'] = updates.profile;
+        const currentProfile = account.account?.profile || {};
+        updateData['account.profile'] = { ...currentProfile, ...updates.profile };
         updateData['account.updatedAt'] = Date.now();
       }
 

@@ -111,6 +111,38 @@ function openPasswordModal(hasPassword) {
 }
 
 /**
+ * 编辑个性签名弹窗
+ * 通过 account_update_profile 携带完整 profile（含 avatar/exp/level）提交，避免服务端整体覆盖时丢失
+ * @param {Object} profile - 当前完整 profile 对象（含 avatar/exp/level/bio）
+ */
+function openBioModal(profile) {
+  const bioEl = el('textarea', {
+    class: 'profile-rename-input',
+    rows: 3,
+    maxlength: 100,
+    placeholder: '介绍一下自己吧（最多100字）',
+  }, profile?.bio || '');
+  bioEl.style.resize = 'vertical';
+  modal.show({
+    title: '✏️ 编辑个性签名',
+    content: el('div', { style: 'padding:4px 0;' }, [
+      el('div', { style: 'font-size:12px;color:var(--text-secondary,#718096);margin-bottom:8px;' },
+        '个性签名会展示在个人资料「账号信息」中'),
+      bioEl,
+    ]),
+    confirmText: '保存',
+    showCancel: true,
+    cancelText: '取消',
+    onConfirm: () => {
+      const bio = bioEl.value.trim();
+      if (bio.length > 100) { toast.warn('个性签名最多100字'); return; }
+      auth.updateProfile({ ...(profile || {}), bio });
+      toast.info('正在保存...');
+    },
+  });
+}
+
+/**
  * 渲染个人资料视图
  * @param {HTMLElement} container - 内容容器（#view-root）
  * @returns {Function} cleanup 函数
@@ -355,7 +387,12 @@ export function renderProfile(container) {
     const infoCards = [
       { label: '账号类型', value: account.type === 'guest' ? '游客' : (account.isAdmin ? '管理员' : '正式账号') },
       { label: '账号 ID', value: account.id || '-' },
+      { label: '用户名', value: account.username || '-' },
+      { label: '昵称', value: account.nickname || '-' },
+      { label: '个性签名', value: d.profile?.bio || '-' },
       { label: '注册时间', value: formatDate(account.createdAt) },
+      { label: '最后登录', value: formatDate(account.lastLogin) },
+      { label: '最后在线', value: formatDate(account.lastSeen) },
       { label: '登录次数', value: account.loginCount || 0 },
       { label: '密码状态', value: account.hasPassword ? '已设置' : '未设置' },
     ];
@@ -379,13 +416,19 @@ export function renderProfile(container) {
               el('div', { class: 'profile-info-label' }, c.label),
               el('div', { class: 'profile-info-value' }, c.value),
             ]))),
-          // 修改/设置密码入口（对齐 v1 账号设置）
-          el('div', { style: 'margin-top:14px;text-align:center;' },
+          // 编辑个性签名 + 修改/设置密码入口（对齐 v1 账号设置）
+          el('div', { style: 'margin-top:14px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;' }, [
+            el('button', {
+              class: 'btn btn-secondary',
+              style: 'padding:6px 18px;font-size:13px;',
+              onClick: () => openBioModal(d.profile || {}),
+            }, '✏️ 编辑个性签名'),
             el('button', {
               class: 'btn btn-secondary',
               style: 'padding:6px 18px;font-size:13px;',
               onClick: () => openPasswordModal(!!account.hasPassword),
-            }, account.hasPassword ? '🔑 修改密码' : '🔑 设置密码')),
+            }, account.hasPassword ? '🔑 修改密码' : '🔑 设置密码'),
+          ]),
         ]),
         el('div', { class: 'panel profile-card' }, [
           el('div', { class: 'profile-section-title' }, '🏆 战绩统计'),
@@ -1251,9 +1294,16 @@ export function renderProfile(container) {
   // 已迁移模块的快捷键/旧路由入口：已在个人资料页时直接切 Tab（见 router.go）
   const offOpenTab = eventBus.on('profile:openTab', (tab) => switchTab(tab));
 
+  // 资料更新成功（如个性签名）：刷新个人资料数据并重渲染
+  const offProfileUpdated = eventBus.on('user:profileUpdated', async () => {
+    await refreshProfileData();
+    renderAll();
+  });
+
   return () => {
     if (embeddedCleanup) { embeddedCleanup(); embeddedCleanup = null; }
     offOpenTab();
+    offProfileUpdated();
     container.innerHTML = '';
   };
 }

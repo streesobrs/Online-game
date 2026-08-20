@@ -132,18 +132,23 @@ export function initAuth() {
       else toast.error(data.message || '❌ 密码设置失败');
     } else if (data.action === 'update_profile') {
       if (data.success) {
-        // 更新昵称成功后：同步本地存储与 store.user（保持 user 结构不变，只改昵称字段）
+        // 更新资料成功后：同步本地存储与 store.user（保持 user 结构不变，只改昵称/资料字段）
         const newNick = data.account?.account?.nickname || data.account?.nickname;
         if (newNick) localStorage.setItem(NICKNAME_KEY, newNick);
+        const newProfile = data.account?.account?.profile;
         const current = store.get('user');
         if (current) {
           const inner = current.account?.account || current.account;
-          if (inner) inner.nickname = newNick || inner.nickname;
+          if (inner) {
+            if (newNick) inner.nickname = newNick;
+            if (newProfile) inner.profile = newProfile;
+          }
           store.set('user', { ...current });
         }
-        toast.success(data.message || '昵称已更新');
+        eventBus.emit('user:profileUpdated', { nickname: newNick, profile: newProfile });
+        toast.success(data.message || '资料已更新');
       } else {
-        toast.error(data.message || '昵称更新失败');
+        toast.error(data.message || '资料更新失败');
       }
     }
   });
@@ -214,6 +219,15 @@ export function fetchAccountByToken() {
 /** 设置/修改昵称（account_update_profile → account_action_result action='update_profile'） */
 export function updateNickname(nickname) {
   emit('account_update_profile', { nickname });
+}
+
+/**
+ * 更新个人资料（如个性签名）
+ * 注意：服务端会整体覆盖 profile 对象，必须携带完整 profile（含 avatar/exp/level），避免丢失
+ * @param {Object} profile - 完整 profile 对象
+ */
+export function updateProfile(profile) {
+  emit('account_update_profile', { profile });
 }
 
 /** 退出登录 */

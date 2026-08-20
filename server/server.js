@@ -1643,6 +1643,8 @@ app.get('/api/profile/:accountId', async (req, res) => {
           nickname: account.account?.nickname,
           type: account.account?.type,
           createdAt: account.account?.createdAt,
+          lastLogin: account.account?.lastLogin || null,
+          lastSeen: account.account?.lastSeen || null,
           loginCount: account.account?.loginCount || 0,
           hasPassword: account.hasPassword || false,
           isAdmin: account.account?.isAdmin === true
@@ -2167,45 +2169,6 @@ io.on('connection', (socket) => {
           permissions: permissions,
           token: result.data.token,
           loginType: 'guest'
-        }
-      });
-
-      // 记录操作日志
-      if (operationLogger) {
-        operationLogger.getLogin(accountId, account.account?.nickname || account.account?.username || '', socket.handshake?.address || '');
-      }
-
-      // 广播用户上线
-      userManager.broadcastUserStatus(accountId, 'online', io);
-    } else {
-      socket.emit('login_result', result);
-    }
-  });
-
-  // 账号登录
-  socket.on('account_login', async (data) => {
-    const { username, password } = data;
-
-    logger.info('收到账号登录请求', {
-      socketId: socket.id,
-      username
-    });
-
-    const result = await userManager.handleAccountLogin(socket, username, password);
-
-    if (result.success) {
-      const account = result.data.account;
-      const permissions = config.permissions[account.account?.type] || config.permissions.registered;
-      const accountId = result.data.account.account.id;
-
-      socket.emit('login_result', {
-        success: true,
-        message: '账号登录成功',
-        data: {
-          account: account,
-          permissions: permissions,
-          token: result.data.token,
-          loginType: 'account'
         }
       });
 
