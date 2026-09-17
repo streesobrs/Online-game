@@ -248,3 +248,36 @@
     /* 版本/滚动条文字 */
     --theme-version-color: #94a3b8;
 }
+
+/* ===== 短名兼容层 =====
+   各业务模块 (profile/chat/friends/...) 使用 var(--surface, #fff) 这类短名，
+   但主题系统只覆盖 --theme-* 变量。这里把短名统一映射到 --theme-*，
+   让所有 feature 文件自动跟随主题换肤。
+
+   ⚠️ 必须放在 body 作用域（而不是 :root）：
+      :root 里 var(--theme-panel-bg) 会在 :root 自身上下文求值，
+      此时 body[data-theme="xxx"] 的覆盖还没生效，短名永远拿到默认值。
+      body 作用域的变量会正确向下继承并跟随主题覆盖。 */
+body {
+    /* 文本 */
+    --text: var(--theme-info-value-color);
+    --text-secondary: var(--theme-info-label-color);
+    --text-muted: var(--theme-tip-text-color);
+
+    /* 背景 */
+    --surface: var(--theme-panel-bg);
+    --surface-alt: var(--theme-stat-item-bg);
+    --surface-hover: var(--theme-nav-btn-bg-hover);
+    --surface-input: var(--theme-status-bg);
+
+    /* 边框 */
+    --border-color: var(--theme-border-color);
+    --border-color-strong: var(--theme-info-title-border);
+
+    /* 主题强调色（可被主题覆盖；未覆盖时用默认） */
+    --accent-indigo: var(--theme-primary, #6366f1);
+    --accent-indigo-dark: var(--theme-btn-primary-bg-hover, #4f46e5);
+    --accent-green: var(--theme-stat-win-color, #48bb78);
+    --accent-red: var(--theme-stat-lose-color, #e53e3e);
+    --accent-blue: var(--theme-btn-primary-bg, #3498db);
+}

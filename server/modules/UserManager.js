@@ -315,6 +315,8 @@ class UserManager {
         nickname: userSession.nickname,
         status,
         gameType: userSession.gameType,
+        accountType: userSession.accountData?.account?.type || 'guest',
+        level: userSession.accountData?.account?.profile?.level || 1,
         timestamp: Date.now()
       });
     }

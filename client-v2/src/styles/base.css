@@ -12,6 +12,8 @@ body {
     min-height: 100vh;
     width: 100%;
     overflow-x: hidden;
+    /* 默认文字颜色跟随主题 — 子元素未显式声明 color 时自动继承此值 */
+    color: var(--text, #2d3748);
 }
 
 body {

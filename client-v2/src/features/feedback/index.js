@@ -13,6 +13,7 @@ import { toast } from '../../components/toast.js';
 import { modal } from '../../components/modal.js';
 import { api } from '../../core/api.js';
 import { go } from '../../core/router.js';
+import { avatarNode } from '../../utils/avatar.js';
 
 // ===== 类型/状态配置（对齐 v1 feedback.html）=====
 const TYPE_CONFIG = {
@@ -71,13 +72,6 @@ function extractList(data) {
   if (data && Array.isArray(data.feedbacks)) return data.feedbacks;
   if (data && Array.isArray(data.data)) return data.data;
   return [];
-}
-
-/** 首字母头像 */
-function avatar(nickname) {
-  return el('div', { class: 'fb-avatar' },
-    el('div', { class: 'fb-avatar-circle' }, String(nickname || '匿').charAt(0))
-  );
 }
 
 // ===== socket 交互（操作成功后服务端广播 feedbacks_list 自动刷新）=====
@@ -142,7 +136,7 @@ export function renderFeedback(container = viewRoot()) {
         ]),
       ])
     );
-    return () => {};
+    return () => { };
   }
 
   const listEl = el('div', { class: 'fb-list' });
@@ -224,7 +218,7 @@ export function renderFeedback(container = viewRoot()) {
     }
 
     return el('div', { class: `fb-comment-item ${isNested ? 'fb-comment-nested' : ''}` }, [
-      avatar(node.nickname),
+      avatarNode(node.accountId, 36),
       el('div', { class: 'fb-comment-main' }, [
         el('div', { class: 'fb-comment-author' }, node.nickname),
         el('div', { class: 'fb-comment-content' }, contentEls),
@@ -251,7 +245,7 @@ export function renderFeedback(container = viewRoot()) {
 
     return el('div', { class: 'fb-card' }, [
       el('div', { class: 'fb-head' }, [
-        avatar(fb.nickname),
+        avatarNode(fb.accountId, 48),
         el('div', { class: 'fb-main' }, [
           el('div', { class: 'fb-title' }, fb.title),
           el('div', { class: 'fb-author' }, `${fb.nickname} · ${formatDate(fb.createdAt)}`),

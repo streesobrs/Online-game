@@ -29,9 +29,9 @@
   padding: 7px 16px;
   border: 1px solid #e2e8f0;
   border-radius: 20px;
-  background: #ffffff;
+  background: var(--surface, #fff);
   font-size: 13px;
-  color: #4a5568;
+  color: var(--text-secondary, #4a5568);
   cursor: pointer;
   transition: all 0.15s;
 }
@@ -42,9 +42,9 @@
 }
 
 .leaderboard-controls .lobby-btn.active {
-  background: #e3f2fd;
+  background: var(--surface-alt, #e3f2fd);
   border-color: var(--theme-primary, #3498db);
-  color: #1976d2;
+  color: var(--accent-blue, #1976d2);
   font-weight: 600;
   transform: scale(1.05);
 }
@@ -59,7 +59,7 @@
 .leaderboard-empty {
   text-align: center;
   padding: 40px 20px;
-  color: #718096;
+  color: var(--text-secondary, #718096);
   font-size: 14px;
 }
 
@@ -76,17 +76,17 @@
 
 .leaderboard-item.top-1 {
   border-color: #f6ad55;
-  background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%);
+  background: linear-gradient(135deg, #fffbeb 0%, var(--surface, #fff) 100%);
 }
 
 .leaderboard-item.top-2 {
-  border-color: #cbd5e0;
-  background: linear-gradient(135deg, #f7fafc 0%, #ffffff 100%);
+  border-color: var(--theme-btn-disabled-bg, #cbd5e0);
+  background: linear-gradient(135deg, var(--surface-alt, #f7fafc) 0%, var(--surface, #fff) 100%);
 }
 
 .leaderboard-item.top-3 {
   border-color: #ed8936;
-  background: linear-gradient(135deg, #fffaf0 0%, #ffffff 100%);
+  background: linear-gradient(135deg, #fffaf0 0%, var(--surface, #fff) 100%);
 }
 
 .leaderboard-item.is-me {
@@ -108,7 +108,7 @@
 .leaderboard-rank-num {
   font-size: 18px;
   font-weight: 700;
-  color: #a0aec0;
+  color: var(--text-muted, #a0aec0);
 }
 
 /* 玩家信息 */
@@ -120,14 +120,14 @@
 .leaderboard-player-name {
   font-size: 14px;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--text, #2d3748);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .leaderboard-item.is-me .leaderboard-player-name {
-  color: #1976d2;
+  color: var(--accent-blue, #1976d2);
 }
 
 .leaderboard-player-meta {
@@ -136,21 +136,21 @@
   gap: 8px;
   margin-top: 4px;
   font-size: 11px;
-  color: #718096;
+  color: var(--text-secondary, #718096);
   flex-wrap: wrap;
 }
 
 .leaderboard-lv-badge {
-  background: #edf2f7;
-  color: #4a5568;
+  background: var(--surface-alt, #edf2f7);
+  color: var(--text-secondary, #4a5568);
   padding: 1px 8px;
   border-radius: 8px;
   font-size: 11px;
 }
 
 .leaderboard-streak-badge {
-  background: #fff5f5;
-  color: #e53e3e;
+  background: var(--surface-alt, #fff5f5);
+  color: var(--accent-red, #e53e3e);
   padding: 1px 8px;
   border-radius: 8px;
   font-size: 11px;
@@ -158,7 +158,7 @@
 
 .leaderboard-maxstreak {
   font-size: 10px;
-  color: #a0aec0;
+  color: var(--text-muted, #a0aec0);
 }
 
 /* 明细（胜/负/平 或 最高分） */
@@ -176,7 +176,7 @@
 .leaderboard-stat-value {
   font-size: 15px;
   font-weight: 700;
-  color: #2d3748;
+  color: var(--text, #2d3748);
 }
 
 .leaderboard-stat-value.win {
@@ -184,16 +184,16 @@
 }
 
 .leaderboard-stat-value.lose {
-  color: #e53e3e;
+  color: var(--accent-red, #e53e3e);
 }
 
 .leaderboard-stat-value.draw {
-  color: #a0aec0;
+  color: var(--text-muted, #a0aec0);
 }
 
 .leaderboard-stat-label {
   font-size: 10px;
-  color: #a0aec0;
+  color: var(--text-muted, #a0aec0);
   margin-top: 2px;
 }
 
@@ -206,14 +206,14 @@
 .leaderboard-winrate-text {
   font-size: 12px;
   font-weight: 700;
-  color: #4a5568;
+  color: var(--text-secondary, #4a5568);
   text-align: right;
   margin-bottom: 4px;
 }
 
 .leaderboard-winrate-bar-bg {
   height: 6px;
-  background: #edf2f7;
+  background: var(--surface-alt, #edf2f7);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -237,7 +237,7 @@
 .leaderboard-self-label {
   font-size: 12px;
   font-weight: 700;
-  color: #718096;
+  color: var(--text-secondary, #718096);
 }
 
 .leaderboard-self-rank {
@@ -249,12 +249,12 @@
 .leaderboard-self-name {
   font-size: 14px;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--text, #2d3748);
 }
 
 .leaderboard-self-stats {
   font-size: 12px;
-  color: #718096;
+  color: var(--text-secondary, #718096);
   margin-left: auto;
 }
 
@@ -264,7 +264,7 @@
 }
 
 .leaderboard-winrate-bar.high {
-  background: linear-gradient(90deg, #48bb78, #38a169);
+  background: linear-gradient(90deg, var(--accent-green, #48bb78), #38a169);
 }
 
 .leaderboard-winrate-bar.mid {
@@ -272,5 +272,5 @@
 }
 
 .leaderboard-winrate-bar.low {
-  background: linear-gradient(90deg, #e53e3e, #c53030);
+  background: linear-gradient(90deg, var(--accent-red, #e53e3e), #c53030);
 }

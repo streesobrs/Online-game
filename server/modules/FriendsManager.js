@@ -41,7 +41,8 @@ class FriendsManager {
     for (const acc of accounts) {
       const accId = acc && acc.account && acc.account.id;
       if (accId && set.has(String(accId))) {
-        const { level } = this.accountManager.calculateLevelAndExp(acc.account.exp || 0);
+        const level = acc.account?.profile?.level
+          || this.accountManager.calculateLevelAndExp(acc.account?.profile?.exp || acc.account?.exp || 0).level;
         map[String(accId)] = {
           accountId: accId,
           nickname: acc.account.nickname || acc.username || `玩家${String(accId).slice(0, 4)}`,

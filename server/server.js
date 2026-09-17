@@ -1115,7 +1115,11 @@ app.get('/api/users/all', async (req, res) => {
     const accounts = await accountManager.getAllAccounts();
     const players = accounts
       .map((a) => {
-        const { level } = accountManager.calculateLevelAndExp(a.account?.exp || 0);
+        // 优先用账号里已存的 level；缺失时才从 exp 反算
+        const profileLevel = a.account?.profile?.level;
+        const level = (typeof profileLevel === 'number' && profileLevel > 0)
+          ? profileLevel
+          : accountManager.calculateLevelAndExp(a.account?.exp || a.account?.profile?.exp || 0).level;
         return {
           accountId: a.account?.id,
           nickname: a.account?.nickname || a.username || `玩家${String(a.account?.id || '').slice(0, 4)}`,

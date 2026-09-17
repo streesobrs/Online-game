@@ -10,19 +10,19 @@ let styleInjected = false;
 
 // 组件专属样式（自包含，后续可迁移至公共样式表）
 const MODAL_STYLE = `
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9998;display:flex;align-items:center;justify-content:center;animation:modal-fade .2s ease}
-.modal{background:#fff;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.2);width:90%;max-width:420px;max-height:80vh;display:flex;flex-direction:column;animation:modal-pop .2s ease}
+.modal-overlay{position:fixed;inset:0;background:var(--theme-modal-overlay,rgba(0,0,0,.45));z-index:9998;display:flex;align-items:center;justify-content:center;animation:modal-fade .2s ease}
+.modal{background:var(--theme-modal-bg,var(--surface,#fff));border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.2);width:90%;max-width:420px;max-height:80vh;display:flex;flex-direction:column;animation:modal-pop .2s ease;color:var(--text,#212529)}
 .modal__header{padding:16px 20px 0;display:flex;align-items:center;justify-content:space-between}
-.modal__title{margin:0;font-size:16px;font-weight:600;color:#212529}
-.modal__body{padding:16px 20px;font-size:14px;color:#495057;overflow-y:auto;line-height:1.6}
+.modal__title{margin:0;font-size:16px;font-weight:600;color:var(--theme-modal-title-color,var(--text,#212529))}
+.modal__body{padding:16px 20px;font-size:14px;color:var(--text-secondary,#495057);overflow-y:auto;line-height:1.6}
 .modal__footer{padding:0 20px 16px;display:flex;justify-content:flex-end;gap:8px}
-.modal__close{border:none;background:none;font-size:22px;line-height:1;color:#adb5bd;cursor:pointer;padding:0 4px}
-.modal__close:hover{color:#495057}
+.modal__close{border:none;background:none;font-size:22px;line-height:1;color:var(--text-muted,#adb5bd);cursor:pointer;padding:0 4px}
+.modal__close:hover{color:var(--text,#495057)}
 .modal .btn{border:none;border-radius:6px;padding:8px 16px;font-size:14px;cursor:pointer;transition:background .15s ease}
-.modal .btn--primary{background:#007bff;color:#fff}
-.modal .btn--primary:hover{background:#0056b3}
-.modal .btn--ghost{background:#f1f3f5;color:#495057}
-.modal .btn--ghost:hover{background:#e9ecef}
+.modal .btn--primary{background:var(--theme-btn-primary-bg,#007bff);color:#fff}
+.modal .btn--primary:hover{background:var(--theme-btn-primary-bg-hover,#0056b3)}
+.modal .btn--ghost{background:var(--surface-hover,#f1f3f5);color:var(--text,#495057)}
+.modal .btn--ghost:hover{background:var(--theme-nav-btn-bg-hover,#e9ecef)}
 @keyframes modal-fade{from{opacity:0}to{opacity:1}}
 @keyframes modal-pop{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
 `;

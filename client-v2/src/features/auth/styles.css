@@ -5,7 +5,7 @@
   inset: 0;
   z-index: 2000;
   display: flex;
-  background: #f3f4f6;
+  background: var(--surface, #f3f4f6);
   font-size: 14px;
 }
 
@@ -125,7 +125,7 @@
 .login-card {
   width: 100%;
   max-width: 420px;
-  background: #fff;
+  background: var(--surface, #fff);
   border-radius: 18px;
   box-shadow: 0 16px 50px rgba(30, 41, 59, 0.18);
   padding: 36px 32px;
@@ -144,7 +144,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #e2e8f0;
+  background: var(--border-color, #e2e8f0);
   transition: background 0.25s ease;
 }
 
@@ -155,7 +155,7 @@
 .login-progress-label {
   margin-left: 6px;
   font-size: 12px;
-  color: #a0aec0;
+  color: var(--text-muted, #a0aec0);
 }
 
 /* 步骤内容 */
@@ -168,13 +168,13 @@
 .login-title {
   font-size: 22px;
   font-weight: 700;
-  color: #1a202c;
+  color: var(--theme-info-title-color, #1a202c);
   margin: 0;
 }
 
 .login-desc {
   font-size: 13px;
-  color: #718096;
+  color: var(--text-secondary, #718096);
   margin: -4px 0 6px;
   line-height: 1.6;
 }
@@ -207,7 +207,7 @@
   padding: 16px 18px;
   border: 1.5px solid #e2e8f0;
   border-radius: 14px;
-  background: #fff;
+  background: var(--surface, #fff);
   cursor: pointer;
   text-align: left;
   transition: all 0.18s ease;
@@ -215,7 +215,7 @@
 
 .login-option:hover {
   border-color: var(--theme-primary, #007bff);
-  background: #f0f7ff;
+  background: var(--surface-alt, #f0f7ff);
   transform: translateY(-1px);
   box-shadow: 0 6px 18px rgba(0, 123, 255, 0.1);
 }
@@ -233,18 +233,18 @@
 .login-option-title {
   font-size: 15px;
   font-weight: 700;
-  color: #2d3748;
+  color: var(--text, #2d3748);
   margin-bottom: 3px;
 }
 
 .login-option-desc {
   font-size: 12px;
-  color: #a0aec0;
+  color: var(--text-muted, #a0aec0);
 }
 
 .login-option-arrow {
   font-size: 22px;
-  color: #cbd5e0;
+  color: var(--theme-btn-disabled-bg, #cbd5e0);
   flex-shrink: 0;
 }
 
@@ -273,13 +273,13 @@
   background: none;
   padding: 6px 0;
   font-size: 13px;
-  color: #a0aec0;
+  color: var(--text-muted, #a0aec0);
   cursor: pointer;
   margin-top: 2px;
 }
 
 .login-back:hover {
-  color: #718096;
+  color: var(--text-secondary, #718096);
 }
 
 /* 游客昵称 */
@@ -314,8 +314,15 @@
 }
 
 @keyframes login-pop {
-  0% { transform: scale(0.3); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 /* 响应式：窄屏收起品牌区 */

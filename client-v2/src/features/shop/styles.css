@@ -60,12 +60,12 @@
 }
 
 .shop-view-tab:hover {
-  border-color: #6366f1;
-  color: #6366f1;
+  border-color: var(--accent-indigo, #6366f1);
+  color: var(--accent-indigo, #6366f1);
 }
 
 .shop-view-tab.active {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: linear-gradient(135deg, var(--accent-indigo, #6366f1), #8b5cf6);
   border-color: transparent;
   color: #fff;
 }
@@ -82,13 +82,13 @@
 }
 
 .shop-tab:hover {
-  border-color: #6366f1;
-  color: #6366f1;
+  border-color: var(--accent-indigo, #6366f1);
+  color: var(--accent-indigo, #6366f1);
 }
 
 .shop-tab.active {
-  background: #6366f1;
-  border-color: #6366f1;
+  background: var(--accent-indigo, #6366f1);
+  border-color: var(--accent-indigo, #6366f1);
   color: #fff;
 }
 
@@ -127,9 +127,9 @@
   right: -6px;
   font-size: 10px;
   font-weight: 600;
-  color: #718096;
-  background: #edf2f7;
-  border: 1px solid #cbd5e0;
+  color: var(--text-secondary, #718096);
+  background: var(--surface-alt, #edf2f7);
+  border: 1px solid var(--theme-btn-disabled-bg, #cbd5e0);
   border-radius: 10px;
   padding: 1px 7px;
   white-space: nowrap;
@@ -178,7 +178,7 @@
 }
 
 .shop-owned.owned {
-  color: #48bb78;
+  color: var(--accent-green, #48bb78);
   font-weight: 600;
 }
 
@@ -204,22 +204,22 @@
 }
 
 .shop-buy-btn {
-  background: #6366f1;
+  background: var(--accent-indigo, #6366f1);
   color: #fff;
 }
 
 .shop-buy-btn:hover {
-  background: #4f46e5;
+  background: var(--accent-indigo-dark, #4f46e5);
 }
 
 .shop-buy-btn:disabled {
-  background: #e2e8f0;
-  color: #a0aec0;
+  background: var(--border-color, #e2e8f0);
+  color: var(--text-muted, #a0aec0);
   cursor: not-allowed;
 }
 
 .shop-use-btn {
-  background: #48bb78;
+  background: var(--accent-green, #48bb78);
   color: #fff;
 }
 
@@ -228,16 +228,16 @@
 }
 
 .shop-equip-btn {
-  background: #edf2f7;
-  color: #4a5568;
+  background: var(--surface-alt, #edf2f7);
+  color: var(--text-secondary, #4a5568);
 }
 
 .shop-equip-btn:hover {
-  background: #e2e8f0;
+  background: var(--border-color, #e2e8f0);
 }
 
 .shop-equip-btn.equipped {
-  background: #ebf8ff;
+  background: var(--surface-alt, #ebf8ff);
   color: #3182ce;
   cursor: default;
 }
@@ -271,7 +271,7 @@
 }
 
 .shop-qty-input:focus {
-  border-color: #6366f1;
+  border-color: var(--accent-indigo, #6366f1);
 }
 
 /* ===== 会员特权横向对比表（对齐 v1 商城） ===== */
@@ -308,7 +308,7 @@
 }
 
 .vip-compare-row.header {
-  background: #f1f3f5;
+  background: var(--surface, #f1f3f5);
   font-weight: 700;
   border-bottom: 2px solid #ced4da;
 }
@@ -345,12 +345,12 @@
   font-weight: 600;
   justify-content: flex-start;
   padding-left: 16px;
-  background: #f8f9fa;
+  background: var(--surface, #f8f9fa);
   color: var(--text, #495057);
 }
 
 .vip-compare-row:nth-child(even) .vip-compare-cell.cell-label {
-  background: #e9ecef;
+  background: var(--surface-alt, #e9ecef);
 }
 
 /* ===== 背包视图 ===== */
@@ -368,5 +368,5 @@
   color: var(--text, #2d3748);
   margin-bottom: 12px;
   padding-left: 8px;
-  border-left: 3px solid #6366f1;
+  border-left: 3px solid var(--accent-indigo, #6366f1);
 }

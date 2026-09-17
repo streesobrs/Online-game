@@ -215,7 +215,7 @@
 }
 
 .fb-vote-btn.voted {
-  background: #e3f2fd;
+  background: var(--surface-alt, #e3f2fd);
   color: #1976d2;
 }
 
@@ -389,7 +389,7 @@
 }
 
 .fb-like-btn.liked {
-  color: #e53e3e;
+  color: var(--accent-red, #e53e3e);
 }
 
 .fb-comment-time {
@@ -398,7 +398,7 @@
 }
 
 .fb-delete-btn:hover {
-  color: #e53e3e !important;
+  color: var(--accent-red, #e53e3e) !important;
 }
 
 /* 楼中楼 */

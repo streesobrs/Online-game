@@ -41,14 +41,14 @@
 
 .spectate-badge {
   font-size: 12px;
-  background: #ebf8ff;
+  background: var(--surface-alt, #ebf8ff);
   color: #3182ce;
   padding: 2px 8px;
   border-radius: 12px;
 }
 
 .spectate-badge.badge-ai {
-  background: #fef3c7;
+  background: var(--surface-alt, #fef3c7);
   color: #92400e;
 }
 

@@ -6,7 +6,7 @@
 .online-empty {
   padding: 20px;
   text-align: center;
-  color: #a0aec0;
+  color: var(--text-muted, #a0aec0);
   font-size: 13px;
 }
 
@@ -21,7 +21,7 @@
 }
 
 .online-item:hover {
-  background: #f7fafc;
+  background: var(--surface-alt, #f7fafc);
 }
 
 .online-item-info {
@@ -35,7 +35,7 @@
   padding: 0;
   font-size: 13px;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--text, #2d3748);
   cursor: pointer;
   text-align: left;
   max-width: 100%;
@@ -51,7 +51,7 @@
 
 .online-item-meta {
   font-size: 11px;
-  color: #a0aec0;
+  color: var(--text-muted, #a0aec0);
   margin-top: 2px;
 }
 
@@ -83,8 +83,8 @@
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 14px;
-  background: #fff;
-  color: #2d3748;
+  background: var(--surface, #fff);
+  color: var(--text, #2d3748);
   cursor: pointer;
   text-align: left;
   transition: border-color 0.15s ease, background 0.15s ease;
@@ -92,7 +92,7 @@
 
 .challenge-game-btn:hover {
   border-color: var(--theme-accent, #4299e1);
-  background: #ebf8ff;
+  background: var(--surface-alt, #ebf8ff);
 }
 
 /* 用户资料卡 */
@@ -107,19 +107,19 @@
 .user-card-name {
   font-size: 16px;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--text, #2d3748);
 }
 
 .user-card-meta {
   font-size: 12px;
-  color: #718096;
+  color: var(--text-secondary, #718096);
 }
 
 .user-card-bio {
   margin-top: 6px;
   font-size: 13px;
   line-height: 1.5;
-  color: #4a5568;
+  color: var(--text-secondary, #4a5568);
   background: var(--surface-alt, #f7fafc);
   border-radius: 6px;
   padding: 8px 12px;
@@ -134,7 +134,7 @@
   gap: 16px;
   margin-top: 10px;
   font-size: 13px;
-  color: #4a5568;
+  color: var(--text-secondary, #4a5568);
 }
 
 .user-card-footer {
@@ -172,8 +172,8 @@
 }
 
 .v2-avatar--placeholder {
-  background: #edf2f7;
-  color: #a0aec0;
+  background: var(--surface-alt, #edf2f7);
+  color: var(--text-muted, #a0aec0);
 }
 
 .v2-avatar-img {

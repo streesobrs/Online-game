@@ -432,7 +432,7 @@ a.nav-btn.nav-btn--legacy:hover {
 
 .account-exp {
     font-size: 10px;
-    color: #718096;
+    color: var(--theme-stat-label-color, #718096);
     white-space: nowrap;
 }
 
@@ -462,46 +462,46 @@ a.nav-btn.nav-btn--legacy:hover {
     font-weight: 500;
     font-size: 12px;
     transition: all 0.2s;
-    background: #4a5568;
+    background: var(--theme-secondary, #6c757d);
     color: white;
     white-space: nowrap;
 }
 
 .account-btn:hover {
-    background: #2d3748;
+    background: var(--surface-hover, #5a6268);
     transform: translateY(-1px);
 }
 
 .account-btn--primary {
-    background: var(--theme-accent, #4299e1);
+    background: var(--theme-btn-primary-bg, #4299e1);
 }
 
 .account-btn--primary:hover {
-    background: #2b6cb0;
+    background: var(--theme-btn-primary-bg-hover, #2b6cb0);
 }
 
 .account-btn--success {
-    background: #48bb78;
+    background: var(--theme-btn-match-bg-hover, #48bb78);
 }
 
 .account-btn--success:hover {
-    background: #2f855a;
+    background: var(--theme-stat-win-color, #2f855a);
 }
 
 .account-btn--info {
-    background: var(--theme-accent, #4299e1);
+    background: var(--theme-btn-primary-bg, #4299e1);
 }
 
 .account-btn--info:hover {
-    background: #2b6cb0;
+    background: var(--theme-btn-primary-bg-hover, #2b6cb0);
 }
 
 .account-btn--danger {
-    background: #e53e3e;
+    background: var(--theme-btn-danger-bg, #e53e3e);
 }
 
 .account-btn--danger:hover {
-    background: #c53030;
+    background: var(--theme-btn-danger-bg-hover, #c53030);
 }
 
 /* ---- 视图内容容器 ---- */
@@ -521,7 +521,7 @@ a.nav-btn.nav-btn--legacy:hover {
 }
 
 .btn-secondary:hover {
-    background: #5a6268;
+    background: var(--surface-hover, #5a6268);
 }
 
 /* ---- 大厅：游戏选择按钮 ---- */
