@@ -34,3 +34,12 @@
   color: #a0aec0;
   font-size: 13px;
 }
+
+.player-locked {
+  padding: 18px 14px;
+  text-align: center;
+  color: #718096;
+  font-size: 13px;
+  background: var(--surface-alt, #f7fafc);
+  border-radius: 8px;
+}

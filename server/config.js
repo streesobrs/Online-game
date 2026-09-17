@@ -238,6 +238,21 @@ module.exports = {
     maxRequests: 100                                // 窗口内最大请求数
   },
 
+  // ========== 个人主页隐私默认配置 ==========
+  // true = 公开（所有人可见），false = 仅自己可见
+  // account.privacy 缺失时使用这些默认值，旧用户无需迁移
+  // 注：level/exp 永远公开、currency 永远不对外显示，不在此列表中
+  privacyDefaults: {
+    bio: true,              // 个性签名
+    createdAt: true,        // 注册时间
+    isAdmin: true,          // 是否管理员
+    stats: true,            // 战绩统计（对局/胜/负/胜率/连胜）
+    achievements: true,     // 徽章/成就
+    loginCount: false,      // 登录次数
+    lastLogin: false,       // 最后登录时间
+    lastSeen: false,        // 最后在线时间
+  },
+
   // ========== FFmpeg配置（GIF头像压缩） ==========
   ffmpeg: {
     path: process.env.FFMPEG_PATH || null,          // ffmpeg可执行文件路径（null为自动检测）

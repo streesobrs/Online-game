@@ -73,6 +73,20 @@
   padding: 1px 8px;
 }
 
+/* 他人主页个性签名 */
+.profile-player-bio {
+  margin: 8px 4px 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text, #2d3748);
+  background: var(--surface-alt, #f7fafc);
+  border-radius: 8px;
+  padding: 10px 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-align: center;
+}
+
 /* 等级 + 经验条 */
 .profile-aside-level {
   background: var(--surface-alt, #f7fafc);
@@ -335,6 +349,167 @@
   font-size: 12px;
   color: var(--text-secondary, #718096);
   margin-top: 4px;
+}
+
+.profile-bio-block {
+  margin-top: 14px;
+  background: var(--surface-alt, #f7fafc);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.profile-bio-label {
+  font-size: 12px;
+  color: var(--text-secondary, #718096);
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.profile-bio-content {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text, #2d3748);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.profile-bio-empty {
+  font-size: 13px;
+  color: var(--text-secondary, #a0aec0);
+  font-style: italic;
+}
+
+.profile-bio-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.profile-bio-input:focus {
+  border-color: #6366f1;
+}
+
+.profile-bio-counter {
+  margin-top: 4px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-secondary, #a0aec0);
+}
+
+.profile-bio-counter.near-limit {
+  color: #ed8936;
+}
+
+.profile-bio-counter.at-limit {
+  color: #e53e3e;
+}
+
+/* ========== 隐私设置弹窗 ========== */
+.privacy-panel {
+  padding: 4px 0;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.privacy-tip {
+  font-size: 12px;
+  color: var(--text-secondary, #718096);
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: var(--surface-alt, #f7fafc);
+  border-radius: 6px;
+  line-height: 1.5;
+}
+
+.privacy-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.privacy-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.privacy-row:hover {
+  background: var(--surface-alt, #f7fafc);
+}
+
+.privacy-row-label {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.privacy-row-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text, #2d3748);
+}
+
+.privacy-row-hint {
+  font-size: 11px;
+  color: var(--text-secondary, #a0aec0);
+  margin-top: 2px;
+}
+
+.privacy-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
+  margin-left: 12px;
+  cursor: pointer;
+}
+
+.privacy-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.privacy-slider {
+  position: absolute;
+  inset: 0;
+  background-color: #cbd5e0;
+  transition: 0.2s;
+  border-radius: 22px;
+}
+
+.privacy-slider::before {
+  position: absolute;
+  content: '';
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.2s;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.privacy-switch input:checked+.privacy-slider {
+  background-color: #48bb78;
+}
+
+.privacy-switch input:checked+.privacy-slider::before {
+  transform: translateX(18px);
 }
 
 /* ===== 各棋种统计 ===== */

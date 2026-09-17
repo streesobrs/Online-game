@@ -115,6 +115,20 @@
   color: #718096;
 }
 
+.user-card-bio {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #4a5568;
+  background: var(--surface-alt, #f7fafc);
+  border-radius: 6px;
+  padding: 8px 12px;
+  max-width: 100%;
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-align: center;
+}
+
 .user-card-stats {
   display: flex;
   gap: 16px;

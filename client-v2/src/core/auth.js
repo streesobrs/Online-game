@@ -222,12 +222,18 @@ export function updateNickname(nickname) {
 }
 
 /**
- * 更新个人资料（如个性签名）
- * 注意：服务端会整体覆盖 profile 对象，必须携带完整 profile（含 avatar/exp/level），避免丢失
- * @param {Object} profile - 完整 profile 对象
+ * 更新账号资料字段
+ * 支持三种顶层字段：profile（个性签名等）、privacy（隐私设置）、nickname（昵称）
+ * 服务端会分别走 account.profile.xxx / account.privacy.xxx / account.nickname 的 dot-notation 更新，
+ * 不会互相干扰。调用方按需传入一种或多种。
+ * @param {Object} params - { profile?: {...}, privacy?: {...}, nickname?: string }
  */
-export function updateProfile(profile) {
-  emit('account_update_profile', { profile });
+export function updateProfile(params) {
+  emit('account_update_profile', {
+    nickname: params.nickname,
+    profile: params.profile,
+    privacy: params.privacy,
+  });
 }
 
 /** 退出登录 */

@@ -29,21 +29,41 @@ export function showUserCard(userId) {
       if (!data) { body.textContent = '未获取到该用户信息'; return; }
       const acc = data.account || {};
       const nickname = acc.nickname || acc.username || '玩家';
-      const level = data.profile?.level ?? 1;
-      const exp = data.profile?.exp ?? 0;
-      const stats = data.stats || {};
-      const currency = data.currency || 0;
+      const profile2 = data.profile || {};
+      const levelHidden = profile2.level == null;
+      const stats = data.stats;
+      const currency = data.currency;
 
       body.innerHTML = '';
+      const bioText = (profile2.bio || '').trim();
+      const bioEl = bioText
+        ? el('div', { class: 'user-card-bio' }, bioText)
+        : null;
+
+      // 等级行：如果等级被隐藏，显示占位
+      const levelMeta = levelHidden
+        ? '🔒 等级私密'
+        : `Lv.${profile2.level ?? 1} · ${profile2.exp ?? 0} EXP`;
+
+      // 战绩行：stats 或 currency 为 null 时显示隐藏占位
+      const statsChildren = [];
+      if (stats != null) {
+        statsChildren.push(el('span', {}, `🏆 胜 ${stats.totalWins ?? 0}`));
+        statsChildren.push(el('span', {}, `⚔️ 局 ${stats.totalGames ?? 0}`));
+      }
+      if (currency != null) {
+        statsChildren.push(el('span', {}, `💎 ${currency}`));
+      }
+      if (statsChildren.length === 0) {
+        statsChildren.push(el('span', {}, '🔒 该用户隐藏了资料'));
+      }
+
       body.append(
         avatarEl(avData?.cosmetics, avData?.cosmeticConfig, 64),
         el('div', { class: 'user-card-name' }, nickname),
-        el('div', { class: 'user-card-meta' }, `Lv.${level} · ${exp} EXP`),
-        el('div', { class: 'user-card-stats' }, [
-          el('span', {}, `🏆 胜 ${stats.totalWins ?? 0}`),
-          el('span', {}, `⚔️ 局 ${stats.totalGames ?? 0}`),
-          el('span', {}, `💎 ${currency}`),
-        ]),
+        el('div', { class: 'user-card-meta' }, levelMeta),
+        ...(bioEl ? [bioEl] : []),
+        el('div', { class: 'user-card-stats' }, statsChildren),
         // 查看他人主页（部分公开数据）
         el('div', { class: 'user-card-footer' }, [
           el('button', { class: 'user-card-profile-btn', onClick: () => { modal.close(); goPlayer(userId); } }, '查看主页 ›'),

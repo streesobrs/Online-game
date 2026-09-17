@@ -1189,6 +1189,7 @@ class AccountManager {
   // 更新账号资料
   async updateProfile(id, updates) {
     try {
+      // 仍需 findOne 确认账号存在（dataStore.update 对不存在的 ID 会静默失败）
       const account = await dataStore.findOne('accounts', { id: id });
       if (!account) {
         logger.warn('账号不存在', { id });
@@ -1203,18 +1204,57 @@ class AccountManager {
       // 处理nickname更新
       if (updates.nickname !== undefined) {
         updateData['account.nickname'] = updates.nickname;
-        updateData['account.updatedAt'] = Date.now();
       }
 
-      // 处理profile更新（合并而非整体覆盖，避免丢失 exp/level/avatar 等字段）
-      if (updates.profile !== undefined) {
-        const currentProfile = account.account?.profile || {};
-        updateData['account.profile'] = { ...currentProfile, ...updates.profile };
-        updateData['account.updatedAt'] = Date.now();
+      // 处理profile更新：用 dot-notation 精确更新每个字段，
+      // 让 dataStore.update 的 processNestedUpdates 直接作用在最新读取的数据上，
+      // 避免先 read 再 merge 再 write 时携带过期的 exp/level 等字段造成数据丢失
+      if (updates.profile !== undefined && typeof updates.profile === 'object') {
+        for (const [key, value] of Object.entries(updates.profile)) {
+          updateData[`account.profile.${key}`] = value;
+        }
       }
+
+      // 处理隐私设置更新：逐项 dot-notation，只接受 DEFAULT_PRIVACY 里定义的合法 key 和 boolean 值
+      if (updates.privacy !== undefined && typeof updates.privacy === 'object') {
+        const validKeys = Object.keys(config.privacyDefaults || {});
+        // 顺便清除历史遗留：旧版本 privacy 曾被错误地写进 account.profile.privacy
+        // 写入 account.privacy.xxx 的同时，标记删除 account.profile.privacy
+        updateData['account.profile.privacy'] = null; // dot-notation 删除
+
+        for (const [key, value] of Object.entries(updates.privacy)) {
+          if (!validKeys.includes(key)) {
+            logger.warn('跳过非法隐私设置 key', { id, key });
+            continue;
+          }
+          if (typeof value !== 'boolean') {
+            logger.warn('跳过非 boolean 隐私值', { id, key, value });
+            continue;
+          }
+          updateData[`account.privacy.${key}`] = value;
+        }
+
+        // 用当前 validKeys 重建整个 account.privacy 对象，清掉废弃 key（如旧版遗留的 level/currency）
+        const rebuiltPrivacy = {};
+        for (const k of validKeys) {
+          // 新值里有就用新值，否则保留现有值，否则走 config 默认值
+          rebuiltPrivacy[k] = (updates.privacy[k] !== undefined)
+            ? !!updates.privacy[k]
+            : (account.account?.privacy?.[k] !== undefined
+              ? !!account.account.privacy[k]
+              : (config.privacyDefaults?.[k] ?? true));
+        }
+        updateData['account.privacy'] = rebuiltPrivacy;
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        return { success: true, message: '无更新内容' };
+      }
+
+      updateData['account.updatedAt'] = Date.now();
 
       await dataStore.update('accounts', { id: id }, updateData);
-      logger.info('账号资料更新', { id, updates: Object.keys(updateData) });
+      logger.info('账号资料更新', { id, keys: Object.keys(updateData) });
 
       return {
         success: true,
@@ -2763,6 +2803,13 @@ class AccountManager {
         await dataStore.writeOne('inventories', userId, store);
         delete account.inventory;
         await this._saveAccount(userId, account);
+        // 迁移幂等性保护：re-read 验证 account.inventory 已真正删除
+        const verifyA = await this._getAccount(userId);
+        if (verifyA?.inventory !== undefined) {
+          logger.error('迁移失败：account.inventory 未被删除，重试', { userId });
+          delete verifyA.inventory;
+          await this._saveAccount(userId, verifyA);
+        }
         const itemCount = Object.keys(store.items || {}).length;
         logger.info('背包数据已迁移到独立存储', { userId, itemCount });
       } else if (store && hasOldData) {
@@ -2777,11 +2824,38 @@ class AccountManager {
         await dataStore.writeOne('inventories', userId, store);
         delete account.inventory;
         await this._saveAccount(userId, account);
+        // 迁移幂等性保护
+        const verifyB = await this._getAccount(userId);
+        if (verifyB?.inventory !== undefined) {
+          logger.error('迁移合并失败：account.inventory 未被删除，重试', { userId });
+          delete verifyB.inventory;
+          await this._saveAccount(userId, verifyB);
+        }
         const itemCount = Object.keys(store.items || {}).length;
         logger.info('背包数据已迁移到独立存储', { userId, itemCount });
       } else if (account && account.inventory !== undefined && !hasOldData) {
         delete account.inventory;
         await this._saveAccount(userId, account);
+      }
+
+      // 防御：清理存储中任何被破坏的 float/字符串值（之前的 bug 可能写入了科学计数法或 [object Object] 字符串）
+      if (store && store.items) {
+        let fixed = false;
+        for (const [k, v] of Object.entries(store.items)) {
+          if (typeof v === 'string') {
+            delete store.items[k]; fixed = true;
+            logger.warn('清理字符串类型的 item（可能是对象被当成 itemId）', { userId, itemId: k, value: v });
+          } else if (typeof v !== 'number' || !Number.isFinite(v)) {
+            delete store.items[k]; fixed = true;
+            logger.warn('清理非法类型的 item', { userId, itemId: k, valueType: typeof v, value: v });
+          } else if (!Number.isInteger(v)) {
+            store.items[k] = Math.round(v); fixed = true;
+            logger.warn('修复 float item count', { userId, itemId: k, old: v });
+          }
+        }
+        if (fixed) {
+          await this._saveInventoryStore(userId, store);
+        }
       }
 
       return store || { userId, items: {}, undoCount: 0, hintCount: 0 };
@@ -2968,8 +3042,25 @@ class AccountManager {
    * 添加道具（支持带 meta 信息的道具，meta 模式下用数组存储每个实例）
    */
   async addItem(userId, itemId, count = 1, meta = null, shopManager = null) {
+    // 防御：count 必须是正整数，否则拒绝（避免把对象/浮点数/NaN 累加进 inventory）
+    if (count == null || typeof count !== 'number' || !Number.isFinite(count) || !Number.isInteger(count) || count <= 0) {
+      logger.error('addItem 收到非法 count', { userId, itemId, count, countType: typeof count });
+      return { success: false, message: `非法道具数量: ${count}` };
+    }
+    if (typeof itemId !== 'string' || !itemId) {
+      logger.error('addItem 收到非法 itemId', { userId, itemId });
+      return { success: false, message: `非法道具 ID: ${itemId}` };
+    }
+
     const invStore = await this._getInventoryStore(userId);
     if (!invStore.items) invStore.items = {};
+
+    // 防御：如果已有值是 float（被之前的 bug 破坏过），round 回整数
+    const existing = invStore.items[itemId];
+    if (typeof existing === 'number' && !Number.isInteger(existing)) {
+      logger.warn('修复 float count', { userId, itemId, old: existing });
+      invStore.items[itemId] = Math.round(existing);
+    }
 
     let hasMeta = meta != null;
     if (!hasMeta && shopManager) {
@@ -4648,8 +4739,14 @@ class AccountManager {
       } catch (e) { /* 忽略 */ }
 
       for (const item of items) {
-        if (!item.id || !item.count) continue;
-        invStore.items[item.id] = (invStore.items[item.id] || 0) + item.count;
+        // 防御：只接受合法的 {id, count}，拒绝非整数 count 或对象
+        if (!item.id || typeof item.id !== 'string') continue;
+        const cnt = item.count;
+        if (cnt == null || typeof cnt !== 'number' || !Number.isInteger(cnt) || cnt <= 0) {
+          logger.error('grantItems 跳过非法条目', { userId, item, countType: typeof cnt });
+          continue;
+        }
+        invStore.items[item.id] = (invStore.items[item.id] || 0) + cnt;
       }
 
       await this._saveInventoryStore(userId, invStore);

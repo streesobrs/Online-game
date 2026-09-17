@@ -112,34 +112,115 @@ function openPasswordModal(hasPassword) {
 
 /**
  * 编辑个性签名弹窗
- * 通过 account_update_profile 携带完整 profile（含 avatar/exp/level）提交，避免服务端整体覆盖时丢失
- * @param {Object} profile - 当前完整 profile 对象（含 avatar/exp/level/bio）
+ * 只发送 { bio }，服务端会合并到 profile，避免携带过期的 exp/level 覆盖最新数据
  */
-function openBioModal(profile) {
+function openBioModal(currentBio) {
+  const MAX_LEN = 100;
   const bioEl = el('textarea', {
-    class: 'profile-rename-input',
+    class: 'profile-bio-input',
     rows: 3,
-    maxlength: 100,
+    maxlength: MAX_LEN,
     placeholder: '介绍一下自己吧（最多100字）',
-  }, profile?.bio || '');
-  bioEl.style.resize = 'vertical';
+  }, currentBio || '');
+  const counterEl = el('div', { class: 'profile-bio-counter' }, `${(currentBio || '').length}/${MAX_LEN}`);
+  const updateCounterClass = () => {
+    const len = bioEl.value.length;
+    counterEl.classList.remove('near-limit', 'at-limit');
+    if (len >= MAX_LEN) counterEl.classList.add('at-limit');
+    else if (len >= MAX_LEN - 20) counterEl.classList.add('near-limit');
+  };
+  bioEl.addEventListener('input', () => {
+    counterEl.textContent = `${bioEl.value.length}/${MAX_LEN}`;
+    updateCounterClass();
+  });
+  updateCounterClass();
   modal.show({
     title: '✏️ 编辑个性签名',
     content: el('div', { style: 'padding:4px 0;' }, [
       el('div', { style: 'font-size:12px;color:var(--text-secondary,#718096);margin-bottom:8px;' },
-        '个性签名会展示在个人资料「账号信息」中'),
+        '个性签名会展示在个人资料账号信息下方'),
       bioEl,
+      counterEl,
     ]),
     confirmText: '保存',
     showCancel: true,
     cancelText: '取消',
     onConfirm: () => {
       const bio = bioEl.value.trim();
-      if (bio.length > 100) { toast.warn('个性签名最多100字'); return; }
-      auth.updateProfile({ ...(profile || {}), bio });
+      if (bio.length > MAX_LEN) { toast.warn(`个性签名最多${MAX_LEN}字`); return; }
+      // 只传 bio，服务端合并到 profile，不覆盖 exp/level/avatar
+      auth.updateProfile({ profile: { bio } });
       toast.info('正在保存...');
     },
   });
+}
+
+/**
+ * 隐私设置弹窗（每次打开从 API 拉最新值，不依赖模块缓存）
+ */
+async function openPrivacyModal() {
+  const PRIVACY_OPTIONS = [
+    { key: 'bio', label: '个性签名', default: true, hint: '别人查看你的主页时能看到你的签名' },
+    { key: 'stats', label: '战绩统计', default: true, hint: '对局数、胜/负、胜率、连胜' },
+    { key: 'achievements', label: '徽章 / 成就', default: true, hint: '已解锁的徽章和成就进度' },
+    { key: 'createdAt', label: '注册时间', default: true, hint: '显示你的账号注册时间' },
+    { key: 'isAdmin', label: '管理员身份', default: true, hint: '是否显示你是管理员' },
+    { key: 'loginCount', label: '登录次数', default: false, hint: '显示你总共登录过多少次' },
+    { key: 'lastLogin', label: '最后登录时间', default: false, hint: '显示你最近一次登录的时间' },
+    { key: 'lastSeen', label: '最后在线时间', default: false, hint: '显示你最近一次上线的时间' },
+  ];
+
+  const body = el('div', { class: 'privacy-panel' },
+    el('div', { class: 'text-muted', style: 'padding:20px;text-align:center;' }, '⏳ 加载中...'));
+  modal.show({
+    title: '⚙️ 隐私设置',
+    content: body,
+    confirmText: '保存设置',
+    showCancel: true,
+    cancelText: '取消',
+    onConfirm: () => {
+      auth.updateProfile({ privacy: { ...toggles } });
+      toast.info('隐私设置已保存');
+    },
+  });
+
+  let toggles = {};
+  // 拉最新 privacy，失败也用默认值
+  let serverPrivacy = null;
+  try {
+    const res = await api.profile.get(currentUserId());
+    serverPrivacy = res?.privacy || {};
+    profilePrivacy = serverPrivacy; // 同步模块缓存
+  } catch (err) { /* 忽略，继续用默认值 */ }
+
+  PRIVACY_OPTIONS.forEach(opt => {
+    toggles[opt.key] = serverPrivacy && serverPrivacy[opt.key] !== undefined
+      ? !!serverPrivacy[opt.key]
+      : opt.default;
+  });
+
+  const rows = PRIVACY_OPTIONS.map(opt => {
+    const labelEl = el('div', { class: 'privacy-row-label' }, [
+      el('span', { class: 'privacy-row-name' }, opt.label),
+      el('span', { class: 'privacy-row-hint' }, opt.hint),
+    ]);
+    // checked attribute 只能是 true/false（el() 会跳过 false，不设 attribute）
+    // 不能用 '' 空字符串 — HTML checkbox 的空 checked 是 truthy！
+    const switchEl = el('label', { class: 'privacy-switch' }, [
+      el('input', { type: 'checkbox', checked: !!toggles[opt.key] }),
+      el('span', { class: 'privacy-slider' }),
+    ]);
+    const checkbox = switchEl.querySelector('input[type=checkbox]');
+    checkbox.addEventListener('change', (e) => { toggles[opt.key] = e.target.checked; });
+    return el('div', { class: 'privacy-row' }, [labelEl, switchEl]);
+  });
+
+  body.innerHTML = '';
+  body.append(
+    el('div', { class: 'privacy-tip' },
+      '开启后，其他用户查看你的主页/资料卡时就能看到对应信息；关闭则只显示给你自己。'),
+    el('div', { class: 'privacy-rows' }, rows),
+  );
 }
 
 /**
@@ -153,6 +234,7 @@ export function renderProfile(container) {
   let activeTab = PROFILE_TAB_KEYS.includes(INIT_TAB) ? INIT_TAB : 'info';
   store.set('profile.initTab', null); // 初始 Tab 已消费，避免下次进入仍停留在上次 Tab
   let profileData = null;
+  let profilePrivacy = {};   // 隐私设置（服务端合并 DEFAULT_PRIVACY + 用户自定义后返回）
   let expMap = {};
   let cosmetics = null;
   let cosmeticConfig = null;
@@ -184,6 +266,7 @@ export function renderProfile(container) {
         api.mails.get(userId),
       ]);
       profileData = proRes.data || null;
+      profilePrivacy = proRes.privacy || {};
       expMap = expRes.data || {};
       cosmetics = cosRes.cosmetics || null;
       cosmeticConfig = cfgRes.cosmetics || null;
@@ -389,13 +472,19 @@ export function renderProfile(container) {
       { label: '账号 ID', value: account.id || '-' },
       { label: '用户名', value: account.username || '-' },
       { label: '昵称', value: account.nickname || '-' },
-      { label: '个性签名', value: d.profile?.bio || '-' },
       { label: '注册时间', value: formatDate(account.createdAt) },
       { label: '最后登录', value: formatDate(account.lastLogin) },
       { label: '最后在线', value: formatDate(account.lastSeen) },
       { label: '登录次数', value: account.loginCount || 0 },
       { label: '密码状态', value: account.hasPassword ? '已设置' : '未设置' },
     ];
+
+    const bioText = (d.profile?.bio || '').trim();
+    const editBioBtn = el('button', {
+      class: 'btn btn-secondary',
+      style: 'padding:6px 14px;font-size:12px;',
+      onClick: () => openBioModal(bioText),
+    }, bioText ? '✏️ 修改签名' : '✏️ 编辑签名');
 
     const statCards = [
       { label: '总对局', value: stats.totalGames ?? 0 },
@@ -416,16 +505,24 @@ export function renderProfile(container) {
               el('div', { class: 'profile-info-label' }, c.label),
               el('div', { class: 'profile-info-value' }, c.value),
             ]))),
-          // 编辑个性签名 + 修改/设置密码入口（对齐 v1 账号设置）
-          el('div', { style: 'margin-top:14px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;' }, [
+          // 个性签名（独立全宽区块，支持多行展示）
+          el('div', { class: 'profile-bio-block' }, [
+            el('div', { class: 'profile-bio-label' }, '个性签名'),
+            bioText
+              ? el('div', { class: 'profile-bio-content' }, bioText)
+              : el('div', { class: 'profile-bio-empty' }, '（暂未设置个性签名）'),
+          ]),
+          // 操作按钮
+          el('div', { style: 'margin-top:12px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;' }, [
+            editBioBtn,
             el('button', {
               class: 'btn btn-secondary',
-              style: 'padding:6px 18px;font-size:13px;',
-              onClick: () => openBioModal(d.profile || {}),
-            }, '✏️ 编辑个性签名'),
+              style: 'padding:6px 14px;font-size:12px;',
+              onClick: () => openPrivacyModal(profilePrivacy),
+            }, '⚙️ 隐私设置'),
             el('button', {
               class: 'btn btn-secondary',
-              style: 'padding:6px 18px;font-size:13px;',
+              style: 'padding:6px 14px;font-size:12px;',
               onClick: () => openPasswordModal(!!account.hasPassword),
             }, account.hasPassword ? '🔑 修改密码' : '🔑 设置密码'),
           ]),
@@ -943,6 +1040,7 @@ export function renderProfile(container) {
     try {
       const res = await api.profile.get(currentUserId());
       if (res?.data) profileData = res.data;
+      if (res?.privacy) profilePrivacy = res.privacy;
     } catch (err) { /* 保留旧数据 */ }
   }
 

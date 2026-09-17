@@ -1592,6 +1592,8 @@ app.post('/api/level-rewards/:accountId/claim', async (req, res) => {
 app.get('/api/profile/:accountId', async (req, res) => {
   try {
     const accountId = req.params.accountId;
+    // selfId：谁在请求。用于隐私过滤（自己看自己 = 完整数据，别人看 = 按隐私设置过滤）
+    const selfId = req.query.selfId || null;
     const account = await accountManager.getAccount(accountId);
     if (!account) {
       return res.status(404).json({ success: false, message: '账号不存在' });
@@ -1634,49 +1636,74 @@ app.get('/api/profile/:accountId', async (req, res) => {
       if (streak > bestStreak) bestStreak = streak;
     }
 
+    // 合并隐私设置：user 自定义的覆盖默认值
+    const privacyDefaults = config.privacyDefaults || {};
+    const userPrivacy = account.account?.privacy || {};
+    const privacy = { ...privacyDefaults, ...userPrivacy };
+
+    // 判断是否为本人访问
+    const isOwner = selfId && selfId === accountId;
+
+    // 构建 account 子对象（按隐私过滤）
+    const accountOut = {
+      id: account.account?.id,
+      username: account.account?.username,
+      nickname: account.account?.nickname,
+      type: account.account?.type,
+      // 以下字段按需公开：
+      createdAt: (privacy.createdAt || isOwner) ? account.account?.createdAt : null,
+      lastLogin: (privacy.lastLogin || isOwner) ? (account.account?.lastLogin || null) : null,
+      lastSeen: (privacy.lastSeen || isOwner) ? (account.account?.lastSeen || null) : null,
+      loginCount: (privacy.loginCount || isOwner) ? (account.account?.loginCount || 0) : null,
+      hasPassword: isOwner ? (account.hasPassword || false) : null,
+      isAdmin: (privacy.isAdmin || isOwner) ? (account.account?.isAdmin === true) : null
+    };
+
+    // profile 子对象：
+    //   - bio 按需公开
+    //   - level/exp 永远公开（用户说不需要隐藏）
+    const rawProfile = account.account?.profile || { level: 1, exp: 0 };
+    const profileOut = { ...rawProfile };
+    if (!isOwner) {
+      if (!privacy.bio) delete profileOut.bio;
+    }
+
+    // currency：永远不对外显示（用户明确要求）
+    const currencyOut = isOwner ? (currency.balance || 0) : null;
+    const statsOut = (privacy.stats || isOwner) ? {
+      totalGames, totalWins, totalDraws, totalLosses, bestStreak,
+      winRate: totalGames > 0 ? Math.round((totalWins / totalGames) * 100) : 0
+    } : null;
+    const achievementsOut = (privacy.achievements || isOwner) ? {
+      unlocked: unlockedAchievements,
+      progress: achievementProgress,
+      badges: account.badges || [],
+      badgeDefinitions: achievementManager.getBadgeDefinitions()
+    } : null;
+
     res.json({
       success: true,
+      // 把最终隐私设置也带回来，方便前端显示"公开/隐藏"状态（本人）或"🔒 私密"（他人）
+      privacy: privacy,
+      isOwner: isOwner,
       data: {
-        account: {
-          id: account.account?.id,
-          username: account.account?.username,
-          nickname: account.account?.nickname,
-          type: account.account?.type,
-          createdAt: account.account?.createdAt,
-          lastLogin: account.account?.lastLogin || null,
-          lastSeen: account.account?.lastSeen || null,
-          loginCount: account.account?.loginCount || 0,
-          hasPassword: account.hasPassword || false,
-          isAdmin: account.account?.isAdmin === true
-        },
-        profile: account.account?.profile || { level: 1, exp: 0 },
-        currency: currency.balance || 0,
+        account: accountOut,
+        profile: profileOut,
+        currency: currencyOut,
         levelRewards: levelRewards.success ? {
           available: levelRewards.available || [],
           future: levelRewards.future || [],
           claimedLevels: levelRewards.claimedLevels || [],
           totalClaimed: levelRewards.totalClaimed || 0
         } : { available: [], future: [], claimedLevels: [], totalClaimed: 0 },
-        achievements: {
-          unlocked: unlockedAchievements,
-          progress: achievementProgress,
-          badges: account.badges || [],
-          badgeDefinitions: achievementManager.getBadgeDefinitions()
-        },
-        stats: {
-          totalGames,
-          totalWins,
-          totalDraws,
-          totalLosses,
-          bestStreak,
-          winRate: totalGames > 0 ? Math.round((totalWins / totalGames) * 100) : 0
-        },
+        achievements: achievementsOut,
+        stats: statsOut,
         games,
         activeBuffs: account.activeBuffs || {},
-        inventory: {
+        inventory: isOwner ? {
           undoCount: account.inventory?.undoCount || 0,
           hintCount: account.inventory?.hintCount || 0
-        }
+        } : null
       }
     });
   } catch (err) {
@@ -2381,8 +2408,8 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const { nickname, profile } = data;
-    const result = await accountManager.updateProfile(userSession.accountId, { nickname, profile });
+    const { nickname, profile, privacy } = data;
+    const result = await accountManager.updateProfile(userSession.accountId, { nickname, profile, privacy });
 
     if (result.success) {
       const account = await accountManager.getAccount(userSession.accountId);

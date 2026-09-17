@@ -92,6 +92,11 @@ function buildPage(d, expMap, avData) {
   const expPercent = Math.min(100, nextExp > 0 ? Math.round((exp / nextExp) * 100) : 0);
   const accountTag = account.type === 'guest' ? '游客账号' : (account.isAdmin ? '管理员' : '正式账号');
 
+  const bioText = (profile.bio || '').trim();
+  const bioBlock = bioText
+    ? el('div', { class: 'profile-player-bio' }, bioText)
+    : null;
+
   // 左侧信息栏（sticky）
   const aside = el('div', { class: 'profile-aside' }, [
     el('div', { class: 'profile-aside-head' }, [
@@ -102,6 +107,7 @@ function buildPage(d, expMap, avData) {
         el('span', { class: 'profile-aside-tag' }, accountTag),
       ]),
     ]),
+    ...(bioBlock ? [bioBlock] : []),
     el('div', { class: 'profile-aside-level' }, [
       el('div', { class: 'profile-aside-level-row' }, [
         el('span', { class: 'profile-aside-level-badge' }, `Lv.${level}`),
@@ -113,33 +119,38 @@ function buildPage(d, expMap, avData) {
       el('div', { class: 'profile-aside-exp-text' }, `经验 ${exp} / ${nextExp}`),
     ]),
     el('div', { class: 'profile-aside-stats' }, [
-      asideStat('💎', d.currency ?? 0, '星钻'),
-      asideStat('🏆', `${ach.progress?.unlocked ?? 0}/${ach.progress?.total ?? 0}`, '成就'),
-      asideStat('⚔️', stats.totalWins ?? 0, '胜场'),
-      asideStat('🔥', stats.bestStreak ?? 0, '连胜'),
+      asideStat('💎', d.currency != null ? d.currency : '🔒', '星钻'),
+      asideStat('🏆', ach != null ? `${ach.progress?.unlocked ?? 0}/${ach.progress?.total ?? 0}` : '🔒', '成就'),
+      asideStat('⚔️', stats != null ? (stats.totalWins ?? 0) : '🔒', '胜场'),
+      asideStat('🔥', stats != null ? (stats.bestStreak ?? 0) : '🔒', '连胜'),
     ]),
   ]);
 
   // 账号信息（不含 username/密码等敏感字段）
+  // null 表示被所有者的隐私设置隐藏了
   const infoCards = [
     { label: '账号类型', value: account.type === 'guest' ? '游客' : (account.isAdmin ? '管理员' : '正式账号') },
     { label: '账号 ID', value: account.id || '-' },
-    { label: '注册时间', value: formatDate(account.createdAt) },
-    { label: '登录次数', value: account.loginCount || 0 },
+    { label: '注册时间', value: account.createdAt != null ? formatDate(account.createdAt) : '🔒 私密' },
+    { label: '登录次数', value: account.loginCount != null ? account.loginCount : '🔒 私密' },
   ];
 
+  const isOwner = d.isOwner === true;
+  const statsHidden = stats === null;
+  const achHidden = ach === null;
+
   const statCards = [
-    { label: '总对局', value: stats.totalGames ?? 0 },
-    { label: '胜利', value: stats.totalWins ?? 0, color: '#48bb78' },
-    { label: '平局', value: stats.totalDraws ?? 0 },
-    { label: '失败', value: stats.totalLosses ?? 0, color: '#e53e3e' },
-    { label: '胜率', value: `${stats.winRate ?? 0}%`, highlight: true },
-    { label: '最佳连胜', value: stats.bestStreak ?? 0 },
+    { label: '总对局', value: stats?.totalGames ?? 0 },
+    { label: '胜利', value: stats?.totalWins ?? 0, color: '#48bb78' },
+    { label: '平局', value: stats?.totalDraws ?? 0 },
+    { label: '失败', value: stats?.totalLosses ?? 0, color: '#e53e3e' },
+    { label: '胜率', value: `${stats?.winRate ?? 0}%`, highlight: true },
+    { label: '最佳连胜', value: stats?.bestStreak ?? 0 },
   ];
 
   // 已解锁徽章
-  const badges = ach.badges || [];
-  const defs = ach.badgeDefinitions || {};
+  const badges = ach?.badges || [];
+  const defs = ach?.badgeDefinitions || {};
   const badgeItems = badges.map((id) => {
     const def = defs[id] || {};
     return el('div', { class: 'profile-badge-item', title: def.name || id }, [
@@ -159,17 +170,22 @@ function buildPage(d, expMap, avData) {
           el('div', { class: 'profile-info-value' }, c.value),
         ]))),
     ]),
-    el('div', { class: 'panel profile-card' }, [
-      el('div', { class: 'profile-section-title' }, '🏆 战绩统计'),
-      el('div', { class: 'profile-stat-grid' },
-        statCards.map((c) => el('div', { class: 'profile-stat-item' }, [
-          el('div', {
-            class: 'profile-stat-value' + (c.highlight ? ' highlight' : ''),
-            style: c.color ? `color:${c.color};` : '',
-          }, c.value),
-          el('div', { class: 'profile-stat-label' }, c.label),
-        ]))),
-    ]),
+    statsHidden
+      ? el('div', { class: 'panel profile-card' }, [
+        el('div', { class: 'profile-section-title' }, '🏆 战绩统计'),
+        el('div', { class: 'player-locked' }, '🔒 该用户隐藏了战绩'),
+      ])
+      : el('div', { class: 'panel profile-card' }, [
+        el('div', { class: 'profile-section-title' }, '🏆 战绩统计'),
+        el('div', { class: 'profile-stat-grid' },
+          statCards.map((c) => el('div', { class: 'profile-stat-item' }, [
+            el('div', {
+              class: 'profile-stat-value' + (c.highlight ? ' highlight' : ''),
+              style: c.color ? `color:${c.color};` : '',
+            }, c.value),
+            el('div', { class: 'profile-stat-label' }, c.label),
+          ]))),
+      ]),
     el('div', { class: 'panel profile-card' }, [
       el('div', { class: 'profile-section-title' }, '🎮 各棋种统计'),
       el('div', { class: 'profile-game-grid' },
@@ -185,12 +201,17 @@ function buildPage(d, expMap, avData) {
           ]);
         })),
     ]),
-    el('div', { class: 'panel profile-card' }, [
-      el('div', { class: 'profile-section-title' }, `🏅 已解锁徽章（${badges.length}）`),
-      badges.length
-        ? el('div', { class: 'profile-badge-grid' }, badgeItems)
-        : el('div', { class: 'player-empty' }, '暂无徽章'),
-    ]),
+    achHidden
+      ? el('div', { class: 'panel profile-card' }, [
+        el('div', { class: 'profile-section-title' }, '🏅 已解锁徽章'),
+        el('div', { class: 'player-locked' }, '🔒 该用户隐藏了成就'),
+      ])
+      : el('div', { class: 'panel profile-card' }, [
+        el('div', { class: 'profile-section-title' }, `🏅 已解锁徽章（${badges.length}）`),
+        badges.length
+          ? el('div', { class: 'profile-badge-grid' }, badgeItems)
+          : el('div', { class: 'player-empty' }, '暂无徽章'),
+      ]),
   ]);
 
   return el('div', { class: 'player-page' }, [

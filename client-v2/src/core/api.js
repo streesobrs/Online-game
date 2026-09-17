@@ -83,8 +83,18 @@ export const api = {
   },
 
   profile: {
-    /** 个人资料 @param {string} accountId */
-    get: (accountId) => api.get(`/api/profile/${encodeURIComponent(accountId)}`),
+    /**
+     * 个人资料
+     * 自动从 localStorage 读取当前账号 ID 作为 selfId，
+     * 后端据此判断"自己看自己"还是"别人看"，并按隐私设置过滤字段
+     * @param {string} accountId - 目标账号 ID
+     * @param {boolean} [withSelfId=true] - 是否自动带 selfId（默认 true）
+     */
+    get: (accountId, withSelfId = true) => {
+      const selfId = withSelfId ? (localStorage.getItem('currentAccountId') || '') : '';
+      const sep = accountId.includes('?') ? '&' : '?';
+      return api.get(`/api/profile/${encodeURIComponent(accountId)}${sep}selfId=${encodeURIComponent(selfId)}`);
+    },
     /** 等级经验配置（levelExp.json：{level: 升到下一级所需经验}） */
     levelExp: () => api.get('/api/config/levelExp'),
   },
