@@ -308,3 +308,101 @@
   color: #ed8936;
   margin-top: 4px;
 }
+
+/* ================================================
+   移动端响应式（≤768px）
+   ================================================ */
+
+@media (max-width: 768px) {
+  .achievements-page {
+    padding: 0 8px 20px;
+  }
+
+  .ach-page-title {
+    font-size: 18px;
+    padding: 14px 0 10px;
+  }
+
+  .ach-overview {
+    padding: 12px 14px;
+  }
+
+  /* Tab 横向滚动 */
+  .ach-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 6px;
+  }
+
+  .ach-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ach-tab {
+    flex-shrink: 0;
+    padding: 6px 12px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  /* 成就卡片网格 */
+  .ach-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
+
+  .ach-card {
+    padding: 12px;
+    gap: 6px;
+  }
+
+  .ach-card-name {
+    font-size: 13px;
+  }
+
+  .ach-card-desc {
+    font-size: 11px;
+    min-height: 28px;
+  }
+
+  .ach-icon-box {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+
+  /* 成就列表滚动高度放松 */
+  .ach-scroll {
+    max-height: none;
+  }
+}
+
+/* 小屏（≤480px） */
+@media (max-width: 480px) {
+  .ach-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .ach-card {
+    padding: 10px;
+  }
+
+  .ach-card-top {
+    gap: 6px;
+  }
+
+  .ach-card-name {
+    font-size: 12px;
+  }
+
+  .ach-card-desc {
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  .ach-card-progress {
+    padding: 6px 8px;
+  }
+}

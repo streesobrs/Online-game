@@ -19,6 +19,11 @@ set ZIP_NAME=%PACKAGE_NAME%.zip
 echo Preparing package...
 echo.
 
+REM Regenerate changelog from git history (fails safely, keeps existing file)
+echo Generating changelog...
+node scripts\gen-changelog.js
+echo.
+
 if exist "temp-package" rmdir /s /q "temp-package"
 mkdir "temp-package"
 

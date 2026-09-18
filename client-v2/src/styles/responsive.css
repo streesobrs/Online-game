@@ -1,10 +1,14 @@
 /**
- * 响应式适配（任务 5.1.1 移动端 ≤768px / 5.1.2 小屏 ≤480px）
+ * 响应式适配（移动端 ≤768px / 小屏 ≤480px）
  * 棋盘等比缩放由 src/utils/responsive.js 的 fitBoard（zoom 方案）处理，
  * 本文件负责页面级布局适配（导航、信息栏、浮动聊天窗、方向键等）。
  */
 
-/* ---- 触屏设备：禁用鼠标悬停效果（避免触屏误触闪动） ---- */
+/* ================================================
+   Part 0: 触屏设备通用优化（与屏幕宽度无关）
+   ================================================ */
+
+/* 触屏设备：禁用鼠标悬停效果（避免触屏误触闪动） */
 @media (hover: none) {
 
   .gobang-cell:hover,
@@ -48,64 +52,97 @@
   }
 }
 
-/* ===== 5.1.1 移动端（≤768px） ===== */
+/* ================================================
+   Part 1: 全局移动端基础规则（≤768px）
+   ================================================ */
+
 @media (max-width: 768px) {
 
-  /* 页面留白收紧 */
-  body {
-    padding: 10px;
+  /* ---- 输入框统一 16px（防止 iOS Safari 聚焦时自动放大页面） ---- */
+  input,
+  textarea,
+  select,
+  .input,
+  .chat-input,
+  .chat-sidebar-search,
+  .profile-rename-input,
+  .profile-bio-input,
+  .profile-filter-select {
+    font-size: 16px !important;
   }
 
-  /* 顶部导航紧凑：缩小按钮、隐藏快捷键角标 */
+  /* ---- 全局按钮最小触控高度（Apple 推荐 ≥44px） ---- */
+  .btn,
+  .nav-btn,
+  .account-btn,
+  .games-mode-tab,
+  .games-difficulty-card,
+  .ai-difficulty-btn,
+  .ai-game-type-card {
+    min-height: 40px;
+  }
+
+  /* ---- 页面留白收紧 ---- */
+  body {
+    padding: 10px;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 10px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+  }
+
+  #view-root {
+    padding: 0 6px;
+  }
+
+  /* ---- 顶部导航：改为横向滚动（空间不足时不换行撑高页面） ---- */
   .nav-layout {
-    padding: 8px 10px;
-    gap: 6px;
-    margin-bottom: 10px;
+    padding: 8px 6px;
+    gap: 0;
+    margin-bottom: 8px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    /* Firefox */
+  }
+
+  .nav-layout::-webkit-scrollbar {
+    display: none;
+    /* Chrome/Safari */
+  }
+
+  .nav-group,
+  .nav-divider {
+    flex-shrink: 0;
+  }
+
+  .nav-divider {
+    display: none;
+    /* 小屏隐藏分隔符，节省宽度 */
   }
 
   .nav-btn {
-    padding: 5px 10px;
+    padding: 6px 12px;
     font-size: 13px;
     gap: 4px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    min-height: 38px;
   }
 
   .nav-btn__shortcut {
     display: none;
   }
 
-  /* 对局信息/操作条收紧（gobang/chess/go/AI 共用 game-status-bar/game-tools-bar） */
-  .game-status-bar,
-  .game-tools-bar,
-  .spectate-match-info {
-    max-width: 100%;
-    gap: 6px;
+  /* ---- 账号条：移动端简化，不显示 hover 展开 ---- */
+  #account-root {
+    margin-bottom: 4px;
   }
 
-  /* 悬浮坞适配（避免固定 340px 溢出） */
-  .float-dock-panel {
-    right: 10px;
-    width: calc(100vw - 20px);
-    max-width: 340px;
-  }
-}
-
-/* ===== 5.1.2 小屏手机（≤480px） ===== */
-@media (max-width: 480px) {
-  body {
-    padding: 6px;
+  .account-bar {
+    padding: 0 4px;
   }
 
-  .nav-layout {
-    padding: 6px 8px;
-    gap: 5px;
-  }
-
-  .nav-btn {
-    padding: 5px 8px;
-    font-size: 12px;
-  }
-
-  /* 账号条：小屏收紧，避免横向溢出 */
   .account-bar .account-btn {
     padding: 6px 10px;
     font-size: 12px;
@@ -115,11 +152,136 @@
     gap: 4px;
   }
 
-  .account-bar .account-exp {
+  /* ---- 对局信息/操作条收紧 ---- */
+  .game-status-bar,
+  .game-tools-bar,
+  .spectate-match-info {
+    max-width: 100%;
+    gap: 6px;
+    padding: 8px 10px;
+  }
+
+  .game-status-bar {
+    font-size: 13px;
+  }
+
+  .gobang-info-tag,
+  .ai-info-tag {
+    font-size: 12px;
+    padding: 3px 8px;
+  }
+
+  .game-tools-bar .btn,
+  .game-status-bar .btn {
+    padding: 7px 12px;
+    font-size: 13px;
+  }
+
+  /* ---- 悬浮坞适配 ---- */
+  .float-dock-panel {
+    right: 10px;
+    width: calc(100vw - 20px);
+    max-width: 340px;
+    height: 520px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 60px);
+  }
+
+  .float-dock-btn {
+    right: 14px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  }
+
+  /* ---- 弹窗：全宽友好 ---- */
+  .modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: 92vh;
+    max-height: 92dvh;
+    border-radius: 12px;
+    margin: 0 12px;
+  }
+
+  .modal__header {
+    padding: 14px 16px 0;
+  }
+
+  .modal__body {
+    padding: 14px 16px;
+  }
+
+  .modal__footer {
+    padding: 0 16px 14px;
+  }
+
+  .modal__footer .btn {
+    flex: 1;
+    min-height: 40px;
+  }
+
+  /* ---- 面板 padding 收紧 ---- */
+  .panel,
+  .chat-sidebar,
+  .games-main,
+  .games-sidebar {
+    padding: 12px;
+  }
+
+  /* ---- 表格/列表横向滚动友好 ---- */
+  .leaderboard-page,
+  .profile-stat-grid,
+  .profile-info-grid {
+    /* clip 而非 hidden：hidden 会把元素变成滚动容器并吞掉滚轮/滑动 */
+    overflow-x: clip;
+  }
+}
+
+/* ================================================
+   Part 2: 小屏手机（≤480px）进一步优化
+   ================================================ */
+
+@media (max-width: 480px) {
+  body {
+    padding: 6px;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 6px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+  }
+
+  /* ---- 导航栏：更小 padding ---- */
+  .nav-btn {
+    padding: 5px 10px;
+    font-size: 12px;
+    min-height: 36px;
+  }
+
+  .nav-btn__icon {
+    font-size: 13px;
+  }
+
+  .nav-btn__name {
+    font-weight: 500;
+  }
+
+  /* ---- 账号条：极度精简 ---- */
+  .account-exp {
     display: none;
   }
 
-  /* 悬浮坞：全宽贴底展开 */
+  .account-starcoins {
+    font-size: 10px;
+    padding: 1px 5px;
+  }
+
+  .account-level {
+    font-size: 10px;
+  }
+
+  .account-bar.collapsed .account-info:hover {
+    /* 小屏不做 hover 展开 */
+    width: auto !important;
+    opacity: 1 !important;
+  }
+
+  /* ---- 悬浮坞：全宽贴底 ---- */
   .float-dock-panel {
     right: 0;
     left: 0;
@@ -127,16 +289,16 @@
     width: 100vw;
     max-width: 100vw;
     max-height: 62vh;
-    height: 62vh;
+    height: calc(62dvh + env(safe-area-inset-bottom, 0px));
     border-radius: 14px 14px 0 0;
   }
 
   .float-dock-btn {
     right: 12px;
-    bottom: 12px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
   }
 
-  /* 贪吃蛇虚拟方向键放大（方便触控） */
+  /* ---- 贪吃蛇虚拟方向键放大（方便触控） ---- */
   .snake-virtual-controls {
     grid-template-columns: repeat(3, 68px);
     grid-template-rows: repeat(3, 68px);
@@ -146,5 +308,433 @@
     width: 68px;
     height: 68px;
     font-size: 24px;
+  }
+
+  /* ---- 面板 padding 进一步收紧 ---- */
+  .panel,
+  .chat-sidebar,
+  .games-main,
+  .games-sidebar,
+  .profile-card {
+    padding: 10px;
+  }
+
+  /* ---- 标题字号缩小 ---- */
+  .games-panel-title,
+  .games-info-title {
+    font-size: 17px;
+  }
+
+  .panel-title {
+    font-size: 15px;
+  }
+}
+
+/* ================================================
+   Part 3: 极小屏（≤360px）极限优化
+   ================================================ */
+
+@media (max-width: 360px) {
+
+  /* 隐藏一些非关键元素，确保主功能可用 */
+  .nav-btn__name {
+    display: none;
+  }
+
+  .nav-btn {
+    padding: 6px 10px;
+  }
+
+  .account-nickname {
+    font-size: 12px;
+    max-width: 80px;
+  }
+}
+
+/* ================================================
+   Part 4: 内容层密度（≤768px 核心修补）
+   —— 前 3 部分改的是外壳/框架，这里改内部数据内容
+   ================================================ */
+
+@media (max-width: 768px) {
+
+  /* ---- 4.1 Games 大厅 ---- */
+
+  /* 侧边栏的快捷键说明：小屏隐藏，节省高度 */
+  .games-sidebar-shortcuts {
+    display: none;
+  }
+
+  /* 侧边栏 tip 更紧凑 */
+  .games-sidebar-tip {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+
+  /* 模式 Tab：padding 缩小 + 字号降 */
+  .games-mode-tab {
+    padding: 8px 16px;
+    font-size: 14px;
+    flex: 1;
+  }
+
+  /* 联机/AI 面板 info-box 内容紧凑 */
+  .games-info-box {
+    padding: 14px;
+  }
+
+  .games-info-title {
+    font-size: 18px;
+  }
+
+  .games-info-desc {
+    font-size: 13px;
+  }
+
+  /* 难度卡：minmax 放宽，让小屏 1 列也不挤压 */
+  .games-difficulties {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+  }
+
+  .games-difficulty-card {
+    padding: 12px 14px;
+  }
+
+  .games-difficulty-label {
+    font-size: 14px;
+  }
+
+  .games-difficulty-desc {
+    font-size: 12px;
+  }
+
+  /* 开始匹配/对战按钮全宽（已有，但字号收紧） */
+  .games-action-row {
+    gap: 10px;
+  }
+
+  /* ---- 4.2 对局内容层（4 款游戏共用 .game-stage） ---- */
+
+  /* 状态条 tag 允许换行 + 更小字号 */
+  .game-status-bar {
+    flex-wrap: wrap;
+  }
+
+  .game-status-group {
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .gobang-info-tag,
+  .ai-info-tag {
+    font-size: 11px;
+    padding: 2px 6px;
+    line-height: 1.4;
+  }
+
+  /* 对手名字长了截断 */
+  .game-status-bar [class*="opponent"],
+  .game-status-bar [class*="opp"] {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 操作条按钮：小屏每个更紧凑 + 允许换行（不再强制 full width） */
+  .game-tools-bar {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 10px;
+  }
+
+  .game-tools-bar .btn {
+    padding: 7px 12px;
+    font-size: 13px;
+    flex: 1 1 auto;
+    min-width: 60px;
+  }
+
+  .game-status-bar .btn {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+
+  /* ---- 4.3 Chat 消息 + 输入 ---- */
+
+  /* 频道选择：按钮更紧凑 */
+  .chat-channel-selector {
+    padding: 8px 8px;
+    gap: 6px;
+  }
+
+  .chat-channel-btn {
+    font-size: 12px;
+    padding: 5px 0;
+  }
+
+  /* 消息列表：最大高度放松 + 字体略小 */
+  .chat-messages {
+    height: auto;
+    max-height: calc(100dvh - 280px);
+    padding: 10px;
+    gap: 6px;
+  }
+
+  .chat-message {
+    max-width: 90%;
+    padding: 7px 10px;
+    font-size: 13px;
+    gap: 6px;
+  }
+
+  .chat-sender {
+    font-size: 11px;
+    gap: 4px;
+  }
+
+  .chat-text {
+    font-size: 13px;
+  }
+
+  /* 输入栏：发送按钮改成固定更宽比例 */
+  .chat-input-container {
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .chat-input {
+    padding: 9px 10px;
+    font-size: 16px;
+    /* 防 iOS 放大 */
+  }
+
+  .chat-send-btn {
+    padding: 0 14px;
+    font-size: 13px;
+    min-width: 64px;
+  }
+
+  /* ---- 4.4 Profile 内容层 ---- */
+
+  /* 资料卡头像 + 名字 */
+  .profile-aside-head .profile-avatar-img,
+  .profile-aside-head .profile-avatar-emoji {
+    width: 64px;
+    height: 64px;
+  }
+
+  .profile-aside-name {
+    font-size: 16px;
+  }
+
+  /* 战绩卡片网格：360px 屏也能放 2 列 */
+  .profile-stat-grid {
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 8px;
+  }
+
+  .profile-stat-item {
+    padding: 10px 6px;
+  }
+
+  .profile-stat-value {
+    font-size: 18px;
+  }
+
+  .profile-stat-value.highlight {
+    font-size: 20px;
+  }
+
+  .profile-stat-label {
+    font-size: 11px;
+  }
+
+  /* 历史列表：小屏 item 更紧凑 */
+  .profile-history-item {
+    padding: 10px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .profile-history-icon {
+    font-size: 22px;
+  }
+
+  .profile-history-name {
+    font-size: 13px;
+  }
+
+  .profile-history-meta {
+    font-size: 11px;
+  }
+
+  .profile-history-replay {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+
+  /* 信息网格 */
+  .profile-info-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+  }
+
+  .profile-info-item {
+    padding: 8px 10px;
+  }
+
+  .profile-info-value {
+    font-size: 13px;
+  }
+
+  /* ---- 4.5 Spectate 观战 ---- */
+  .spectate-container {
+    padding: 12px 8px;
+  }
+
+  .spectate-list {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .spectate-card {
+    padding: 12px;
+  }
+
+  .spectate-game-name {
+    font-size: 15px;
+  }
+
+  /* ---- 4.6 Feedback 帮助 ---- */
+  .fb-page {
+    padding: 10px 8px;
+  }
+
+  .fb-title {
+    font-size: 20px;
+    margin-bottom: 12px;
+  }
+
+  .fb-login-tip {
+    padding: 28px 16px;
+  }
+
+  .fb-submit-card {
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+
+  .fb-form-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* ---- 4.7 Online-players 在线玩家（悬浮坞里） ---- */
+  .float-dock-online .online-item {
+    padding: 8px 6px;
+    gap: 8px;
+  }
+
+  .float-dock-online .online-item-btn,
+  .float-dock-online .chat-online-btn {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+
+  /* ---- 4.8 Snake 贪吃蛇 ---- */
+
+  /* HUD：去掉 inline style 的 margin-left:16px，改用 flex 均匀分布 */
+  .snake-hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+    font-size: 14px;
+    padding: 0 10px;
+    flex-wrap: wrap;
+  }
+
+  .snake-hud span[style*="margin-left"] {
+    margin-left: 0 !important;
+  }
+
+  /* 虚拟方向键：grid 缩小 gap 节省高度 */
+  .snake-virtual-controls {
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  /* "返回大厅"按钮：小屏全宽更易点 */
+  .snake-hud~div[style*="text-align"] .btn-secondary,
+  .snake-virtual-controls+div[style*="text-align"] .btn-secondary {
+    width: 100%;
+    max-width: 240px;
+    padding: 10px 0 !important;
+    font-size: 15px;
+  }
+}
+
+/* 480px 以下再进一步收紧内容 */
+@media (max-width: 480px) {
+
+  /* Games */
+  .games-mode-tabs {
+    gap: 4px;
+  }
+
+  .games-mode-tab {
+    padding: 7px 12px;
+    font-size: 13px;
+  }
+
+  .games-action-row .btn-lg {
+    padding: 10px 16px;
+    font-size: 15px;
+  }
+
+  /* 对局状态条：tag 再小 */
+  .game-status-group {
+    gap: 3px;
+  }
+
+  .gobang-info-tag,
+  .ai-info-tag {
+    font-size: 10px;
+    padding: 1px 5px;
+  }
+
+  .game-status-bar,
+  .game-tools-bar {
+    padding: 6px 8px;
+    gap: 4px;
+  }
+
+  .game-tools-bar .btn,
+  .game-status-bar .btn {
+    padding: 6px 10px;
+    font-size: 12px;
+    min-width: 54px;
+  }
+
+  /* Chat 消息 */
+  .chat-message {
+    font-size: 12px;
+    padding: 6px 8px;
+    gap: 5px;
+  }
+
+  .chat-sender {
+    font-size: 10px;
+  }
+
+  /* Profile */
+  .profile-stat-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .profile-info-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }

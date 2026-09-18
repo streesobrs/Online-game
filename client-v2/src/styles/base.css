@@ -5,15 +5,24 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+    /* 移除默认点击高亮（移动端更干净） */
+    -webkit-tap-highlight-color: transparent;
 }
 
 html,
 body {
     min-height: 100vh;
+    min-height: 100dvh;
     width: 100%;
-    overflow-x: hidden;
+    /* 横向裁切用 clip：hidden 会让 body 变成滚动容器（另一轴 visible 会被计算为 auto），
+       滚轮事件会被 body 吞掉，导致外层页面滚不动。clip 只裁切、不产生滚动容器 */
+    overflow-x: clip;
+    /* 阻止过度滚动/下拉刷新。必须放在 html 上才会作用到视口 */
+    overscroll-behavior-y: contain;
     /* 默认文字颜色跟随主题 — 子元素未显式声明 color 时自动继承此值 */
     color: var(--text, #2d3748);
+    /* 禁止双击缩放 + 优化触控响应 */
+    touch-action: manipulation;
 }
 
 body {
@@ -22,14 +31,52 @@ body {
     align-items: stretch;
     font-family: 'PingFang SC', 'Microsoft Yahei', Arial, sans-serif;
     padding: 16px;
+    /* 安全区适配：避免刘海/状态栏遮挡 */
+    padding-top: calc(env(safe-area-inset-top, 0px) + 16px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
     min-height: 100vh;
+    min-height: 100dvh;
     width: 100%;
-    overflow-x: hidden;
+    overflow-x: clip;
     background: var(--theme-bg);
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
     transition: background 0.3s ease;
+}
+
+/* 安全区辅助类：可在需要时显式使用 */
+.pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+}
+
+.pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* 触屏设备：禁止文本选择（非输入元素），避免长按误选
+   PC（鼠标/键盘）不做此限制，否则无法选中与复制页面文字 */
+@media (hover: none) and (pointer: coarse) {
+    body {
+        -webkit-user-select: none;
+        user-select: none;
+    }
+}
+
+/* 但输入框、文本域、可选择元素保持可选中 */
+input,
+textarea,
+select,
+.content-editable,
+[contenteditable] {
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+/* 图片默认允许长按保存 */
+img {
+    -webkit-user-select: default;
+    -webkit-touch-callout: default;
 }
 
 #app {

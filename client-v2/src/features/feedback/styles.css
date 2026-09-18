@@ -456,3 +456,369 @@
     margin-left: 16px;
   }
 }
+
+/* ================================================
+   新增：Tab 切换 + 帮助 + 更新日志
+   ================================================ */
+
+.fb-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  background: var(--surface-alt, #f3f4f6);
+  padding: 4px;
+  border-radius: 10px;
+}
+
+.fb-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 9px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary, #64748b);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  min-height: 38px;
+}
+
+.fb-tab:hover {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.05));
+  color: var(--text, #1e293b);
+}
+
+.fb-tab.active {
+  background: var(--surface, #fff);
+  color: var(--theme-primary, #007bff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.fb-tab-content {
+  min-height: 200px;
+}
+
+/* 帮助 Tab */
+.fb-help {
+  background: var(--theme-panel-bg, #fff);
+  border-radius: 12px;
+  box-shadow: var(--theme-panel-shadow, 0 3px 12px rgba(0, 0, 0, 0.07));
+  padding: 20px;
+}
+
+.fb-help-title {
+  font-size: 16px;
+  margin: 16px 0 10px;
+  color: var(--theme-info-title-color, #2c3e50);
+}
+
+.fb-help-title:first-child {
+  margin-top: 0;
+}
+
+.fb-help-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 6px 16px;
+}
+
+.fb-help-sc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary, #64748b);
+}
+
+.fb-help-kbd {
+  display: inline-block;
+  padding: 2px 8px;
+  min-width: 28px;
+  font-size: 12px;
+  font-family: inherit;
+  text-align: center;
+  background: var(--surface-alt, #f1f3f5);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 4px;
+  color: var(--text, #1e293b);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+}
+
+.fb-help-tips {
+  padding-left: 18px;
+  line-height: 1.9;
+  font-size: 13px;
+  color: var(--text-secondary, #64748b);
+}
+
+.fb-help-tips li::marker {
+  color: var(--theme-primary, #007bff);
+}
+
+/* 更新日志 Tab */
+.clg-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.clg-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--theme-info-title-color, #2c3e50);
+}
+
+.clg-meta {
+  font-size: 12px;
+  color: var(--text-muted, #94a3b8);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.clg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* 分页条 */
+.clg-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.clg-page-btn {
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--surface, #fff);
+  color: var(--text, #475569);
+  padding: 6px 14px;
+  font-size: 13px;
+  border-radius: 8px;
+  cursor: pointer;
+  min-height: 34px;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.clg-page-btn:hover:not(:disabled) {
+  border-color: var(--theme-primary, #007bff);
+  color: var(--theme-primary, #007bff);
+}
+
+.clg-page-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.clg-page-info {
+  font-size: 12px;
+  color: var(--text-muted, #94a3b8);
+}
+
+.clg-release {
+  background: var(--theme-panel-bg, #fff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.clg-release-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.clg-release-tag {
+  font-family: monospace;
+  font-size: 12px;
+  background: var(--surface-alt, #e0f2fe);
+  color: #0369a1;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.clg-release-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text, #1e293b);
+}
+
+.clg-release-hash {
+  font-family: monospace;
+  font-size: 11px;
+  background: #fef3c7;
+  color: #92400e;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.clg-release-meta {
+  font-size: 12px;
+  color: var(--text-muted, #94a3b8);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.clg-release-body summary {
+  font-size: 12px;
+  color: var(--theme-primary, #007bff);
+  cursor: pointer;
+  padding: 4px 0;
+  user-select: none;
+}
+
+.clg-release-body[open] summary {
+  margin-bottom: 10px;
+  border-bottom: 1px dashed var(--border-color, #e2e8f0);
+}
+
+.clg-release-md {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text, #334155);
+}
+
+.clg-release-md h1,
+.clg-release-md h2,
+.clg-release-md h3 {
+  margin: 14px 0 8px;
+  color: var(--theme-info-title-color, #2c3e50);
+}
+
+.clg-release-md h1 {
+  font-size: 16px;
+}
+
+.clg-release-md h2 {
+  font-size: 14px;
+}
+
+.clg-release-md h3 {
+  font-size: 13px;
+}
+
+.clg-release-md ul,
+.clg-release-md ol {
+  padding-left: 20px;
+  margin: 6px 0;
+}
+
+.clg-release-md li {
+  margin: 2px 0;
+}
+
+.clg-release-md code {
+  background: var(--surface-alt, #f1f3f5);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+.clg-release-md pre {
+  background: #1e293b;
+  color: #e2e8f0;
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.clg-release-md pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.clg-release-md blockquote {
+  border-left: 3px solid var(--theme-primary, #007bff);
+  padding-left: 10px;
+  color: var(--text-secondary, #64748b);
+  margin: 8px 0;
+}
+
+.clg-release-md a {
+  color: var(--theme-primary, #007bff);
+  text-decoration: none;
+}
+
+.clg-release-md a:hover {
+  text-decoration: underline;
+}
+
+.clg-release-md hr {
+  border: none;
+  border-top: 1px solid var(--border-color, #e2e8f0);
+  margin: 12px 0;
+}
+
+.clg-release-md strong {
+  font-weight: 700;
+}
+
+.clg-release-md em {
+  font-style: italic;
+}
+
+/* 空态 */
+.clg-empty {
+  text-align: center;
+  padding: 30px 20px;
+  background: var(--theme-panel-bg, #fff);
+  border-radius: 10px;
+  border: 1px dashed var(--border-color, #e2e8f0);
+}
+
+.clg-empty-hint {
+  font-size: 12px;
+  color: var(--text-muted, #94a3b8);
+  margin-top: 6px;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .fb-tabs {
+    gap: 2px;
+    padding: 3px;
+  }
+
+  .fb-tab {
+    padding: 8px 6px;
+    font-size: 13px;
+  }
+
+  .fb-help {
+    padding: 14px;
+  }
+
+  .fb-help-shortcuts {
+    grid-template-columns: 1fr;
+    gap: 4px 12px;
+  }
+
+  .clg-release {
+    padding: 12px;
+  }
+
+  .clg-release-tag {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+
+  .clg-release-title {
+    font-size: 14px;
+  }
+}

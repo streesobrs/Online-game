@@ -197,7 +197,7 @@ export function startMatch(container, matchData) {
     const cellByHeight = Math.floor((availableHeight - padding) / 10);
     let cellSize = Math.min(cellByWidth, cellByHeight);
 
-    cellSize = Math.max(10, Math.min(cellSize, 42));
+    cellSize = Math.max(12, Math.min(cellSize, 42));
     board.style.setProperty('--board-cell-size', cellSize + 'px');
     // 显式设置棋盘总尺寸（border-box）
     board.style.width = `calc(9 * ${cellSize}px + 48px)`;

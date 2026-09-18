@@ -166,8 +166,8 @@ export function startMatch(container, matchData) {
     const cellByHeight = Math.floor((availableHeight - padding) / rows);
     let cellSize = Math.min(cellByWidth, cellByHeight);
 
-    // 限制范围：小屏不低于10px，大屏不超过42px
-    cellSize = Math.max(10, Math.min(cellSize, 42));
+    // 限制范围：小屏不低于12px（保证最基本触控），大屏不超过42px
+    cellSize = Math.max(12, Math.min(cellSize, 42));
     board.style.setProperty('--board-cell-size', cellSize + 'px');
     // 显式设置棋盘总尺寸（border-box，含 padding + border）
     board.style.width = `calc(${cols} * ${cellSize}px + ${padding}px)`;

@@ -370,3 +370,129 @@
   padding-left: 8px;
   border-left: 3px solid var(--accent-indigo, #6366f1);
 }
+
+/* ================================================
+   移动端响应式（≤768px）
+   ================================================ */
+
+@media (max-width: 768px) {
+  .shop-header {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .shop-balance {
+    font-size: 14px;
+  }
+
+  .shop-vip-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+  }
+
+  /* Tab 改为横向滚动 */
+  .shop-view-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 4px 0 10px;
+    padding-bottom: 8px;
+  }
+
+  .shop-view-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .shop-view-tab {
+    flex-shrink: 0;
+    padding: 7px 16px;
+    font-size: 13px;
+  }
+
+  .shop-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 6px;
+  }
+
+  .shop-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .shop-tab {
+    flex-shrink: 0;
+    padding: 7px 14px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  /* 商品网格小屏变单列 */
+  .shop-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 10px;
+  }
+
+  .shop-card {
+    padding: 12px;
+  }
+
+  .shop-card-desc {
+    min-height: auto;
+  }
+
+  .shop-card-name {
+    font-size: 14px;
+  }
+
+  .shop-card-actions .btn {
+    font-size: 12px;
+    padding: 7px 0;
+  }
+
+  /* VIP 对比表保留横向滚动 */
+  .shop-vip-compare {
+    margin-top: 16px;
+  }
+
+  .vip-compare-table {
+    min-width: 560px;
+  }
+}
+
+/* 小屏（≤480px） */
+@media (max-width: 480px) {
+  .shop-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .shop-card {
+    padding: 10px;
+  }
+
+  .shop-card-icon {
+    font-size: 28px;
+    margin-bottom: 4px;
+  }
+
+  .shop-card-name {
+    font-size: 13px;
+  }
+
+  .shop-card-desc {
+    font-size: 11px;
+    margin: 4px 0;
+    min-height: 32px;
+  }
+
+  .shop-card-actions {
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .shop-card-actions .btn {
+    font-size: 12px;
+    padding: 7px 0;
+  }
+}

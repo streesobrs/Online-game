@@ -274,3 +274,112 @@
 .leaderboard-winrate-bar.low {
   background: linear-gradient(90deg, var(--accent-red, #e53e3e), #c53030);
 }
+
+/* ================================================
+   移动端响应式（≤768px）
+   ================================================ */
+
+@media (max-width: 768px) {
+  .leaderboard-page {
+    padding: 0 8px 20px;
+  }
+
+  .leaderboard-title {
+    font-size: 18px;
+    padding: 14px 0 10px;
+  }
+
+  .leaderboard-item {
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 10px;
+  }
+
+  /* 名次列缩小 */
+  .leaderboard-rank-col {
+    width: 32px;
+  }
+
+  .leaderboard-rank-medal {
+    font-size: 20px;
+  }
+
+  .leaderboard-rank-num {
+    font-size: 15px;
+  }
+
+  /* 玩家信息：自适应 */
+  .leaderboard-player-name {
+    font-size: 13px;
+  }
+
+  .leaderboard-player-meta {
+    font-size: 10px;
+    gap: 4px;
+  }
+
+  /* 胜/负/平明细：小屏隐藏，只留胜率条 */
+  .leaderboard-player-detail {
+    display: none;
+  }
+
+  /* 胜率列：缩小 */
+  .leaderboard-winrate-col {
+    width: 72px;
+    flex-shrink: 0;
+  }
+
+  .leaderboard-winrate-text {
+    font-size: 11px;
+    margin-bottom: 2px;
+  }
+
+  /* "我的排名"卡 */
+  .leaderboard-self-card {
+    padding: 10px 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .leaderboard-self-stats {
+    margin-left: auto;
+    font-size: 11px;
+  }
+}
+
+/* ================================================
+   小屏（≤480px）进一步收紧
+   ================================================ */
+
+@media (max-width: 480px) {
+  .leaderboard-item {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .leaderboard-rank-col {
+    width: 28px;
+  }
+
+  .leaderboard-rank-medal {
+    font-size: 18px;
+  }
+
+  .leaderboard-winrate-col {
+    width: 60px;
+  }
+
+  .leaderboard-winrate-text {
+    font-size: 10px;
+  }
+
+  .leaderboard-winrate-bar-bg {
+    height: 5px;
+  }
+
+  /* 筛选按钮小屏紧凑 */
+  .leaderboard-controls .lobby-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+}

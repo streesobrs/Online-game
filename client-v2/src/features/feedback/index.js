@@ -1,10 +1,10 @@
 /**
- * 帮助/反馈模块（任务 6）
- * 复刻 v1 feedback.html：提交反馈 + 反馈列表 + 点赞 + 评论（含楼中楼回复/评论点赞/删除自己的评论）。
+ * 帮助/反馈模块 + 更新日志 Tab（任务 6 + 新增更新日志）
  *
- * 数据流：
- * - 初始加载与提交：HTTP（GET/POST /api/feedbacks，对齐 v1）
- * - 投票/评论/回复/点赞/删除：socket 事件，服务端操作成功后广播 feedbacks_list → eventBus 'feedback:list' 全量刷新
+ * Tab 结构：[帮助] [反馈] [📰 更新日志]
+ *   - 帮助：快捷键一览 + 基础使用说明（本地，不请求后端）
+ *   - 反馈：提交反馈 + 反馈列表 + 评论（原功能，HTTP + socket）
+ *   - 更新日志：读取本地生成的 src/config/changelog.js（纯前端，无网络请求）
  */
 import { eventBus } from '../../core/eventBus.js';
 import { emit } from '../../core/socket.js';
@@ -14,6 +14,14 @@ import { modal } from '../../components/modal.js';
 import { api } from '../../core/api.js';
 import { go } from '../../core/router.js';
 import { avatarNode } from '../../utils/avatar.js';
+import { renderChangelog } from './changelog.js';
+
+// ===== Tab 定义 =====
+const TABS = [
+  { id: 'help', label: '❓ 帮助' },
+  { id: 'feedback', label: '📝 反馈' },
+  { id: 'changelog', label: '📰 更新日志' },
+];
 
 // ===== 类型/状态配置（对齐 v1 feedback.html）=====
 const TYPE_CONFIG = {
@@ -118,38 +126,126 @@ function toggleReplyBox(replyBox) {
 }
 
 /**
- * 渲染帮助/反馈视图（路由 #/feedback）
+ * 渲染帮助/反馈/更新日志视图（路由 #/feedback）
  * @param {HTMLElement} container
  * @returns {Function} cleanup
  */
 export function renderFeedback(container = viewRoot()) {
   container.innerHTML = '';
 
-  // 登录检测：v1 要求登录才能打开反馈页
-  if (!localStorage.getItem('userToken')) {
-    container.append(
-      el('div', { class: 'fb-page' }, [
-        el('div', { class: 'fb-title' }, '📝 帮助/反馈'),
+  // 默认 tab：从路由读取或 'changelog'
+  const url = new URL(location.href);
+  const initialTab = url.hash.includes('tab=help') ? 'help'
+    : url.hash.includes('tab=feedback') ? 'feedback'
+      : 'changelog';
+  let currentTab = initialTab;
+
+  // Tab 内容容器
+  const contentEl = el('div', { class: 'fb-tab-content' });
+
+  // Tab 栏
+  const tabBar = el('div', { class: 'fb-tabs' },
+    TABS.map((t) => el('button', {
+      class: `fb-tab ${currentTab === t.id ? 'active' : ''}`,
+      'data-tab': t.id,
+      onClick: () => switchTab(t.id),
+    }, t.label))
+  );
+
+  // 页面壳
+  const pageEl = el('div', { class: 'fb-page' }, [
+    el('div', { class: 'fb-title' }, '📝 帮助 / 反馈 / 更新'),
+    tabBar,
+    contentEl,
+  ]);
+  container.append(pageEl);
+
+  // ---- 原反馈模块的局部状态（跨 Tab 切换时需要保留）----
+  const fbState = {
+    expanded: new Set(),
+    shownReplies: new Set(),
+    currentList: [],
+    listEl: null,
+  };
+  const listState = fbState; // 复用原命名习惯
+
+  /** 切换 Tab + 渲染对应内容 */
+  function switchTab(tabId) {
+    currentTab = tabId;
+    // 更新 tab 高亮
+    tabBar.querySelectorAll('.fb-tab').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.tab === tabId);
+    });
+    contentEl.innerHTML = '';
+    if (tabId === 'help') renderHelpTab();
+    else if (tabId === 'feedback') renderFeedbackTab();
+    else renderChangelog(contentEl);
+  }
+
+  /** ---- 帮助 Tab（快捷键 + 使用说明）---- */
+  function renderHelpTab() {
+    const content = el('div', { class: 'fb-help' }, [
+      el('h3', { class: 'fb-help-title' }, '⌨️ 快捷键'),
+      el('div', { class: 'fb-help-shortcuts' }, [
+        scRow('G', '游戏大厅'),
+        scRow('C', '聊天'),
+        scRow('H', '好友'),
+        scRow('L', '排行榜'),
+        scRow('V', '观战'),
+        scRow('P', '个人资料'),
+        scRow('F', '帮助 / 反馈'),
+        scRow('1-4', '游戏大厅切换棋种'),
+        scRow('T / A', '游戏大厅联机 / AI'),
+        scRow('Enter', '游戏大厅开始匹配'),
+        scRow('Esc', '取消匹配'),
+        scRow('← → ↑ ↓', '下棋 / 控制贪吃蛇'),
+      ]),
+      el('h3', { class: 'fb-help-title' }, '� 使用说明'),
+      el('ul', { class: 'fb-help-tips' }, [
+        el('li', {}, '第一次使用请先在顶部右侧注册账号'),
+        el('li', {}, '游戏大厅里选择棋种 → 联机匹配 或 AI 对战'),
+        el('li', {}, '联机对局需要先点「开始匹配」，系统会自动找人'),
+        el('li', {}, '贪吃蛇为实时对战，分数高者获胜'),
+        el('li', {}, '右上角账号头像区域可以看等级/星星币'),
+        el('li', {}, '观战：打开观战 Tab 选择一场进行中的对局'),
+        el('li', {}, '遇到 Bug 或有建议？切到「反馈」Tab 提交'),
+        el('li', {}, '想看最近改了啥？切到「更新日志」Tab 👈'),
+      ]),
+    ]);
+    contentEl.append(content);
+  }
+
+  function scRow(key, desc) {
+    return el('div', { class: 'fb-help-sc-row' }, [
+      el('kbd', { class: 'fb-help-kbd' }, key),
+      el('span', {}, desc),
+    ]);
+  }
+
+  /** ---- 反馈 Tab（原有功能，抽成内部函数）---- */
+  function renderFeedbackTab() {
+    // 登录检测（v1 要求登录才能提交反馈）
+    if (!localStorage.getItem('userToken')) {
+      contentEl.append(
         el('div', { class: 'fb-login-tip' }, [
           el('p', {}, '登录后才能提交反馈与评论'),
           el('button', { class: 'lobby-btn', onClick: () => go('games') }, '返回大厅'),
-        ]),
-      ])
+        ])
+      );
+      return;
+    }
+
+    // 复用原代码块（原 renderFeedback 里的 DOM 构建）
+    const listEl = el('div', { class: 'fb-list' });
+    fbState.listEl = listEl;
+    const typeSelect = el('select', { class: 'fb-select' },
+      Object.entries(TYPE_CONFIG).map(([key, cfg]) => el('option', { value: key }, cfg.label))
     );
-    return () => { };
-  }
+    const titleInput = el('input', { class: 'fb-input', placeholder: '一句话概括你的问题或建议', maxlength: 50 });
+    const contentInput = el('textarea', { class: 'fb-textarea', placeholder: '详细描述你的问题或建议（可附操作步骤）' });
+    const submitBtn = el('button', { class: 'fb-submit-btn' }, '提交反馈');
 
-  const listEl = el('div', { class: 'fb-list' });
-  const typeSelect = el('select', { class: 'fb-select' },
-    Object.entries(TYPE_CONFIG).map(([key, cfg]) => el('option', { value: key }, cfg.label))
-  );
-  const titleInput = el('input', { class: 'fb-input', placeholder: '一句话概括你的问题或建议', maxlength: 50 });
-  const contentInput = el('textarea', { class: 'fb-textarea', placeholder: '详细描述你的问题或建议（可附操作步骤）' });
-  const submitBtn = el('button', { class: 'fb-submit-btn' }, '提交反馈');
-
-  container.append(
-    el('div', { class: 'fb-page' }, [
-      el('div', { class: 'fb-title' }, '📝 帮助/反馈'),
+    contentEl.append(
       el('div', { class: 'fb-submit-card' }, [
         el('h2', { class: 'fb-submit-title' }, '✍️ 提交反馈'),
         el('div', { class: 'fb-form-row' }, [typeSelect, titleInput]),
@@ -158,201 +254,200 @@ export function renderFeedback(container = viewRoot()) {
       ]),
       el('div', { class: 'fb-list-title' }, '📋 全部反馈'),
       listEl,
-    ])
-  );
+    );
 
-  // 当前反馈列表（广播/加载时更新，供局部重渲染）
-  let currentList = [];
+    // ---- 复用原 renderCard / renderCommentNode / renderList ----
 
-  /** 渲染单条评论/回复（B站风格，带头像与楼中楼） */
-  function renderCommentNode(node, feedback, isNested = false, replyToNickname = null) {
-    const liked = node.likes && node.likes.indexOf(myAccountId) !== -1;
-    const isOwner = node.accountId === myAccountId;
-    const key = `${feedback.id}:${node.id}`;
+    /** 渲染单条评论/回复 */
+    function renderCommentNode(node, feedback, isNested = false, replyToNickname = null) {
+      const liked = node.likes && node.likes.indexOf(myAccountId) !== -1;
+      const isOwner = node.accountId === myAccountId;
+      const key = `${feedback.id}:${node.id}`;
 
-    const replyInput = el('input', { class: 'fb-reply-input', placeholder: `回复 ${node.nickname}...` });
-    replyInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') sendReply(feedback.id, node.id, replyInput);
-    });
-    const replyBox = el('div', { class: 'fb-reply-box', style: { display: 'none' } }, [
-      replyInput,
-      el('button', { class: 'fb-reply-send', onClick: () => sendReply(feedback.id, node.id, replyInput) }, '发送'),
-    ]);
+      const replyInput = el('input', { class: 'fb-reply-input', placeholder: `回复 ${node.nickname}...` });
+      replyInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') sendReply(feedback.id, node.id, replyInput);
+      });
+      const replyBox = el('div', { class: 'fb-reply-box', style: { display: 'none' } }, [
+        replyInput,
+        el('button', { class: 'fb-reply-send', onClick: () => sendReply(feedback.id, node.id, replyInput) }, '发送'),
+      ]);
 
-    const actionBtns = [
-      el('span', { class: 'fb-comment-time' }, formatDate(node.createdAt)),
-      el('button', { class: `fb-like-btn ${liked ? 'liked' : ''}`, onClick: () => likeComment(feedback.id, node.id) }, `👍 ${(node.likes && node.likes.length) || 0}`),
-      el('button', { class: 'fb-reply-btn', onClick: () => toggleReplyBox(replyBox) }, '回复'),
-    ];
-    if (isOwner) {
-      actionBtns.push(el('button', { class: 'fb-delete-btn', onClick: () => deleteComment(feedback.id, node.id) }, '删除'));
-    }
-
-    // 内容（楼中楼显示 @被回复者）
-    const contentEls = [];
-    if (isNested && replyToNickname) {
-      contentEls.push(el('span', { class: 'fb-at-user' }, `@${replyToNickname}`), ' ');
-    }
-    contentEls.push(node.content);
-
-    // 楼中楼回复：默认只展示前 2 条，超出部分可展开
-    const replies = [];
-    collectReplies(node, replies, node.nickname);
-    const replyNodes = [];
-    if (replies.length > 0) {
-      const showCount = state.shownReplies.has(key) ? replies.length : Math.min(2, replies.length);
-      for (let i = 0; i < showCount; i++) {
-        const showAt = replies[i].replyToNickname !== node.nickname;
-        replyNodes.push(renderCommentNode(replies[i].reply, feedback, true, showAt ? replies[i].replyToNickname : null));
+      const actionBtns = [
+        el('span', { class: 'fb-comment-time' }, formatDate(node.createdAt)),
+        el('button', { class: `fb-like-btn ${liked ? 'liked' : ''}`, onClick: () => likeComment(feedback.id, node.id) }, `👍 ${(node.likes && node.likes.length) || 0}`),
+        el('button', { class: 'fb-reply-btn', onClick: () => toggleReplyBox(replyBox) }, '回复'),
+      ];
+      if (isOwner) {
+        actionBtns.push(el('button', { class: 'fb-delete-btn', onClick: () => deleteComment(feedback.id, node.id) }, '删除'));
       }
-      if (replies.length > 2) {
-        replyNodes.push(el('button', {
-          class: 'fb-view-more',
-          onClick: () => {
-            if (state.shownReplies.has(key)) state.shownReplies.delete(key);
-            else state.shownReplies.add(key);
-            render();
-          },
-        }, state.shownReplies.has(key) ? '收起回复' : `共${replies.length}条回复，点击查看`));
+
+      const contentEls = [];
+      if (isNested && replyToNickname) {
+        contentEls.push(el('span', { class: 'fb-at-user' }, `@${replyToNickname}`), ' ');
       }
+      contentEls.push(node.content);
+
+      const replies = [];
+      collectReplies(node, replies, node.nickname);
+      const replyNodes = [];
+      if (replies.length > 0) {
+        const showCount = fbState.shownReplies.has(key) ? replies.length : Math.min(2, replies.length);
+        for (let i = 0; i < showCount; i++) {
+          const showAt = replies[i].replyToNickname !== node.nickname;
+          replyNodes.push(renderCommentNode(replies[i].reply, feedback, true, showAt ? replies[i].replyToNickname : null));
+        }
+        if (replies.length > 2) {
+          replyNodes.push(el('button', {
+            class: 'fb-view-more',
+            onClick: () => {
+              if (fbState.shownReplies.has(key)) fbState.shownReplies.delete(key);
+              else fbState.shownReplies.add(key);
+              render();
+            },
+          }, fbState.shownReplies.has(key) ? '收起回复' : `共${replies.length}条回复，点击查看`));
+        }
+      }
+
+      return el('div', { class: `fb-comment-item ${isNested ? 'fb-comment-nested' : ''}` }, [
+        avatarNode(node.accountId, 36),
+        el('div', { class: 'fb-comment-main' }, [
+          el('div', { class: 'fb-comment-author' }, node.nickname),
+          el('div', { class: 'fb-comment-content' }, contentEls),
+          el('div', { class: 'fb-comment-actions' }, actionBtns),
+          replyBox,
+          ...(replyNodes.length ? [el('div', { class: 'fb-replies' }, replyNodes)] : []),
+        ]),
+      ]);
     }
 
-    return el('div', { class: `fb-comment-item ${isNested ? 'fb-comment-nested' : ''}` }, [
-      avatarNode(node.accountId, 36),
-      el('div', { class: 'fb-comment-main' }, [
-        el('div', { class: 'fb-comment-author' }, node.nickname),
-        el('div', { class: 'fb-comment-content' }, contentEls),
-        el('div', { class: 'fb-comment-actions' }, actionBtns),
-        replyBox,
-        ...(replyNodes.length ? [el('div', { class: 'fb-replies' }, replyNodes)] : []),
-      ]),
-    ]);
-  }
+    function renderCard(fb) {
+      const type = TYPE_CONFIG[fb.type] || TYPE_CONFIG.other;
+      const status = STATUS_CONFIG[fb.status] || STATUS_CONFIG.pending;
+      const voteCount = fb.votes?.length || 0;
+      const hasVoted = fb.votes?.some((v) => v.accountId === myAccountId);
+      const totalComments = countAllComments(fb.comments);
+      const isOpen = fbState.expanded.has(fb.id);
 
-  /** 渲染单条反馈卡片 */
-  function renderCard(fb) {
-    const type = TYPE_CONFIG[fb.type] || TYPE_CONFIG.other;
-    const status = STATUS_CONFIG[fb.status] || STATUS_CONFIG.pending;
-    const voteCount = fb.votes?.length || 0;
-    const hasVoted = fb.votes?.some((v) => v.accountId === myAccountId);
-    const totalComments = countAllComments(fb.comments);
-    const isOpen = state.expanded.has(fb.id);
+      const commentInput = el('input', { class: 'fb-comment-input', placeholder: '写下你的评论...' });
+      commentInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') addComment(fb.id, commentInput);
+      });
 
-    const commentInput = el('input', { class: 'fb-comment-input', placeholder: '写下你的评论...' });
-    commentInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') addComment(fb.id, commentInput);
-    });
-
-    return el('div', { class: 'fb-card' }, [
-      el('div', { class: 'fb-head' }, [
-        avatarNode(fb.accountId, 48),
-        el('div', { class: 'fb-main' }, [
-          el('div', { class: 'fb-title' }, fb.title),
-          el('div', { class: 'fb-author' }, `${fb.nickname} · ${formatDate(fb.createdAt)}`),
-          el('div', { class: 'fb-content' }, fb.content),
-          el('div', { class: 'fb-actions' }, [
-            el('button', {
-              class: `fb-vote-btn ${hasVoted ? 'voted' : ''}`,
-              onClick: () => vote(fb.id),
-            }, ['👍 ', el('span', { class: 'fb-vote-count' }, String(voteCount))]),
-            el('button', {
-              class: 'fb-toggle-comments',
-              onClick: () => {
-                if (state.expanded.has(fb.id)) state.expanded.delete(fb.id);
-                else state.expanded.add(fb.id);
-                render();
-              },
-            }, `💬 ${totalComments} 条评论`),
+      return el('div', { class: 'fb-card' }, [
+        el('div', { class: 'fb-head' }, [
+          avatarNode(fb.accountId, 48),
+          el('div', { class: 'fb-main' }, [
+            el('div', { class: 'fb-title' }, fb.title),
+            el('div', { class: 'fb-author' }, `${fb.nickname} · ${formatDate(fb.createdAt)}`),
+            el('div', { class: 'fb-content' }, fb.content),
+            el('div', { class: 'fb-actions' }, [
+              el('button', {
+                class: `fb-vote-btn ${hasVoted ? 'voted' : ''}`,
+                onClick: () => vote(fb.id),
+              }, ['👍 ', el('span', { class: 'fb-vote-count' }, String(voteCount))]),
+              el('button', {
+                class: 'fb-toggle-comments',
+                onClick: () => {
+                  if (fbState.expanded.has(fb.id)) fbState.expanded.delete(fb.id);
+                  else fbState.expanded.add(fb.id);
+                  render();
+                },
+              }, `💬 ${totalComments} 条评论`),
+            ]),
+          ]),
+          el('div', { class: 'fb-meta' }, [
+            el('span', { class: `fb-type ${type.cls}` }, type.label),
+            el('span', { class: `fb-status ${status.cls}` }, status.label),
           ]),
         ]),
-        el('div', { class: 'fb-meta' }, [
-          el('span', { class: `fb-type ${type.cls}` }, type.label),
-          el('span', { class: `fb-status ${status.cls}` }, status.label),
+        el('div', { class: `fb-comments ${isOpen ? 'open' : ''}` }, [
+          el('div', { class: 'fb-add-comment' }, [
+            commentInput,
+            el('button', { class: 'fb-comment-send', onClick: () => addComment(fb.id, commentInput) }, '发送'),
+          ]),
+          el('div', { class: 'fb-comments-list' },
+            fb.comments && fb.comments.length
+              ? fb.comments.map((c) => renderCommentNode(c, fb))
+              : [el('div', { class: 'fb-comments-empty' }, '暂无评论')]
+          ),
         ]),
-      ]),
-      el('div', { class: `fb-comments ${isOpen ? 'open' : ''}` }, [
-        el('div', { class: 'fb-add-comment' }, [
-          commentInput,
-          el('button', { class: 'fb-comment-send', onClick: () => addComment(fb.id, commentInput) }, '发送'),
-        ]),
-        el('div', { class: 'fb-comments-list' },
-          fb.comments && fb.comments.length
-            ? fb.comments.map((c) => renderCommentNode(c, fb))
-            : [el('div', { class: 'fb-comments-empty' }, '暂无评论')]
-        ),
-      ]),
-    ]);
-  }
-
-  /** 渲染反馈列表 */
-  function renderList(list) {
-    listEl.innerHTML = '';
-    if (!list || !list.length) {
-      listEl.append(el('div', { class: 'fb-empty' }, '还没有反馈，快来提交第一条吧 📝'));
-      return;
+      ]);
     }
-    list.forEach((fb) => listEl.append(renderCard(fb)));
-  }
 
-  /** 局部重渲染（评论展开/收起、查看回复时保留展开状态） */
-  function render() {
-    renderList(currentList);
-  }
-
-  // 提交反馈（HTTP，对齐 v1；提交后服务端不广播，主动刷新）
-  submitBtn.addEventListener('click', async () => {
-    const type = typeSelect.value;
-    const title = titleInput.value.trim();
-    const content = contentInput.value.trim();
-    if (!title || !content) { toast.warn('请填写标题和内容'); return; }
-    if (!myAccountId) { toast.warn('请先登录'); return; }
-    submitBtn.disabled = true;
-    try {
-      const res = await api.feedback.submit({ accountId: myAccountId, nickname: myNickname, type, title, content });
-      if (res && res.success) {
-        toast.success('反馈提交成功！');
-        titleInput.value = '';
-        contentInput.value = '';
-        const updated = await api.feedback.list();
-        currentList = extractList(updated);
-        renderList(currentList);
-      } else {
-        toast.error((res && res.message) || '提交失败');
-      }
-    } catch (err) {
-      toast.error(err.message || '提交失败，请重试');
-    } finally {
-      submitBtn.disabled = false;
-    }
-  });
-
-  // 服务端广播（任何用户投票/评论/回复/点赞/删除后触发）
-  const offList = eventBus.on('feedback:list', (data) => {
-    currentList = extractList(data);
-    renderList(currentList);
-  });
-
-  // socket 操作失败提示
-  const offError = eventBus.on('system:error', (data) => {
-    if (data && data.message) toast.error(data.message);
-  });
-
-  // 初始加载（HTTP）
-  listEl.append(el('div', { class: 'fb-empty' }, '📥 加载中...'));
-  api.feedback.list()
-    .then((res) => {
-      currentList = extractList(res);
-      renderList(currentList);
-    })
-    .catch((err) => {
-      console.error('[v2] 加载反馈失败:', err);
+    function renderList(list) {
       listEl.innerHTML = '';
-      listEl.append(el('div', { class: 'fb-empty' }, '加载失败，请稍后重试'));
+      if (!list || !list.length) {
+        listEl.append(el('div', { class: 'fb-empty' }, '还没有反馈，快来提交第一条吧 📝'));
+        return;
+      }
+      list.forEach((fb) => listEl.append(renderCard(fb)));
+    }
+
+    function render() {
+      renderList(fbState.currentList);
+    }
+
+    // ---- 提交反馈 ----
+    submitBtn.addEventListener('click', async () => {
+      const type = typeSelect.value;
+      const title = titleInput.value.trim();
+      const content = contentInput.value.trim();
+      if (!title || !content) { toast.warn('请填写标题和内容'); return; }
+      if (!myAccountId) { toast.warn('请先登录'); return; }
+      submitBtn.disabled = true;
+      try {
+        const res = await api.feedback.submit({ accountId: myAccountId, nickname: myNickname, type, title, content });
+        if (res && res.success) {
+          toast.success('反馈提交成功！');
+          titleInput.value = '';
+          contentInput.value = '';
+          const updated = await api.feedback.list();
+          fbState.currentList = extractList(updated);
+          renderList(fbState.currentList);
+        } else {
+          toast.error((res && res.message) || '提交失败');
+        }
+      } catch (err) {
+        toast.error(err.message || '提交失败，请重试');
+      } finally {
+        submitBtn.disabled = false;
+      }
     });
 
+    // ---- socket 订阅 ----
+    const offList = eventBus.on('feedback:list', (data) => {
+      fbState.currentList = extractList(data);
+      if (fbState.listEl && fbState.listEl.parentNode) {
+        renderList(fbState.currentList);
+      }
+    });
+    const offError = eventBus.on('system:error', (data) => {
+      if (data && data.message) toast.error(data.message);
+    });
+    fbState.cleanupFns = [offList, offError];
+
+    // ---- 初始加载 ----
+    listEl.append(el('div', { class: 'fb-empty' }, '📥 加载中...'));
+    api.feedback.list()
+      .then((res) => {
+        fbState.currentList = extractList(res);
+        renderList(fbState.currentList);
+      })
+      .catch((err) => {
+        console.error('[v2] 加载反馈失败:', err);
+        listEl.innerHTML = '';
+        listEl.append(el('div', { class: 'fb-empty' }, '加载失败，请稍后重试'));
+      });
+  }
+
+  // ---- 初始化：渲染默认 Tab ----
+  switchTab(currentTab);
+
   return () => {
-    offList();
-    offError();
+    if (fbState.cleanupFns) {
+      fbState.cleanupFns.forEach((fn) => { try { fn(); } catch { } });
+    }
     container.innerHTML = '';
   };
 }

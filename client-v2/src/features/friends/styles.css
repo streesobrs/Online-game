@@ -160,3 +160,54 @@
     font-size: 11px;
   }
 }
+
+/* ================================================
+   通用移动端（≤768px）
+   ================================================ */
+
+@media (max-width: 768px) {
+  .friends-page {
+    padding: 12px 8px;
+    max-width: none;
+  }
+
+  .friends-page-title {
+    font-size: 18px;
+    margin-bottom: 12px;
+  }
+
+  .friends-row {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .friends-actions {
+    gap: 6px;
+  }
+
+  .friends-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .friends-section-title {
+    font-size: 13px;
+  }
+
+  .friends-row {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .friends-name {
+    font-size: 13px;
+  }
+
+  .friends-btn {
+    padding: 5px 8px;
+    font-size: 11px;
+    border-radius: 6px;
+  }
+}

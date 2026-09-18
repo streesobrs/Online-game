@@ -10,19 +10,32 @@ let styleInjected = false;
 
 // 组件专属样式（自包含，后续可迁移至公共样式表）
 const MODAL_STYLE = `
-.modal-overlay{position:fixed;inset:0;background:var(--theme-modal-overlay,rgba(0,0,0,.45));z-index:9998;display:flex;align-items:center;justify-content:center;animation:modal-fade .2s ease}
-.modal{background:var(--theme-modal-bg,var(--surface,#fff));border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.2);width:90%;max-width:420px;max-height:80vh;display:flex;flex-direction:column;animation:modal-pop .2s ease;color:var(--text,#212529)}
-.modal__header{padding:16px 20px 0;display:flex;align-items:center;justify-content:space-between}
+.modal-overlay{position:fixed;inset:0;background:var(--theme-modal-overlay,rgba(0,0,0,.45));z-index:9998;display:flex;align-items:center;justify-content:center;animation:modal-fade .2s ease;top:env(safe-area-inset-top,0);left:0;right:0;bottom:0}
+.modal{background:var(--theme-modal-bg,var(--surface,#fff));border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.2);width:90%;max-width:420px;max-height:80vh;max-height:80dvh;display:flex;flex-direction:column;animation:modal-pop .2s ease;color:var(--text,#212529);margin:0 auto}
+.modal__header{padding:16px 20px 0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .modal__title{margin:0;font-size:16px;font-weight:600;color:var(--theme-modal-title-color,var(--text,#212529))}
-.modal__body{padding:16px 20px;font-size:14px;color:var(--text-secondary,#495057);overflow-y:auto;line-height:1.6}
-.modal__footer{padding:0 20px 16px;display:flex;justify-content:flex-end;gap:8px}
-.modal__close{border:none;background:none;font-size:22px;line-height:1;color:var(--text-muted,#adb5bd);cursor:pointer;padding:0 4px}
+.modal__body{padding:16px 20px;font-size:14px;color:var(--text-secondary,#495057);overflow-y:auto;line-height:1.6;flex:1;min-height:0;-webkit-overflow-scrolling:touch}
+.modal__footer{padding:0 20px 16px;display:flex;justify-content:flex-end;gap:8px;flex-shrink:0}
+.modal__close{border:none;background:none;font-size:22px;line-height:1;color:var(--text-muted,#adb5bd);cursor:pointer;padding:0 4px;-webkit-tap-highlight-color:transparent}
 .modal__close:hover{color:var(--text,#495057)}
-.modal .btn{border:none;border-radius:6px;padding:8px 16px;font-size:14px;cursor:pointer;transition:background .15s ease}
+.modal .btn{border:none;border-radius:6px;padding:8px 16px;font-size:14px;cursor:pointer;transition:background .15s ease;min-height:36px}
 .modal .btn--primary{background:var(--theme-btn-primary-bg,#007bff);color:#fff}
 .modal .btn--primary:hover{background:var(--theme-btn-primary-bg-hover,#0056b3)}
 .modal .btn--ghost{background:var(--surface-hover,#f1f3f5);color:var(--text,#495057)}
 .modal .btn--ghost:hover{background:var(--theme-nav-btn-bg-hover,#e9ecef)}
+/* 移动端适配 */
+@media(max-width:768px){
+.modal{width:100%;max-width:calc(100vw - 24px);max-height:92vh;max-height:92dvh;border-radius:14px}
+.modal__header{padding:14px 16px 0}
+.modal__body{padding:14px 16px}
+.modal__footer{padding:0 16px 14px;gap:10px}
+.modal__footer .btn{flex:1;min-height:42px;font-size:15px;padding:10px 14px;border-radius:8px}
+}
+@media(max-width:480px){
+.modal{max-width:calc(100vw - 16px);border-radius:12px}
+}
+/* body 滚动锁定 */
+body.modal-open{overflow:hidden}
 @keyframes modal-fade{from{opacity:0}to{opacity:1}}
 @keyframes modal-pop{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
 `;
@@ -63,7 +76,7 @@ export function show(options = {}) {
   ensureStyle();
 
   const overlay = el('div', { class: 'modal-overlay' });
-  const modal = el('div', { class: 'modal' });
+  const modal = el('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true' });
   const header = el('div', { class: 'modal__header' },
     el('h3', { class: 'modal__title' }, title),
     el('button', { class: 'modal__close', type: 'button', 'aria-label': '关闭' }, '×')
@@ -80,6 +93,9 @@ export function show(options = {}) {
   modal.append(header, body, footer);
   overlay.append(modal);
   document.body.appendChild(overlay);
+
+  // 锁定 body 滚动（移动端关键）
+  document.body.classList.add('modal-open');
 
   // 确认
   modal.querySelector('.btn--primary').addEventListener('click', () => {
@@ -120,6 +136,8 @@ export function close() {
   if (activeOverlay) {
     activeOverlay.remove();
     activeOverlay = null;
+    // 解除 body 滚动锁定
+    document.body.classList.remove('modal-open');
   }
 }
 
