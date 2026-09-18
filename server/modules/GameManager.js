@@ -744,6 +744,22 @@ class GameManager {
         message: (data && data.message) ? data.message : '对方请求重置棋盘'
       });
 
+      // 记录操作日志
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId: user.accountId,
+          username: user.nickname || user.username,
+          action: 'reset_request',
+          category: 'game',
+          targetId: game.gameId,
+          targetName: game.gameType,
+          details: {
+            opponentId,
+            message: (data && data.message) ? data.message : '对方请求重置棋盘'
+          }
+        });
+      }
+
       opponentSocket.emit('reset_request', {
         from: user.accountId,
         fromNickname: user.nickname,
@@ -870,6 +886,19 @@ class GameManager {
       responder: user.accountId
     });
 
+    // 记录操作日志
+    if (this.operationLogger) {
+      this.operationLogger.log({
+        userId: user.accountId,
+        username: user.nickname || user.username,
+        action: 'reset_confirm',
+        category: 'game',
+        targetId: gameId,
+        targetName: game.gameType,
+        details: { requesterId }
+      });
+    }
+
     return true;
   }
 
@@ -932,6 +961,19 @@ class GameManager {
       requester: requesterId,
       rejecter: user.accountId
     });
+
+    // 记录操作日志
+    if (this.operationLogger) {
+      this.operationLogger.log({
+        userId: user.accountId,
+        username: user.nickname || user.username,
+        action: 'reset_reject',
+        category: 'game',
+        targetId: game.gameId,
+        targetName: game.gameType,
+        details: { requesterId }
+      });
+    }
 
     return true;
   }
@@ -1271,6 +1313,29 @@ class GameManager {
 
       await dataStore.add('games', record);
       logger.info('贪吃蛇游戏记录已保存', { gameId: record.gameId, score: data.score, maxLength: record.maxLength });
+
+      // 记录操作日志
+      if (this.operationLogger && data.accountId) {
+        const user = this.userManager.getUserByAccountId(data.accountId);
+        this.operationLogger.log({
+          userId: data.accountId,
+          username: user?.nickname || user?.username || '',
+          action: 'snake_end',
+          category: 'game',
+          targetId: record.gameId,
+          targetName: 'snake',
+          details: {
+            score: data.score,
+            result: record.result,
+            winner: record.winner,
+            maxLength: record.maxLength,
+            foodEaten: record.foodEaten,
+            duration: record.duration,
+            player1: record.player1,
+            player2: record.player2
+          }
+        });
+      }
     } catch (err) {
       logger.error('保存贪吃蛇游戏记录失败', { error: err.message });
     }
@@ -3262,6 +3327,23 @@ class GameManager {
           } else {
             socket.emit('hint_deduct', { success: true });
           }
+        }
+
+        // 记录操作日志
+        if (this.operationLogger) {
+          this.operationLogger.log({
+            userId: user.accountId,
+            username: user.nickname || user.username,
+            action: 'hint_request',
+            category: 'game',
+            targetId: game.gameId,
+            targetName: gameType,
+            details: {
+              move: hintData.move,
+              hintType: hintData.type,
+              gameType
+            }
+          });
         }
       } else {
         const socket = this.userManager.getSocketByAccountId(user.accountId);

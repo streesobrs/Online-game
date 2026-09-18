@@ -48,6 +48,12 @@ copy "package.json" "temp-package\" >nul
 copy "start.bat" "temp-package\" >nul
 copy "start.ps1" "temp-package\" >nul
 
+REM 打包产物不带 scripts/ 目录，去掉依赖它的开发期脚本，
+REM 否则部署后 npm start 会在 prestart 阶段报 MODULE_NOT_FOUND 直接退出
+echo Patching package.json for runtime...
+node -e "const fs=require('fs');const p='temp-package/package.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));for(const k of ['prestart','predev','changelog'])delete j.scripts[k];fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n');"
+if errorlevel 1 echo [Warning] package.json patch failed, npm start may break on the target machine
+
 echo Creating zip file: %ZIP_NAME%
 powershell -Command "Compress-Archive -Path 'temp-package\*' -DestinationPath '%ZIP_NAME%' -Force"
 

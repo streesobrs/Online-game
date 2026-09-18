@@ -9,8 +9,12 @@
  * - find：函数返回目标元素（如按按钮文本查找）
  * - view：进入该步骤前自动跳转到对应路由
  * - before：同视图内渲染前执行的钩子（如切换 Tab）
+ * - extra：气泡内额外渲染的交互区（返回节点），用于引导内联开关
+ * - text：字符串或函数（函数在渲染时求值，便于随状态变化）
  */
 import { el } from '../utils/dom.js';
+import { getNavPrefs } from '../layouts/mode.js';
+import { buildNavPrefsPanel } from './navPrefs.js';
 
 const DONE_KEY = 'v2_onboarding_done';
 
@@ -39,10 +43,19 @@ const MAIN_STEPS = [
   },
   {
     view: 'games',
-    selector: '.account-bar',
+    icon: '🧩',
+    title: '界面自定义',
+    text: '两个开关随你组合，拨动即时生效；以后可在「个人资料 → 界面设置」里随时改。',
+    extra: (refresh) => buildNavPrefsPanel(refresh),
+  },
+  {
+    view: 'games',
+    find: () => document.querySelector('.nav-drawer-handle') || document.querySelector('.account-bar'),
     icon: '👤',
-    title: '顶部账号栏',
-    text: '显示你的头像、昵称、等级和经验。点头像进入个人资料（战绩 / 资产 / 邮件 / 成就 / 商城 / 主题），旁边按钮可切换主题、退出登录。',
+    title: '账号入口',
+    text: () => (getNavPrefs().account === 'drawer'
+      ? '账号信息收在右侧这条贴边把手：点一下滑出抽屉，里面有头像 / 昵称 / 等级 / 星钻和导航快捷入口，点空白处收起。把手还能上下拖动，位置会记住。'
+      : '这个悬浮胶囊显示你的头像、昵称、等级和经验。点一下展开成卡片（资料 / 游戏 / 退出），按住可以拖到屏幕任意角落。'),
   },
   {
     view: 'games',
@@ -247,6 +260,9 @@ export function startTour(key, steps) {
   startGuide(steps, null);
 }
 
+/** 场景引导标记用的 key（与下方 startXxxTour 一一对应） */
+const TOUR_KEYS = ['game', 'mail', 'shop', 'assets', 'spectate'];
+
 /** 首次进入对局触发 */
 export function startGameTour() { startTour('game', GAME_TOUR_STEPS); }
 
@@ -261,6 +277,11 @@ export function startAssetsTour() { startTour('assets', ASSETS_TOUR_STEPS); }
 
 /** 首次进入观战页触发 */
 export function startSpectateTour() { startTour('spectate', SPECTATE_TOUR_STEPS); }
+
+/** 清掉全部场景引导标记（重看引导时用；下次进入对应页面会重新触发） */
+export function resetAllTours() {
+  TOUR_KEYS.forEach((key) => localStorage.removeItem(`v2_tour_${key}`));
+}
 
 /* ===== 引擎实现 ===== */
 
@@ -334,7 +355,8 @@ function waitFor(step, cb, tries = 10) {
 
 /** 高亮目标 + 渲染气泡 */
 function renderStep(step) {
-  // 高亮目标（fixed/sticky 元素不强制改定位，避免破坏原有布局）
+  // 高亮目标（只把 static 提升为 relative 以建立层叠上下文；
+  // fixed/sticky/absolute 本身已定位，强行改为 relative 会打乱原有位置）
   if (step.selector || step.find) {
     targetEl = resolveTarget(step);
     if (!targetEl) {
@@ -342,34 +364,42 @@ function renderStep(step) {
       next();
       return;
     }
-    targetEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    const pos = getComputedStyle(targetEl).position;
-    if (pos !== 'fixed' && pos !== 'sticky') {
-      targetEl._onbPos = pos;
+    // 已在视口内的元素不滚动：抽屉把手等绝对定位元素在 fixed 容器里，
+    // 触发 scrollIntoView 会让文档跟着滚一段
+    const rect = targetEl.getBoundingClientRect();
+    const inView = rect.top >= 0 && rect.left >= 0
+      && rect.bottom <= window.innerHeight && rect.right <= window.innerWidth;
+    if (!inView) targetEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (getComputedStyle(targetEl).position === 'static') {
+      targetEl._onbPos = 'static';
       targetEl.style.position = 'relative';
     }
     targetEl.classList.add('onboarding-target');
   }
 
-  // 气泡内容
+  // 气泡内容（原生 append 会把 null 变成文本 "null"，无 extra 时不能塞进数组）
   pop.innerHTML = '';
-  pop.append(
+  const text = typeof step.text === 'function' ? step.text() : step.text;
+  const extra = typeof step.extra === 'function' ? step.extra(() => showStep(stepIndex)) : null;
+  const nodes = [
     el('div', { class: 'onboarding-pop-head' }, [
       el('span', { class: 'onboarding-pop-icon' }, step.icon),
       el('div', { class: 'onboarding-pop-title' }, `${stepIndex + 1}/${currentSteps.length} ${step.title}`),
     ]),
-    el('div', { class: 'onboarding-pop-text' }, step.text),
-    el('div', { class: 'onboarding-pop-actions' }, [
-      el('button', { class: 'onboarding-pop-skip', onClick: finish }, '跳过'),
-      el('div', { class: 'onboarding-pop-nav' }, [
-        stepIndex > 0 ? el('button', { class: 'onboarding-pop-btn ghost', onClick: () => showStep(stepIndex - 1) }, '上一步') : null,
-        el('button', {
-          class: 'onboarding-pop-btn',
-          onClick: () => (stepIndex < currentSteps.length - 1 ? next() : finish()),
-        }, stepIndex < currentSteps.length - 1 ? '下一步' : '完成'),
-      ]),
+    el('div', { class: 'onboarding-pop-text' }, text),
+  ];
+  if (extra) nodes.push(el('div', { class: 'onboarding-pop-extra' }, extra));
+  nodes.push(el('div', { class: 'onboarding-pop-actions' }, [
+    el('button', { class: 'onboarding-pop-skip', onClick: finish }, '跳过'),
+    el('div', { class: 'onboarding-pop-nav' }, [
+      stepIndex > 0 ? el('button', { class: 'onboarding-pop-btn ghost', onClick: () => showStep(stepIndex - 1) }, '上一步') : null,
+      el('button', {
+        class: 'onboarding-pop-btn',
+        onClick: () => (stepIndex < currentSteps.length - 1 ? next() : finish()),
+      }, stepIndex < currentSteps.length - 1 ? '下一步' : '完成'),
     ]),
-  );
+  ]));
+  pop.append(...nodes);
 
   positionPop();
 }

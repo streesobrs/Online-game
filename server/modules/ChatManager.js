@@ -444,6 +444,15 @@ class ChatManager {
       });
     }
 
+    // 记录操作日志
+    if (this.operationLogger) {
+      const targetUser = this.userManager.getUserByAccountId(targetUserId);
+      this.operationLogger.getChat(user.accountId, user.nickname || '', 'private', this.sanitizeMessage(message), {
+        targetId: targetUserId,
+        targetName: targetUser?.nickname || ''
+      });
+    }
+
     return { success: true, offline: !targetOnline };
   }
 

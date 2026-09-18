@@ -123,6 +123,7 @@ class UserManager {
           existingSession.nickname = accountData.account.nickname || existingSession.nickname;
         }
         userSession = existingSession;
+        userSession.isReconnect = true;
 
         this.socketToAccount.set(socket.id, accountId);
 
@@ -146,6 +147,7 @@ class UserManager {
           accountId: accountId,
           socketId: socket.id,
           socket: socket,
+          isReconnect: false,
           token: sessionToken,
           nickname: accountData.account?.nickname || '未登录',
           status: 'online',
@@ -428,6 +430,70 @@ class UserManager {
     }, this.RECONNECT_GRACE_PERIOD);
     this.disconnectTimers.set(accountId, timer);
 
+    return userSession;
+  }
+
+  // 用户主动退出登录：记录日志、下线，并把当前 socket 还原为匿名会话（便于退出后直接重新登录）
+  async handleUserLogout(accountId, io) {
+    if (!accountId) return null;
+
+    const userSession = this.onlineUsers.get(accountId);
+    if (!userSession) return null;
+
+    const socketId = userSession.socketId;
+
+    // 取消重连定时器
+    const timer = this.disconnectTimers.get(accountId);
+    if (timer) {
+      clearTimeout(timer);
+      this.disconnectTimers.delete(accountId);
+    }
+
+    // 记录操作日志
+    if (this.operationLogger) {
+      this.operationLogger.getLogout(accountId, userSession.nickname || '', {
+        onlineDuration: Date.now() - userSession.connectedAt,
+        reason: 'manual'
+      });
+    }
+
+    // 广播离线状态
+    this.broadcastUserStatus(accountId, 'offline', io);
+
+    // 保存最后在线时间
+    if (this.accountManager) {
+      try {
+        await this.accountManager.updateLastSeen(accountId);
+      } catch (err) {
+        logger.warn('保存最后在线时间失败', { accountId, error: err.message });
+      }
+    }
+
+    // 退出账号所在房间，并把会话还原为匿名状态
+    this.onlineUsers.delete(accountId);
+    if (socketId) {
+      try { userSession.socket?.leave(accountId); } catch (e) { /* 忽略离开房间错误 */ }
+      userSession.accountId = null;
+      userSession.token = null;
+      userSession.nickname = '未登录';
+      userSession.accountType = 'anonymous';
+      userSession.accountData = {
+        account: {
+          id: null,
+          type: 'anonymous',
+          nickname: '未登录',
+          profile: { level: 1, exp: 0 }
+        },
+        stats: { totalGames: 0, wins: 0, losses: 0, draws: 0 }
+      };
+      userSession.status = 'online';
+      userSession.game = null;
+      userSession.gameType = null;
+      this.socketToAccount.set(socketId, socketId);
+      this.onlineUsers.set(socketId, userSession);
+    }
+
+    logger.info('用户主动退出登录', { accountId, socketId });
     return userSession;
   }
 

@@ -387,7 +387,9 @@ class AccountManager {
           account: safeAccount,
           permissions: permissions,
           token: this.generateSessionToken(account.account.id),
-          loginType: 'account'
+          loginType: 'account',
+          // 本次登录新算出的回归标记（safeAccount 里带的是更新前的旧值）
+          activity: { returnPlayer, longReturnPlayer }
         }
       };
     } catch (err) {
@@ -396,6 +398,33 @@ class AccountManager {
         success: false,
         message: '登录失败，请稍后重试'
       };
+    }
+  }
+
+  // 记录客户端类型（v1 / v2），供后台管理查看用户使用的客户端
+  async recordClientInfo(accountId, clientType, clientVersion = null) {
+    try {
+      if (!accountId || (clientType !== 'v1' && clientType !== 'v2')) return false;
+
+      const account = await dataStore.findOne('accounts', { 'account.id': accountId });
+      if (!account) return false;
+
+      const now = Date.now();
+      const prev = account.account?.client || {};
+      const unchanged = prev.type === clientType && prev.version === (clientVersion || prev.version || null);
+      // 类型未变化且一小时内已记录过，跳过写入，避免重连时频繁落盘
+      if (unchanged && now - (prev.lastSeen || 0) < 60 * 60 * 1000) return false;
+
+      await dataStore.update('accounts', { 'account.id': accountId }, {
+        'account.client.type': clientType,
+        'account.client.version': clientVersion || prev.version || null,
+        'account.client.firstSeen': prev.firstSeen || now,
+        'account.client.lastSeen': now
+      });
+      return true;
+    } catch (err) {
+      logger.error('记录客户端类型失败', { accountId, clientType, error: err.message });
+      return false;
     }
   }
 
@@ -2535,6 +2564,18 @@ class AccountManager {
           'account.updatedAt': Date.now()
         });
         logger.info('发放等级奖励', { accountId, levels: availableRewards.map(r => r.level) });
+
+        if (this.operationLogger) {
+          const levels = availableRewards.map(r => r.level);
+          this.operationLogger.log({
+            userId: accountId,
+            username: account?.account?.nickname || account?.account?.username || '',
+            action: 'level_reward_claim',
+            category: 'reward',
+            targetName: `等级 ${levels.join(',')}`,
+            details: { levels }
+          });
+        }
       }
 
       return { success: true, rewards: availableRewards, claimedLevels: claimedRewards };
@@ -3129,6 +3170,11 @@ class AccountManager {
         await this.addAvatarSlots(userId, slotAdd);
         this._consumeItem(invStore, itemId, count);
         await this._saveInventoryStore(userId, invStore);
+
+        if (this.operationLogger) {
+          this.operationLogger.getItemUse(userId, '', itemId, itemInfo.name || itemId, count, { message: `成功增加${slotAdd}个自定义头像槽位！` });
+        }
+
         return { success: true, message: `成功增加${slotAdd}个自定义头像槽位！` };
       }
     }
@@ -3562,6 +3608,18 @@ class AccountManager {
       account.cosmetics.equipped.avatar = null;
       await this._saveAccount(userId, account);
 
+      if (this.operationLogger) {
+        const uploadedAvatar = account.cosmetics.owned.customAvatars.find(a => a.file === avatarFile);
+        this.operationLogger.log({
+          userId,
+          username: account?.account?.nickname || account?.account?.username || '',
+          action: 'avatar_upload',
+          category: 'cosmetic',
+          targetId: avatarFile,
+          targetName: uploadedAvatar?.name || avatarFile
+        });
+      }
+
       return {
         success: true,
         avatarFile: avatarFile,
@@ -3753,6 +3811,8 @@ class AccountManager {
         return { success: false, message: '头像不存在' };
       }
 
+      const deletedAvatarName = account.cosmetics.owned.customAvatars[idx].name || avatarFile;
+
       const avatarDir = path.join(__dirname, '..', '..', 'data', 'cosmetics', 'avatars', userId);
       const filePath = path.join(avatarDir, avatarFile);
       if (fs.existsSync(filePath)) {
@@ -3771,6 +3831,18 @@ class AccountManager {
       }
 
       await this._saveAccount(userId, account);
+
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId,
+          username: account?.account?.nickname || account?.account?.username || '',
+          action: 'avatar_delete',
+          category: 'cosmetic',
+          targetId: avatarFile,
+          targetName: deletedAvatarName
+        });
+      }
+
       return { success: true, message: '删除成功', avatars: account.cosmetics.owned.customAvatars };
     } catch (err) {
       logger.error('删除自定义头像失败', { userId, error: err.message });
@@ -3804,8 +3876,22 @@ class AccountManager {
         return { success: false, message: '名称不能超过20字' };
       }
 
+      const oldAvatarName = account.cosmetics.owned.customAvatars[idx].name || avatarFile;
       account.cosmetics.owned.customAvatars[idx].name = trimmedName;
       await this._saveAccount(userId, account);
+
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId,
+          username: account?.account?.nickname || account?.account?.username || '',
+          action: 'avatar_rename',
+          category: 'cosmetic',
+          targetId: avatarFile,
+          targetName: trimmedName,
+          details: { oldName: oldAvatarName, newName: trimmedName }
+        });
+      }
+
       return { success: true, message: '改名成功', avatars: account.cosmetics.owned.customAvatars };
     } catch (err) {
       logger.error('重命名自定义头像失败', { userId, error: err.message });
@@ -4392,6 +4478,19 @@ class AccountManager {
       await this._saveMailStore(userId, mailStore);
       await this._saveAccount(userId, account);
       logger.info('领取邮件奖励', { userId, mailId, rewards });
+
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId,
+          username: account?.account?.nickname || account?.account?.username || '',
+          action: 'mail_claim',
+          category: 'mail',
+          targetId: mailId,
+          targetName: mail.title,
+          details: { mailId, rewards }
+        });
+      }
+
       return { success: true, rewards, message: '领取成功' };
     } catch (err) {
       logger.error('领取邮件失败', { userId, mailId, error: err.message });
@@ -4573,6 +4672,18 @@ class AccountManager {
       await this._saveMailStore(userId, mailStore);
       await this._saveAccount(userId, account);
       logger.info('批量领取邮件', { userId, claimedCount, totalRewards });
+
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId,
+          username: account?.account?.nickname || account?.account?.username || '',
+          action: 'mail_claim_all',
+          category: 'mail',
+          amount: claimedCount,
+          details: { count: claimedCount, rewards: totalRewards }
+        });
+      }
+
       return { success: true, claimedCount, rewards: totalRewards };
     } catch (err) {
       logger.error('批量领取邮件失败', { userId, error: err.message });
@@ -4597,6 +4708,18 @@ class AccountManager {
 
       mail.read = true;
       await this._saveMailStore(userId, mailStore);
+
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId,
+          username: '',
+          action: 'mail_read',
+          category: 'mail',
+          targetId: mailId,
+          details: { mailId }
+        });
+      }
+
       return { success: true };
     } catch (err) {
       logger.error('标记邮件已读失败', { userId, mailId, error: err.message });
@@ -4623,6 +4746,18 @@ class AccountManager {
       }
 
       await this._saveMailStore(userId, mailStore);
+
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId,
+          username: '',
+          action: 'mail_read_all',
+          category: 'mail',
+          amount: count,
+          details: { count }
+        });
+      }
+
       return { success: true, readCount: count };
     } catch (err) {
       logger.error('批量标记已读失败', { userId, error: err.message });
@@ -4645,6 +4780,18 @@ class AccountManager {
       const deleted = beforeLen - mailStore.mails.length;
 
       await this._saveMailStore(userId, mailStore);
+
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId,
+          username: '',
+          action: 'mail_delete',
+          category: 'mail',
+          targetId: mailId,
+          details: { mailId }
+        });
+      }
+
       return { success: true, deleted };
     } catch (err) {
       logger.error('删除邮件失败', { userId, mailId, error: err.message });
@@ -4667,6 +4814,18 @@ class AccountManager {
       const deleted = beforeLen - mailStore.mails.length;
 
       await this._saveMailStore(userId, mailStore);
+
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId,
+          username: '',
+          action: 'mail_cleanup',
+          category: 'mail',
+          amount: deleted,
+          details: { count: deleted }
+        });
+      }
+
       return { success: true, deleted };
     } catch (err) {
       logger.error('清理已领取邮件失败', { userId, error: err.message });

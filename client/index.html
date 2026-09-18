@@ -6079,10 +6079,11 @@
           await init();
         }
 
-        // 发送客户端连接请求（包含版本号和token）
+        // 发送客户端连接请求（包含版本号、客户端类型和token）
         // 注意：init()函数会恢复currentAccount，所以这里可以获取到正确的token
         socket.emit('client_connect', {
           clientVersion: APP_VERSION,
+          clientType: 'v1',
           token: localStorage.getItem('userToken') || 'none'
         });
 
@@ -13604,6 +13605,10 @@
 
     function logout() {
       showConfirmDialog('确定要退出登录吗？', () => {
+        // 通知服务端记录登出并结束会话
+        if (socket && socket.connected) {
+          socket.emit('logout');
+        }
         currentAccount = null;
         clearAccount();
         updateAccountBar();
@@ -13618,6 +13623,10 @@
     // 游客退出
     function guestLogout() {
       showConfirmDialog('确定要退出游客模式吗？', () => {
+        // 通知服务端记录登出并结束会话
+        if (socket && socket.connected) {
+          socket.emit('logout');
+        }
         currentAccount = null;
         clearAccount();
         updateAccountBar();

@@ -46,7 +46,7 @@ class AdminManager {
   }
 
   // 生成动态管理员Token
-  generateDynamicToken() {
+  generateDynamicToken(identity = {}) {
     if (!config.admin.enableDynamicTokens) {
       return config.admin.token; // 回退到静态Token
     }
@@ -54,6 +54,8 @@ class AdminManager {
     const token = crypto.randomBytes(config.security.adminTokenBytes).toString('hex');
     const tokenInfo = {
       token: token,
+      accountId: identity.accountId || '',
+      username: identity.username || '',
       createdAt: Date.now(),
       lastUsed: Date.now(),
       socketIds: new Set()
@@ -87,6 +89,21 @@ class AdminManager {
     // 更新最后使用时间
     tokenInfo.lastUsed = Date.now();
     return true;
+  }
+
+  // 解析Token对应的管理员身份，供 REST 路由记录操作日志
+  resolveIdentity(token) {
+    if (token === config.admin.token) {
+      return { accountId: 'static-admin', username: '内置管理员' };
+    }
+    const tokenInfo = this.activeTokens.get(token);
+    if (!tokenInfo) {
+      return { accountId: '', username: '管理员' };
+    }
+    return {
+      accountId: tokenInfo.accountId || 'static-admin',
+      username: tokenInfo.username || '管理员'
+    };
   }
 
   // 通过用户Token验证并获取管理员账号（从游戏大厅/个人资料页自动登录）
@@ -137,7 +154,7 @@ class AdminManager {
     }
 
     // 生成动态Token
-    const token = this.generateDynamicToken();
+    const token = this.generateDynamicToken({ accountId, username });
 
     logger.info('通过用户Token自动登录成功', {
       accountId,
@@ -190,7 +207,10 @@ class AdminManager {
     }
 
     // 生成动态Token
-    const token = this.generateDynamicToken();
+    const token = this.generateDynamicToken({
+      accountId: account.account?.account?.id,
+      username: account.account?.account?.username || username
+    });
 
     return {
       success: true,
@@ -199,8 +219,8 @@ class AdminManager {
     };
   }
 
-  // 升级账号为管理员
-  async upgradeToAdmin(accountId, upgradeKey) {
+  // 升级账号为管理员（凭升级密钥自助提权）
+  async upgradeWithKey(accountId, upgradeKey) {
     // 验证升级密钥
     if (upgradeKey !== config.admin.upgradeKey) {
       return {
@@ -306,7 +326,13 @@ class AdminManager {
       if (tokenInfo) {
         tokenInfo.socketIds.add(socket.id);
         tokenInfo.lastUsed = Date.now();
+        // 带上管理员身份，操作日志据此记录操作人
+        adminInfo.accountId = tokenInfo.accountId || '';
+        adminInfo.username = tokenInfo.username || '';
       }
+    }
+    if (!adminInfo.username) {
+      adminInfo.username = '管理员';
     }
 
     this.adminSockets.set(socket.id, adminInfo);
@@ -484,6 +510,7 @@ class AdminManager {
           accountId: u.accountId,
           nickname: account?.nickname || u.nickname,
           status: u.status,
+          clientType: u.clientType || account?.client?.type || null,
           gameType: u.gameType,
           game: u.game,
           connectedAt: u.connectedAt,
@@ -739,10 +766,24 @@ class AdminManager {
 
   // 更新系统配置（部分配置支持热更新）
   updateSystemConfig(socket, updates) {
+    const adminInfo = this.adminSockets.get(socket.id);
+
     // 这里可以实现配置热更新
     // 注意：某些配置需要重启服务器才能生效
 
     logger.info('管理员更新配置', { adminSocket: socket.id, updates });
+
+    // 记录操作日志
+    if (this.operationLogger && adminInfo) {
+      this.operationLogger.getAdminAction(
+        adminInfo.accountId || '',
+        adminInfo.username || '管理员',
+        'config_update',
+        '',
+        '',
+        { keys: Object.keys(updates || {}) }
+      );
+    }
 
     socket.emit('admin_action_result', {
       action: 'update_config',
@@ -753,6 +794,7 @@ class AdminManager {
 
   // 系统维护模式
   setMaintenanceMode(socket, enabled, options = {}, io) {
+    const adminInfo = this.adminSockets.get(socket.id);
     const config = require('../config');
     const runtimeConfig = require('./runtimeConfig');
     const {
@@ -880,6 +922,24 @@ class AdminManager {
       }
     }
 
+    // 记录操作日志
+    if (this.operationLogger && adminInfo) {
+      this.operationLogger.getAdminAction(
+        adminInfo.accountId || '',
+        adminInfo.username || '管理员',
+        'maintenance_mode',
+        '',
+        '',
+        {
+          enabled,
+          message,
+          durationMinutes,
+          blockChat,
+          kick
+        }
+      );
+    }
+
     socket.emit('admin_action_result', {
       action: 'maintenance_mode',
       success: true,
@@ -890,6 +950,7 @@ class AdminManager {
 
   // 调度维护（预告模式）
   scheduleMaintenance(socket, options, io) {
+    const adminInfo = this.adminSockets.get(socket.id);
     const {
       message = '系统维护中，请稍后再试',
       durationMinutes = 30,
@@ -956,6 +1017,18 @@ class AdminManager {
       }
       this.setMaintenanceMode(execSocket, true, { message, durationMinutes, blockChat, kick }, io);
     }, noticeMinutes * 60 * 1000);
+
+    // 记录操作日志
+    if (this.operationLogger && adminInfo) {
+      this.operationLogger.getAdminAction(
+        adminInfo.accountId || '',
+        adminInfo.username || '管理员',
+        'maintenance_schedule',
+        '',
+        '',
+        { message, noticeMinutes, durationMinutes, blockChat, kick }
+      );
+    }
 
     try {
       socket.emit('admin_action_result', {
@@ -1036,6 +1109,8 @@ class AdminManager {
 
   // 禁言用户
   muteUser(socket, accountId, duration = config.admin.defaultMuteMinutes, reason = '') {
+    const adminInfo = this.adminSockets.get(socket.id);
+
     if (!this.chatManager) {
       socket.emit('admin_action_result', {
         action: 'mute_user',
@@ -1050,6 +1125,19 @@ class AdminManager {
 
     if (success) {
       logger.info('管理员禁言用户', { adminSocket: socket.id, accountId, duration, reason });
+
+      // 记录操作日志
+      if (this.operationLogger && adminInfo) {
+        this.operationLogger.getAdminAction(
+          adminInfo.accountId || '',
+          adminInfo.username || '管理员',
+          'mute_user',
+          accountId,
+          reason,
+          { duration }
+        );
+      }
+
       socket.emit('admin_action_result', {
         action: 'mute_user',
         success: true,
@@ -1068,6 +1156,8 @@ class AdminManager {
 
   // 解除禁言
   unmuteUser(socket, accountId) {
+    const adminInfo = this.adminSockets.get(socket.id);
+
     if (!this.chatManager) {
       socket.emit('admin_action_result', {
         action: 'unmute_user',
@@ -1081,6 +1171,19 @@ class AdminManager {
 
     if (success) {
       logger.info('管理员解除禁言', { adminSocket: socket.id, accountId });
+
+      // 记录操作日志
+      if (this.operationLogger && adminInfo) {
+        this.operationLogger.getAdminAction(
+          adminInfo.accountId || '',
+          adminInfo.username || '管理员',
+          'unmute_user',
+          accountId,
+          '',
+          {}
+        );
+      }
+
       socket.emit('admin_action_result', {
         action: 'unmute_user',
         success: true,
@@ -1099,6 +1202,8 @@ class AdminManager {
 
   // 清理数据
   async cleanupData(socket, options = {}) {
+    const adminInfo = this.adminSockets.get(socket.id);
+
     try {
       const { oldGames = false, oldLogs = false, inactiveUsers = false } = options;
       let cleaned = 0;
@@ -1118,6 +1223,18 @@ class AdminManager {
       }
 
       logger.info('管理员清理数据', { adminSocket: socket.id, cleaned });
+
+      // 记录操作日志
+      if (this.operationLogger && adminInfo) {
+        this.operationLogger.getAdminAction(
+          adminInfo.accountId || '',
+          adminInfo.username || '管理员',
+          'cleanup_data',
+          '',
+          '',
+          { oldGames, oldLogs, inactiveUsers, cleaned }
+        );
+      }
 
       socket.emit('admin_action_result', {
         action: 'cleanup_data',
@@ -1361,6 +1478,7 @@ class AdminManager {
 
   // 给特定用户发送消息
   sendUserMessage(socket, accountId, message) {
+    const adminInfo = this.adminSockets.get(socket.id);
     const userSocket = this.userManager.getSocketByAccountId(accountId);
     if (!userSocket) {
       socket.emit('admin_action_result', {
@@ -1378,6 +1496,18 @@ class AdminManager {
     });
 
     logger.info('管理员给用户发送消息', { adminSocket: socket.id, accountId, message });
+
+    // 记录操作日志
+    if (this.operationLogger && adminInfo) {
+      this.operationLogger.getAdminAction(
+        adminInfo.accountId || '',
+        adminInfo.username || '管理员',
+        'send_message',
+        accountId,
+        '',
+        { message }
+      );
+    }
 
     socket.emit('admin_action_result', {
       action: 'send_user_message',
@@ -1459,8 +1589,22 @@ class AdminManager {
 
   // 升级为管理员
   async upgradeToAdmin(socket, accountId) {
+    const adminInfo = this.adminSockets.get(socket.id);
     const result = await this.accountManager.upgradeToAdmin(accountId);
     logger.info('管理员升级账号为管理员', { adminSocket: socket.id, accountId });
+
+    // 记录操作日志
+    if (this.operationLogger && adminInfo && result.success) {
+      this.operationLogger.getAdminAction(
+        adminInfo.accountId || '',
+        adminInfo.username || '管理员',
+        'upgrade_admin',
+        accountId,
+        '',
+        {}
+      );
+    }
+
     socket.emit('admin_action_result', {
       action: 'upgrade_to_admin',
       ...result
@@ -1470,6 +1614,8 @@ class AdminManager {
 
   // 降级管理员
   async downgradeFromAdmin(socket, accountId) {
+    const adminInfo = this.adminSockets.get(socket.id);
+
     try {
       const account = await dataStore.findOne('accounts', { 'account.id': accountId });
       if (!account) {
@@ -1496,6 +1642,19 @@ class AdminManager {
       });
 
       logger.info('管理员取消账号管理员权限', { adminSocket: socket.id, accountId });
+
+      // 记录操作日志
+      if (this.operationLogger && adminInfo) {
+        this.operationLogger.getAdminAction(
+          adminInfo.accountId || '',
+          adminInfo.username || '管理员',
+          'downgrade_admin',
+          accountId,
+          '',
+          {}
+        );
+      }
+
       socket.emit('admin_action_result', {
         action: 'downgrade_from_admin',
         success: true,
@@ -1514,6 +1673,8 @@ class AdminManager {
 
   // 封禁账号
   async banAccount(socket, accountId, reason = '') {
+    const adminInfo = this.adminSockets.get(socket.id);
+
     try {
       const account = await dataStore.findOne('accounts', { 'account.id': accountId });
       if (!account) {
@@ -1546,6 +1707,19 @@ class AdminManager {
       }
 
       logger.info('管理员封禁账号', { adminSocket: socket.id, accountId, reason });
+
+      // 记录操作日志
+      if (this.operationLogger && adminInfo) {
+        this.operationLogger.getAdminAction(
+          adminInfo.accountId || '',
+          adminInfo.username || '管理员',
+          'ban_account',
+          accountId,
+          reason,
+          {}
+        );
+      }
+
       socket.emit('admin_action_result', {
         action: 'ban_account',
         success: true,
@@ -1564,6 +1738,8 @@ class AdminManager {
 
   // 解封账号
   async unbanAccount(socket, accountId) {
+    const adminInfo = this.adminSockets.get(socket.id);
+
     try {
       const account = await dataStore.findOne('accounts', { 'account.id': accountId });
       if (!account) {
@@ -1583,6 +1759,19 @@ class AdminManager {
       });
 
       logger.info('管理员解封账号', { adminSocket: socket.id, accountId });
+
+      // 记录操作日志
+      if (this.operationLogger && adminInfo) {
+        this.operationLogger.getAdminAction(
+          adminInfo.accountId || '',
+          adminInfo.username || '管理员',
+          'unban_account',
+          accountId,
+          '',
+          {}
+        );
+      }
+
       socket.emit('admin_action_result', {
         action: 'unban_account',
         success: true,
@@ -1601,8 +1790,22 @@ class AdminManager {
 
   // 重置密码
   async resetPassword(socket, accountId, password) {
+    const adminInfo = this.adminSockets.get(socket.id);
     const result = await this.accountManager.resetPasswordByAdmin(accountId, password);
     logger.info('管理员重置账号密码', { adminSocket: socket.id, accountId });
+
+    // 记录操作日志
+    if (this.operationLogger && adminInfo && result.success) {
+      this.operationLogger.getAdminAction(
+        adminInfo.accountId || '',
+        adminInfo.username || '管理员',
+        'reset_password',
+        accountId,
+        '',
+        {}
+      );
+    }
+
     socket.emit('admin_action_result', {
       action: 'reset_password',
       ...result
@@ -1611,8 +1814,22 @@ class AdminManager {
 
   // 创建账号
   async createAccount(socket, username, password, nickname, isAdmin = false) {
+    const adminInfo = this.adminSockets.get(socket.id);
     const result = await this.accountManager.createAdminAccount(username, password, nickname, isAdmin);
     logger.info('管理员创建账号', { adminSocket: socket.id, username, isAdmin });
+
+    // 记录操作日志
+    if (this.operationLogger && adminInfo && result.success) {
+      this.operationLogger.getAdminAction(
+        adminInfo.accountId || '',
+        adminInfo.username || '管理员',
+        'create_account',
+        result.accountId || '',
+        username,
+        { nickname, isAdmin }
+      );
+    }
+
     socket.emit('admin_action_result', {
       action: 'create_account',
       ...result
@@ -1624,6 +1841,8 @@ class AdminManager {
 
   // 删除账号
   async deleteAccount(socket, id) {
+    const adminInfo = this.adminSockets.get(socket.id);
+
     if (!this.accountManager) {
       socket.emit('admin_action_result', {
         action: 'delete_account',
@@ -1643,6 +1862,18 @@ class AdminManager {
 
 
       logger.info('管理员删除账号', { adminSocket: socket.id, id });
+
+      // 记录操作日志
+      if (this.operationLogger && adminInfo) {
+        this.operationLogger.getAdminAction(
+          adminInfo.accountId || '',
+          adminInfo.username || '管理员',
+          'delete_account',
+          id,
+          '',
+          {}
+        );
+      }
     }
     socket.emit('admin_action_result', {
       action: 'delete_account',
@@ -1698,12 +1929,14 @@ class AdminManager {
         lastLogin: account.account?.lastLogin,
         stats: account.stats || account.account?.stats,
         profile: account.account?.profile || account.profile,
-        achievements: account.achievements || account.account?.achievements
+        achievements: account.achievements || account.account?.achievements,
+        client: account.account?.client || null
       },
       user: user ? {
         userId: user.accountId,
         nickname: user.nickname,
         status: user.status,
+        clientType: user.clientType || account.account?.client?.type || null,
         gameType: user.gameType,
         game: user.game,
         connectedAt: user.connectedAt,
@@ -1721,6 +1954,8 @@ class AdminManager {
 
   // 修改用户经验值
   async modifyUserExp(socket, id, operation, amount) {
+    const adminInfo = this.adminSockets.get(socket.id);
+
     if (!this.accountManager) {
       socket.emit('admin_action_result', {
         action: 'modify_user_exp',
@@ -1732,6 +1967,19 @@ class AdminManager {
 
     const result = await this.accountManager.modifyUserExp(id, operation, amount);
     logger.info('管理员修改用户经验值', { adminSocket: socket.id, id, operation, amount });
+
+    // 记录操作日志
+    if (this.operationLogger && adminInfo && result.success) {
+      this.operationLogger.getAdminAction(
+        adminInfo.accountId || '',
+        adminInfo.username || '管理员',
+        'modify_exp',
+        id,
+        '',
+        { operation, amount }
+      );
+    }
+
     socket.emit('admin_action_result', {
       action: 'modify_user_exp',
       ...result
@@ -1740,6 +1988,8 @@ class AdminManager {
 
   // 添加用户成就
   async addUserAchievement(socket, id, achievementId) {
+    const adminInfo = this.adminSockets.get(socket.id);
+
     if (!this.accountManager) {
       socket.emit('admin_action_result', {
         action: 'add_user_achievement',
@@ -1752,6 +2002,19 @@ class AdminManager {
     const result = await this.accountManager.addUserAchievement(id, achievementId);
     if (result.success) {
       logger.info('管理员添加用户成就', { adminSocket: socket.id, id, achievementId });
+
+      // 记录操作日志
+      if (this.operationLogger && adminInfo) {
+        this.operationLogger.getAdminAction(
+          adminInfo.accountId || '',
+          adminInfo.username || '管理员',
+          'achievement_add',
+          id,
+          achievementId,
+          {}
+        );
+      }
+
       // 发放成就奖励（EXP等）
       if (this.achievementManager) {
         const achievement = this.achievementManager.getAchievement(achievementId);
@@ -1773,6 +2036,8 @@ class AdminManager {
 
   // 移除用户成就
   async removeUserAchievement(socket, id, achievementId) {
+    const adminInfo = this.adminSockets.get(socket.id);
+
     if (!this.accountManager) {
       socket.emit('admin_action_result', {
         action: 'remove_user_achievement',
@@ -1785,6 +2050,19 @@ class AdminManager {
     const result = await this.accountManager.removeUserAchievement(id, achievementId);
     if (result.success) {
       logger.info('管理员移除用户成就', { adminSocket: socket.id, id, achievementId });
+
+      // 记录操作日志
+      if (this.operationLogger && adminInfo) {
+        this.operationLogger.getAdminAction(
+          adminInfo.accountId || '',
+          adminInfo.username || '管理员',
+          'achievement_remove',
+          id,
+          achievementId,
+          {}
+        );
+      }
+
       // 回收成就奖励（扣除EXP）
       if (this.achievementManager) {
         const achievement = this.achievementManager.getAchievement(achievementId);
@@ -1806,6 +2084,8 @@ class AdminManager {
 
   // 重置用户成就
   async resetUserAchievements(socket, id) {
+    const adminInfo = this.adminSockets.get(socket.id);
+
     if (!this.accountManager) {
       socket.emit('admin_action_result', {
         action: 'reset_user_achievements',
@@ -1818,6 +2098,19 @@ class AdminManager {
     const result = await this.accountManager.resetUserAchievements(id);
     if (result.success) {
       logger.info('管理员重置用户成就', { adminSocket: socket.id, id, count: result.removedAchievements?.length || 0 });
+
+      // 记录操作日志
+      if (this.operationLogger && adminInfo) {
+        this.operationLogger.getAdminAction(
+          adminInfo.accountId || '',
+          adminInfo.username || '管理员',
+          'achievement_reset',
+          id,
+          '',
+          { count: result.removedAchievements?.length || 0 }
+        );
+      }
+
       // 回收所有已解锁成就的奖励
       if (this.achievementManager && result.removedAchievements && result.removedAchievements.length > 0) {
         let totalRevokedExp = 0;
@@ -1851,6 +2144,8 @@ class AdminManager {
 
   // 给指定用户发送邮件（带物品/星钻/经验奖励）
   async sendMailToUser(socket, data) {
+    const adminInfo = this.adminSockets.get(socket.id);
+
     if (!this.accountManager) {
       socket.emit('admin_action_result', {
         action: 'send_mail',
@@ -1873,6 +2168,27 @@ class AdminManager {
     const mailData = { title, content, items, cosmetics, vip, starCoins, exp, from };
     const result = await this.accountManager.sendMail(userId, mailData);
     logger.info('管理员发送邮件', { adminSocket: socket.id, userId, title });
+
+    // 记录操作日志
+    if (this.operationLogger && adminInfo && result.success) {
+      this.operationLogger.getAdminAction(
+        adminInfo.accountId || '',
+        adminInfo.username || '管理员',
+        'mail_send',
+        userId,
+        title,
+        {
+          mailId: result.mail?.id || '',
+          title,
+          items: items.length,
+          cosmetics: cosmetics.length,
+          vipDays: vip?.days || 0,
+          starCoins,
+          exp
+        }
+      );
+    }
+
     socket.emit('admin_action_result', {
       action: 'send_mail',
       ...result
@@ -1890,6 +2206,8 @@ class AdminManager {
 
   // 给多个用户发送邮件
   async sendMailToMultiple(socket, data) {
+    const adminInfo = this.adminSockets.get(socket.id);
+
     if (!this.accountManager) {
       socket.emit('admin_action_result', {
         action: 'send_mail_batch',
@@ -1912,6 +2230,26 @@ class AdminManager {
     const mailData = { title, content, items, starCoins, exp, from };
     const result = await this.accountManager.sendMailToUsers(userIds, mailData);
     logger.info('管理员批量发送邮件', { adminSocket: socket.id, userCount: userIds.length, title });
+
+    // 记录操作日志
+    if (this.operationLogger && adminInfo && result.success) {
+      this.operationLogger.getAdminAction(
+        adminInfo.accountId || '',
+        adminInfo.username || '管理员',
+        'mail_batch',
+        '',
+        title,
+        {
+          title,
+          userCount: userIds.length,
+          sentCount: result.sentCount || 0,
+          items: items.length,
+          starCoins,
+          exp
+        }
+      );
+    }
+
     socket.emit('admin_action_result', {
       action: 'send_mail_batch',
       ...result
@@ -1931,6 +2269,8 @@ class AdminManager {
 
   // 给所有用户发送邮件（全站邮件）
   async sendMailToAllUsers(socket, data) {
+    const adminInfo = this.adminSockets.get(socket.id);
+
     if (!this.accountManager) {
       socket.emit('admin_action_result', {
         action: 'send_mail_all',
@@ -1944,6 +2284,26 @@ class AdminManager {
     const mailData = { title, content, items, cosmetics, vip, starCoins, exp, from };
     const result = await this.accountManager.sendMailToAll(mailData);
     logger.info('管理员发送全站邮件', { adminSocket: socket.id, title, sentCount: result.sentCount });
+
+    // 记录操作日志
+    if (this.operationLogger && adminInfo && result.success) {
+      this.operationLogger.getAdminAction(
+        adminInfo.accountId || '',
+        adminInfo.username || '管理员',
+        'mail_all',
+        '',
+        title,
+        {
+          title,
+          sentCount: result.sentCount || 0,
+          items: items.length,
+          cosmetics: cosmetics.length,
+          starCoins,
+          exp
+        }
+      );
+    }
+
     socket.emit('admin_action_result', {
       action: 'send_mail_all',
       ...result
@@ -1963,6 +2323,8 @@ class AdminManager {
 
   // 直接给用户发放星钻（立即到账，不通过邮件）
   async grantStarCoinsToUser(socket, id, amount, reason) {
+    const adminInfo = this.adminSockets.get(socket.id);
+
     if (!this.accountManager) {
       socket.emit('admin_action_result', {
         action: 'grant_starcoins',
@@ -1974,6 +2336,19 @@ class AdminManager {
 
     const result = await this.accountManager.grantStarCoins(id, amount, reason);
     logger.info('管理员发放星钻', { adminSocket: socket.id, id, amount, reason });
+
+    // 记录操作日志
+    if (this.operationLogger && adminInfo && result.success) {
+      this.operationLogger.getAdminAction(
+        adminInfo.accountId || '',
+        adminInfo.username || '管理员',
+        'grant_starcoins',
+        id,
+        reason || '',
+        { amount }
+      );
+    }
+
     socket.emit('admin_action_result', {
       action: 'grant_starcoins',
       ...result
@@ -1990,6 +2365,8 @@ class AdminManager {
 
   // 直接给用户发放经验
   async grantExpToUser(socket, id, amount, reason) {
+    const adminInfo = this.adminSockets.get(socket.id);
+
     if (!this.accountManager) {
       socket.emit('admin_action_result', {
         action: 'grant_exp',
@@ -2001,6 +2378,19 @@ class AdminManager {
 
     const result = await this.accountManager.grantExp(id, amount, reason);
     logger.info('管理员发放经验', { adminSocket: socket.id, id, amount, reason });
+
+    // 记录操作日志
+    if (this.operationLogger && adminInfo && result.success) {
+      this.operationLogger.getAdminAction(
+        adminInfo.accountId || '',
+        adminInfo.username || '管理员',
+        'grant_exp',
+        id,
+        reason || '',
+        { amount }
+      );
+    }
+
     socket.emit('admin_action_result', {
       action: 'grant_exp',
       ...result
@@ -2017,6 +2407,8 @@ class AdminManager {
 
   // 直接给用户发放物品
   async grantItemsToUser(socket, id, items) {
+    const adminInfo = this.adminSockets.get(socket.id);
+
     if (!this.accountManager) {
       socket.emit('admin_action_result', {
         action: 'grant_items',
@@ -2028,6 +2420,21 @@ class AdminManager {
 
     const result = await this.accountManager.grantItems(id, items);
     logger.info('管理员发放物品', { adminSocket: socket.id, id, items });
+
+    // 记录操作日志
+    if (this.operationLogger && adminInfo && result.success) {
+      this.operationLogger.getAdminAction(
+        adminInfo.accountId || '',
+        adminInfo.username || '管理员',
+        'grant_items',
+        id,
+        '',
+        {
+          items: Array.isArray(items) ? items.map(i => ({ id: i.id, count: i.count })) : []
+        }
+      );
+    }
+
     socket.emit('admin_action_result', {
       action: 'grant_items',
       ...result

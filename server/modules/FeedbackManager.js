@@ -4,6 +4,7 @@ const config = require('../config');
 
 class FeedbackManager {
   constructor() {
+    this.operationLogger = null;
   }
 
   // 提交反馈
@@ -26,6 +27,20 @@ class FeedbackManager {
 
       await dataStore.add('feedbacks', feedback);
       logger.info('反馈已提交', { feedbackId, accountId, type, title });
+
+      // 记录操作日志
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId: accountId,
+          username: nickname || '',
+          action: 'feedback_submit',
+          category: 'feedback',
+          targetId: feedbackId,
+          targetName: title,
+          details: { type: feedback.type }
+        });
+      }
+
       return { success: true, feedback };
     } catch (err) {
       logger.error('提交反馈失败', { accountId, error: err.message });
@@ -95,7 +110,8 @@ class FeedbackManager {
 
       // 检查是否已经投过票
       const existingVoteIndex = feedback.votes.findIndex(v => v.accountId === accountId);
-      if (existingVoteIndex !== -1) {
+      const isCancel = existingVoteIndex !== -1;
+      if (isCancel) {
         // 已投过票，取消投票
         feedback.votes.splice(existingVoteIndex, 1);
       } else {
@@ -111,6 +127,19 @@ class FeedbackManager {
       feedbacks[feedbackIndex] = feedback;
       await dataStore.write('feedbacks', feedbacks);
       logger.info('反馈投票', { feedbackId, accountId, voteType });
+
+      // 记录操作日志
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId: accountId,
+          username: '',
+          action: 'feedback_vote',
+          category: 'feedback',
+          targetId: feedbackId,
+          details: { voteType, canceled: isCancel }
+        });
+      }
+
       return { success: true, feedback };
     } catch (err) {
       logger.error('投票失败', { feedbackId, accountId, error: err.message });
@@ -182,6 +211,19 @@ class FeedbackManager {
       feedbacks[feedbackIndex] = feedback;
       await dataStore.write('feedbacks', feedbacks);
       logger.info('添加反馈评论', { feedbackId, commentId, accountId });
+
+      // 记录操作日志
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId: accountId,
+          username: '',
+          action: 'feedback_comment',
+          category: 'feedback',
+          targetId: feedbackId,
+          details: { commentId }
+        });
+      }
+
       return { success: true, feedback };
     } catch (err) {
       logger.error('添加评论失败', { feedbackId, accountId, error: err.message });
@@ -204,6 +246,7 @@ class FeedbackManager {
       feedbacks[feedbackIndex] = feedback;
       await dataStore.write('feedbacks', feedbacks);
       logger.info('更新反馈状态', { feedbackId, status });
+
       return { success: true, feedback };
     } catch (err) {
       logger.error('更新反馈状态失败', { feedbackId, error: err.message });
@@ -234,6 +277,19 @@ class FeedbackManager {
       feedbacks[feedbackIndex].updatedAt = Date.now();
       await dataStore.write('feedbacks', feedbacks);
       logger.info('楼中楼回复', { feedbackId, nodeId, accountId });
+
+      // 记录操作日志
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId: accountId,
+          username: '',
+          action: 'feedback_comment',
+          category: 'feedback',
+          targetId: feedbackId,
+          details: { nodeId, reply: true }
+        });
+      }
+
       return { success: true, feedback: feedbacks[feedbackIndex] };
     } catch (err) {
       logger.error('楼中楼回复失败', { error: err.message });
@@ -263,7 +319,8 @@ class FeedbackManager {
 
       if (!target.likes) target.likes = [];
       const idx = target.likes.indexOf(accountId);
-      if (idx !== -1) {
+      const liked = idx === -1;
+      if (!liked) {
         target.likes.splice(idx, 1); // 取消点赞
       } else {
         target.likes.push(accountId); // 点赞
@@ -271,6 +328,19 @@ class FeedbackManager {
 
       feedback.updatedAt = Date.now();
       await dataStore.write('feedbacks', feedbacks);
+
+      // 记录操作日志
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId: accountId,
+          username: '',
+          action: 'feedback_like',
+          category: 'feedback',
+          targetId: feedbackId,
+          details: { nodeId, liked }
+        });
+      }
+
       return { success: true, feedback };
     } catch (err) {
       logger.error('评论点赞失败', { error: err.message });
@@ -295,6 +365,19 @@ class FeedbackManager {
         comments.splice(cIdx, 1);
         feedback.updatedAt = Date.now();
         await dataStore.write('feedbacks', feedbacks);
+
+        // 记录操作日志
+        if (this.operationLogger) {
+          this.operationLogger.log({
+            userId: accountId,
+            username: '',
+            action: 'feedback_delete_comment',
+            category: 'feedback',
+            targetId: feedbackId,
+            details: { nodeId }
+          });
+        }
+
         return { success: true, feedback };
       }
 
@@ -306,6 +389,19 @@ class FeedbackManager {
             if (!result.success) return result;
             feedback.updatedAt = Date.now();
             await dataStore.write('feedbacks', feedbacks);
+
+            // 记录操作日志
+            if (this.operationLogger) {
+              this.operationLogger.log({
+                userId: accountId,
+                username: '',
+                action: 'feedback_delete_comment',
+                category: 'feedback',
+                targetId: feedbackId,
+                details: { nodeId }
+              });
+            }
+
             return { success: true, feedback };
           }
         }

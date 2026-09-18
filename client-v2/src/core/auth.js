@@ -238,6 +238,8 @@ export function updateProfile(params) {
 
 /** 退出登录 */
 export function logout() {
+  // 通知服务端记录登出并结束会话
+  emit('logout');
   clearAuth();
   toast.info('已退出登录');
   if (window.location.hash !== '#/login') {

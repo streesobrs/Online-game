@@ -8,10 +8,31 @@ const MAX_RECORDS_PER_USER = 200000;
 const MAX_DAYS = 90;
 const TRACE_RETENTION_DAYS = 7;
 
+// 日志中需要脱敏的字段，避免 token / 密码等明文落盘与展示
+const SENSITIVE_KEYS = new Set([
+  'token', 'usertoken', 'password', 'oldpassword', 'newpassword',
+  'confirmpassword', 'secret', 'authorization'
+]);
+
 class OperationLogger {
   constructor() {
     this.logDir = path.join(config.paths.data, 'operation_logs');
+    this._clientResolver = null;
     this._initDir();
+  }
+
+  // 注入客户端类型解析器：传入账号ID，返回该账号当前使用的客户端（v1 / v2）
+  setClientResolver(resolver) {
+    this._clientResolver = typeof resolver === 'function' ? resolver : null;
+  }
+
+  _resolveClientType(userId) {
+    if (!userId || !this._clientResolver) return null;
+    try {
+      return this._clientResolver(userId) || null;
+    } catch (e) {
+      return null;
+    }
   }
 
   _initDir() {
@@ -111,7 +132,9 @@ class OperationLogger {
     }
     const result = {};
     for (const [k, v] of Object.entries(value)) {
-      result[k] = this._sanitizeValue(v, maxDepth, currentDepth + 1);
+      result[k] = SENSITIVE_KEYS.has(String(k).toLowerCase())
+        ? '***'
+        : this._sanitizeValue(v, maxDepth, currentDepth + 1);
     }
     return result;
   }
@@ -134,6 +157,10 @@ class OperationLogger {
     if (op.details !== undefined && op.details !== null && Object.keys(op.details).length > 0) logEntry.details = this._sanitizeValue(op.details);
     if (op.ip) logEntry.ip = op.ip;
 
+    // 统一记录客户端类型（v1 / v2），便于按客户端追溯所有操作
+    const clientType = op.clientType || this._resolveClientType(op.userId);
+    if (clientType) logEntry.clientType = clientType;
+
     const userId = op.userId || 'anonymous';
     const isTrace = logEntry.category === 'trace';
     const category = isTrace ? 'trace' : 'default';
@@ -143,43 +170,19 @@ class OperationLogger {
     await this._appendToJsonl(filePath, logEntry);
     await this._updateUserIndex(userId, logEntry, filePath);
 
-    // 兼容旧格式：同时写入 dataStore 便于迁移期过渡
-    try {
-      await this._legacyBackup(userId, logEntry);
-    } catch (e) {
-      // 兼容失败不影响主流程
-    }
-
     return logEntry;
-  }
-
-  async _legacyBackup(userId, logEntry) {
-    const cutoffTime = Date.now() - 30 * 24 * 60 * 60 * 1000; // 只保留30天旧数据
-    try {
-      const data = await dataStore.readOne('operationLogs', userId);
-      if (!data || !Array.isArray(data.logs)) {
-        await dataStore.writeOne('operationLogs', userId, { userId, logs: [logEntry] });
-        return;
-      }
-      data.logs.push(logEntry);
-      data.logs = data.logs.filter(l => l.timestamp >= cutoffTime);
-      if (data.logs.length > 5000) {
-        data.logs.splice(0, data.logs.length - 5000);
-      }
-      await dataStore.writeOne('operationLogs', userId, data);
-    } catch (e) {
-      logger.warn('操作日志兼容备份失败', { userId, error: e.message });
-    }
   }
 
   async logSocketEvent(userId, username, event, data, details = {}) {
     const sanitized = this._sanitizeValue(data, 2, 0);
+    // category 由调用方指定（如管理端事件为 admin），未指定时按追踪日志处理
+    const { category, ...extraDetails } = details;
     return this.log({
       userId,
       username,
       action: 'socket_' + event,
-      category: 'trace',
-      details: { event, data: sanitized, ...details }
+      category: category || 'trace',
+      details: { event, data: sanitized, ...extraDetails }
     });
   }
 
@@ -217,7 +220,7 @@ class OperationLogger {
   }
 
   async queryLogs(params) {
-    const { userId, username, action, category, targetId, startDate, endDate, page = 1, pageSize = 50, includeTrace = false } = params;
+    const { userId, username, action, category, targetId, clientType, startDate, endDate, page = 1, pageSize = 50, includeTrace = false } = params;
 
     const parsedPage = Math.max(1, parseInt(page) || 1);
     const parsedPageSize = Math.min(200, Math.max(1, parseInt(pageSize) || 50));
@@ -291,12 +294,22 @@ class OperationLogger {
       allLogs = allLogs.concat(legacyLogs);
     }
 
+    // 去重：同一条日志可能同时存在于 jsonl 与迁移期旧格式中
+    const seenIds = new Set();
+    allLogs = allLogs.filter(l => {
+      if (!l.id) return true;
+      if (seenIds.has(l.id)) return false;
+      seenIds.add(l.id);
+      return true;
+    });
+
     // 过滤
     let logs = allLogs;
     if (username) logs = logs.filter(l => l.username && l.username.toLowerCase().includes(username.toLowerCase()));
     if (action) logs = logs.filter(l => l.action === action);
     if (category) logs = logs.filter(l => l.category === category);
     if (targetId) logs = logs.filter(l => l.targetId === targetId);
+    if (clientType) logs = logs.filter(l => l.clientType === clientType);
 
     logs.sort((a, b) => b.timestamp - a.timestamp);
 
@@ -480,13 +493,14 @@ class OperationLogger {
     });
   }
 
-  async getLogin(userId, username, ip = '') {
+  async getLogin(userId, username, ip = '', details = {}) {
     return this.log({
       userId,
       username,
       action: 'login',
       category: 'account',
-      ip
+      ip,
+      details
     });
   }
 

@@ -87,14 +87,29 @@ function authenticateToken(req, res, next) {
   }
 
   if (adminManager && adminManager.verifyToken(token)) {
+    // 附带管理员身份，供路由记录操作日志（时间/客户端/用户/操作）
+    req.adminToken = token;
+    req.adminIdentity = adminManager.resolveIdentity(token);
     return next();
   }
 
   if (token === config.admin.token) {
+    req.adminToken = token;
+    req.adminIdentity = { accountId: 'static-admin', username: '内置管理员' };
     return next();
   }
 
   return res.status(401).json({ success: false, message: '无效的认证Token' });
+}
+
+// 管理端 REST 操作日志统一入口：记录 时间/操作人/操作/目标
+function logAdminRest(req, action, details = {}, target = {}) {
+  if (!operationLogger) return;
+  const identity = req.adminIdentity || { accountId: 'static-admin', username: '内置管理员' };
+  operationLogger.getAdminAction(
+    identity.accountId, identity.username, action,
+    target.targetId || '', target.targetName || '', details
+  );
 }
 
 // 静态文件服务 - 优先 client 目录，fallback 到根目录
@@ -244,6 +259,11 @@ app.post('/api/update/upload', authenticateToken, express.raw({
       return res.status(400).json({ success: false, message: '未收到文件数据' });
     }
     const result = await updateManager.saveUploadedFile(req.body, 'update.zip');
+    logAdminRest(req, 'update_upload', {
+      size: result.size,
+      sizeFormatted: (result.size / 1024 / 1024).toFixed(2) + ' MB',
+      hash: result.hash
+    });
     res.json({
       success: true,
       message: '上传成功',
@@ -270,6 +290,9 @@ app.post('/api/update/start', authenticateToken, async (req, res) => {
       return res.status(409).json({ success: false, message: '已有更新正在进行中' });
     }
     res.json({ success: true, message: '更新开始执行' });
+    logAdminRest(req, 'update_start', {
+      currentVersion: config.version
+    });
     updateManager.startUpdate().catch(err => {
       logger.error('更新执行失败', { error: err.message });
     });
@@ -282,6 +305,7 @@ app.post('/api/update/start', authenticateToken, async (req, res) => {
 app.post('/api/update/cancel', authenticateToken, (req, res) => {
   try {
     updateManager.cancelUpdate();
+    logAdminRest(req, 'update_cancel');
     res.json({ success: true, message: '更新已取消' });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -295,6 +319,7 @@ app.post('/api/update/rollback', authenticateToken, async (req, res) => {
       return res.status(400).json({ success: false, message: '请指定要回滚的备份' });
     }
     res.json({ success: true, message: '开始回滚，服务将重启' });
+    logAdminRest(req, 'update_rollback', { backupName }, { targetId: backupName, targetName: backupName });
     updateManager.manualRollback(backupName).catch(err => {
       logger.error('回滚失败', { error: err.message });
     });
@@ -307,6 +332,7 @@ app.post('/api/update/rollback', authenticateToken, async (req, res) => {
 app.delete('/api/update/backup/:name', authenticateToken, (req, res) => {
   try {
     updateManager.deleteBackup(req.params.name);
+    logAdminRest(req, 'update_delete_backup', { backupName: req.params.name }, { targetId: req.params.name, targetName: req.params.name });
     res.json({ success: true, message: '备份已删除' });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -634,6 +660,11 @@ app.get('/api/themes/:id', (req, res) => {
 app.post('/api/themes', authenticateToken, async (req, res) => {
   try {
     const result = await themeManager.addTheme(req.body);
+    if (result && result.success) {
+      const themeName = req.body.name || req.body.id || '';
+      logAdminRest(req, 'theme_add', { themeId: req.body.id, themeName: req.body.name },
+        { targetId: req.body.id || '', targetName: themeName });
+    }
     res.json(result);
   } catch (err) {
     logger.error('添加主题失败', { error: err.message });
@@ -648,6 +679,10 @@ app.post('/api/themes', authenticateToken, async (req, res) => {
 app.put('/api/themes/:id', authenticateToken, async (req, res) => {
   try {
     const result = await themeManager.updateTheme(req.params.id, req.body);
+    if (result && result.success) {
+      logAdminRest(req, 'theme_update', { themeId: req.params.id, fields: Object.keys(req.body || {}) },
+        { targetId: req.params.id, targetName: req.body.name || req.params.id });
+    }
     res.json(result);
   } catch (err) {
     logger.error('更新主题失败', { id: req.params.id, error: err.message });
@@ -662,6 +697,9 @@ app.put('/api/themes/:id', authenticateToken, async (req, res) => {
 app.delete('/api/themes/:id', authenticateToken, async (req, res) => {
   try {
     const result = await themeManager.deleteTheme(req.params.id);
+    if (result && result.success) {
+      logAdminRest(req, 'theme_delete', { themeId: req.params.id }, { targetId: req.params.id, targetName: req.params.id });
+    }
     res.json(result);
   } catch (err) {
     logger.error('删除主题失败', { id: req.params.id, error: err.message });
@@ -676,6 +714,7 @@ app.delete('/api/themes/:id', authenticateToken, async (req, res) => {
 app.post('/api/themes/reload', authenticateToken, async (req, res) => {
   try {
     const result = await themeManager.reloadThemes();
+    logAdminRest(req, 'theme_reload');
     res.json(result);
   } catch (err) {
     logger.error('重新加载主题失败', { error: err.message });
@@ -774,6 +813,10 @@ app.put('/api/accounts/:id/exp', authenticateToken, async (req, res) => {
       });
     }
     const result = await accountManager.modifyUserExp(req.params.id, operation, parseInt(amount));
+    if (result && result.success) {
+      logAdminRest(req, 'account_modify_exp', { operation, amount: parseInt(amount) },
+        { targetId: req.params.id, targetName: result.data?.account?.nickname || req.params.id });
+    }
     res.json(result);
   } catch (err) {
     logger.error('修改用户经验失败', { error: err.message });
@@ -879,9 +922,9 @@ app.get('/api/admin/games', authenticateToken, async (req, res) => {
 // 管理员：获取操作日志列表（分页+筛选）
 app.get('/api/admin/operation-logs', authenticateToken, async (req, res) => {
   try {
-    const { userId, username, action, category, targetId, startDate, endDate, page = 1, pageSize = 50, includeTrace = 'false' } = req.query;
+    const { userId, username, action, category, targetId, clientType, startDate, endDate, page = 1, pageSize = 50, includeTrace = 'false' } = req.query;
     const result = await operationLogger.queryLogs({
-      userId, username, action, category, targetId, startDate, endDate, page, pageSize,
+      userId, username, action, category, targetId, clientType, startDate, endDate, page, pageSize,
       includeTrace: includeTrace === 'true'
     });
     res.json({ success: true, ...result });
@@ -998,6 +1041,7 @@ app.put('/api/feedbacks/:id/status', authenticateToken, async (req, res) => {
     const result = await feedbackManager.updateFeedbackStatus(id, status);
     // 广播实时更新
     if (result.success) {
+      logAdminRest(req, 'feedback_status', { status }, { targetId: id, targetName: id });
       feedbackManager.getFeedbackList().then(all => io.emit('feedbacks_list', { feedbacks: all }));
     }
     res.json(result);
@@ -1271,6 +1315,7 @@ app.post('/api/chat/broadcast', authenticateToken, async (req, res) => {
       message: message,
       timestamp: Date.now()
     });
+    logAdminRest(req, 'chat_broadcast', { message });
     res.json({
       success: true,
       message: '广播发送成功'
@@ -1314,6 +1359,7 @@ app.post('/api/system/maintenance', authenticateToken, async (req, res) => {
       message: message || '服务器正在维护中',
       timestamp: Date.now()
     });
+    logAdminRest(req, 'system_maintenance', { enabled: !!enabled, message: message || '' });
     res.json({
       success: true,
       message: enabled ? '服务器已进入维护模式' : '服务器已退出维护模式'
@@ -1405,6 +1451,10 @@ app.post('/api/achievements/:id/award', authenticateToken, async (req, res) => {
       });
     }
     const result = await accountManager.addUserAchievement(accountId, req.params.id);
+    if (result && result.success) {
+      logAdminRest(req, 'achievement_award', { achievementId: req.params.id },
+        { targetId: accountId, targetName: req.params.id });
+    }
     res.json(result);
   } catch (err) {
     logger.error('添加用户成就失败', { error: err.message });
@@ -1517,6 +1567,12 @@ app.get('/api/currency/:accountId/exp-transactions', async (req, res) => {
 app.post('/api/currency/compensate', async (req, res) => {
   try {
     const result = await accountManager.compensateOldPlayers();
+    if (result && result.success && operationLogger) {
+      const identity = req.adminIdentity || { accountId: 'system', username: '系统' };
+      operationLogger.getAdminAction(identity.accountId, identity.username, 'compensate_old_players', '', '', {
+        total: result.total, compensated: result.compensated, skipped: result.skipped, totalCoins: result.totalCoins
+      });
+    }
     res.json(result);
   } catch (err) {
     logger.error('星钻补偿失败', { error: err.message });
@@ -1819,6 +1875,8 @@ AccountManager.migrateAll().then(result => {
 });
 const userManager = new UserManager(accountManager);
 userManager.operationLogger = operationLogger;
+// 注入客户端类型解析器：所有操作日志自动带上用户当前使用的客户端（v1 / v2）
+operationLogger.setClientResolver((accountId) => userManager.getUserByAccountId(accountId)?.clientType || null);
 logger.info('用户管理器初始化完成');
 
 const achievementManager = new AchievementManager(accountManager, userManager);
@@ -1848,10 +1906,12 @@ const shopManager = new ShopManager();
 shopManager.operationLogger = operationLogger;
 // 注入accountManager到FeedbackManager用于实时查询昵称
 feedbackManager.accountManager = accountManager;
+feedbackManager.operationLogger = operationLogger;
 
 const friendsManager = new FriendsManager();
 friendsManager.userManager = userManager;
 friendsManager.accountManager = accountManager;
+friendsManager.operationLogger = operationLogger;
 logger.info('好友系统初始化完成');
 
 // 服务器启动时增加构建版本号
@@ -1982,6 +2042,30 @@ const serverStartTime = Date.now();
 
 // 初始化贪吃蛇游戏存储（在连接回调外部，全局共享）
 io.snakeGames = new Map(); // 存储进行中的游戏
+
+// 判断客户端版本类型（v1 / v2）：优先取客户端上报值，其次按访问路径（/beta、/preview）兜底
+function detectClientType(socket, data) {
+  const declared = String(data?.clientType || '').toLowerCase();
+  if (declared === 'v1' || declared === 'v2') return declared;
+  const referer = socket?.handshake?.headers?.referer || '';
+  if (/\/(beta|preview)(\/|$)/.test(referer)) return 'v2';
+  return 'v1';
+}
+
+// 将当前会话使用的客户端类型写入账号，供后台管理查看
+// data 为空时沿用会话中已识别的类型，避免登录阶段把类型覆盖回默认值
+function recordSessionClient(socket, session, data) {
+  if (!session || !accountManager) return;
+  if (data && (data.clientType || data.clientVersion)) {
+    session.clientType = detectClientType(socket, data);
+    session.clientVersion = data.clientVersion || session.clientVersion || null;
+  } else if (!session.clientType) {
+    session.clientType = detectClientType(socket, null);
+  }
+  if (session.accountId) {
+    accountManager.recordClientInfo(session.accountId, session.clientType, session.clientVersion);
+  }
+}
 
 // 主命名空间
 io.on('connection', (socket) => {
@@ -2119,6 +2203,9 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // 记录本次连接使用的客户端类型（v1 / v2）
+    recordSessionClient(socket, userSession, data);
+
     // 如果是已登录的账号，发送登录结果
     if (userSession.accountId && userSession.accountData && userSession.accountData.account?.type !== 'anonymous') {
       const account = userSession.accountData;
@@ -2140,6 +2227,16 @@ io.on('connection', (socket) => {
         socketId: socket.id,
         accountId: userSession.accountId
       });
+
+      // 记录操作日志：token 自动登录（socket 重连不算一次新的登录）
+      if (operationLogger && !userSession.isReconnect) {
+        operationLogger.getLogin(
+          userSession.accountId,
+          account.account?.nickname || account.account?.username || userSession.nickname || '',
+          socket.handshake?.address || '',
+          { loginType: 'token' }
+        );
+      }
     }
 
     // 重连时恢复游戏状态
@@ -2203,9 +2300,12 @@ io.on('connection', (socket) => {
         }
       });
 
+      // 记录客户端类型（v1 / v2）
+      recordSessionClient(socket, userManager.getUserBySocketId(socket.id), null);
+
       // 记录操作日志
       if (operationLogger) {
-        operationLogger.getLogin(accountId, account.account?.nickname || account.account?.username || '', socket.handshake?.address || '');
+        operationLogger.getLogin(accountId, account.account?.nickname || account.account?.username || '', socket.handshake?.address || '', { loginType: 'guest' });
       }
 
       // 广播用户上线
@@ -2280,6 +2380,11 @@ io.on('connection', (socket) => {
       userManager.broadcastUserStatus(newAccountId, 'online', io);
     }
 
+    // 记录客户端类型（v1 / v2）
+    if (result.success) {
+      recordSessionClient(socket, userSession, null);
+    }
+
     // 记录操作日志（注册成功时）
     if (result.success && operationLogger) {
       const registeredId = guestAccountId || result.id;
@@ -2336,23 +2441,20 @@ io.on('connection', (socket) => {
         // 广播用户上线
         userManager.broadcastUserStatus(newAccountId, 'online', io);
 
-        // 检查回归玩家成就
+        // 检查回归玩家成就（标记取自本次登录的计算结果，不是账号里的旧值）
         if (achievementManager) {
-          const account = result.data.account;
-          const returnPlayer = account.account?.activity?.returnPlayer;
-          const longReturnPlayer = account.account?.activity?.longReturnPlayer;
-
-          if (returnPlayer) {
-            await achievementManager.checkAndAwardAchievement(newAccountId, 'return_player');
-          }
-          if (longReturnPlayer) {
-            await achievementManager.checkAndAwardAchievement(newAccountId, 'long_return_player');
+          const activity = result.data.activity || {};
+          if (activity.returnPlayer || activity.longReturnPlayer) {
+            await achievementManager.checkAchievements(newAccountId, {
+              returnPlayer: !!activity.returnPlayer,
+              longReturnPlayer: !!activity.longReturnPlayer
+            });
           }
         }
 
         // 记录操作日志
         if (operationLogger) {
-          operationLogger.getLogin(newAccountId, userSession?.nickname || username, socket.handshake?.address || '');
+          operationLogger.getLogin(newAccountId, userSession?.nickname || username, socket.handshake?.address || '', { loginType: 'password' });
         }
 
         logger.info('账号登录成功', {
@@ -2360,6 +2462,9 @@ io.on('connection', (socket) => {
           accountId: newAccountId,
           username
         });
+
+        // 记录客户端类型（v1 / v2）
+        recordSessionClient(socket, userSession, null);
       }
     }
 
@@ -2377,7 +2482,7 @@ io.on('connection', (socket) => {
 
       // 记录操作日志
       if (operationLogger) {
-        operationLogger.getLogin(userSession.accountId, userSession.nickname || '', socket.handshake?.address || '');
+        operationLogger.getLogin(userSession.accountId, userSession.nickname || '', socket.handshake?.address || '', { loginType: 'guest' });
       }
 
       const result = {
@@ -2413,6 +2518,8 @@ io.on('connection', (socket) => {
     }
 
     const { nickname, profile, privacy } = data;
+    // 更新前的快照，用于比对出真正发生变化的字段（客户端常回传整份 profile）
+    const before = userSession.accountData?.account || {};
     const result = await accountManager.updateProfile(userSession.accountId, { nickname, profile, privacy });
 
     if (result.success) {
@@ -2423,6 +2530,39 @@ io.on('connection', (socket) => {
       if (account) {
         userSession.accountData = account;
         userSession.nickname = account.account?.nickname || userSession.nickname;
+      }
+
+      // 记录操作日志：只记录真正变化的字段，避免出现无意义的空记录
+      if (operationLogger) {
+        const fields = [];
+        if (nickname && nickname !== before.nickname) fields.push('nickname');
+        if (profile && typeof profile === 'object') {
+          for (const [k, v] of Object.entries(profile)) {
+            if (v !== before.profile?.[k]) fields.push(`profile.${k}`);
+          }
+        }
+        if (privacy && typeof privacy === 'object') {
+          for (const [k, v] of Object.entries(privacy)) {
+            if (v !== before.privacy?.[k]) fields.push(`privacy.${k}`);
+          }
+        }
+
+        if (fields.length > 0) {
+          operationLogger.log({
+            userId: userSession.accountId,
+            username: userSession.nickname || '',
+            action: 'profile_update',
+            category: 'account',
+            targetName: nickname || '',
+            ip: socket.handshake?.address || '',
+            details: {
+              fields,
+              nickname: nickname || undefined,
+              profile: profile && typeof profile === 'object' ? profile : undefined,
+              privacy: privacy && typeof privacy === 'object' ? privacy : undefined
+            }
+          });
+        }
       }
     }
 
@@ -2446,6 +2586,18 @@ io.on('connection', (socket) => {
 
     const { oldPassword, newPassword } = data;
     const result = await accountManager.changePassword(userSession.accountId, oldPassword, newPassword);
+
+    // 记录操作日志
+    if (result.success && operationLogger) {
+      operationLogger.log({
+        userId: userSession.accountId,
+        username: userSession.nickname || '',
+        action: 'password_change',
+        category: 'account',
+        ip: socket.handshake?.address || ''
+      });
+    }
+
     socket.emit('account_action_result', {
       action: 'change_password',
       ...result
@@ -2466,6 +2618,18 @@ io.on('connection', (socket) => {
 
     const { password } = data;
     const result = await accountManager.setPassword(userSession.accountId, password);
+
+    // 记录操作日志
+    if (result.success && operationLogger) {
+      operationLogger.log({
+        userId: userSession.accountId,
+        username: userSession.nickname || '',
+        action: 'password_set',
+        category: 'account',
+        ip: socket.handshake?.address || ''
+      });
+    }
+
     socket.emit('account_action_result', {
       action: 'set_password',
       ...result
@@ -2481,7 +2645,20 @@ io.on('connection', (socket) => {
       accountId
     });
 
-    const result = await adminManager.upgradeToAdmin(accountId, upgradeKey);
+    const result = await adminManager.upgradeWithKey(accountId, upgradeKey);
+
+    // 记录操作日志（提权属敏感操作）
+    if (result && result.success && operationLogger) {
+      const userSession = userManager.getUserBySocketId(socket.id);
+      operationLogger.log({
+        userId: accountId,
+        username: userSession?.nickname || '',
+        action: 'admin_upgrade',
+        category: 'account',
+        targetId: accountId,
+        ip: socket.handshake?.address || ''
+      });
+    }
 
     socket.emit('admin_upgrade_result', result);
   });
@@ -2490,10 +2667,38 @@ io.on('connection', (socket) => {
   socket.on('account_reset_password', async (data) => {
     const { username, password } = data;
     const result = await accountManager.resetPassword(username, password);
+
+    // 记录操作日志（找回密码属敏感操作）
+    if (result.success && operationLogger) {
+      operationLogger.log({
+        userId: result.accountId || result.id || '',
+        username: result.nickname || username || '',
+        action: 'password_reset',
+        category: 'account',
+        targetName: username || '',
+        ip: socket.handshake?.address || ''
+      });
+    }
+
     socket.emit('account_action_result', {
       action: 'reset_password',
       ...result
     });
+  });
+
+  // 退出登录（客户端主动登出，与断线重连区分）
+  socket.on('logout', async () => {
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (!userSession || !userSession.accountId) {
+      socket.emit('logout_result', { success: true });
+      return;
+    }
+
+    // 与断线一致地处理进行中的匹配/对局（此时会话还在）
+    gameManager.handleUserDisconnect(socket.id, io);
+    await userManager.handleUserLogout(userSession.accountId, io);
+
+    socket.emit('logout_result', { success: true });
   });
 
   // 通过token获取账号信息
@@ -2520,6 +2725,11 @@ io.on('connection', (socket) => {
           userManager.socketToAccount.set(socket.id, accountId);
           userManager.onlineUsers.set(accountId, userSession);
           try { socket.join(accountId); } catch (e) { /* 忽略房间加入错误 */ }
+
+          // 记录操作日志：此处新建会话说明本次是 token 登录（client_connect 未抢先建会话）
+          if (operationLogger) {
+            operationLogger.getLogin(accountId, userSession.nickname || '', socket.handshake?.address || '', { loginType: 'token' });
+          }
         } else {
           userSession.accountData = result.data;
           userSession.token = token;
@@ -3293,6 +3503,18 @@ io.on('connection', (socket) => {
         gameType
       });
 
+      // 记录操作日志
+      if (operationLogger) {
+        operationLogger.log({
+          userId: accountId || '',
+          username: user.nickname || '',
+          action: 'snake_start',
+          category: 'game',
+          targetName: gameType || 'snake',
+          ip: socket.handshake?.address || ''
+        });
+      }
+
       // 可以在这里添加游戏开始时的统计或其他逻辑
 
     } catch (err) {
@@ -3488,6 +3710,20 @@ io.on('connection', (socket) => {
             highScore: clientHighScore,
             previousHighScore: currentHighScore
           });
+
+          // 记录操作日志
+          if (operationLogger) {
+            operationLogger.log({
+              userId: user.accountId,
+              username: user.nickname || '',
+              action: 'snake_highscore',
+              category: 'game',
+              targetName: 'snake',
+              amount: clientHighScore,
+              ip: socket.handshake?.address || '',
+              details: { previousHighScore: currentHighScore, highScore: clientHighScore }
+            });
+          }
 
           // 通知客户端账号数据已更新
           const updatedAccount = await gameManager.accountManager.getAccount(user.accountId);
@@ -4283,7 +4519,9 @@ adminNamespace.on('connection', (socket) => {
     'add_user_achievement', 'remove_user_achievement', 'reset_user_achievements',
     'cleanup_data',
     'update_backup_db', 'update_restore_backup', 'update_apply_update',
-    'update_upload_package', 'update_set_channel', 'update_delete_backup'
+    'update_upload_package', 'update_set_channel', 'update_delete_backup',
+    'update_start_upload', 'update_start', 'update_cancel', 'update_rollback',
+    'update_system_setting', 'reset_system_setting', 'reset_all_settings'
   ]);
 
   socket.use(([event, ...args], next) => {
@@ -4497,5 +4735,9 @@ process.on('uncaughtException', (err) => {
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  logger.error('未处理的Promise拒绝', { reason });
+  // 直接打 { reason } 时 Error 会被序列化成 {}，看不出原因，这里补上 message/stack
+  logger.error('未处理的Promise拒绝', {
+    error: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined
+  });
 });

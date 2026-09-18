@@ -246,6 +246,17 @@
     font-size: 10px;
   }
 
+  /* ---- 全局抽屉：面板占满更多宽度，把手收窄 ---- */
+  .nav-drawer-panel {
+    width: 100%;
+    max-width: 86vw;
+    padding: 14px;
+  }
+
+  .nav-drawer-handle {
+    padding: 5px 3px 5px 6px;
+  }
+
   /* ---- 悬浮坞：全宽贴底 ---- */
   .float-dock-panel {
     right: 0;

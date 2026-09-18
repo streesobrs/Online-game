@@ -42,6 +42,7 @@ socket.on('connect', () => {
   // 已登录则回发 login_result（自动登录），这是匹配等操作的前置条件。
   socket.emit('client_connect', {
     clientVersion,
+    clientType: 'v2',
     token: localStorage.getItem('userToken') || 'none',
   });
   eventBus.emit('socket:connect');

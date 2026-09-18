@@ -17,7 +17,7 @@ import { initRouter, registerRoute, go, isActive, setRouteGuard } from './core/r
 import { initShortcuts } from './utils/shortcut.js';
 import { NAV_ITEMS, GAMES, FEATURES, findItem } from './data/navItems.js';
 import * as themes from './features/themes/index.js';
-import { switchLayout, renderAccountBar } from './layouts/registry.js';
+import { applyNavMode, getNavPrefs, setNavPrefs } from './layouts/mode.js';
 import { viewRoot } from './utils/dom.js';
 import * as login from './features/auth/login.js';
 import { renderLoginPage } from './features/auth/login-page.js';
@@ -42,7 +42,7 @@ window.registerRoute = registerRoute;
 window.shortcuts = { initShortcuts };
 window.navItems = { NAV_ITEMS, GAMES, FEATURES, findItem };
 window.themes = themes;
-window.switchLayout = switchLayout;
+window.navPrefs = { getNavPrefs, setNavPrefs, applyNavMode };
 window.login = login;
 
 // 1. 初始化登录态（恢复 token、订阅登录事件、socket 连接后自动登录）
@@ -106,11 +106,8 @@ store.subscribe('currentView', (id) => {
 // 5. 初始化快捷键（元数据驱动）
 initShortcuts();
 
-// 6. 渲染布局（导航栏；读取本地保存的布局，默认 topnav）
-switchLayout(localStorage.getItem('nav-layout') || 'topnav');
-
-// 6.1 初始化顶部悬浮账号条
-renderAccountBar(document.getElementById('account-root') || document.body);
+// 6. 渲染导航界面（读取本地保存的界面形态：全局抽屉 / 悬浮头像，默认抽屉）
+applyNavMode();
 
 // 7. 初始化常驻悬浮坞（合并聊天 + 在线玩家）
 initFloatingChat();

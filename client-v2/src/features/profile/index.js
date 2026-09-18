@@ -22,7 +22,8 @@ import { eventBus } from '../../core/eventBus.js';
 import { NAV_ITEMS } from '../../data/navItems.js';
 import * as auth from '../../core/auth.js';
 import { requestReplay, showReplay } from '../replay/index.js';
-import { resetOnboarding, startOnboarding, startMailTour, startAssetsTour, startShopTour } from '../../components/onboarding.js';
+import { resetOnboarding, resetAllTours, startOnboarding, startMailTour, startAssetsTour, startShopTour } from '../../components/onboarding.js';
+import { buildNavPrefsPanel } from '../../components/navPrefs.js';
 
 /** 游戏类型展示元数据 */
 const GAME_META = {
@@ -224,6 +225,18 @@ async function openPrivacyModal() {
 }
 
 /**
+ * 界面设置弹窗：导航栏 / 账号入口两个开关，与新手引导共用同一份偏好，拨动即时生效
+ */
+function openUiSettingsModal() {
+  modal.show({
+    title: '🧩 界面设置',
+    content: buildNavPrefsPanel(),
+    confirmText: '完成',
+    showCancel: false,
+  });
+}
+
+/**
  * 渲染个人资料视图
  * @param {HTMLElement} container - 内容容器（#view-root）
  * @returns {Function} cleanup 函数
@@ -340,10 +353,14 @@ export function renderProfile(container) {
         el('button', { class: 'profile-aside-btn', onClick: () => switchTab('achievements') }, '🏆 我的成就'),
         el('button', { class: 'profile-aside-btn', onClick: () => switchTab('shop') }, '🛒 我的商城'),
         el('button', { class: 'profile-aside-btn', onClick: () => switchTab('themes') }, '🎨 主题设置'),
+        el('button', { class: 'profile-aside-btn', onClick: openUiSettingsModal }, '🧩 界面设置'),
         el('button', {
           class: 'profile-aside-btn',
           onClick: () => {
+            // 主引导 + 全部场景引导标记一起清掉：主引导立刻重放，
+            // 场景引导（对局/邮件/商城/资产/观战）下次进入对应页面时重新触发
             resetOnboarding();
+            resetAllTours();
             window.location.hash = '#/games';
             setTimeout(() => startOnboarding(), 500);
           },

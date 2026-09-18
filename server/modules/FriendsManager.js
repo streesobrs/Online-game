@@ -9,13 +9,14 @@ class FriendsManager {
   constructor() {
     this.userManager = null;   // 注入：查询在线状态
     this.accountManager = null; // 注入：查询账号公开信息
+    this.operationLogger = null; // 注入：记录操作日志
     // 写操作串行队列，避免并发读改写造成数据丢失
     this._chain = Promise.resolve();
   }
 
   _serialize(fn) {
     const run = this._chain.then(() => fn(), () => fn());
-    this._chain = run.catch(() => {});
+    this._chain = run.catch(() => { });
     return run;
   }
 
@@ -121,6 +122,20 @@ class FriendsManager {
         existing.responder = requesterId;
         await this._save(list);
         const requesterInfo = await this._info(requesterId);
+
+        // 记录操作日志
+        if (this.operationLogger) {
+          this.operationLogger.log({
+            userId: requesterId,
+            username: requesterInfo ? requesterInfo.nickname : '',
+            action: 'friend_request',
+            category: 'social',
+            targetId,
+            targetName: target.account?.nickname || target.username || '',
+            details: { autoAccepted: true }
+          });
+        }
+
         return {
           success: true,
           autoAccepted: true,
@@ -140,6 +155,20 @@ class FriendsManager {
       });
       await this._save(list);
       const requesterInfo = await this._info(requesterId);
+
+      // 记录操作日志
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId: requesterId,
+          username: requesterInfo ? requesterInfo.nickname : '',
+          action: 'friend_request',
+          category: 'social',
+          targetId,
+          targetName: target.account?.nickname || target.username || '',
+          details: { autoAccepted: false }
+        });
+      }
+
       return {
         success: true,
         autoAccepted: false,
@@ -170,6 +199,18 @@ class FriendsManager {
       if (!accept) {
         list.splice(idx, 1);
         await this._save(list);
+
+        // 记录操作日志
+        if (this.operationLogger) {
+          this.operationLogger.log({
+            userId,
+            username: '',
+            action: 'friend_reject',
+            category: 'social',
+            targetId: requesterId
+          });
+        }
+
         return { success: true, message: '已拒绝该好友申请' };
       }
 
@@ -178,6 +219,18 @@ class FriendsManager {
       list[idx].responder = userId;
       await this._save(list);
       const responderInfo = await this._info(userId);
+
+      // 记录操作日志
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId,
+          username: responderInfo ? responderInfo.nickname : '',
+          action: 'friend_accept',
+          category: 'social',
+          targetId: requesterId
+        });
+      }
+
       return {
         success: true,
         message: '已添加好友',
@@ -197,6 +250,18 @@ class FriendsManager {
       if (idx === -1) return { success: false, message: '你们还不是好友' };
       list.splice(idx, 1);
       await this._save(list);
+
+      // 记录操作日志
+      if (this.operationLogger) {
+        this.operationLogger.log({
+          userId: accountId,
+          username: '',
+          action: 'friend_remove',
+          category: 'social',
+          targetId: friendId
+        });
+      }
+
       return { success: true, message: '已删除好友' };
     });
   }

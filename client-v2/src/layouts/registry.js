@@ -8,6 +8,9 @@ import { renderTopNav } from './topnav.js';
 // 账号条为全局元素（独立于导航布局），由 main.js 挂载到 #account-root
 export { renderAccountBar } from './topnav.js';
 
+// 全局抽屉（界面形态 drawer），由 layouts/mode.js 挂载到 #drawer-root
+export { renderNavDrawer } from './drawer.js';
+
 export const LAYOUTS = {
     topnav: {
         id: 'topnav',

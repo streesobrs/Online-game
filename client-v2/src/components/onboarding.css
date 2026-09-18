@@ -82,6 +82,14 @@
   gap: 8px;
 }
 
+/* 气泡内联交互区（如界面自定义开关） */
+.onboarding-pop-extra {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
 .onboarding-pop-skip {
   border: none;
   background: none;

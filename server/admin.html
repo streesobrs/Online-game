@@ -3038,6 +3038,7 @@
                     <th>状态</th>
                     <th>棋种</th>
                     <th>账号类型</th>
+                    <th>客户端</th>
                     <th>等级</th>
                     <th>连接时间</th>
                     <th>操作</th>
@@ -3045,7 +3046,7 @@
                 </thead>
                 <tbody id="online-users-body">
                   <tr>
-                    <td colspan="8">
+                    <td colspan="9">
                       <div class="empty-state">
                         <div class="empty-icon">👤</div>暂无在线用户
                       </div>
@@ -3213,6 +3214,10 @@
                   <option value="moderation">举报</option>
                   <option value="admin">管理</option>
                   <option value="game">游戏</option>
+                  <option value="mail">邮件</option>
+                  <option value="reward">奖励</option>
+                  <option value="social">社交</option>
+                  <option value="feedback">反馈</option>
                   <option value="trace">追踪</option>
                 </select>
                 <select id="oplogs-action" class="filter-select" onchange="loadOperationLogs(1)">
@@ -3229,6 +3234,11 @@
                   <option value="game_start">对战开始</option>
                   <option value="ai_game_start">AI对战开始</option>
                 </select>
+                <select id="oplogs-client" class="filter-select" onchange="loadOperationLogs(1)">
+                  <option value="">全部客户端</option>
+                  <option value="v1">v1</option>
+                  <option value="v2">v2</option>
+                </select>
                 <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#94a3b8;cursor:pointer;">
                   <input type="checkbox" id="oplogs-trace" onchange="loadOperationLogs(1)">
                   包含追踪日志
@@ -3243,6 +3253,7 @@
                   <tr>
                     <th>时间</th>
                     <th>用户</th>
+                    <th>客户端</th>
                     <th>分类</th>
                     <th>操作</th>
                     <th>目标</th>
@@ -3251,7 +3262,7 @@
                 </thead>
                 <tbody id="oplogs-body">
                   <tr>
-                    <td colspan="6">
+                    <td colspan="7">
                       <div class="empty-state">
                         <div class="empty-icon">⏳</div>加载中...
                       </div>
@@ -3318,6 +3329,12 @@
               <option value="admin">管理员</option>
               <option value="normal">普通用户</option>
             </select>
+            <label>客户端:</label>
+            <select id="account-client" class="filter-select" onchange="filterAccounts()">
+              <option value="all">全部客户端</option>
+              <option value="v1">v1</option>
+              <option value="v2">v2</option>
+            </select>
             <button class="btn btn-sm btn-secondary" onclick="loadAccounts()">🔄 刷新</button>
           </div>
 
@@ -3338,6 +3355,7 @@
                     <th style="width:70px;">类型</th>
                     <th style="width:70px;">角色</th>
                     <th style="width:70px;">状态</th>
+                    <th style="width:70px;">客户端</th>
                     <th style="width:60px;">等级</th>
                     <th style="width:120px;">最后登录</th>
                     <th style="width:80px;">操作</th>
@@ -3345,7 +3363,7 @@
                 </thead>
                 <tbody id="accounts-body">
                   <tr>
-                    <td colspan="9">
+                    <td colspan="10">
                       <div class="empty-state">
                         <div class="empty-icon">🔑</div>加载中...
                       </div>
@@ -5516,7 +5534,7 @@
       const users = adminData.users || [];
 
       if (users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">👤</div>暂无在线用户</div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">👤</div>暂无在线用户</div></td></tr>';
         return;
       }
 
@@ -5551,6 +5569,7 @@
         <td><span class="badge ${statusClass}">${statusText}</span></td>
         <td>${user.gameType || '-'}</td>
         <td>${accountType === 'registered' ? '注册用户' : '游客'}</td>
+        <td>${clientBadgeHtml(user.clientType || user.account?.client?.type)}</td>
         <td>Lv.${accountLevel}</td>
         <td>${formatTime(user.connectedAt)}</td>
         <td>
@@ -5641,6 +5660,7 @@
       const type = document.getElementById('account-type').value;
       const status = document.getElementById('account-status').value;
       const role = document.getElementById('account-role').value;
+      const client = document.getElementById('account-client').value;
 
       if (search) {
         filtered = filtered.filter(a =>
@@ -5668,7 +5688,20 @@
         filtered = filtered.filter(a => !a.account?.isAdmin);
       }
 
+      if (client !== 'all') {
+        filtered = filtered.filter(a => a.account?.client?.type === client);
+      }
+
       return filtered;
+    }
+
+    // 客户端类型徽章（v1 / v2）
+    function clientBadgeHtml(type) {
+      if (!type) return '<span style="color:#475569;font-size:11px;">-</span>';
+      const style = type === 'v2'
+        ? 'background:rgba(59,130,246,0.2);color:#60a5fa;'
+        : 'background:rgba(148,163,184,0.2);color:#94a3b8;';
+      return `<span class="badge" style="${style}">${escapeHtml(type)}</span>`;
     }
 
     function renderAccountsTable() {
@@ -5679,12 +5712,12 @@
       const pageData = filtered.slice(start, end);
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">🔑</div>暂无账号</div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">🔑</div>暂无账号</div></td></tr>';
         return;
       }
 
       if (pageData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">📄</div>当前页没有数据</div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📄</div>当前页没有数据</div></td></tr>';
         return;
       }
 
@@ -5706,6 +5739,7 @@
         <td><span class="badge ${typeClass}">${acc.account?.type === 'registered' ? '注册' : '游客'}</span></td>
         <td><span class="badge ${roleClass}">${acc.account?.isAdmin ? '管理员' : '普通'}</span></td>
         <td><span class="badge ${statusBadge}">${statusText}</span></td>
+        <td>${clientBadgeHtml(acc.account?.client?.type)}</td>
         <td>Lv.${level}</td>
         <td style="font-size:11px;color:#64748b;">${formatTime(acc.account?.lastLogin)}</td>
         <td>
@@ -6764,6 +6798,7 @@
     // ==================== 操作日志 ====================
     let opLogPage = 1;
     let opLogPageSize = 50;
+    let opLogCache = {}; // 当前页日志缓存，供详情弹窗按 id 读取
 
     const opActionNames = {
       item_use: '道具使用', item_purchase: '道具购买', pack_open: '开启礼包',
@@ -6782,14 +6817,100 @@
       return_lobby: '返回大厅', spectate_join: '开始观战', spectate_leave: '结束观战',
       undo_request: '请求悔棋', undo_accept: '悔棋同意', undo_reject: '悔棋拒绝', undo_ai: 'AI悔棋',
       admin_end_game: '管理员结束对战', admin_reset_game: '管理员重置游戏',
-      admin_broadcast: '管理员广播', admin_kick_user: '管理员踢出'
+      admin_broadcast: '管理员广播', admin_kick_user: '管理员踢出',
+      // 账号安全
+      profile_update: '修改个人资料', password_change: '修改密码', password_set: '设置密码',
+      password_reset: '重置密码', admin_upgrade: '升级为管理员',
+      // 外观
+      avatar_upload: '上传头像', avatar_delete: '删除头像', avatar_rename: '重命名头像',
+      // 邮件 / 奖励
+      mail_claim: '领取邮件附件', mail_claim_all: '一键领取邮件', mail_read: '阅读邮件',
+      mail_read_all: '全部标记已读', mail_delete: '删除邮件', mail_cleanup: '清理邮件',
+      level_reward_claim: '领取等级奖励',
+      // 社交
+      friend_request: '好友申请', friend_accept: '同意好友', friend_reject: '拒绝好友', friend_remove: '删除好友',
+      // 反馈
+      feedback_submit: '提交反馈', feedback_vote: '反馈投票', feedback_comment: '反馈评论',
+      feedback_status: '反馈状态变更', feedback_like: '反馈点赞', feedback_delete_comment: '删除反馈评论',
+      // 对局
+      reset_request: '请求重置对局', reset_confirm: '确认重置对局', reset_reject: '拒绝重置对局',
+      hint_request: '请求提示', snake_start: '贪吃蛇开始', snake_end: '贪吃蛇结束', snake_highscore: '同步最高分',
+      // 管理端（业务动作）
+      admin_config_update: '更新系统配置', admin_maintenance_mode: '切换维护模式', admin_maintenance_schedule: '设置维护计划',
+      admin_mute_user: '禁言用户', admin_unmute_user: '解除禁言', admin_cleanup_data: '清理数据',
+      admin_send_message: '发送消息', admin_upgrade_admin: '提升管理员', admin_downgrade_admin: '撤销管理员',
+      admin_ban_account: '封禁账号', admin_unban_account: '解封账号', admin_reset_password: '重置用户密码',
+      admin_create_account: '创建账号', admin_delete_account: '删除账号', admin_modify_exp: '修改经验',
+      admin_achievement_add: '发放成就', admin_achievement_remove: '移除成就', admin_achievement_reset: '重置成就',
+      admin_achievement_award: '授予成就', admin_mail_send: '发送邮件', admin_mail_batch: '批量发送邮件',
+      admin_mail_all: '全服发送邮件', admin_grant_starcoins: '发放星钻', admin_grant_exp: '发放经验',
+      admin_grant_items: '发放道具', admin_compensate_old_players: '老玩家星钻补偿',
+      // 管理端（主题 / 更新 / 系统）
+      admin_theme_add: '添加主题', admin_theme_update: '更新主题', admin_theme_delete: '删除主题', admin_theme_reload: '重载主题',
+      admin_update_upload: '上传更新包', admin_update_start: '执行更新', admin_update_cancel: '取消更新',
+      admin_update_rollback: '回滚版本', admin_update_delete_backup: '删除更新备份',
+      admin_account_modify_exp: '修改用户经验', admin_feedback_status: '更新反馈状态',
+      admin_chat_broadcast: '全服广播', admin_system_maintenance: '切换维护模式'
     };
+
+    // 追踪日志（socket_ 事件）的中文名
+    const opTraceEventNames = {
+      // 游戏
+      move: '落子', ai_move: 'AI落子', game_result: '对局结果', ai_game_result: 'AI对局结果',
+      reset: '重置对局', reset_confirm: '确认重置', reset_reject: '拒绝重置',
+      match_request: '发起匹配', cancel_match: '取消匹配',
+      challenge_request: '发起挑战', challenge_response: '挑战应答',
+      return_lobby: '返回大厅', undo_request: '请求悔棋', undo_response: '悔棋应答',
+      request_hint: '请求提示', game_use_item: '对局使用道具', ai_game_start: 'AI对战开始',
+      // 观战
+      spectate_join: '加入观战', spectate_leave: '离开观战', get_spectate_list: '获取观战列表',
+      // 账号
+      client_connect: '客户端连接', account_login: '账号登录', guest_login: '游客登录',
+      account_register: '账号注册', account_update_profile: '修改资料',
+      account_change_password: '修改密码', account_set_password: '设置密码', account_reset_password: '重置密码',
+      // 贪吃蛇
+      snake_game_start: '贪吃蛇开始', snake_game_end: '贪吃蛇结束',
+      snake_sync_highscore: '同步最高分', snake_request_full_state: '请求完整状态',
+      // 聊天
+      chat_global: '发送世界聊天', chat_game: '发送对局聊天', chat_private: '发送私聊',
+      get_private_history: '获取私聊历史', get_private_conversations: '获取私聊会话',
+      // 反馈
+      submit_feedback: '提交反馈', vote_feedback: '反馈投票',
+      add_comment: '添加评论', reply_comment: '回复评论', like_comment: '点赞评论', delete_comment: '删除评论',
+      // 管理端
+      admin_account_login: '管理员登录', admin_user_token_login: '管理员令牌登录',
+      kick_user: '踢出用户', end_game: '结束对战', broadcast: '全服广播', reset_game: '重置游戏',
+      update_config: '更新配置', maintenance_mode: '维护模式', maintenance_schedule: '维护计划',
+      mute_user: '禁言用户', unmute_user: '解除禁言', delete_account: '删除账号',
+      modify_user_exp: '修改用户经验', grant_starcoins: '发放星钻', grant_exp: '发放经验',
+      grant_items: '发放道具', send_mail_to_user: '发送邮件', send_mail_batch: '批量发送邮件',
+      send_mail_all: '全服发送邮件', add_user_achievement: '添加成就',
+      remove_user_achievement: '移除成就', reset_user_achievements: '重置成就',
+      cleanup_data: '清理数据', update_backup_db: '备份数据库', update_restore_backup: '恢复备份',
+      update_apply_update: '应用更新', update_upload_package: '上传更新包',
+      update_set_channel: '设置更新渠道', update_delete_backup: '删除备份',
+      update_start_upload: '上传更新包', update_start: '执行更新',
+      update_cancel: '取消更新', update_rollback: '回滚版本',
+      update_system_setting: '修改系统设置', reset_system_setting: '重置系统设置',
+      reset_all_settings: '重置全部设置'
+    };
+
+    // 操作列的显示名：优先查便捷方法名，其次解析 socket_ 追踪事件
+    function opActionLabel(log) {
+      if (opActionNames[log.action]) return opActionNames[log.action];
+      if (typeof log.action === 'string' && log.action.startsWith('socket_')) {
+        const ev = log.action.slice(7);
+        return opTraceEventNames[ev] || ev;
+      }
+      return log.action;
+    }
 
     const opCategoryColors = {
       item: '#60a5fa', currency: '#fbbf24', cosmetic: '#c084fc',
       vip: '#f97316', exp: '#22c55e', account: '#94a3b8',
       pack: '#14b8a6', achievement: '#8b5cf6', chat: '#06b6d4',
       moderation: '#ef4444', admin: '#ec4899', game: '#f59e0b',
+      mail: '#38bdf8', reward: '#facc15', social: '#34d399', feedback: '#a78bfa',
       trace: '#64748b'
     };
 
@@ -6804,11 +6925,13 @@
         const keyword = document.getElementById('oplogs-search')?.value || '';
         const category = document.getElementById('oplogs-category')?.value || '';
         const action = document.getElementById('oplogs-action')?.value || '';
+        const clientFilter = document.getElementById('oplogs-client')?.value || '';
         const includeTrace = document.getElementById('oplogs-trace')?.checked || false;
         const params = new URLSearchParams({ page, pageSize: opLogPageSize });
         if (keyword) params.set('username', keyword);
         if (category) params.set('category', category);
         if (action) params.set('action', action);
+        if (clientFilter) params.set('clientType', clientFilter);
         params.set('includeTrace', includeTrace ? 'true' : 'false');
         const res = await fetch('/api/admin/operation-logs?' + params, { headers: { 'Authorization': 'Bearer ' + token } });
         const data = await res.json();
@@ -6823,21 +6946,22 @@
         document.getElementById('oplogs-today').textContent = stats.today || 0;
 
         if (list.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📭</div>暂无操作日志</div></td></tr>';
+          tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📭</div>暂无操作日志</div></td></tr>';
           pagEl.innerHTML = '';
           return;
         }
 
+        opLogCache = {};
         tbody.innerHTML = list.map(log => {
-          const actionName = opActionNames[log.action] || log.action;
+          const actionName = opActionLabel(log);
           const catColor = opCategoryColors[log.category] || '#94a3b8';
-          const detailsHtml = log.details && typeof log.details === 'object'
-            ? `<button class="table-btn table-btn-info" style="font-size:11px;padding:2px 6px;margin-left:6px;" onclick="showOpLogDetails(${JSON.stringify(log.details).replace(/"/g, '&quot;')})">详情</button>`
-            : '';
+          opLogCache[log.id] = log;
+          const detailsHtml = `<button class="table-btn table-btn-info" style="font-size:11px;padding:2px 6px;margin-left:6px;" onclick="showOpLogDetails('${log.id}')">详情</button>`;
           const summary = buildOpLogSummary(log);
           return `<tr>
             <td>${formatTime(log.timestamp)}</td>
             <td><span style="font-weight:500;">${log.username || log.userId || '-'}</span></td>
+            <td>${clientBadgeHtml(log.clientType)}</td>
             <td><span style="color:${catColor};font-size:11px;">${log.category}</span></td>
             <td>${actionName}</td>
             <td>${log.targetName || log.targetId || '-'}</td>
@@ -6847,7 +6971,7 @@
 
         renderOpLogPagination(data.pagination);
       } catch (e) {
-        tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">❌</div>加载失败: ' + e.message + '</div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">❌</div>加载失败: ' + e.message + '</div></td></tr>';
       }
     }
 
@@ -6890,10 +7014,14 @@
         case 'vip_purchase':
         case 'vip_renew':
           return `${amount} 天`;
-        case 'login':
-          return d.ip || '登录成功';
-        case 'logout':
-          return d.onlineDuration ? `在线 ${Math.round(d.onlineDuration / 1000)} 秒` : '离线';
+        case 'login': {
+          const typeText = { token: '令牌自动登录', password: '账号密码登录', guest: '游客登录' }[d.loginType];
+          return typeText ? `登录成功（${typeText}）` : (d.ip || '登录成功');
+        }
+        case 'logout': {
+          const reasonText = d.reason === 'manual' ? '主动退出' : '连接断开';
+          return d.onlineDuration ? `${reasonText}（在线 ${Math.round(d.onlineDuration / 1000)} 秒）` : reasonText;
+        }
         case 'chat':
           return d.message ? `「${String(d.message).substring(0, 40)}」` : '-';
         case 'achievement_unlock':
@@ -6917,22 +7045,165 @@
         case 'admin_kick_user':
         case 'admin_broadcast':
           return d.adminUsername || '管理员操作';
-        default:
+        case 'profile_update':
+          if (Array.isArray(d.fields) && d.fields.length) {
+            const fieldNames = {
+              'nickname': '昵称',
+              'profile.bio': '个性签名', 'profile.signature': '个性签名', 'profile.avatar': '头像',
+              'profile.gender': '性别', 'profile.region': '地区', 'profile.birthday': '生日',
+              'privacy.showGames': '对局记录可见性', 'privacy.showStats': '战绩可见性',
+              'privacy.allowFriendRequest': '允许好友申请', 'privacy.showOnline': '在线状态可见性'
+            };
+            const labels = d.fields.map(f => fieldNames[f] || f);
+            const text = `修改：${labels.join('、')}`;
+            return text.length > 60 ? text.substring(0, 60) + '…' : text;
+          }
+          if (d.nickname) return `昵称 → ${d.nickname}`;
+          return '更新个人资料';
+        case 'password_change':
+        case 'password_set':
+        case 'password_reset':
+          return '密码已更新';
+        case 'avatar_upload':
+          return log.targetName ? `上传「${log.targetName}」` : '上传自定义头像';
+        case 'avatar_delete':
+          return log.targetName ? `删除「${log.targetName}」` : '删除自定义头像';
+        case 'avatar_rename':
+          return d.newName ? `${d.oldName || ''} → ${d.newName}` : '重命名头像';
+        case 'mail_claim':
+          return log.targetName ? `领取「${log.targetName}」附件` : '领取邮件附件';
+        case 'mail_claim_all':
+          return d.count ? `一键领取 ${d.count} 封邮件` : '一键领取邮件附件';
+        case 'mail_read':
+          return log.targetName ? `阅读「${log.targetName}」` : '阅读邮件';
+        case 'mail_read_all':
+          return d.count ? `标记 ${d.count} 封为已读` : '全部标记为已读';
+        case 'mail_delete':
+          return log.targetName ? `删除「${log.targetName}」` : '删除邮件';
+        case 'mail_cleanup':
+          return d.count ? `清理 ${d.count} 封邮件` : '清理邮件';
+        case 'level_reward_claim':
+          if (Array.isArray(d.levels) && d.levels.length) return `领取等级奖励：${d.levels.join('、')} 级`;
+          return d.level ? `领取 ${d.level} 级奖励` : '领取等级奖励';
+        case 'friend_request':
+          return log.targetName ? `向 ${log.targetName} 发起好友申请` : '发起好友申请';
+        case 'friend_accept':
+          return log.targetName ? `同意 ${log.targetName} 的好友申请` : '同意好友申请';
+        case 'friend_reject':
+          return log.targetName ? `拒绝 ${log.targetName} 的好友申请` : '拒绝好友申请';
+        case 'friend_remove':
+          return log.targetName ? `删除好友 ${log.targetName}` : '删除好友';
+        case 'feedback_submit':
+          return log.targetName ? `「${String(log.targetName).substring(0, 30)}」${d.type ? `（${d.type}）` : ''}` : '提交反馈';
+        case 'feedback_vote':
+          if (d.canceled) return '取消投票';
+          return d.voteType ? `投${d.voteType === 'up' ? '支持' : '反对'}票` : '反馈投票';
+        case 'feedback_comment':
+          return d.reply ? '回复评论' : '发表评论';
+        case 'feedback_status':
+          return d.status ? `状态 → ${d.status}` : '更新反馈状态';
+        case 'feedback_like':
+          return d.liked === false ? '取消点赞' : '点赞评论';
+        case 'feedback_delete_comment':
+          return '删除评论';
+        case 'reset_request':
+          return d.message || '请求重置对局';
+        case 'reset_confirm':
+          return '同意重置对局';
+        case 'reset_reject':
+          return '拒绝重置对局';
+        case 'hint_request':
+          return d.gameType ? `${d.gameType} 请求提示` : '请求提示';
+        case 'snake_start':
+          return d.difficulty ? `难度: ${d.difficulty}` : '贪吃蛇开始';
+        case 'snake_end':
+          return d.score !== undefined ? `得分 ${d.score}${d.result ? `（${d.result}）` : ''}` : '贪吃蛇结束';
+        case 'snake_highscore':
+          return d.highScore !== undefined ? `最高分 ${d.highScore}` : '同步最高分';
+        case 'admin_theme_add':
+        case 'admin_theme_update':
+        case 'admin_theme_delete':
+        case 'admin_theme_reload':
+          return d.themeName || d.themeId || '主题操作';
+        case 'admin_update_upload':
+          return d.sizeFormatted ? `更新包 ${d.sizeFormatted}` : '上传更新包';
+        case 'admin_update_start':
+          return d.currentVersion ? `当前版本 ${d.currentVersion}` : '执行更新';
+        case 'admin_update_rollback':
+        case 'admin_update_delete_backup':
+          return d.backupName || '备份操作';
+        case 'admin_mail_send':
+        case 'admin_mail_batch':
+        case 'admin_mail_all':
+          return d.title || log.targetName || '发送邮件';
+        case 'admin_grant_starcoins':
+        case 'admin_grant_exp':
+        case 'admin_grant_items':
+        case 'admin_modify_exp':
+        case 'admin_account_modify_exp': {
+          const amt = (amount !== undefined && amount !== null) ? amount : d.amount;
+          return (amt !== undefined && amt !== null) ? `${amt > 0 ? '+' : ''}${amt}` : '管理端发放';
+        }
+        case 'admin_compensate_old_players':
+          return d.compensated !== undefined ? `补偿 ${d.compensated} 个账号` : '老玩家补偿';
+        case 'admin_system_maintenance':
+        case 'admin_maintenance_mode':
+          return d.enabled ? '开启维护模式' : '关闭维护模式';
+        case 'socket_update_system_setting':
+          return d.data?.key ? `${d.data.key} = ${JSON.stringify(d.data.value)}` : '修改系统设置';
+        case 'socket_reset_system_setting':
+          return d.data?.key ? `重置 ${d.data.key}` : '重置系统设置';
+        case 'socket_reset_all_settings':
+          return '重置全部系统设置';
+        case 'socket_update_rollback':
+          return d.data?.backupName ? `回滚到 ${d.data.backupName}` : '回滚版本';
+        default: {
+          // 追踪事件：把上报的关键数据作为摘要展示
+          if (typeof log.action === 'string' && log.action.startsWith('socket_')) {
+            const payload = d.data;
+            if (payload && typeof payload === 'object' && Object.keys(payload).length > 0) {
+              const s = JSON.stringify(payload);
+              return s.length > 80 ? s.substring(0, 80) + '…' : s;
+            }
+            return '-';
+          }
           if (amount === undefined || amount === null || amount === 0) return '-';
           return `${amount > 0 ? '+' : ''}${amount}`;
+        }
       }
     }
 
-    function showOpLogDetails(details) {
+    function showOpLogDetails(logId) {
+      const log = opLogCache[logId];
+      if (!log) {
+        showToast('日志已刷新，请重新打开', 'error');
+        return;
+      }
+
+      const rows = [
+        ['时间', formatTime(log.timestamp)],
+        ['用户', log.username || log.userId || '-'],
+        ['客户端', log.clientType || '-'],
+        ['分类', log.category || '-'],
+        ['操作', opActionLabel(log)],
+        ['目标', log.targetName || log.targetId || '-'],
+        ['摘要', buildOpLogSummary(log)]
+      ];
+      if (log.ip) rows.push(['IP', log.ip]);
+
       let html = '<div style="font-size:13px;color:#e2e8f0;">';
-      for (const [key, val] of Object.entries(details)) {
-        if (typeof val === 'object') {
-          html += `<div style="margin:4px 0;"><span style="color:#94a3b8;">${key}:</span> <pre style="margin:0;font-size:11px;color:#60a5fa;">${JSON.stringify(val, null, 2)}</pre></div>`;
-        } else {
-          html += `<div style="margin:4px 0;"><span style="color:#94a3b8;">${key}:</span> <span>${val}</span></div>`;
-        }
+      rows.forEach(([key, val]) => {
+        html += `<div style="margin:4px 0;"><span style="color:#94a3b8;">${key}:</span> <span>${escapeHtml(String(val))}</span></div>`;
+      });
+
+      const data = log.details && typeof log.details === 'object' ? log.details : null;
+      if (data && Object.keys(data).length > 0) {
+        html += `<div style="margin-top:10px;"><div style="color:#94a3b8;margin-bottom:4px;">附加数据:</div><pre style="margin:0;font-size:11px;color:#60a5fa;white-space:pre-wrap;word-break:break-all;">${escapeHtml(JSON.stringify(data, null, 2))}</pre></div>`;
+      } else {
+        html += '<div style="margin-top:10px;color:#64748b;">无附加数据</div>';
       }
       html += '</div>';
+
       showModal('操作详情', html, [{ text: '关闭', class: 'btn-secondary', action: closeModal }]);
     }
 
@@ -7559,7 +7830,7 @@
       );
       const tbody = document.getElementById('online-users-body');
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">🔍</div>无匹配用户</div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">🔍</div>无匹配用户</div></td></tr>';
         return;
       }
       tbody.innerHTML = filtered.map(user => {
@@ -7707,6 +7978,14 @@
               <div class="detail-item">
                 <span class="detail-label">最后在线</span>
                 <span class="detail-value">${formatTime(account.lastSeen)}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">客户端</span>
+                <span class="detail-value">${(user?.clientType || account.client?.type) ? `${(user?.clientType || account.client.type)}${account.client?.version ? ` (${account.client.version})` : ''}` : '-'}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">客户端最近使用</span>
+                <span class="detail-value">${formatTime(account.client?.lastSeen)}</span>
               </div>
               ${isBanned ? `
               <div class="detail-item">
