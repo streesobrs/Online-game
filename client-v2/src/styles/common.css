@@ -194,6 +194,9 @@
     display: flex;
     justify-content: flex-start;
     width: 100%;
+    /* 右上角留出悬浮账号条的位置，窄屏时导航按钮不会缩到胶囊下面 */
+    padding-right: 56px;
+    box-sizing: border-box;
 }
 
 .nav-group {
@@ -268,10 +271,16 @@ a.nav-btn.nav-btn--legacy:hover {
     margin-left: 2px;
 }
 
-/* ---- 顶部悬浮账号条（紧凑版） ---- */
+/* ---- 顶部悬浮账号条（脱离文档流，可拖动） ---- */
 #account-root {
-    width: 100%;
-    margin-bottom: 6px;
+    position: fixed;
+    top: 0;
+    left: auto;
+    right: 12px;
+    z-index: 1100;
+    width: auto;
+    margin: 0;
+    padding: 0;
 }
 
 .account-bar {
@@ -279,20 +288,37 @@ a.nav-btn.nav-btn--legacy:hover {
     justify-content: flex-end;
     align-items: center;
     gap: 8px;
-    width: 100%;
-    max-width: 100%;
+    width: auto;
+    max-width: none;
     margin: 0;
-    padding: 0 10px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    transition: all 0.3s ease;
+    padding: 8px 0;
+    transition: none;
 }
 
 .account-bar.collapsed {
     justify-content: flex-end;
-    max-width: 100%;
-    padding-right: 10px;
+    padding-right: 0;
+}
+
+/* 拖动：抓取光标；按住胶囊任意空白处即可拖动（按钮保持正常点击） */
+.account-info .account-btn {
+    cursor: pointer;
+}
+
+/* 头像是 <img>，禁用浏览器原生图片拖拽，否则按住拖动会拖出一个头像虚影 */
+.account-info img,
+.account-info .v2-avatar {
+    -webkit-user-drag: none;
+}
+
+.account-bar.dragging .account-info {
+    cursor: grabbing;
+    outline: 2px solid var(--theme-primary, #007bff);
+    outline-offset: 2px;
+}
+
+.account-bar.dragging {
+    user-select: none;
 }
 
 .account-info {
@@ -301,6 +327,12 @@ a.nav-btn.nav-btn--legacy:hover {
     justify-content: space-between;
     gap: 10px;
     padding: 4px 10px;
+    /* 拖动：抓取光标；触屏下由指针事件接管手势，避免拖动时页面跟着滚 */
+    cursor: grab;
+    touch-action: none;
+    /* 长按拖动时不要选中文字 / 弹出系统菜单 */
+    user-select: none;
+    -webkit-touch-callout: none;
     background: var(--theme-nav-bg);
     border-radius: 8px;
     box-shadow: none;
@@ -309,77 +341,42 @@ a.nav-btn.nav-btn--legacy:hover {
     min-height: 36px;
     max-height: 36px;
     border: none;
-    transition: all 0.3s ease;
+    /* 只过渡真正会变的属性：原来的 all 里 width 从 40px 变 auto 无法插值，会直接跳变 */
+    transition: max-width 0.22s ease, padding 0.22s ease, opacity 0.22s ease,
+        border-radius 0.22s ease, box-shadow 0.22s ease;
     box-sizing: border-box;
-    overflow: visible;
+    /* 收起时靠 max-width + 裁切隐藏内容，这样宽度变化才有过渡 */
+    overflow: hidden;
     position: relative;
     z-index: 1;
 }
 
+/* 收起态：只露出头像，其余内容被裁掉 */
 .account-bar.collapsed .account-info {
-    width: 40px;
+    max-width: 40px;
     padding: 4px;
     opacity: 0.85;
     background: var(--theme-nav-bg);
     border-radius: 6px;
-    justify-content: center;
+    justify-content: flex-start;
     align-items: center;
 }
 
-.account-bar.collapsed .account-info:hover {
-    opacity: 1;
-    width: auto;
-    min-width: 180px;
+/* 展开态：点击胶囊后展开成完整卡片
+   max-width 要略大于实际内容宽度，过渡才会均匀铺开（太小会裁掉右侧按钮） */
+.account-bar.collapsed.expanded .account-info {
+    max-width: 520px;
     padding: 4px 10px;
+    opacity: 1;
     border-radius: 8px;
     justify-content: space-between;
     z-index: 101;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-/* 收起态：user-section 绝对居中只显示头像 */
-.account-bar.collapsed .account-user-section {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    width: auto;
-    height: auto;
-}
-
-.account-bar.collapsed .account-user-details {
-    display: none !important;
-}
-
-.account-bar.collapsed .account-buttons {
-    opacity: 0;
+/* 收起时按钮不参与交互（内容已被裁切，保险起见） */
+.account-bar.collapsed:not(.expanded) .account-buttons {
     pointer-events: none;
-    transition: opacity 0.25s ease;
-}
-
-.account-bar.collapsed .account-info:hover .account-user-section {
-    position: relative;
-    left: auto;
-    top: auto;
-    transform: none;
-    width: auto;
-    height: auto;
-}
-
-.account-bar.collapsed .account-info:hover .account-user-details {
-    display: flex !important;
-}
-
-.account-bar.collapsed .account-info:hover .account-buttons {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-.account-info:hover {
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
 }
 
 .account-user-section {

@@ -20,36 +20,6 @@
   .chess-intersection:hover {
     background: transparent;
   }
-
-  /* 账号条：触屏无 hover，强制展开为完整卡片 */
-  .account-bar.collapsed .account-info {
-    width: auto;
-    max-width: calc(100vw - 16px);
-    opacity: 1;
-    padding: 4px 10px;
-    height: auto;
-    min-height: 36px;
-    border-radius: 8px;
-    justify-content: space-between;
-  }
-
-  .account-bar.collapsed .account-user-section {
-    position: relative;
-    left: auto;
-    top: auto;
-    transform: none;
-    width: auto;
-    height: auto;
-  }
-
-  .account-bar.collapsed .account-user-details {
-    display: flex !important;
-  }
-
-  .account-bar.collapsed .account-buttons {
-    opacity: 1;
-    pointer-events: auto;
-  }
 }
 
 /* ================================================
@@ -135,12 +105,8 @@
   }
 
   /* ---- 账号条：移动端简化，不显示 hover 展开 ---- */
-  #account-root {
-    margin-bottom: 4px;
-  }
-
   .account-bar {
-    padding: 0 4px;
+    padding: 6px 0;
   }
 
   .account-bar .account-btn {
@@ -150,6 +116,11 @@
 
   .account-bar .account-buttons {
     gap: 4px;
+  }
+
+  /* 展开态别超出视口（胶囊靠右停靠，会向左展开） */
+  .account-bar.collapsed.expanded .account-info {
+    max-width: calc(100vw - 24px);
   }
 
   /* ---- 对局信息/操作条收紧 ---- */
@@ -273,12 +244,6 @@
 
   .account-level {
     font-size: 10px;
-  }
-
-  .account-bar.collapsed .account-info:hover {
-    /* 小屏不做 hover 展开 */
-    width: auto !important;
-    opacity: 1 !important;
   }
 
   /* ---- 悬浮坞：全宽贴底 ---- */
