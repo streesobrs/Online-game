@@ -15,6 +15,9 @@
  *
  * 注意：脚本自身的提交（标题形如 chore(更新日志): ...）会被自动跳过，
  *       否则每次生成都会把上一次的生成提交也写进日志里。
+ *
+ * 位置说明：放在 server/ 下是为了能随打包产物一起发布（package.bat 只复制
+ *          client / client-v2 / server / updater），所以 ROOT 需要向上两级。
  */
 const { execFileSync } = require('child_process');
 const fs = require('fs');
@@ -55,7 +58,7 @@ const ITEM_RE = /^\s*[-*+]\s+(.+)$/;
 /** 标题行：type(scope): 描述 */
 const SUBJECT_RE = /^(\w+)(?:\(([^)]+)\))?[:：]\s*(.+)$/;
 
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(__dirname, '..', '..');
 const OUT_FILE = path.join(ROOT, 'client-v2', 'src', 'config', 'changelog.js');
 
 /** 读取 git 提交记录（记录间用 \x1e 分隔，字段用 \x1f 分隔） */

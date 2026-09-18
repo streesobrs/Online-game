@@ -4,11 +4,11 @@
   "description": "多棋种联机大厅",
   "main": "server/server.js",
   "scripts": {
-    "prestart": "node scripts/gen-changelog.js",
-    "predev": "node scripts/gen-changelog.js",
+    "prestart": "node server/scripts/gen-changelog.js",
+    "predev": "node server/scripts/gen-changelog.js",
     "start": "node server/server.js",
     "dev": "nodemon server/server.js",
-    "changelog": "node scripts/gen-changelog.js",
+    "changelog": "node server/scripts/gen-changelog.js",
     "pkg": "pkg . --targets node18-win-x64 --output dist/game-server.exe"
   },
   "bin": "server/server.js",

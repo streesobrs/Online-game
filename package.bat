@@ -21,7 +21,7 @@ echo.
 
 REM Regenerate changelog from git history (fails safely, keeps existing file)
 echo Generating changelog...
-node scripts\gen-changelog.js
+node server\scripts\gen-changelog.js
 echo.
 
 if exist "temp-package" rmdir /s /q "temp-package"
@@ -48,12 +48,8 @@ copy "package.json" "temp-package\" >nul
 copy "start.bat" "temp-package\" >nul
 copy "start.ps1" "temp-package\" >nul
 
-REM 打包产物不带 scripts/ 目录，去掉依赖它的开发期脚本，
-REM 否则部署后 npm start 会在 prestart 阶段报 MODULE_NOT_FOUND 直接退出
-echo Patching package.json for runtime...
-node -e "const fs=require('fs');const p='temp-package/package.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));for(const k of ['prestart','predev','changelog'])delete j.scripts[k];fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n');"
-if errorlevel 1 echo [Warning] package.json patch failed, npm start may break on the target machine
-
+REM npm scripts are kept as-is: gen-changelog.js now ships inside server/scripts/,
+REM so prestart works on the target machine too (it keeps the existing changelog when git is absent).
 echo Creating zip file: %ZIP_NAME%
 powershell -Command "Compress-Archive -Path 'temp-package\*' -DestinationPath '%ZIP_NAME%' -Force"
 

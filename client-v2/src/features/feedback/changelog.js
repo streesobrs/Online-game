@@ -2,7 +2,7 @@
  * 更新日志渲染组件（帮助/反馈页 Tab 之一）
  *
  * 数据源：src/config/changelog.js
- *   —— 该文件由 scripts/gen-changelog.js 从 git 提交记录生成（npm run changelog），
+ *   —— 该文件由 server/scripts/gen-changelog.js 从 git 提交记录生成（npm run changelog），
  *      不请求任何外部接口，因此没有网络/限流问题。
  * 布局：左侧版本列表 + 右侧选中记录详情（与资料页「邮箱」Tab 一致）
  * 渲染：极简 Markdown → HTML（src/utils/md.js）
