@@ -154,7 +154,7 @@ export function renderFeedback(container = viewRoot()) {
 
   // 页面壳
   const pageEl = el('div', { class: 'fb-page' }, [
-    el('div', { class: 'fb-title' }, '📝 帮助 / 反馈 / 更新'),
+    el('div', { class: 'fb-page-title' }, '📝 帮助 / 反馈 / 更新'),
     tabBar,
     contentEl,
   ]);

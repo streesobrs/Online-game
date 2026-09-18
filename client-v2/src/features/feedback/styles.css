@@ -7,7 +7,7 @@
   padding: 16px;
 }
 
-.fb-title {
+.fb-page-title {
   font-size: 24px;
   font-weight: 700;
   color: var(--theme-title-color, #2d3748);
@@ -461,20 +461,22 @@
    新增：Tab 切换 + 帮助 + 更新日志
    ================================================ */
 
+/* Tab 栏：靠左的胶囊分组，宽度随内容（不要 flex:1，否则在大屏被拉成三个大块） */
 .fb-tabs {
-  display: flex;
+  display: inline-flex;
   gap: 4px;
   margin-bottom: 16px;
-  background: var(--surface-alt, #f3f4f6);
   padding: 4px;
+  max-width: 100%;
+  background: var(--surface-alt, #f3f4f6);
   border-radius: 10px;
 }
 
 .fb-tab {
-  flex: 1;
+  flex: 0 0 auto;
   border: none;
   background: transparent;
-  padding: 9px 12px;
+  padding: 8px 20px;
   font-size: 14px;
   font-weight: 500;
   color: var(--text-secondary, #64748b);
@@ -482,6 +484,7 @@
   cursor: pointer;
   transition: all 0.18s ease;
   min-height: 38px;
+  white-space: nowrap;
 }
 
 .fb-tab:hover {
@@ -559,9 +562,9 @@
 /* 更新日志 Tab */
 .clg-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 14px;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .clg-title {
@@ -578,37 +581,120 @@
   align-items: center;
 }
 
-.clg-list {
-  display: flex;
-  flex-direction: column;
+/* 分栏：左侧版本列表 + 右侧详情（与资料页「邮箱」Tab 一致） */
+.clg-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
   gap: 14px;
+  align-items: start;
 }
 
-/* 分页条 */
+.clg-side-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.clg-side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 520px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  padding: 6px;
+  background: var(--surface, #fff);
+}
+
+.clg-side-item {
+  padding: 9px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+}
+
+.clg-side-item:hover {
+  background: var(--surface-hover, #f1f5f9);
+}
+
+.clg-side-item.active {
+  background: var(--surface-hover, #eef2ff);
+  border-color: var(--accent-indigo, #6366f1);
+}
+
+.clg-side-item-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text, #2d3748);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clg-side-item.active .clg-side-item-title {
+  font-weight: 700;
+}
+
+.clg-side-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-muted, #a0aec0);
+}
+
+.clg-side-item-tag {
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--surface-alt, #e0f2fe);
+  color: #0369a1;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* 分页条：固定两行（页码 / 跳转），避免在窄侧栏里随机折行 */
 .clg-pager {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.clg-pager-nav,
+.clg-pager-jump {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 3px;
   flex-wrap: wrap;
-  margin-top: 16px;
+}
+
+.clg-pager-jump {
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted, #94a3b8);
 }
 
 .clg-page-btn {
+  min-width: 26px;
+  height: 28px;
+  padding: 0 6px;
   border: 1px solid var(--border-color, #e2e8f0);
   background: var(--surface, #fff);
-  color: var(--text, #475569);
-  padding: 6px 14px;
-  font-size: 13px;
-  border-radius: 8px;
+  color: var(--text-secondary, #4a5568);
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1;
   cursor: pointer;
-  min-height: 34px;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition: all 0.15s;
 }
 
 .clg-page-btn:hover:not(:disabled) {
-  border-color: var(--theme-primary, #007bff);
-  color: var(--theme-primary, #007bff);
+  border-color: var(--accent-indigo, #6366f1);
+  color: var(--accent-indigo, #6366f1);
 }
 
 .clg-page-btn:disabled {
@@ -616,44 +702,101 @@
   cursor: not-allowed;
 }
 
-.clg-page-info {
+.clg-page-num.active {
+  background: var(--accent-indigo, #6366f1);
+  border-color: var(--accent-indigo, #6366f1);
+  color: #fff;
+}
+
+.clg-page-gap {
+  padding: 0 2px;
   font-size: 12px;
+  color: var(--text-muted, #a0aec0);
+}
+
+.clg-page-input {
+  width: 48px;
+  height: 28px;
+  padding: 0 4px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 6px;
+  background: var(--surface, #fff);
+  color: var(--text, #2d3748);
+  font-size: 12px;
+  text-align: center;
+  /* 去掉数字框的上下箭头，窄侧栏里更紧凑 */
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.clg-page-input::-webkit-outer-spin-button,
+.clg-page-input::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.clg-page-info {
+  margin-top: 2px;
+  text-align: center;
+  font-size: 11px;
   color: var(--text-muted, #94a3b8);
 }
 
-.clg-release {
-  background: var(--theme-panel-bg, #fff);
+/* 右侧详情 */
+.clg-detail {
   border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 10px;
-  padding: 14px 16px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  padding: 16px;
+  min-height: 220px;
 }
 
-.clg-release-head {
+.clg-detail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.clg-detail-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text, #2d3748);
+}
+
+.clg-detail-type {
+  flex-shrink: 0;
+  font-family: monospace;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--surface-alt, #f1f3f5);
+  color: var(--text-secondary, #64748b);
+}
+
+.clg-detail-meta {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  margin-bottom: 6px;
+  margin-bottom: 10px;
+  font-size: 11px;
+  color: var(--text-muted, #a0aec0);
 }
 
-.clg-release-tag {
+.clg-detail-tag {
   font-family: monospace;
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 600;
   background: var(--surface-alt, #e0f2fe);
   color: #0369a1;
-  padding: 3px 8px;
+  padding: 2px 8px;
   border-radius: 4px;
-  font-weight: 600;
 }
 
-.clg-release-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text, #1e293b);
-}
-
-.clg-release-hash {
+.clg-detail-hash {
   font-family: monospace;
   font-size: 11px;
   background: #fef3c7;
@@ -662,65 +805,42 @@
   border-radius: 10px;
 }
 
-.clg-release-meta {
-  font-size: 12px;
-  color: var(--text-muted, #94a3b8);
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
-
-.clg-release-body summary {
-  font-size: 12px;
-  color: var(--theme-primary, #007bff);
-  cursor: pointer;
-  padding: 4px 0;
-  user-select: none;
-}
-
-.clg-release-body[open] summary {
-  margin-bottom: 10px;
-  border-bottom: 1px dashed var(--border-color, #e2e8f0);
-}
-
-.clg-release-md {
+.clg-detail-md {
   font-size: 13px;
   line-height: 1.7;
   color: var(--text, #334155);
 }
 
-.clg-release-md h1,
-.clg-release-md h2,
-.clg-release-md h3 {
+.clg-detail-md h1,
+.clg-detail-md h2,
+.clg-detail-md h3 {
   margin: 14px 0 8px;
   color: var(--theme-info-title-color, #2c3e50);
 }
 
-.clg-release-md h1 {
+.clg-detail-md h1 {
   font-size: 16px;
 }
 
-.clg-release-md h2 {
+.clg-detail-md h2 {
   font-size: 14px;
 }
 
-.clg-release-md h3 {
+.clg-detail-md h3 {
   font-size: 13px;
 }
 
-.clg-release-md ul,
-.clg-release-md ol {
+.clg-detail-md ul,
+.clg-detail-md ol {
   padding-left: 20px;
   margin: 6px 0;
 }
 
-.clg-release-md li {
+.clg-detail-md li {
   margin: 2px 0;
 }
 
-.clg-release-md code {
+.clg-detail-md code {
   background: var(--surface-alt, #f1f3f5);
   padding: 1px 6px;
   border-radius: 3px;
@@ -728,7 +848,7 @@
   font-family: monospace;
 }
 
-.clg-release-md pre {
+.clg-detail-md pre {
   background: #1e293b;
   color: #e2e8f0;
   padding: 12px;
@@ -737,39 +857,39 @@
   margin: 8px 0;
 }
 
-.clg-release-md pre code {
+.clg-detail-md pre code {
   background: transparent;
   padding: 0;
   color: inherit;
 }
 
-.clg-release-md blockquote {
+.clg-detail-md blockquote {
   border-left: 3px solid var(--theme-primary, #007bff);
   padding-left: 10px;
   color: var(--text-secondary, #64748b);
   margin: 8px 0;
 }
 
-.clg-release-md a {
+.clg-detail-md a {
   color: var(--theme-primary, #007bff);
   text-decoration: none;
 }
 
-.clg-release-md a:hover {
+.clg-detail-md a:hover {
   text-decoration: underline;
 }
 
-.clg-release-md hr {
+.clg-detail-md hr {
   border: none;
   border-top: 1px solid var(--border-color, #e2e8f0);
   margin: 12px 0;
 }
 
-.clg-release-md strong {
+.clg-detail-md strong {
   font-weight: 700;
 }
 
-.clg-release-md em {
+.clg-detail-md em {
   font-style: italic;
 }
 
@@ -796,7 +916,7 @@
   }
 
   .fb-tab {
-    padding: 8px 6px;
+    padding: 8px 14px;
     font-size: 13px;
   }
 
@@ -809,16 +929,11 @@
     gap: 4px 12px;
   }
 
-  .clg-release {
-    padding: 12px;
+  .clg-layout {
+    grid-template-columns: 1fr;
   }
 
-  .clg-release-tag {
-    font-size: 11px;
-    padding: 2px 6px;
-  }
-
-  .clg-release-title {
-    font-size: 14px;
+  .clg-side {
+    max-height: 320px;
   }
 }
