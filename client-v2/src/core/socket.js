@@ -127,6 +127,10 @@ const EVENT_MAP = {
   snake_food_sync: 'snake:foodSync',
   snake_full_state_sync: 'snake:fullStateSync',
 
+  // 消消乐专属
+  match3_progress: 'match3:progress',
+  match3_result: 'match3:result',
+
   // AI 对战
   ai_game_start: 'ai:gameStart',
   ai_move_result: 'ai:moveResult',

@@ -548,9 +548,10 @@ class AccountManager {
           const streak = lastGameType ? (games[lastGameType]?.streak || 0) : 0;
           return { wins: totalWins, losses: totalLosses, draws: totalDraws, totalGames, streak, maxStreak: maxStreakOverall };
         }
-        if (type === 'snake') {
-          const g = account.games?.snake || {};
-          const score = account.stats?.snakeGames?.highScore || g.highScore || 0;
+        // 单人游戏（贪吃蛇 / 消消乐）：无胜负概念，排序看最高分
+        if (type === 'snake' || type === 'match3') {
+          const g = account.games?.[type] || {};
+          const score = account.stats?.[`${type}Games`]?.highScore || g.highScore || 0;
           return { wins: 0, losses: 0, draws: 0, totalGames: g.totalGames || 0, streak: 0, maxStreak: 0, score };
         }
         const g = account.games?.[type] || {};
@@ -566,8 +567,8 @@ class AccountManager {
         if (!type || type === 'all') {
           return Object.values(account.games || {}).reduce((sum, g) => sum + (g.wins || 0), 0);
         }
-        if (type === 'snake') {
-          return account.stats?.snakeGames?.highScore || account.games?.snake?.highScore || 0;
+        if (type === 'snake' || type === 'match3') {
+          return account.stats?.[`${type}Games`]?.highScore || account.games?.[type]?.highScore || 0;
         }
         return account.games?.[type]?.wins || 0;
       };
@@ -728,6 +729,15 @@ class AccountManager {
           totalGames: 0,
           highScore: 0,
           totalScore: 0,
+          lastPlayedAt: null
+        },
+        match3: {
+          totalGames: 0,
+          highScore: 0,
+          totalScore: 0,
+          maxCombo: 0,
+          maxLevel: 0,
+          totalStars: 0,
           lastPlayedAt: null
         }
       },
@@ -1048,6 +1058,15 @@ class AccountManager {
             highScore: 0,
             totalScore: 0,
             lastPlayedAt: null
+          },
+          match3: {
+            totalGames: 0,
+            highScore: 0,
+            totalScore: 0,
+            maxCombo: 0,
+            maxLevel: 0,
+            totalStars: 0,
+            lastPlayedAt: null
           }
         },
         stats: {
@@ -1363,6 +1382,15 @@ class AccountManager {
           totalGames: 0,
           highScore: 0,
           totalScore: 0,
+          lastPlayedAt: null
+        },
+        match3: {
+          totalGames: 0,
+          highScore: 0,
+          totalScore: 0,
+          maxCombo: 0,
+          maxLevel: 0,
+          totalStars: 0,
           lastPlayedAt: null
         }
       };

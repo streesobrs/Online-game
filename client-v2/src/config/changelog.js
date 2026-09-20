@@ -3,10 +3,19 @@
  *
  * 生成命令：npm run changelog
  * 数据源：git 提交记录（遵循 .trae/rules/git-commit-message.md 提交规范）
- * 生成时间：2026-09-18T09:50:17.984Z
+ * 生成时间：2026-09-20T03:08:28.597Z
  */
 
 export const CHANGELOG = [
+  {
+    "tag": "Build 738",
+    "name": "调整更新日志脚本路径与打包配置",
+    "type": "chore",
+    "scope": "构建",
+    "hash": "dac99aa",
+    "publishedAt": "2026-09-18T17:50:38+08:00",
+    "body": "### 后端改动\n- 将更新日志生成脚本从根目录scripts移动到server/scripts下\n- 更新package.json中的脚本路径，适配新的脚本位置\n- 更新package.bat中的脚本调用路径与打包注释\n- 更新changelog.js组件中的脚本引用路径\n- 更新server/version.json构建版本号到738\n\n### 前端改动\n- 修复更新日志组件的脚本路径引用错误\n- 更新本地更新日志数据源，新增Build 737版本记录"
+  },
   {
     "tag": "Build 737",
     "name": "新增全局抽屉布局与界面自定义功能",

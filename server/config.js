@@ -348,6 +348,27 @@ module.exports = {
     expPerScoreDivisor: 2                           // 经验换算除数（每N分1经验，即分数/2）
   },
 
+  // ========== 消消乐游戏奖励配置 ==========
+  match3Rewards: {
+    baseExp: 30,                                    // 单局结束基础经验奖励
+    expPerScoreDivisor: 300,                        // 闯关模式经验换算除数（每N分1经验；闯关一局得分几千，配 perTile=30 刚好）
+    endlessExpPerScoreDivisor: 60,                  // 无尽模式经验换算除数（无尽一局能打到数十万分，尺度大 100 倍，除数须同比下调）
+    endless3ExpPerScoreDivisor: 1200,               // 三色爽局经验换算除数（一局可打到数百万分，是标准无尽的约 20 倍尺度；
+                                                    // 取 1200 让它的「经验/分钟」与标准无尽大致同档，不因为分高就爆经验）
+    starBonus: 20,                                  // 闯关模式每颗星额外经验（仅闯关生效）
+    maxScorePerMove: 25000,                         // 单步最高合理得分（反刷分：score ≤ moves × 本值）
+    // 客户端按颜色数缩放得分后，实测单步极值：4色8948 / 5色12498 / 6色5148 / 7色4961 / 8色5871
+    // 取约 2 倍余量避免误杀正常长连锁；改 client-v2 的 COLOR_SCORE_MULTIPLIER 后需同步复核
+    endless3MaxScorePerMove: 60000,                 // 三色爽局的单步上限（同上规则）
+    // 固定 3 色连锁极长，实测人类水平每步均分约 16,600、单步最高约 15 万，故单独放宽到 60000（约 3.6 倍余量）
+    minMsPerMove: 300                               // 单步最短合理耗时毫秒（反刷分：durationMs ≥ moves × 本值）
+  },
+
+  // ========== 各游戏关卡静态限制表（关卡平台结构校验用，不是引擎，只是数值） ==========
+  levelLimits: {
+    match3: { maxBytes: 32768, maxRows: 12, maxCols: 10, maxCells: 120, schemaVersion: 1 }
+  },
+
   // ========== 道具系统配置 ==========
   items: {
     // 时效性道具持续时间（毫秒）

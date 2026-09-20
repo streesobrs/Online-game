@@ -1341,6 +1341,112 @@ class GameManager {
     }
   }
 
+  // 保存消消乐成绩
+  // 单人游戏：只更新账号字段，不写入 games 集合（消消乐不进对战历史 / 回放）
+  // @returns {{success:boolean, progress?:object}} progress 为合并后的进度摘要，回给客户端
+  async saveMatch3Record(data) {
+    const { accountId, mode, level } = data;
+    const isLevel = mode === 'level';
+    // 三色爽局每步得分比标准无尽高一个量级（实测 16,600 vs 2,400），
+    // 因此它的分数与连锁只进独立字段，既不进无尽榜/成就，也不进任何跨模式累计，
+    // 否则 games.match3.totalScore 与 stats.totalScore 会被它独占
+    const isEndless3 = mode === 'endless3';
+    const countsToTotals = !isEndless3;
+
+    try {
+      const account = await this.accountManager.getAccount(accountId);
+      if (!account) {
+        return { success: false, message: '账号不存在' };
+      }
+
+      const current = account.games?.match3 || {};
+      const currentStats = account.stats?.match3Games || {};
+      const score = Math.max(0, Math.floor(data.score || 0));
+      const combo = Math.max(0, Math.floor(data.maxCombo || 0));
+      const stars = Math.max(0, Math.min(3, Math.floor(data.stars || 0)));
+
+      // 星级按关逐关取最高，总星数由星表推导（客户端上报的是单关星数）
+      const starsMap = { ...(current.stars || {}) };
+      let maxLevel = current.maxLevel || 0;
+      if (isLevel && Number.isFinite(level) && stars > 0) {
+        const key = String(level);
+        starsMap[key] = Math.max(starsMap[key] || 0, stars);
+        maxLevel = Math.max(maxLevel, level);
+      }
+      const totalStars = Object.values(starsMap).reduce((sum, n) => sum + (n || 0), 0);
+      const maxCombo = isEndless3 ? (current.maxCombo || 0) : Math.max(current.maxCombo || 0, combo);
+      // 无尽模式最高分独立记录：闯关模式与三色爽局的分数都不参与无尽榜
+      const highScore = isLevel || isEndless3
+        ? (current.highScore || 0)
+        : Math.max(current.highScore || 0, score);
+      // 三色爽局自己的最高分 / 连锁
+      const highScore3 = isEndless3 ? Math.max(current.highScore3 || 0, score) : (current.highScore3 || 0);
+      const maxCombo3 = isEndless3 ? Math.max(current.maxCombo3 || 0, combo) : (current.maxCombo3 || 0);
+      const countedScore = countsToTotals ? score : 0;
+
+      // 只更新具体字段，避免覆盖 security 等敏感字段
+      // totalGames / lastPlayedAt 交给 AccountManager.updateGameStats 统一维护，此处不重复累加
+      const updates = {
+        'games.match3.totalScore': (current.totalScore || 0) + countedScore,
+        'games.match3.highScore': highScore,
+        'games.match3.maxCombo': maxCombo,
+        'games.match3.highScore3': highScore3,
+        'games.match3.maxCombo3': maxCombo3,
+        'games.match3.maxLevel': maxLevel,
+        'games.match3.totalStars': totalStars,
+        'games.match3.stars': starsMap,
+        'stats.totalScore': (account.stats?.totalScore || 0) + countedScore,
+        'stats.match3Games.totalGames': (currentStats.totalGames || 0) + 1,
+        'stats.match3Games.totalScore': (currentStats.totalScore || 0) + countedScore,
+        'stats.match3Games.highScore': highScore,
+        'stats.match3Games.maxLevel': maxLevel,
+        'stats.match3Games.totalStars': totalStars
+      };
+
+      await this.accountManager.updateUser(accountId, updates);
+
+      if (this.operationLogger) {
+        const user = this.userManager.getUserByAccountId(accountId);
+        this.operationLogger.log({
+          userId: accountId,
+          username: user?.nickname || user?.username || '',
+          action: 'match3_end',
+          category: 'game',
+          targetName: 'match3',
+          amount: score,
+          details: {
+            mode,
+            level: isLevel ? level : null,
+            score,
+            maxCombo: combo,
+            stars: isLevel ? stars : 0,
+            moves: data.moves || 0,
+            durationMs: data.durationMs || 0,
+            highScore,
+            maxLevel,
+            totalStars
+          }
+        });
+      }
+
+      logger.info('消消乐成绩已保存', { accountId, mode, level, score, stars, maxLevel, totalStars });
+
+      return {
+        success: true,
+        progress: {
+          maxLevel,
+          stars: starsMap,
+          totalStars,
+          endless: { highScore, bestCombo: maxCombo },
+          endless3: { highScore: highScore3, bestCombo: maxCombo3 }
+        }
+      };
+    } catch (err) {
+      logger.error('保存消消乐成绩失败', { error: err.message });
+      return { success: false, message: '保存失败' };
+    }
+  }
+
   // 处理返回大厅
   handleReturnLobby(socketId, io, reason = '主动返回') {
     const user = this.userManager.getUserBySocketId(socketId);

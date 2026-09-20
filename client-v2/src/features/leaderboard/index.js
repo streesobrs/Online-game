@@ -14,7 +14,11 @@ const GAME_TYPES = [
   { key: 'go', label: '⚫ 围棋' },
   { key: 'chinese-chess', label: '♟️ 象棋' },
   { key: 'snake', label: '🐍 贪吃蛇' },
+  { key: 'match3', label: '🍬 消消乐' },
 ];
+
+/** 单人游戏：无胜负概念，榜单看最高分而非胜/负/平（与 AccountManager.getGameStats 一致） */
+const SCORE_TYPES = ['snake', 'match3'];
 
 /** 当前登录账号 ID（高亮自己） */
 const myId = localStorage.getItem('currentAccountId');
@@ -24,22 +28,22 @@ function leaderboardItem(player, gameType) {
   const isTop3 = player.rank <= 3;
   const medal = player.rank === 1 ? '🥇' : player.rank === 2 ? '🥈' : player.rank === 3 ? '🥉' : '';
   const isMe = player.id != null && String(player.id) === String(myId);
-  const isSnake = gameType === 'snake';
+  const isScoreType = SCORE_TYPES.includes(gameType);
   const winrateCls = player.winrateNum >= 60 ? 'high' : player.winrateNum >= 40 ? 'mid' : 'low';
 
   const metaEls = [
     el('span', { class: 'leaderboard-lv-badge' }, `Lv.${player.level || 1}`),
     el('span', {}, `🏟️ ${player.totalGames || 0}局`),
   ];
-  if (!isSnake && player.streak && player.streak > 2) {
+  if (!isScoreType && player.streak && player.streak > 2) {
     metaEls.push(el('span', { class: 'leaderboard-streak-badge' }, `🔥 ${player.streak}连胜`));
   }
-  if (!isSnake && player.maxStreak && player.maxStreak > 0) {
+  if (!isScoreType && player.maxStreak && player.maxStreak > 0) {
     metaEls.push(el('span', { class: 'leaderboard-maxstreak' }, `最高${player.maxStreak}连胜`));
   }
 
-  // 明细：贪吃蛇显示最高分，棋类显示胜/负/平
-  const statEls = isSnake
+  // 明细：单人游戏显示最高分，棋类显示胜/负/平
+  const statEls = isScoreType
     ? [el('div', { class: 'leaderboard-stat-item' }, [
       el('div', { class: 'leaderboard-stat-value' }, String(player.score || 0)),
       el('div', { class: 'leaderboard-stat-label' }, '最高分'),
@@ -66,7 +70,7 @@ function leaderboardItem(player, gameType) {
       el('div', { class: 'leaderboard-player-meta' }, metaEls),
     ]),
     el('div', { class: 'leaderboard-player-detail' }, statEls),
-    !isSnake && totalForRate > 0
+    !isScoreType && totalForRate > 0
       ? el('div', { class: 'leaderboard-winrate-col' }, [
         el('div', { class: 'leaderboard-winrate-text' }, player.winrate || '0%'),
         el('div', { class: 'leaderboard-winrate-bar-bg' }, [

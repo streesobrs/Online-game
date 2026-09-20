@@ -1,0 +1,595 @@
+/**
+ * 消消乐样式（P2：渲染与交互）
+ * - 棋子颜色走 CSS 变量，便于主题适配（P6 再细化暗色主题）
+ * - 棋盘用绝对定位渲染，异形 / 分仓棋盘的洞不占位
+ */
+.m3-view {
+  --m3-cell: 48px;
+  --m3-dur: 200ms;
+  --m3-gem-a: #ccd2dd;
+  --m3-gem-b: #9aa3b2;
+  --m3-c1-a: #ff8a9b;
+  --m3-c1-b: #e5384f;
+  --m3-c2-a: #7bc0ff;
+  --m3-c2-b: #2b7fd4;
+  --m3-c3-a: #86e39a;
+  --m3-c3-b: #2fa84f;
+  --m3-c4-a: #ffe07a;
+  --m3-c4-b: #e8a90c;
+  --m3-c5-a: #c3aeff;
+  --m3-c5-b: #7a5cd6;
+  --m3-c6-a: #ffbd7a;
+  --m3-c6-b: #e87b1a;
+  --m3-c7-a: #7ce7e0;
+  --m3-c7-b: #1a9e9a;
+  --m3-c8-a: #ffa8d8;
+  --m3-c8-b: #d94f9a;
+  padding: 12px 16px 24px;
+}
+
+.m3-head {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.m3-title {
+  margin: 0;
+  font-size: 20px;
+  color: var(--theme-title-color, #2c3e50);
+}
+
+.m3-sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--theme-status-color, #4a5568);
+}
+
+/* ===== 棋盘形态选择 ===== */
+.m3-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+
+.m3-menu-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 180px;
+  padding: 18px 12px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 12px;
+  background: var(--theme-panel-bg, #fff);
+  color: var(--theme-title-color, #2c3e50);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.m3-menu-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.m3-menu-icon {
+  font-size: 30px;
+}
+
+.m3-menu-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.m3-menu-meta {
+  font-size: 12px;
+  color: var(--theme-status-color, #4a5568);
+}
+
+/* ===== HUD ===== */
+.m3-hud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.m3-hud-item {
+  font-size: 13px;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-hud-value {
+  margin-left: 4px;
+  font-weight: 700;
+  color: var(--theme-accent, #27ae60);
+}
+
+/* ===== 棋盘 ===== */
+.m3-board-host {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.m3-board {
+  position: relative;
+  margin: 0 auto;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--theme-panel-bg, #fff);
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  touch-action: none;
+  user-select: none;
+}
+
+.m3-cell {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: var(--m3-cell);
+  height: var(--m3-cell);
+  transition: transform var(--m3-dur) ease;
+}
+
+.m3-no-anim .m3-cell {
+  transition: none !important;
+}
+
+.m3-gem {
+  position: absolute;
+  inset: 3px;
+  border-radius: 10px;
+  background: linear-gradient(160deg, var(--m3-gem-a), var(--m3-gem-b));
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.16), inset 0 2px 0 rgba(255, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 180ms ease, opacity 180ms ease;
+}
+
+.m3-c1 {
+  --m3-gem-a: var(--m3-c1-a);
+  --m3-gem-b: var(--m3-c1-b);
+}
+
+.m3-c2 {
+  --m3-gem-a: var(--m3-c2-a);
+  --m3-gem-b: var(--m3-c2-b);
+}
+
+.m3-c3 {
+  --m3-gem-a: var(--m3-c3-a);
+  --m3-gem-b: var(--m3-c3-b);
+}
+
+.m3-c4 {
+  --m3-gem-a: var(--m3-c4-a);
+  --m3-gem-b: var(--m3-c4-b);
+}
+
+.m3-c5 {
+  --m3-gem-a: var(--m3-c5-a);
+  --m3-gem-b: var(--m3-c5-b);
+}
+
+.m3-c6 {
+  --m3-gem-a: var(--m3-c6-a);
+  --m3-gem-b: var(--m3-c6-b);
+}
+
+.m3-c7 {
+  --m3-gem-a: var(--m3-c7-a);
+  --m3-gem-b: var(--m3-c7-b);
+}
+
+.m3-c8 {
+  --m3-gem-a: var(--m3-c8-a);
+  --m3-gem-b: var(--m3-c8-b);
+}
+
+.m3-rainbow {
+  background: conic-gradient(#ff5b6e, #ffbd7a, #ffe07a, #2fa84f, #2b7fd4, #7a5cd6, #ff5b6e);
+}
+
+/* 特殊元素标记（条状 / 炸弹） */
+.m3-special {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  font-size: 20px;
+}
+
+.m3-special-row,
+.m3-special-col {
+  border-radius: 6px;
+}
+
+.m3-empty {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ===== 障碍物（冰块 / 锁链 / 石头）===== */
+.m3-blocker {
+  font-size: 22px;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.2);
+}
+
+.m3-blocker-ice {
+  background: linear-gradient(160deg, #d8f2ff, #7fb8d8);
+  opacity: 0.92;
+}
+
+.m3-blocker-lock {
+  background: linear-gradient(160deg, #cfd6e0, #6b7787);
+}
+
+.m3-blocker-stone {
+  background: linear-gradient(160deg, #b9b3ab, #6d675f);
+}
+
+/* 剩余 hp 角标 */
+.m3-cell[data-hp]::after {
+  content: attr(data-hp);
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  min-width: 15px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 10px;
+  line-height: 15px;
+  text-align: center;
+}
+
+/* 受击抖动 */
+.m3-hit .m3-gem {
+  animation: m3-hit 180ms ease;
+}
+
+@keyframes m3-hit {
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-3px);
+  }
+
+  75% {
+    transform: translateX(3px);
+  }
+}
+
+/* ===== 关卡列表（按章节分组，开发方案 4.4）===== */
+.m3-chapters {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.m3-chapter-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.m3-chapter-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--theme-title-color, #2c3e50);
+}
+
+.m3-chapter-desc {
+  font-size: 12px;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-level-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 10px;
+}
+
+.m3-level {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 10px;
+  background: var(--theme-panel-bg, #fff);
+  color: var(--theme-title-color, #2c3e50);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.m3-level:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.m3-level--locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.m3-level-id {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.m3-level-name {
+  font-size: 12px;
+  text-align: center;
+}
+
+.m3-level-stars {
+  font-size: 12px;
+  color: #e8a90c;
+  letter-spacing: 1px;
+}
+
+/* ===== 目标进度 ===== */
+.m3-goals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.m3-goal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 14px;
+  font-size: 12px;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-goal--done {
+  border-color: var(--theme-accent, #27ae60);
+  color: var(--theme-accent, #27ae60);
+}
+
+.m3-goal-count {
+  font-weight: 700;
+}
+
+.m3-result-stars {
+  font-size: 24px;
+  color: #ffd54a;
+  letter-spacing: 3px;
+}
+
+/* 选中 / 消除 / 洗牌 状态 */
+.m3-selected .m3-gem {
+  outline: 3px solid var(--theme-primary, #007bff);
+  outline-offset: -3px;
+  transform: scale(1.06);
+}
+
+.m3-clearing .m3-gem,
+.m3-shuffling .m3-gem {
+  transform: scale(0.2);
+  opacity: 0;
+}
+
+/* ===== 结算浮层 ===== */
+.m3-result {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  text-align: center;
+}
+
+.m3-result-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.m3-result-line {
+  font-size: 14px;
+}
+
+/* ===== 操作区 ===== */
+.m3-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.m3-btn {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #fff;
+  background: var(--theme-btn-primary-bg, #3498db);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.m3-btn:hover {
+  background: var(--theme-btn-primary-bg-hover, #2980b9);
+}
+
+.m3-btn--ghost {
+  background: var(--theme-btn-disabled-bg, #bdc3c7);
+}
+
+.m3-btn--ghost:hover {
+  background: var(--theme-secondary, #6c757d);
+}
+
+/* 提前结算：目标达成后才可用，用强调色区别于普通按钮 */
+.m3-btn--settle {
+  background: var(--theme-accent, #27ae60);
+}
+
+.m3-btn--settle:hover {
+  background: var(--theme-accent, #27ae60);
+  filter: brightness(0.92);
+}
+
+.m3-btn:disabled {
+  background: var(--theme-btn-disabled-bg, #bdc3c7);
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.m3-btn:disabled:hover {
+  background: var(--theme-btn-disabled-bg, #bdc3c7);
+}
+
+/* 通用隐藏：需覆盖组件自身的 display（如 .m3-achieved 的 flex），故加 !important */
+.m3-hidden {
+  display: none !important;
+}
+
+/* ===== 目标达成提示条（达成后不结算，提示可继续刷分或提前结算）===== */
+.m3-achieved {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--theme-accent, #27ae60);
+  border-radius: 10px;
+  background: rgba(39, 174, 96, 0.12);
+  text-align: center;
+}
+
+.m3-achieved-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--theme-accent, #27ae60);
+}
+
+.m3-achieved-desc {
+  font-size: 12px;
+  color: var(--theme-status-color, #4a5568);
+}
+
+/* ===== 积分详情面板（弹窗内容，见 scoreDetails.js）===== */
+.m3-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.m3-detail-total {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(39, 174, 96, 0.1);
+}
+
+.m3-detail-total-label {
+  font-size: 12px;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-detail-total-num {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--theme-accent, #27ae60);
+}
+
+.m3-detail-sec {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+
+.m3-detail-sec-title {
+  flex-basis: 100%;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--theme-title-color, #2c3e50);
+}
+
+.m3-detail-sub {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 12px;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-detail-row {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: var(--theme-panel-bg, #fff);
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  font-size: 13px;
+}
+
+.m3-detail-label {
+  flex: 1;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-detail-hint {
+  font-size: 11px;
+  color: var(--theme-status-color, #4a5568);
+  opacity: 0.75;
+}
+
+.m3-detail-val {
+  font-weight: 700;
+  color: var(--theme-title-color, #2c3e50);
+}
+
+.m3-detail-chip {
+  padding: 3px 9px;
+  border-radius: 12px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  background: var(--theme-panel-bg, #fff);
+  font-size: 12px;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-detail-goal {
+  flex-basis: 100%;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  font-size: 13px;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-detail-goal--done {
+  border-color: var(--theme-accent, #27ae60);
+  color: var(--theme-accent, #27ae60);
+}

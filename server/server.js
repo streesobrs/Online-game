@@ -3735,6 +3735,239 @@ io.on('connection', (socket) => {
     }
   });
 
+  // 消消乐游戏开始
+  socket.on('match3_game_start', (data) => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user) {
+      socket.emit('error', { message: '用户不存在' });
+      return;
+    }
+
+    const { mode, level } = data || {};
+
+    try {
+      logger.info('消消乐游戏开始', { accountId: user.accountId, mode, level });
+
+      if (operationLogger) {
+        operationLogger.log({
+          userId: user.accountId || '',
+          username: user.nickname || '',
+          action: 'match3_start',
+          category: 'game',
+          targetName: 'match3',
+          details: { mode, level },
+          ip: socket.handshake?.address || ''
+        });
+      }
+    } catch (err) {
+      logger.error('处理消消乐游戏开始失败', { error: err.message });
+    }
+  });
+
+  // 消消乐游戏结束
+  socket.on('match3_game_end', async (data) => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user) {
+      socket.emit('error', { message: '用户不存在' });
+      return;
+    }
+
+    const accountId = user.accountId;
+    const { mode, level, score, maxCombo, moves, durationMs, cleared, stars } = data || {};
+
+    try {
+      logger.info('消消乐游戏结束', { accountId, mode, level, score, maxCombo, moves, durationMs });
+
+      // 未登录（游客）不落库、不发经验
+      if (!accountId || !gameManager || !gameManager.accountManager) return;
+
+      const rewards = config.match3Rewards;
+      const safeScore = Math.max(0, Math.floor(score || 0));
+      const safeMoves = Math.max(0, Math.floor(moves || 0));
+      const safeDuration = Math.max(0, Math.floor(durationMs || 0));
+
+      // 反刷分校验（开发方案 9.4）：任一不通过则不发经验、不入榜
+      // 三色爽局每步得分高一个量级（实测 16,600 vs 标准无尽的 2,400），用独立上限，否则正常玩家会被误判
+      const perMoveCap = mode === 'endless3'
+        ? (rewards.endless3MaxScorePerMove || rewards.maxScorePerMove)
+        : rewards.maxScorePerMove;
+      const account = await gameManager.accountManager.getAccount(accountId);
+      const currentMaxLevel = account?.games?.match3?.maxLevel || 0;
+      const violations = [];
+      if (safeMoves <= 0) {
+        violations.push('no_moves');
+      } else {
+        if (safeScore > safeMoves * perMoveCap) violations.push('score_per_move');
+        if (safeDuration < safeMoves * rewards.minMsPerMove) violations.push('duration_per_move');
+      }
+      if (mode === 'level' && (!Number.isFinite(level) || level < 1 || level > currentMaxLevel + 1)) {
+        violations.push('level_jump');
+      }
+
+      if (violations.length > 0) {
+        logger.warn('消消乐上报数据未通过校验，不予发奖', {
+          accountId, mode, level, score: safeScore, moves: safeMoves, durationMs: safeDuration, violations
+        });
+        if (operationLogger) {
+          operationLogger.log({
+            userId: accountId,
+            username: user.nickname || '',
+            action: 'match3_reject',
+            category: 'game',
+            targetName: 'match3',
+            amount: safeScore,
+            details: { mode, level, score: safeScore, moves: safeMoves, durationMs: safeDuration, violations },
+            ip: socket.handshake?.address || ''
+          });
+        }
+        socket.emit('match3_result', {
+          success: false,
+          rejected: true,
+          message: '成绩未通过校验，本次不计入经验与榜单'
+        });
+        return;
+      }
+
+      // 保存成绩（只更新账号字段，不写 games 集合，避免进入对战历史）
+      const saved = await gameManager.saveMatch3Record({
+        accountId,
+        mode,
+        level,
+        score: safeScore,
+        maxCombo,
+        moves: safeMoves,
+        durationMs: safeDuration,
+        cleared,
+        stars
+      });
+      if (!saved.success) {
+        socket.emit('match3_result', { success: false, message: saved.message || '保存失败' });
+        return;
+      }
+
+      // 游戏统计（单人游戏无胜负，result 传 null）
+      await gameManager.accountManager.updateGameStats(accountId, null, 'match3', false, null, safeDuration);
+
+      // 经验：基础 + 分数换算，闯关模式按星级额外加成
+      // 三种模式的得分数量级差很远（闯关几千 / 标准无尽数十万 / 三色爽局数百万），除数必须分开定，
+      // 否则尺度最大的模式单位时间经验会被严重稀释。未配置时逐级回退。
+      const starCount = mode === 'level' ? Math.max(0, Math.min(3, Math.floor(stars || 0))) : 0;
+      const scoreDivisorByMode = {
+        level: rewards.expPerScoreDivisor,
+        endless: rewards.endlessExpPerScoreDivisor || rewards.expPerScoreDivisor,
+        endless3: rewards.endless3ExpPerScoreDivisor
+          || rewards.endlessExpPerScoreDivisor
+          || rewards.expPerScoreDivisor
+      };
+      const scoreDivisor = scoreDivisorByMode[mode] || rewards.expPerScoreDivisor;
+      const expReward = rewards.baseExp +
+        Math.floor(safeScore / scoreDivisor) +
+        starCount * rewards.starBonus;
+
+      if (expReward > 0) {
+        const expResult = await gameManager.accountManager.addExp(accountId, expReward);
+        if (expResult.success) {
+          socket.emit('exp_gained', { expResult });
+          await userManager.syncAccountData(accountId, io);
+        }
+      }
+
+      // 通知客户端账号数据已更新（getAccount 会自动剥离 security）
+      const updatedAccount = await gameManager.accountManager.getAccount(accountId);
+      socket.emit('account_updated', { account: updatedAccount });
+      socket.emit('match3_result', { success: true, exp: expReward, progress: saved.progress });
+
+      // 检查成就
+      if (gameManager.achievementManager) {
+        const postAccount = await gameManager.accountManager.getAccount(accountId);
+        if (postAccount) {
+          const playedGameTypes = postAccount.games
+            ? Object.keys(postAccount.games).filter(k => postAccount.games[k].totalGames > 0).length
+            : 0;
+
+          // 聚合各游戏类型的最高分 / 闯关进度，供 game_type 类成就使用
+          const gameTypeWins = {};
+          const gameTypeHighScores = {};
+          const gameTypeMaxLevel = {};
+          const gameTypeMaxCombo = {};
+          const gameTypeStars = {};
+          let bestStreak = 0;
+          let bestMaxStreak = 0;
+          if (postAccount.games) {
+            for (const [gk, gd] of Object.entries(postAccount.games)) {
+              gameTypeWins[gk] = gd.wins || 0;
+              gameTypeHighScores[gk] = gd.highScore || 0;
+              gameTypeMaxLevel[gk] = gd.maxLevel || 0;
+              gameTypeMaxCombo[gk] = gd.maxCombo || 0;
+              gameTypeStars[gk] = gd.totalStars || 0;
+              bestStreak = Math.max(bestStreak, gd.streak || 0);
+              bestMaxStreak = Math.max(bestMaxStreak, gd.maxStreak || 0);
+            }
+          }
+
+          const unlockedAchievements = await gameManager.achievementManager.checkAchievements(accountId, {
+            ...postAccount.stats,
+            ...(postAccount.stats?.flags || {}),
+            ...(postAccount.account?.activity || {}),
+            gameType: 'match3',
+            score: safeScore,
+            stars: starCount,
+            level: postAccount.account?.profile?.level || 1,
+            streak: bestStreak,
+            maxStreak: bestMaxStreak,
+            allGameTypes: playedGameTypes >= 3,
+            singleGameType: playedGameTypes === 1 && (postAccount.stats?.totalGames || 0) > 1,
+            wins: postAccount.stats?.totalWins || 0,
+            losses: postAccount.stats?.totalLosses || 0,
+            draws: postAccount.stats?.totalDraws || 0,
+            gameTypeWins,
+            gameTypeHighScores,
+            gameTypeMaxLevel,
+            gameTypeMaxCombo,
+            gameTypeStars,
+            timestamp: Date.now()
+          });
+
+          if (unlockedAchievements.length > 0 && socket && socket.connected) {
+            socket.emit('achievements_unlocked', { achievements: unlockedAchievements });
+          }
+        }
+      }
+    } catch (err) {
+      logger.error('处理消消乐游戏结果失败', { error: err.message });
+    }
+  });
+
+  // 同步消消乐进度（客户端进入消消乐页面时触发）
+  socket.on('match3_sync_progress', async () => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user || !user.accountId) {
+      return; // 未登录用户不处理
+    }
+
+    try {
+      const account = await gameManager.accountManager.getAccount(user.accountId);
+      if (!account) return;
+
+      const match3 = account.games?.match3 || {};
+      socket.emit('match3_progress', {
+        maxLevel: match3.maxLevel || 0,
+        stars: match3.stars || {},
+        totalStars: match3.totalStars || 0,
+        endless: {
+          highScore: match3.highScore || 0,
+          bestCombo: match3.maxCombo || 0
+        },
+        endless3: {
+          highScore: match3.highScore3 || 0,
+          bestCombo: match3.maxCombo3 || 0
+        }
+      });
+    } catch (err) {
+      logger.error('同步消消乐进度失败', { error: err.message });
+    }
+  });
+
   // ========== 观战相关事件 ==========
 
   // 开始观战
@@ -3919,6 +4152,8 @@ io.on('connection', (socket) => {
     'account_reset_password',
     // 贪吃蛇
     'snake_game_start', 'snake_game_end', 'snake_sync_highscore', 'snake_request_full_state',
+    // 消消乐
+    'match3_game_start', 'match3_game_end', 'match3_sync_progress',
     // 聊天
     'chat_global', 'chat_game', 'chat_private',
     'get_private_history', 'get_private_conversations',

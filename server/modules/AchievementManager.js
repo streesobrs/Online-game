@@ -613,6 +613,71 @@ class AchievementManager {
         type: 'creative',
         condition: { longReturnPlayer: true },
         reward: { exp: 1000, badge: 'long_return_player' }
+      },
+      // 消消乐成就
+      {
+        id: 140,
+        name: '首消',
+        description: '首次通关任一关卡',
+        type: 'game_type',
+        condition: { gameType: 'match3', maxLevel: 1 },
+        reward: { exp: 100, badge: 'match3_first_clear' }
+      },
+      {
+        id: 141,
+        name: '三星初现',
+        description: '首次在关卡中拿到3星',
+        type: 'game_type',
+        condition: { gameType: 'match3', stars: 3 },
+        reward: { exp: 200, badge: 'match3_first_3star' }
+      },
+      {
+        id: 142,
+        name: '连锁新手',
+        description: '单局最高连锁达到5',
+        type: 'game_type',
+        condition: { gameType: 'match3', maxCombo: 5 },
+        reward: { exp: 200, badge: 'match3_combo_5' }
+      },
+      {
+        id: 143,
+        name: '连锁大师',
+        description: '单局最高连锁达到10',
+        type: 'game_type',
+        condition: { gameType: 'match3', maxCombo: 10 },
+        reward: { exp: 800, badge: 'match3_combo_10' }
+      },
+      {
+        id: 144,
+        name: '消除达人',
+        description: '无尽模式单局分数达到60000',
+        type: 'game_type',
+        condition: { gameType: 'match3', highScore: 60000 },
+        reward: { exp: 1000, badge: 'match3_score_60000' }
+      },
+      {
+        id: 145,
+        name: '闯关十关',
+        description: '通关第10关',
+        type: 'game_type',
+        condition: { gameType: 'match3', maxLevel: 10 },
+        reward: { exp: 1000, badge: 'match3_level_10' }
+      },
+      {
+        id: 146,
+        name: '全星章节',
+        description: '累计获得30颗星',
+        type: 'game_type',
+        condition: { gameType: 'match3', totalStars: 30 },
+        reward: { exp: 1500, badge: 'match3_all_star_chapter' }
+      },
+      {
+        id: 147,
+        name: '无尽之王',
+        description: '无尽模式最高分达到150000',
+        type: 'game_type',
+        condition: { gameType: 'match3', highScore: 150000 },
+        reward: { exp: 2000, badge: 'match3_king' }
       }
     ];
   }
@@ -732,6 +797,19 @@ class AchievementManager {
         if (achievement.condition.highScore !== undefined) {
           return stats.gameTypeHighScores &&
             stats.gameTypeHighScores[achievement.condition.gameType] >= achievement.condition.highScore;
+        }
+        // 消消乐：闯关进度 / 单局连锁 / 累计星数 / 单局星数
+        if (achievement.condition.maxLevel !== undefined) {
+          return (stats.gameTypeMaxLevel?.[achievement.condition.gameType] || 0) >= achievement.condition.maxLevel;
+        }
+        if (achievement.condition.maxCombo !== undefined) {
+          return (stats.gameTypeMaxCombo?.[achievement.condition.gameType] || 0) >= achievement.condition.maxCombo;
+        }
+        if (achievement.condition.totalStars !== undefined) {
+          return (stats.gameTypeStars?.[achievement.condition.gameType] || 0) >= achievement.condition.totalStars;
+        }
+        if (achievement.condition.stars !== undefined) {
+          return (stats.stars || 0) >= achievement.condition.stars;
         }
         return false;
       case 'ai':
@@ -1020,6 +1098,15 @@ class AchievementManager {
       snake_legend: '🐍',
       snake_king: '👑',
       snake_god: '💎',
+      // 消消乐系列
+      match3_first_clear: '🍬',
+      match3_first_3star: '⭐',
+      match3_combo_5: '🔥',
+      match3_combo_10: '🔥',
+      match3_score_60000: '💯',
+      match3_level_10: '🔟',
+      match3_all_star_chapter: '🌟',
+      match3_king: '👑',
       // 等级系列
       level_5: '5️',
       level_10: '🔟',

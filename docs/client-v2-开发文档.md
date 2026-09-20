@@ -538,7 +538,7 @@ client-v2/vendor/*.bak
 │           ├── base.css         # 基础 reset
 │           └── common.css       # 通用组件样式
 │
-└── client-v2-开发文档.md        # 本文档
+└── docs/                        # 项目文档目录（本文档即 docs/client-v2-开发文档.md）
 ```
 
 ---

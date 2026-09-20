@@ -245,6 +245,14 @@ function getSettingCategories() {
       'snakeRewards.winScoreThreshold', 'snakeRewards.baseExp',
       'snakeRewards.expPerScoreDivisor'
     ],
+    '消消乐奖励': [
+      'match3Rewards.baseExp', 'match3Rewards.expPerScoreDivisor',
+      'match3Rewards.endlessExpPerScoreDivisor',
+      'match3Rewards.endless3ExpPerScoreDivisor',
+      'match3Rewards.starBonus', 'match3Rewards.maxScorePerMove',
+      'match3Rewards.endless3MaxScorePerMove',
+      'match3Rewards.minMsPerMove'
+    ],
     '道具效果': [
       'items.effects.expPotion', 'items.effects.expPackage',
       'items.effects.undoCard', 'items.effects.hintCard',
