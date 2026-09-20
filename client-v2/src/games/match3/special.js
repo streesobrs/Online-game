@@ -5,8 +5,11 @@
  * - 生成位置：优先玩家交换的那一格（由 match.js 的 spawnIndex 决定），否则交叉点 / 连线中点
  * - 触发：被消除时立即生效；效果波及到的特殊元素继续触发
  * - 级联用队列处理并设上限，防止递归失控
+ * - 彩球例外：条状 / 炸弹的爆炸不波及彩球，扫到也原地保留（不触发、不消耗）；
+ *   彩球只在玩家主动拿它去交换时才结算
  *
  * 形态效果：row 整行 / col 整列 / bomb 半径内的方形区域（默认 3×3）/ rainbow 同色全部
+ * 彩球组合：+ 普通方块 → 清除全场同色；+ 条状 / 炸弹 → 该效果复制给全部同色棋子并逐颗触发
  */
 import { SPECIAL, SPECIAL_RULES, SHAPE } from './config.js';
 import { colOf, getAt, index, isPlayable, rowOf } from './grid.js';
@@ -46,17 +49,22 @@ export function effectCells(grid, cellIndex) {
   const r = rowOf(grid, cellIndex);
   const c = colOf(grid, cellIndex);
   const out = [];
+  // 爆炸范围内的格：彩球不被波及（扫到也原地保留，只由玩家主动交换消耗）
+  const push = (i) => {
+    if (getAt(grid, i)?.special === SPECIAL.RAINBOW) return;
+    out.push(i);
+  };
 
   if (cell.special === SPECIAL.ROW) {
     for (let cc = 0; cc < grid.cols; cc += 1) {
-      if (isPlayable(grid, r, cc)) out.push(index(grid, r, cc));
+      if (isPlayable(grid, r, cc)) push(index(grid, r, cc));
     }
     return out;
   }
 
   if (cell.special === SPECIAL.COL) {
     for (let rr = 0; rr < grid.rows; rr += 1) {
-      if (isPlayable(grid, rr, c)) out.push(index(grid, rr, c));
+      if (isPlayable(grid, rr, c)) push(index(grid, rr, c));
     }
     return out;
   }
@@ -65,7 +73,7 @@ export function effectCells(grid, cellIndex) {
     const rad = SPECIAL_RULES.bombRadius;
     for (let rr = r - rad; rr <= r + rad; rr += 1) {
       for (let cc = c - rad; cc <= c + rad; cc += 1) {
-        if (isPlayable(grid, rr, cc)) out.push(index(grid, rr, cc));
+        if (isPlayable(grid, rr, cc)) push(index(grid, rr, cc));
       }
     }
     return out;
@@ -85,8 +93,9 @@ export function effectCells(grid, cellIndex) {
 }
 
 /**
- * 彩球 + 任意方块交换：清除目标颜色的全部方块
+ * 彩球 + 普通方块 / 彩球交换：清除目标颜色的全部方块
  * 彩球 + 彩球是唯一例外（清空全盘），开发方案 1.3 的"不做两两组合"针对的是条状 / 炸弹
+ * 目标是条状 / 炸弹时另走 rainbowCopyTargets（效果复制给同色），不走这里
  * @returns {number[]} 去重后的待清除格子
  */
 export function rainbowSwapTargets(grid, rainbowIndex, targetIndex) {
@@ -102,6 +111,26 @@ export function rainbowSwapTargets(grid, rainbowIndex, targetIndex) {
     if (cell && cell.color === color) out.add(i);
   }
   return [...out];
+}
+
+/**
+ * 彩球 + 条状 / 炸弹：把该特殊元素的效果复制给全部同色棋子
+ * 复制后由 expandSpecials 逐颗触发，因此同色棋子各自生效并继续级联；
+ * 复制只改 special，颜色保留（复制出来的仍是可参与连线的同色棋子）
+ * @returns {{shape:string, color:number, cells:number[]}|null} null 表示目标不是可复制的特殊元素
+ */
+export function rainbowCopyTargets(grid, targetIndex) {
+  const target = getAt(grid, targetIndex);
+  if (!target || target.blocker || !target.special) return null;
+  if (target.special === SPECIAL.RAINBOW || target.color == null) return null;
+
+  const cells = [];
+  for (const i of grid.cellIndex) {
+    const cell = getAt(grid, i);
+    if (!cell || cell.blocker || cell.color !== target.color) continue;
+    cells.push(i);
+  }
+  return { shape: target.special, color: target.color, cells };
 }
 
 /**

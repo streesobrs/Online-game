@@ -303,6 +303,31 @@ test('彩球：清除全盘同色方块', () => {
   cells.forEach((i) => assert.equal(getAt(grid, i).color, 2));
 });
 
+test('条状爆炸不波及彩球：扫到也原地保留，且不引爆', () => {
+  const grid = makeGrid(BASE);
+  setAt(grid, 12, { color: 3, special: 'row' });
+  setAt(grid, 11, { color: null, special: 'rainbow' }); // (2,1) 与横条同行
+
+  // 整行 5 格，去掉彩球那一格
+  assert.deepEqual(effectCells(grid, 12).sort((a, b) => a - b), [10, 12, 13, 14]);
+
+  const { cleared, triggered } = expandSpecials(grid, [12]);
+  assert.equal(cleared.has(11), false);       // 彩球不被消除
+  assert.equal(triggered.length, 1);          // 只有横条触发，彩球不引爆
+  assert.equal(triggered[0].special, 'row');
+});
+
+test('炸弹爆炸不波及彩球：3×3 内的彩球不被引爆', () => {
+  const grid = makeGrid(BASE);
+  setAt(grid, 12, { color: 3, special: 'bomb' });
+  setAt(grid, 13, { color: null, special: 'rainbow' }); // (2,3) 在 3×3 范围内
+
+  assert.equal(effectCells(grid, 12).length, 8); // 9 格去掉彩球那一格
+
+  const { cleared } = expandSpecials(grid, [12]);
+  assert.equal(cleared.has(13), false);
+});
+
 // ========== 连锁与计分 ==========
 section('连锁与计分');
 
@@ -375,6 +400,43 @@ test('彩球 + 彩球：清空全盘', () => {
     targetIndex: 1,
   });
   assert.equal(result.steps[0].cleared.length, grid.cellIndex.length);
+});
+
+test('彩球 + 横条：把横条效果复制给全部同色方块并逐颗触发', () => {
+  const grid = makeGrid(BASE);
+  setAt(grid, 0, { color: null, special: 'rainbow' });
+  setAt(grid, 1, { color: 3, special: 'row' }); // 目标：颜色 3 的横条
+
+  const result = resolveRainbowSwap(grid, {
+    rng: createRng(7),
+    colors: 6,
+    rainbowIndex: 0,
+    targetIndex: 1,
+  });
+
+  const step = result.steps[0];
+  // BASE 中颜色 3 共 12 个：全部变成横条并各自触发 → 每一行都被清空
+  assert.equal(step.triggered.filter((t) => t.special === 'row').length, 12);
+  assert.equal(step.triggered[0].special, 'rainbow');
+  assert.equal(result.breakdown.specials.row, 12);
+  assert.equal(step.cleared.length, grid.cellIndex.length);
+});
+
+test('彩球 + 普通方块：同色特殊元素被波及后立即触发（不被当成普通方块消掉）', () => {
+  const grid = makeGrid(BASE);
+  setAt(grid, 0, { color: null, special: 'rainbow' });
+  setAt(grid, 3, { color: 3, special: 'bomb' }); // 同色炸弹：(0,4) 为其波及范围
+
+  const result = resolveRainbowSwap(grid, {
+    rng: createRng(7),
+    colors: 6,
+    rainbowIndex: 0,
+    targetIndex: 1,
+  });
+
+  // (0,4) 是颜色 2，不在「清除全场颜色 3」的范围内，只能由炸弹触发时被波及
+  assert.equal(result.breakdown.specials.bomb, 1);
+  assert.equal(result.steps[0].cleared.includes(4), true);
 });
 
 test('cascadeStart：接在已有连锁之后时序号与倍率延续', () => {
@@ -482,6 +544,10 @@ test('非法关卡逐项报错', () => {
   assert.equal(validateLevel({ ...VALID_LEVEL, rows: 3 }).ok, false);
   assert.equal(validateLevel({ ...VALID_LEVEL, rows: 20 }).ok, false);
   assert.equal(validateLevel({ ...VALID_LEVEL, colors: 2 }).ok, false);
+  assert.equal(validateLevel({ ...VALID_LEVEL, colors: 4 }).ok, true);
+  // 收集目标的颜色不能超出该关颜色数（否则该关永远无法通关）
+  assert.equal(validateLevel({ ...VALID_LEVEL, goals: [{ type: 'collect', color: 6, target: 5 }] }).ok, false);
+  assert.equal(validateLevel({ ...VALID_LEVEL, goals: [{ type: 'collect', color: 5, target: 5 }] }).ok, true);
   assert.equal(validateLevel({ ...VALID_LEVEL, goals: [] }).ok, false);
   assert.equal(validateLevel({ ...VALID_LEVEL, moves: 0 }).ok, false);
   assert.equal(validateLevel({ ...VALID_LEVEL, gravity: 'up' }).ok, false);

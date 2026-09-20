@@ -14,7 +14,7 @@ import { COLOR_NAMES, STAR_RULES, STORAGE_KEYS } from './config.js';
 import { CHAPTERS, LEVEL_COUNT, getLevel, levelsOfChapter } from './levels.js';
 import { createMatch3Board } from './board.js';
 import { showScoreDetails } from './scoreDetails.js';
-import { onProgress, reportEnd, reportStart, requestProgress } from './sync.js';
+import { estimateExp, onProgress, reportEnd, reportStart, requestProgress } from './sync.js';
 import { el } from '../../utils/dom.js';
 import { toast } from '../../components/toast.js';
 
@@ -101,8 +101,10 @@ function recordClear(levelId, stars) {
 export function renderLevelMode(container, { onExit }) {
   let board = null;
   let viewing = 'list'; // 服务端进度到达时，只有停在列表才刷新，避免打断对局
+  let refreshExp = null; // 对局中：奖励配置到达后重刷「预计经验」（列表态为 null）
 
   function disposeBoard() {
+    refreshExp = null;
     if (board) {
       board.destroy();
       board = null;
@@ -187,8 +189,12 @@ export function renderLevelMode(container, { onExit }) {
     reportStart({ mode: 'level', level: level.id });
 
     const scoreEl = el('span', { class: 'm3-hud-value' }, '0');
+    const gainedEl = el('span', { class: 'm3-hud-value m3-hud-value--gain' }, '+0');
+    const liveEl = el('span', { class: 'm3-hud-value m3-hud-value--combo' }, '—');
     const cascadeEl = el('span', { class: 'm3-hud-value' }, '0');
     const movesEl = el('span', { class: 'm3-hud-value' }, String(level.moves));
+    const expEl = el('span', { class: 'm3-hud-value' }, '—');
+    const expItem = el('span', { class: 'm3-hud-item m3-hidden' }, '预计经验', expEl);
     const goalList = el('div', { class: 'm3-goals' });
     const achievedEl = el('div', { class: 'm3-achieved m3-hidden' });
     const host = el('div', { class: 'm3-board-host' });
@@ -219,8 +225,11 @@ export function renderLevelMode(container, { onExit }) {
         'div',
         { class: 'm3-hud' },
         el('span', { class: 'm3-hud-item' }, '分数', scoreEl),
+        el('span', { class: 'm3-hud-item' }, '本步得分', gainedEl),
+        el('span', { class: 'm3-hud-item' }, '连消', liveEl),
         el('span', { class: 'm3-hud-item' }, '最高连锁', cascadeEl),
         el('span', { class: 'm3-hud-item' }, '剩余步数', movesEl),
+        expItem,
       ),
       goalList,
       achievedEl,
@@ -253,11 +262,25 @@ export function renderLevelMode(container, { onExit }) {
       );
     }
 
+    /** 预计经验：奖励配置由服务端下发，未获取到（未登录 / 离线）时整项隐藏 */
+    function paintExp(info) {
+      const stars = achieved ? starsFor(level, achievedMovesLeft) : 0;
+      const exp = estimateExp({ mode: 'level', score: info.score, stars });
+      expItem.classList.toggle('m3-hidden', exp == null);
+      if (exp != null) {
+        expEl.textContent = `+${exp}`;
+        expItem.title = stars
+          ? `基础 + 分数换算 + ${stars}★加成（以服务端结算为准）`
+          : '基础 + 分数换算（星级加成在目标达成后计入，以服务端结算为准）';
+      }
+    }
+
     /** 目标全部达成：锁定星级、开放「提前结算」，但**不**结束对局 */
     function markAchieved(info) {
       achieved = true;
       achievedMovesLeft = info.movesLeft;
       const stars = starsFor(level, achievedMovesLeft);
+      paintExp(info); // 星级已锁定，预计经验可以带上星级加成
       settleBtn.disabled = false;
       achievedEl.classList.remove('m3-hidden');
       achievedEl.replaceChildren(
@@ -333,11 +356,17 @@ export function renderLevelMode(container, { onExit }) {
 
     board = createMatch3Board(host, {
       payload: level,
+      onStep({ cascade, gained }) {
+        liveEl.textContent = `×${cascade}`;
+        gainedEl.textContent = `+${gained}`;
+      },
       onUpdate(info) {
         scoreEl.textContent = String(info.score);
         cascadeEl.textContent = String(info.maxCascade);
         movesEl.textContent = String(Math.max(0, info.movesLeft));
+        if (info.gained != null) gainedEl.textContent = `+${info.gained}`;
         paintGoals(info);
+        paintExp(info);
         if (info.shuffled) toast.info('无可消除，已自动洗牌');
         if (!finished && !achieved && goalProgress(level, info).every((item) => item.done)) {
           markAchieved(info);
@@ -349,13 +378,16 @@ export function renderLevelMode(container, { onExit }) {
     });
 
     paintGoals({ score: 0, collected: {}, blockersCleared: 0 });
+    paintExp({ score: 0 });
+    refreshExp = () => paintExp(board.getState());
   }
 
   renderList();
 
-  // 拉取服务端进度：到达后合并进本地存档，并刷新列表（对局中不打断）
+  // 拉取服务端进度：到达后合并进本地，并刷新列表（对局中不打断）；奖励配置到达后补显预计经验
   const offProgress = onProgress(() => {
     if (viewing === 'list') renderList();
+    else refreshExp?.();
   });
   requestProgress();
 

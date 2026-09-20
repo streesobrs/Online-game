@@ -17,9 +17,15 @@ export const BOARD_LIMITS = {
   maxCells: 120,
 };
 
-/** 元素种类限制 */
+/**
+ * 元素种类限制
+ *
+ * min 为 4：碎格子（有洞 / 分仓）棋盘因为没有完整行可借力，
+ * 颜色一多就频繁出现「无可行步 → 只能靠系统洗牌」，
+ * 关卡颜色数上限因此压到 4 色（见 levels.js 第 2 / 3 章）。
+ */
 export const COLOR_LIMITS = {
-  min: 5,
+  min: 4,
   max: 8,
   default: 6,
 };
@@ -173,6 +179,43 @@ export const ENDLESS3 = {
   type: 'endless3',
 };
 
+/**
+ * 肉鸽试炼（娱乐玩法，开发方案 5.6）
+ *
+ * 与两种无尽玩法的根本区别：**这是一局多层的 run**，不是单盘长跑。
+ * - 每层重新生成 8×8 标准盘，限步内本层得分达标即过关，步数随层数缓慢增长
+ * - 过关后从祝福池（perks.js）三选一，祝福在本轮内累计，层数越高目标分越高
+ * - 步数耗尽仍未达标即本轮结束，结算「到达层数 + 本轮总分」（可用「免死金牌」祝福抵消一次）
+ *
+ * 目标分 = baseGoal × goalGrowth^(层数-1) × (1 + perkGoalWeight × (层数-1)) × (1 - 目标减免)
+ * 本层步数 = movesPerFloor + 祝福加成 + floor((层数-1) / movesPerFloorStep)
+ *
+ * **层数成长来源**：棋盘参数只由祝福决定，祝福一旦叠满，每层能打出的分数就固定了。
+ * 若没有随层数增长的来源，目标分指数曲线迟早越过这条「可达分平台」，run 必然在固定层数猝死，
+ * 且后期分数横盘（实测：无层数成长时 4 色 ×2.07 的 build 从第 10 层起稳定在 2 万上下，
+ * 第 15 层目标 46,776 直接打不动）。因此每 movesPerFloorStep 层多发 1 步，
+ * 让可达分随层数线性上涨（实测第 1 层 1,545 → 第 20 层 163,974），玩家能持续看到分数变高。
+ *
+ * 数值由 tests/match3-rogue-balance.mjs 的模拟标定（8×8 随机走子、每层 3 次采样取中位、理性三选一）：
+ * 16 次 run 的到达层数为 中位 22 · p25 21 · 最低 17 · 无首层翻车，达成率全程落在 1.2~6.9 倍；
+ * 模拟用的是随机走子，真人水平会再高几层。改本组数值前先重跑该脚本，否则「能打几层」会跟着漂。
+ */
+export const ROGUE = {
+  type: 'rogue',
+  rows: 8,
+  cols: 8,
+  colors: 6,            // 基准元素种类；「极简主义」祝福在此基础上下调，下限 minColors
+  minColors: 4,         // 颜色数下限：4 色以下（3 色）每步得分会暴涨约 10 倍，留给无尽三色
+  movesPerFloor: 10,    // 每层基准步数（「补给包」祝福与层数成长都在这之上叠加）
+  movesPerFloorStep: 2, // 层数成长来源：每 N 层多发 1 步
+  baseGoal: 900,        // 第 1 层目标分（6 色 10 步的中位分约 1750，首层几乎必过）
+  goalGrowth: 1.28,     // 每层目标分的增长系数
+  perkGoalWeight: 0.1,  // 每层额外提高目标分的比例（与层数挂钩）
+  perkChoices: 3,       // 每次过关给出几个祝福备选
+  friendlyPicks: 2,     // 前几次三选一只出成长类祝福，避免开局连出保命牌导致第 2 层就翻车
+  shieldMoves: 3,       // 「免死金牌」生效时补的步数
+};
+
 /** 本地存档键（开发方案 8） */
 export const STORAGE_KEYS = {
   progress: 'match3Progress',
@@ -180,6 +223,7 @@ export const STORAGE_KEYS = {
   session: 'match3Session',
   bestEndless3: 'match3BestEndless3',
   sessionEndless3: 'match3SessionEndless3',
+  rogueBest: 'match3BestRogue', // 肉鸽试炼最佳：{ maxFloor, highScore }
 };
 
 /** 洗牌规则 */

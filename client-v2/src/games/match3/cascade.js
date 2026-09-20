@@ -8,7 +8,7 @@ import { MATCH_RULES, SCORE, SHAPE, SHUFFLE, SPECIAL } from './config.js';
 import { columnSegments, createGrid, getAt, hasBlocker, index, setAt } from './grid.js';
 import { damageBlockers, placeBlockers } from './blockers.js';
 import { findMatches } from './match.js';
-import { expandSpecials, makeSpecial, rainbowSwapTargets } from './special.js';
+import { expandSpecials, makeSpecial, rainbowCopyTargets, rainbowSwapTargets } from './special.js';
 import { findValidMove, isResolvable, shuffleBoard } from './deadlock.js';
 import { createRng } from './rng.js';
 
@@ -114,9 +114,13 @@ export function refill(grid, rng, colors) {
   return added;
 }
 
-/** 连锁倍率：第 n 次连锁 = 1 + step × (n - 1)，上限 cascadeMax */
-export function cascadeMultiplier(cascade) {
-  return Math.min(1 + SCORE.cascadeStep * (cascade - 1), SCORE.cascadeMax);
+/**
+ * 连锁倍率：第 n 次连锁 = 1 + step × (n - 1)，上限 cascadeMax
+ * @param {number} cascade - 第几次连锁（从 1 起）
+ * @param {number} [cascadeMax] - 倍率上限，默认取 SCORE.cascadeMax（肉鸽模式的祝福可抬高它）
+ */
+export function cascadeMultiplier(cascade, cascadeMax = SCORE.cascadeMax) {
+  return Math.min(1 + SCORE.cascadeStep * (cascade - 1), cascadeMax);
 }
 
 /**
@@ -158,13 +162,14 @@ export function mergeBreakdown(a, b) {
 /**
  * 连锁循环：反复 消除 → 触发特殊元素 → 下落 → 补充，直到没有可消除的连线
  * @param {object} grid 棋盘（就地修改）
- * @param {{rng:object, colors:number, focus?:number, cascadeStart?:number, colorMult?:number}} options
+ * @param {{rng:object, colors:number, focus?:number, cascadeStart?:number, colorMult?:number, cascadeMax?:number}} options
  *   focus 为玩家刚交换的格子；cascadeStart 用于接在已有的连锁之后（彩球交换先算一次）；
- *   colorMult 为按颜色数给的得分倍率（仅无尽模式传，见 config.js 的 COLOR_SCORE_MULTIPLIER），默认 1
+ *   colorMult 为按颜色数给的得分倍率（仅无尽模式传，见 config.js 的 COLOR_SCORE_MULTIPLIER），默认 1；
+ *   cascadeMax 为连锁倍率上限，默认 SCORE.cascadeMax（肉鸽模式的祝福可抬高它）
  * @returns {{steps:Array, gained:number, maxCascade:number, resolvable:boolean,
  *            colors:Object, blockersCleared:number, breakdown:Object}}
  */
-export function resolve(grid, { rng, colors, focus = null, cascadeStart = 1, colorMult = 1 }) {
+export function resolve(grid, { rng, colors, focus = null, cascadeStart = 1, colorMult = 1, cascadeMax = SCORE.cascadeMax }) {
   const steps = [];
   let cascade = cascadeStart - 1;
   let gained = 0;
@@ -201,7 +206,7 @@ export function resolve(grid, { rng, colors, focus = null, cascadeStart = 1, col
       spawned.push({ index: group.spawnIndex, shape: group.shape, color: group.color });
     }
 
-    const multiplier = cascadeMultiplier(cascade);
+    const multiplier = cascadeMultiplier(cascade, cascadeMax);
     const tileScore = Math.round(candyCleared.length * SCORE.perTile * multiplier * colorMult);
     const specialScore = Math.round(
       triggered.reduce((sum, item) => sum + (SCORE.specialBonus[item.special] || 0), 0) * colorMult,
@@ -258,38 +263,71 @@ export function resolve(grid, { rng, colors, focus = null, cascadeStart = 1, col
 /**
  * 彩球 + 任意方块交换：把交换本身当作第 1 次连锁结算，后续连锁接在其后
  * 这是唯一允许「两颗特殊元素直接交换」的组合（开发方案 3.5）
- * @param {{rng:object, colors:number, rainbowIndex:number, targetIndex:number, colorMult?:number}} options
+ *
+ * 两种结算方式：
+ * - 目标是条状 / 炸弹：把该特殊效果复制给全部同色棋子，再逐颗触发
+ * - 目标是普通方块 / 彩球：清除全场同色；被波及到的特殊元素（含同色条状 / 炸弹）立即触发
+ * @param {{rng:object, colors:number, rainbowIndex:number, targetIndex:number, colorMult?:number, cascadeMax?:number}} options
  * @returns {{steps:Array, gained:number, maxCascade:number, resolvable:boolean,
  *            colors:Object, blockersCleared:number, breakdown:Object}}
  */
-export function resolveRainbowSwap(grid, { rng, colors, rainbowIndex, targetIndex, colorMult = 1 }) {
-  const targets = rainbowSwapTargets(grid, rainbowIndex, targetIndex);
-  const blockerDamage = damageBlockers(grid, targets);
+export function resolveRainbowSwap(grid, { rng, colors, rainbowIndex, targetIndex, colorMult = 1, cascadeMax = SCORE.cascadeMax }) {
+  const copy = rainbowCopyTargets(grid, targetIndex);
+  const cleared = new Set([rainbowIndex]);
+  const triggered = [];
+  const rainbowCell = getAt(grid, rainbowIndex);
+
+  // 彩球是这次交换的发起方：它的效果已经转化为下面的结算方式，
+  // 摘掉标记以免被其他特殊元素的波及范围扫到后二次触发（该格必定被消除）
+  if (rainbowCell) rainbowCell.special = null;
+
+  if (copy) {
+    // 先复制再触发：复制出来的每颗特殊元素各自生效，效果继续级联（由 expandSpecials 负责）
+    for (const i of copy.cells) {
+      const cell = getAt(grid, i);
+      if (cell.special !== copy.shape) cell.special = copy.shape;
+    }
+    const expanded = expandSpecials(grid, copy.cells);
+    expanded.cleared.forEach((i) => cleared.add(i));
+    triggered.push({ index: rainbowIndex, special: SPECIAL.RAINBOW, cells: copy.cells.slice() });
+    triggered.push(...expanded.triggered);
+  } else {
+    // 普通方块 / 彩球：清除全场同色，被波及的特殊元素一并触发
+    const targets = rainbowSwapTargets(grid, rainbowIndex, targetIndex);
+    const expanded = expandSpecials(grid, targets.filter((i) => i !== rainbowIndex));
+    expanded.cleared.forEach((i) => cleared.add(i));
+    triggered.push({ index: rainbowIndex, special: SPECIAL.RAINBOW, cells: [...cleared] });
+    triggered.push(...expanded.triggered);
+  }
+
+  const blockerDamage = damageBlockers(grid, cleared);
 
   // 彩球命中集合里也可能带障碍格：障碍只受击、不参与消除
   const candyCleared = [];
   const colorTotals = {};
-  let bonus = 0;
-  for (const i of targets) {
+  for (const i of cleared) {
     const cell = getAt(grid, i);
     if (!cell || cell.blocker) continue;
     candyCleared.push(i);
     if (cell.color != null) colorTotals[cell.color] = (colorTotals[cell.color] || 0) + 1;
-    if (cell.special === SPECIAL.RAINBOW) bonus += SCORE.specialBonus[SPECIAL.RAINBOW];
   }
 
-  const multiplier = cascadeMultiplier(1);
+  const multiplier = cascadeMultiplier(1, cascadeMax);
   const tileScore = Math.round(candyCleared.length * SCORE.perTile * multiplier * colorMult);
-  const specialScore = Math.round(bonus * colorMult);
+  const specialScore = Math.round(
+    triggered.reduce((sum, item) => sum + (SCORE.specialBonus[item.special] || 0), 0) * colorMult,
+  );
   const blockerScore = Math.round(blockerDamage.removed.length * SCORE.blockerBonus * colorMult);
   const gained = tileScore + specialScore + blockerScore;
 
-  // 彩球首次触发算在第 1 连锁内：计一次 tile、加一次 rainbow 触发、记录一层连锁
+  // 彩球首次触发算在第 1 连锁内：计一次 tile、记录每个被触发的特殊元素、记录一层连锁
   const breakdown = emptyBreakdown();
   breakdown.tile += tileScore;
   breakdown.special += specialScore;
   breakdown.blocker += blockerScore;
-  breakdown.specials[SPECIAL.RAINBOW] = (breakdown.specials[SPECIAL.RAINBOW] || 0) + 1;
+  for (const item of triggered) {
+    breakdown.specials[item.special] = (breakdown.specials[item.special] || 0) + 1;
+  }
   breakdown.cascades[1] = (breakdown.cascades[1] || 0) + 1;
 
   for (const i of candyCleared) setAt(grid, i, null);
@@ -300,7 +338,7 @@ export function resolveRainbowSwap(grid, { rng, colors, rainbowIndex, targetInde
     cascade: 1,
     multiplier,
     cleared: candyCleared,
-    triggered: [{ index: rainbowIndex, special: SPECIAL.RAINBOW, cells: candyCleared.slice() }],
+    triggered,
     spawned: [],
     removedBlockers: blockerDamage.removed.slice(),
     damagedBlockers: blockerDamage.damaged.slice(),
@@ -309,7 +347,7 @@ export function resolveRainbowSwap(grid, { rng, colors, rainbowIndex, targetInde
     added,
   };
 
-  const rest = resolve(grid, { rng, colors, cascadeStart: 2, colorMult });
+  const rest = resolve(grid, { rng, colors, cascadeStart: 2, colorMult, cascadeMax });
   return {
     steps: [first, ...rest.steps],
     gained: gained + rest.gained,

@@ -106,6 +106,9 @@ export function validateLevel(payload) {
       if (goal.type === 'collect') {
         if (!isInteger(goal.color) || goal.color < 1 || goal.color > COLOR_LIMITS.max) {
           errors.push(`goals[${k}].color 必须是 1~${COLOR_LIMITS.max} 的整数`);
+        } else if (isInteger(colors) && goal.color > colors) {
+          // 颜色数不够时该颜色根本不会出现，目标永远无法达成
+          errors.push(`goals[${k}].color 超出该关颜色数：${goal.color} > colors ${colors}`);
         }
       }
     });

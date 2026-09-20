@@ -2845,6 +2845,57 @@ class AccountManager {
     }
   }
 
+  // ========== 消消乐逐关明细独立存储 ==========
+
+  /**
+   * 读取消消乐逐关明细（星表 { 关号: 星数 }）
+   *
+   * 逐关星数会随关卡数线性增长，混在账号文件里会让每一次账号写入
+   * （登录、经验、邮件、聊天…）都把它一起序列化重写一遍，
+   * 所以单独存成 data/match3/<userId>.json。
+   * 老账号里残留的 games.match3.stars 会在首次读取时迁走、并从账号中删除。
+   */
+  async getMatch3Stars(userId) {
+    try {
+      const store = await dataStore.readOne('match3', userId);
+      const account = await this._getAccount(userId);
+      const legacy = account?.games?.match3?.stars;
+
+      if (!legacy || typeof legacy !== 'object') {
+        return store?.stars || {};
+      }
+
+      // 迁移：账号里的旧星表与独立文件按关取最高后合并
+      const stars = { ...(store?.stars || {}) };
+      for (const [level, count] of Object.entries(legacy)) {
+        stars[level] = Math.max(stars[level] || 0, count || 0);
+      }
+      await dataStore.writeOne('match3', userId, { userId, stars });
+      delete account.games.match3.stars;
+      await this._saveAccount(userId, account);
+      logger.info('消消乐逐关星表已迁移到独立存储', { userId, levels: Object.keys(stars).length });
+      return stars;
+    } catch (err) {
+      logger.error('读取消消乐逐关明细失败', { userId, error: err.message });
+      return {};
+    }
+  }
+
+  /**
+   * 保存消消乐逐关明细（星表）
+   * @param {string} userId 账号 ID
+   * @param {object} stars { 关号: 星数 }
+   */
+  async saveMatch3Stars(userId, stars) {
+    try {
+      await dataStore.writeOne('match3', userId, { userId, stars: stars || {} });
+      return true;
+    } catch (err) {
+      logger.error('保存消消乐逐关明细失败', { userId, error: err.message });
+      return false;
+    }
+  }
+
   // ========== 背包独立存储 ==========
 
   /**

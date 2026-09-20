@@ -6,7 +6,7 @@
  * - 动画用 async/await 串 Promise，动画期间锁输入
  * - 引擎层不碰 DOM，本文件不写玩法规则
  */
-import { ANIM, BLOCKER_KINDS, BLOCKERS, COLOR_LIMITS, LAYOUT, SPECIAL, colorScoreMultiplier } from './config.js';
+import { ANIM, BLOCKER_KINDS, BLOCKERS, COLOR_LIMITS, LAYOUT, SCORE, SPECIAL, colorScoreMultiplier } from './config.js';
 import {
   colOf,
   createGrid,
@@ -18,8 +18,9 @@ import {
   toPixel,
 } from './grid.js';
 import { createInitialBoard, mergeBreakdown, resolve, resolveRainbowSwap } from './cascade.js';
-import { shuffleBoard, swapCells } from './deadlock.js';
+import { shuffleBoard, findValidMove, swapCells } from './deadlock.js';
 import { hasMatch } from './match.js';
+import { makeSpecial } from './special.js';
 import { createRng } from './rng.js';
 import { el } from '../../utils/dom.js';
 import { fitBoard } from '../../utils/responsive.js';
@@ -38,9 +39,14 @@ const wait = (ms) => new Promise((done) => setTimeout(done, ms));
  * @param {HTMLElement} container - 挂载容器
  * @param {Object} options
  * @param {Object} options.payload - 关卡 payload（纯数据，见开发方案 4.5）
+ *   通用字段：rows / cols / mask / colors / moves / blockers / id；
+ *   可选表现与规则字段：colorScaling（按颜色数缩放得分，仅无尽模式）、
+ *   scoreMult（额外得分倍率，肉鸽模式的自选祝福用）、cascadeMax（连锁倍率上限，默认 SCORE.cascadeMax）、
+ *   specials（开局注入的特殊元素，形如 [{ kind, count }]，肉鸽模式的「军火库」类祝福用）
  * @param {number} [options.seed] - 覆盖默认种子（默认取 payload.id，保证同一关可复现）
  * @param {Object} [options.snapshot] - 局内续存快照（无尽模式刷新后续玩）
  * @param {Function} [options.onUpdate] - 每次状态变化回调 (info)
+ * @param {Function} [options.onStep] - 连锁逐层回调 ({ cascade, gained, stepGained, cleared })，用于实时连消 / 本步得分
  * @param {Function} [options.onGameOver] - 步数用尽回调 ({ score, maxCascade })
  * @returns {Object} { grid, destroy, getState, getSnapshot, setColors, attemptSwap }
  */
@@ -49,6 +55,7 @@ export function createMatch3Board(container, options = {}) {
   const { rows, cols } = payload;
   const cell = LAYOUT.cellSize;
   const onUpdate = options.onUpdate || (() => { });
+  const onStep = options.onStep || (() => { });
   const onGameOver = options.onGameOver || (() => { });
   const movesLimit = Number.isFinite(payload.moves) ? payload.moves : Infinity;
   const snapshot = options.snapshot || null;
@@ -72,6 +79,31 @@ export function createMatch3Board(container, options = {}) {
   }
   const rng = createRng(seed);
   if (snapshot && snapshot.rngState != null) rng.setState(snapshot.rngState);
+
+  /**
+   * 开局注入特殊元素（肉鸽模式的「军火库 / 爆破专家 / 彩球礼物」祝福）
+   * 在已有糖果上就地加标记、不动颜色，因此不会凭空造出连线；
+   * 注入后若全盘再无可行步（概率极低），重排一次，与引擎其它位置的兜底策略一致
+   */
+  function injectSpecials(list) {
+    const kinds = [];
+    for (const item of list) {
+      for (let n = 0; n < (item.count || 0); n += 1) kinds.push(item.kind);
+    }
+    const candidates = grid.cellIndex.filter((i) => {
+      const cell = grid.cells[i];
+      return cell && !cell.blocker && cell.special == null;
+    });
+    for (const kind of kinds) {
+      if (candidates.length === 0) return;
+      const [i] = candidates.splice(rng.int(candidates.length), 1);
+      setAt(grid, i, makeSpecial(kind, grid.cells[i].color));
+    }
+    if (kinds.length > 0 && !findValidMove(grid)) shuffleBoard(grid, rng);
+  }
+
+  // 续存快照里的格子已经带着特殊标记，不重复注入
+  if (!snapshot) injectSpecials(payload.specials || []);
 
   const state = {
     colors: snapshot?.colors || payload.colors || COLOR_LIMITS.default,
@@ -102,6 +134,16 @@ export function createMatch3Board(container, options = {}) {
   }
   container.appendChild(boardEl);
   const fit = fitBoard(boardEl, container);
+
+  // 棋盘浮层反馈（连消 / 本步得分）：盖在棋子之上、不拦截指针，飘一次即自行移除
+  const floatEl = el('div', { class: 'm3-floats' });
+  boardEl.appendChild(floatEl);
+  function popFloat(text, variant) {
+    if (state.disposed) return;
+    const node = el('span', { class: `m3-float m3-float--${variant}` }, text);
+    node.addEventListener('animationend', () => node.remove());
+    floatEl.appendChild(node);
+  }
 
   const posOf = (i) => {
     const { x, y } = toPixel(grid, rowOf(grid, i), colOf(grid, i), cell);
@@ -172,12 +214,22 @@ export function createMatch3Board(container, options = {}) {
   // 颜色数得分倍率：仅无尽模式启用（payload.colorScaling）。
   // 闯关关卡的颜色数与目标值已逐关标定，不能再缩放，故默认关闭。
   const colorScaling = payload.colorScaling === true;
-  const currentColorMult = () => (colorScaling ? colorScoreMultiplier(state.colors) : 1);
+  // 额外得分倍率：肉鸽模式的自选祝福在此累乘（与颜色数倍率同时生效）
+  const scoreMult = Number.isFinite(payload.scoreMult) && payload.scoreMult > 0 ? payload.scoreMult : 1;
+  // 连锁倍率上限：肉鸽模式的「连环爆发」祝福可抬高，默认与全局配置一致
+  const cascadeMax = Number.isFinite(payload.cascadeMax) ? payload.cascadeMax : SCORE.cascadeMax;
+  const currentColorMult = () => (colorScaling ? colorScoreMultiplier(state.colors) : 1) * scoreMult;
 
   // ---- 动画 ----
   /** 逐轮播放 消除 → 下落 → 补充 */
   async function playSteps(steps) {
+    let gained = 0; // 本步（玩家一次操作）累计得分：连锁中逐层累加，实时反馈用
     for (const step of steps) {
+      gained += step.gained;
+      onStep({ cascade: step.cascade, gained, stepGained: step.gained, cleared: step.cleared.length });
+      popFloat(`+${gained}`, 'score');
+      if (step.cascade >= 2) popFloat(`连消 ×${step.cascade}`, 'combo');
+
       setDur(ANIM.clear);
       step.cleared.forEach((i) => cellEls.get(i)?.classList.add('m3-clearing'));
       // 障碍受击：抖动一下再按新 hp 重绘（碎裂的那格随后变成空格）
@@ -260,13 +312,14 @@ export function createMatch3Board(container, options = {}) {
 
     const result =
       rainbowIndex == null
-        ? resolve(grid, { rng, colors: state.colors, focus: b, colorMult: currentColorMult() })
+        ? resolve(grid, { rng, colors: state.colors, focus: b, colorMult: currentColorMult(), cascadeMax })
         : resolveRainbowSwap(grid, {
           rng,
           colors: state.colors,
           rainbowIndex,
           targetIndex: target,
           colorMult: currentColorMult(),
+          cascadeMax,
         });
 
     state.score += result.gained;
@@ -384,6 +437,28 @@ export function createMatch3Board(container, options = {}) {
       breakdown: mergeBreakdown(state.breakdown, null),
     }),
     attemptSwap,
+    /**
+     * 追加步数并重新激活棋盘（肉鸽模式的「免死金牌」等祝福用）
+     * 步数用尽时引擎已把棋盘置为 over，这里补足步数后要一并解锁
+     */
+    addMoves(count) {
+      const n = Math.max(0, Math.floor(count || 0));
+      if (n === 0 || state.disposed) return;
+      state.movesLeft += n;
+      if (state.movesLeft > 0) state.over = false;
+      emit();
+    },
+    /** 免费洗牌（不消耗步数）：肉鸽模式的「备用洗牌」祝福用 */
+    async shuffle() {
+      if (state.busy || state.over || state.disposed) return false;
+      state.busy = true;
+      state.selected = null;
+      await reshuffle();
+      state.busy = false;
+      if (state.disposed) return false;
+      emit({ shuffled: true });
+      return true;
+    },
     /** 锁定输入（自由结算 / 步数用尽后，棋盘保持可见但不再接受操作） */
     lock() {
       state.over = true;

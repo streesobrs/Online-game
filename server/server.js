@@ -3773,10 +3773,10 @@ io.on('connection', (socket) => {
     }
 
     const accountId = user.accountId;
-    const { mode, level, score, maxCombo, moves, durationMs, cleared, stars } = data || {};
+    const { mode, level, floor, score, maxCombo, moves, durationMs, cleared, stars } = data || {};
 
     try {
-      logger.info('消消乐游戏结束', { accountId, mode, level, score, maxCombo, moves, durationMs });
+      logger.info('消消乐游戏结束', { accountId, mode, level, floor, score, maxCombo, moves, durationMs });
 
       // 未登录（游客）不落库、不发经验
       if (!accountId || !gameManager || !gameManager.accountManager) return;
@@ -3787,10 +3787,13 @@ io.on('connection', (socket) => {
       const safeDuration = Math.max(0, Math.floor(durationMs || 0));
 
       // 反刷分校验（开发方案 9.4）：任一不通过则不发经验、不入榜
-      // 三色爽局每步得分高一个量级（实测 16,600 vs 标准无尽的 2,400），用独立上限，否则正常玩家会被误判
+      // 三色爽局每步得分高一个量级（实测 16,600 vs 标准无尽的 2,400），肉鸽因可降到 3 色并叠得分倍率祝福更高，
+      // 两者都用独立上限，否则正常玩家会被误判
       const perMoveCap = mode === 'endless3'
         ? (rewards.endless3MaxScorePerMove || rewards.maxScorePerMove)
-        : rewards.maxScorePerMove;
+        : mode === 'rogue'
+          ? (rewards.rogueMaxScorePerMove || rewards.maxScorePerMove)
+          : rewards.maxScorePerMove;
       const account = await gameManager.accountManager.getAccount(accountId);
       const currentMaxLevel = account?.games?.match3?.maxLevel || 0;
       const violations = [];
@@ -3806,7 +3809,7 @@ io.on('connection', (socket) => {
 
       if (violations.length > 0) {
         logger.warn('消消乐上报数据未通过校验，不予发奖', {
-          accountId, mode, level, score: safeScore, moves: safeMoves, durationMs: safeDuration, violations
+          accountId, mode, level, floor, score: safeScore, moves: safeMoves, durationMs: safeDuration, violations
         });
         if (operationLogger) {
           operationLogger.log({
@@ -3816,7 +3819,7 @@ io.on('connection', (socket) => {
             category: 'game',
             targetName: 'match3',
             amount: safeScore,
-            details: { mode, level, score: safeScore, moves: safeMoves, durationMs: safeDuration, violations },
+            details: { mode, level, floor, score: safeScore, moves: safeMoves, durationMs: safeDuration, violations },
             ip: socket.handshake?.address || ''
           });
         }
@@ -3833,6 +3836,7 @@ io.on('connection', (socket) => {
         accountId,
         mode,
         level,
+        floor,
         score: safeScore,
         maxCombo,
         moves: safeMoves,
@@ -3849,13 +3853,16 @@ io.on('connection', (socket) => {
       await gameManager.accountManager.updateGameStats(accountId, null, 'match3', false, null, safeDuration);
 
       // 经验：基础 + 分数换算，闯关模式按星级额外加成
-      // 三种模式的得分数量级差很远（闯关几千 / 标准无尽数十万 / 三色爽局数百万），除数必须分开定，
+      // 各模式的得分数量级差很远（闯关几千 / 标准无尽数十万 / 三色爽局数百万 / 肉鸽数万），除数必须分开定，
       // 否则尺度最大的模式单位时间经验会被严重稀释。未配置时逐级回退。
       const starCount = mode === 'level' ? Math.max(0, Math.min(3, Math.floor(stars || 0))) : 0;
       const scoreDivisorByMode = {
         level: rewards.expPerScoreDivisor,
         endless: rewards.endlessExpPerScoreDivisor || rewards.expPerScoreDivisor,
         endless3: rewards.endless3ExpPerScoreDivisor
+          || rewards.endlessExpPerScoreDivisor
+          || rewards.expPerScoreDivisor,
+        rogue: rewards.rogueExpPerScoreDivisor
           || rewards.endlessExpPerScoreDivisor
           || rewards.expPerScoreDivisor
       };
@@ -3950,9 +3957,11 @@ io.on('connection', (socket) => {
       if (!account) return;
 
       const match3 = account.games?.match3 || {};
+      // 逐关星表在独立集合里（data/match3/<用户ID>.json），不在账号文件
+      const stars = await gameManager.accountManager.getMatch3Stars(user.accountId);
       socket.emit('match3_progress', {
         maxLevel: match3.maxLevel || 0,
-        stars: match3.stars || {},
+        stars,
         totalStars: match3.totalStars || 0,
         endless: {
           highScore: match3.highScore || 0,
@@ -3961,7 +3970,15 @@ io.on('connection', (socket) => {
         endless3: {
           highScore: match3.highScore3 || 0,
           bestCombo: match3.maxCombo3 || 0
-        }
+        },
+        // 肉鸽试炼的隔离战绩：最高层数与最高分都不与其它模式互相污染
+        rogue: {
+          maxFloor: match3.rogueMaxFloor || 0,
+          highScore: match3.rogueHighScore || 0
+        },
+        // 经验奖励配置：客户端据此实时显示「预计经验」（公式见上面的 match3_game_end），
+        // 避免客户端镜像一份常量而与服务端漂移。服务器仍以本次下发的值为准发经验
+        rewards: config.match3Rewards
       });
     } catch (err) {
       logger.error('同步消消乐进度失败', { error: err.message });

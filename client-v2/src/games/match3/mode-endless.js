@@ -13,7 +13,7 @@
 import { ENDLESS, ENDLESS3, ENDLESS_TIERS, STORAGE_KEYS, colorScoreMultiplier } from './config.js';
 import { createMatch3Board } from './board.js';
 import { showScoreDetails } from './scoreDetails.js';
-import { onProgress, reportEnd, reportStart, requestProgress } from './sync.js';
+import { estimateExp, onProgress, reportEnd, reportStart, requestProgress } from './sync.js';
 import { el } from '../../utils/dom.js';
 import { toast } from '../../components/toast.js';
 
@@ -116,8 +116,10 @@ export function renderEndless(container, { onExit, variant = ENDLESS.type }) {
   let board = null;
   let timerId = null;
   let finished = false;
+  let refreshExp = null; // 奖励配置到达后重刷「预计经验」
 
   function teardown() {
+    refreshExp = null;
     if (board) {
       board.destroy();
       board = null;
@@ -144,9 +146,13 @@ export function renderEndless(container, { onExit, variant = ENDLESS.type }) {
     const colorsAt = (score) => (spec.tiered ? tierColors(score) : spec.config.colors);
 
     const scoreEl = el('span', { class: 'm3-hud-value' }, String(session?.score || 0));
+    const gainedEl = el('span', { class: 'm3-hud-value m3-hud-value--gain' }, '+0');
+    const liveEl = el('span', { class: 'm3-hud-value m3-hud-value--combo' }, '—');
     const comboEl = el('span', { class: 'm3-hud-value' }, String(session?.maxCombo || 0));
     const clearedEl = el('span', { class: 'm3-hud-value' }, String(session?.cleared || 0));
     const timeEl = el('span', { class: 'm3-hud-value' }, formatDuration(elapsedBefore));
+    const expEl = el('span', { class: 'm3-hud-value' }, '—');
+    const expItem = el('span', { class: 'm3-hud-item m3-hidden' }, '预计经验', expEl);
     const host = el('div', { class: 'm3-board-host' });
 
     // 难度档位只有标准无尽有；三色爽局固定 3 色，不显示该项
@@ -163,10 +169,13 @@ export function renderEndless(container, { onExit, variant = ENDLESS.type }) {
       'div',
       { class: 'm3-hud' },
       el('span', { class: 'm3-hud-item' }, '分数', scoreEl),
+      el('span', { class: 'm3-hud-item' }, '本步得分', gainedEl),
+      el('span', { class: 'm3-hud-item' }, '连消', liveEl),
       el('span', { class: 'm3-hud-item' }, '最高连锁', comboEl),
       el('span', { class: 'm3-hud-item' }, '消除', clearedEl),
       colorEl ? el('span', { class: 'm3-hud-item' }, '难度', colorEl) : null,
       el('span', { class: 'm3-hud-item' }, '用时', timeEl),
+      expItem,
     );
 
     const actions = el(
@@ -192,6 +201,16 @@ export function renderEndless(container, { onExit, variant = ENDLESS.type }) {
       host,
       actions,
     );
+
+    /** 预计经验：奖励配置由服务端下发，未获取到（未登录 / 离线）时整项隐藏 */
+    function paintExp(score) {
+      const exp = estimateExp({ mode: spec.config.type, score });
+      expItem.classList.toggle('m3-hidden', exp == null);
+      if (exp != null) {
+        expEl.textContent = `+${exp}`;
+        expItem.title = '基础 + 分数换算（以服务端结算为准）';
+      }
+    }
 
     /** 局内续存：每次状态变化覆盖写，刷新后从同一局面继续 */
     function persist() {
@@ -276,10 +295,16 @@ export function renderEndless(container, { onExit, variant = ENDLESS.type }) {
       },
       seed,
       snapshot: session?.board || null,
+      onStep({ cascade, gained }) {
+        liveEl.textContent = `×${cascade}`;
+        gainedEl.textContent = `+${gained}`;
+      },
       onUpdate(info) {
         scoreEl.textContent = String(info.score);
         comboEl.textContent = String(info.maxCascade);
         clearedEl.textContent = String(info.cleared);
+        if (info.gained != null) gainedEl.textContent = `+${info.gained}`;
+        paintExp(info.score);
         if (spec.tiered) {
           // 难度升档：只影响后续补充的方块，已有棋盘不动
           const next = tierColors(info.score);
@@ -293,6 +318,9 @@ export function renderEndless(container, { onExit, variant = ENDLESS.type }) {
       },
     });
 
+    paintExp(session?.score || 0);
+    refreshExp = () => paintExp(board.getState().score);
+
     timerId = setInterval(() => {
       timeEl.textContent = formatDuration(elapsed());
     }, 1000);
@@ -300,8 +328,8 @@ export function renderEndless(container, { onExit, variant = ENDLESS.type }) {
 
   mountRun();
 
-  // 拉取服务端最高分并合并进本地（结算时读到的历史最高才是准的）
-  const offProgress = onProgress();
+  // 拉取服务端最高分并合并进本地（结算时读到的历史最高才是准的）；奖励配置到达后补显预计经验
+  const offProgress = onProgress(() => refreshExp?.());
   requestProgress();
 
   return () => {

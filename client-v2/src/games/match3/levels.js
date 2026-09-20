@@ -7,12 +7,17 @@
  * - 第 3 章：分仓多区域与混合形态，三类目标混用
  *
  * 数值标定方式（改目标值前先读这段）：
- * 元素种类按章节递增，是主要的难度杠杆：
- * - 第 1 章 5 色 → 第 2 / 3 章 6 色
+ * 元素种类数按棋盘形态分档，是主要的难度杠杆：
+ * - 第 1 章 5 色（完整矩形，行 / 列贯通，连锁够用）
+ * - 第 2 / 3 章 4 色（挖洞 / 分仓棋盘）：碎格子棋盘没有完整行列可借力，
+ *   颜色一多就频繁出现「全盘无可行步 → 只能靠系统洗牌」的局面。
+ *   实测 6 色时第 2 / 3 章有 6 关平均每 60 步要洗 3~7 次牌，降到 4 色后基本归零。
  * 每关目标值来自「贪心策略批量模拟」的三星线中位可达量乘以章节系数：
  * - 三星线 = moves × (1 - STAR_RULES.threeStarRemainRatio)
  * - 第 1 章 ×0.55（宽松）→ 第 2 章 ×0.7 → 第 3 章 ×0.85（吃紧）
  * - 多目标关卡每个目标再乘 0.9（双目标）/ 0.8（三目标），抵消同时达成的额外压力
+ * 第 2 / 3 章由 6 色降 4 色时，目标值按「同策略下 4 色 / 6 色达成量之比」折算，
+ * 保持原有难度手感（4 色连锁更长，达成量普遍涨 1.5~4 倍，目标同步上调）。
  * 调整棋盘尺寸 / 步数 / 颜色数后必须重新模拟，否则目标会重新变得不可达。
  *
  * 每关的 payload 都是纯数据（可 JSON 序列化），满足 UGC-ready 约束（4.5）：
@@ -313,36 +318,36 @@ export const LEVELS = [
     starScore: 7100, schemaVersion: 1,
   },
 
-  // ===== 第 2 章：异形棋盘 + 障碍（6 色） =====
+  // ===== 第 2 章：异形棋盘 + 障碍（4 色） =====
   {
     id: 11, chapter: 2, name: '菱形花园',
-    rows: 9, cols: 9, mask: MASK.diamond, colors: 6, moves: 22,
-    goals: [{ type: 'score', target: 1400 }, { type: 'collect', color: 2, target: 7 }],
+    rows: 9, cols: 9, mask: MASK.diamond, colors: 4, moves: 22,
+    goals: [{ type: 'score', target: 3600 }, { type: 'collect', color: 2, target: 33 }],
     starScore: 3700, schemaVersion: 1,
   },
   {
     id: 12, chapter: 2, name: '冰封的十字',
-    rows: 9, cols: 9, mask: MASK.cross, colors: 6, moves: 22,
-    goals: [{ type: 'clearBlockers', target: 2 }],
+    rows: 9, cols: 9, mask: MASK.cross, colors: 4, moves: 22,
+    goals: [{ type: 'clearBlockers', target: 3 }],
     blockers: [ice(3, 3), ice(3, 4), ice(3, 5), ice(5, 3), ice(5, 4), ice(5, 5)],
     starScore: 3900, schemaVersion: 1,
   },
   {
     id: 13, chapter: 2, name: '环形锁链',
-    rows: 9, cols: 9, mask: MASK.ring, colors: 6, moves: 22,
-    goals: [{ type: 'score', target: 1400 }, { type: 'clearBlockers', target: 3 }],
+    rows: 9, cols: 9, mask: MASK.ring, colors: 4, moves: 22,
+    goals: [{ type: 'score', target: 2200 }, { type: 'clearBlockers', target: 2 }],
     blockers: [lock(0, 4), lock(8, 4), lock(4, 0), lock(4, 1), lock(4, 7), lock(4, 8)],
     starScore: 3200, schemaVersion: 1,
   },
   {
     id: 14, chapter: 2, name: '心之收集',
-    rows: 9, cols: 9, mask: MASK.heart, colors: 6, moves: 22,
-    goals: [{ type: 'collect', color: 1, target: 8 }], starScore: 3600, schemaVersion: 1,
+    rows: 9, cols: 9, mask: MASK.heart, colors: 4, moves: 22,
+    goals: [{ type: 'collect', color: 1, target: 33 }], starScore: 3600, schemaVersion: 1,
   },
   {
     id: 15, chapter: 2, name: '石阶上的石头',
-    rows: 10, cols: 9, mask: MASK.stair, colors: 6, moves: 24,
-    goals: [{ type: 'score', target: 1400 }, { type: 'clearBlockers', target: 3 }],
+    rows: 10, cols: 9, mask: MASK.stair, colors: 4, moves: 24,
+    goals: [{ type: 'score', target: 2300 }, { type: 'clearBlockers', target: 4 }],
     blockers: [
       stone(0, 4), stone(1, 4), stone(2, 4), stone(4, 4),
       stone(5, 4), stone(7, 4), stone(8, 4), stone(9, 4),
@@ -351,20 +356,20 @@ export const LEVELS = [
   },
   {
     id: 16, chapter: 2, name: '沙漏与青草',
-    rows: 9, cols: 9, mask: MASK.hourglass, colors: 6, moves: 22,
-    goals: [{ type: 'collect', color: 3, target: 6 }, { type: 'clearBlockers', target: 3 }],
+    rows: 9, cols: 9, mask: MASK.hourglass, colors: 4, moves: 22,
+    goals: [{ type: 'collect', color: 3, target: 19 }, { type: 'clearBlockers', target: 4 }],
     blockers: [ice(0, 4), ice(1, 4), ice(4, 3), ice(4, 4), ice(7, 4), ice(8, 4)],
     starScore: 3600, schemaVersion: 1,
   },
   {
-    id: 17, chapter: 2, name: '蝴蝶结的六色',
-    rows: 9, cols: 9, mask: MASK.bowtie, colors: 6, moves: 24,
-    goals: [{ type: 'score', target: 1400 }], starScore: 3300, schemaVersion: 1,
+    id: 17, chapter: 2, name: '蝴蝶结的双翼',
+    rows: 9, cols: 9, mask: MASK.bowtie, colors: 4, moves: 24,
+    goals: [{ type: 'score', target: 2100 }], starScore: 3300, schemaVersion: 1,
   },
   {
     id: 18, chapter: 2, name: '三角冰塔',
-    rows: 10, cols: 9, mask: MASK.triangle, colors: 6, moves: 24,
-    goals: [{ type: 'clearBlockers', target: 3 }],
+    rows: 10, cols: 9, mask: MASK.triangle, colors: 4, moves: 24,
+    goals: [{ type: 'clearBlockers', target: 5 }],
     blockers: [
       ice(0, 4), ice(1, 3), ice(1, 4), ice(1, 5),
       stone(3, 3), stone(3, 4), stone(3, 5),
@@ -374,15 +379,15 @@ export const LEVELS = [
   },
   {
     id: 19, chapter: 2, name: '城堡守卫',
-    rows: 10, cols: 9, mask: MASK.castle, colors: 6, moves: 24,
-    goals: [{ type: 'score', target: 1700 }, { type: 'collect', color: 5, target: 8 }],
+    rows: 10, cols: 9, mask: MASK.castle, colors: 4, moves: 24,
+    goals: [{ type: 'score', target: 5500 }, { type: 'collect', color: 1, target: 30 }],
     blockers: [lock(0, 3), lock(1, 3), lock(4, 1), lock(4, 7), lock(9, 1), lock(9, 7)],
     starScore: 4400, schemaVersion: 1,
   },
   {
     id: 20, chapter: 2, name: '花朵与冰霜',
-    rows: 9, cols: 9, mask: MASK.flower, colors: 6, moves: 26,
-    goals: [{ type: 'score', target: 1800 }, { type: 'clearBlockers', target: 5 }],
+    rows: 9, cols: 9, mask: MASK.flower, colors: 4, moves: 26,
+    goals: [{ type: 'score', target: 7500 }, { type: 'clearBlockers', target: 8 }],
     blockers: [
       ice(2, 2), ice(2, 3), ice(2, 4), ice(2, 5), ice(2, 6),
       ice(6, 2), ice(6, 3), ice(6, 4), ice(6, 5), ice(6, 6),
@@ -391,25 +396,25 @@ export const LEVELS = [
     starScore: 4800, schemaVersion: 1,
   },
 
-  // ===== 第 3 章：分仓多区域 + 混合形态（6 色，目标吃紧） =====
+  // ===== 第 3 章：分仓多区域 + 混合形态（4 色，目标吃紧） =====
   {
     id: 21, chapter: 3, name: '左右工坊',
-    rows: 10, cols: 9, mask: MASK.twinLR, colors: 6, moves: 24,
-    goals: [{ type: 'score', target: 1700 }], starScore: 3400, schemaVersion: 1,
+    rows: 10, cols: 9, mask: MASK.twinLR, colors: 4, moves: 24,
+    goals: [{ type: 'score', target: 2900 }], starScore: 3400, schemaVersion: 1,
   },
   {
     id: 22, chapter: 3, name: '上下两仓',
-    rows: 10, cols: 9, mask: MASK.twinTB, colors: 6, moves: 24,
+    rows: 10, cols: 9, mask: MASK.twinTB, colors: 4, moves: 24,
     goals: [
-      { type: 'collect', color: 2, target: 8 },
-      { type: 'collect', color: 4, target: 9 },
+      { type: 'collect', color: 2, target: 33 },
+      { type: 'collect', color: 4, target: 20 },
     ],
     starScore: 3900, schemaVersion: 1,
   },
   {
     id: 23, chapter: 3, name: '四仓清障',
-    rows: 10, cols: 9, mask: MASK.quad, colors: 6, moves: 26,
-    goals: [{ type: 'clearBlockers', target: 4 }],
+    rows: 10, cols: 9, mask: MASK.quad, colors: 4, moves: 26,
+    goals: [{ type: 'clearBlockers', target: 5 }],
     blockers: [
       ice(0, 2), ice(1, 2), ice(2, 2), ice(3, 2),
       ice(5, 2), ice(6, 2), ice(7, 2), ice(8, 2),
@@ -418,15 +423,15 @@ export const LEVELS = [
     starScore: 4100, schemaVersion: 1,
   },
   {
-    id: 24, chapter: 3, name: '三仓六色',
-    rows: 10, cols: 9, mask: MASK.triple, colors: 6, moves: 26,
-    goals: [{ type: 'score', target: 1700 }, { type: 'collect', color: 3, target: 9 }],
+    id: 24, chapter: 3, name: '三仓分拣',
+    rows: 10, cols: 9, mask: MASK.triple, colors: 4, moves: 26,
+    goals: [{ type: 'score', target: 3000 }, { type: 'collect', color: 3, target: 19 }],
     starScore: 3900, schemaVersion: 1,
   },
   {
     id: 25, chapter: 3, name: '环中孤岛',
-    rows: 10, cols: 9, mask: MASK.ringIsland, colors: 6, moves: 28,
-    goals: [{ type: 'collect', color: 1, target: 9 }, { type: 'clearBlockers', target: 3 }],
+    rows: 10, cols: 9, mask: MASK.ringIsland, colors: 4, moves: 28,
+    goals: [{ type: 'collect', color: 1, target: 18 }, { type: 'clearBlockers', target: 4 }],
     blockers: [
       ice(0, 4), ice(9, 4), ice(1, 3), ice(1, 5),
       stone(2, 0), stone(2, 8), stone(6, 0), stone(6, 8),
@@ -435,8 +440,8 @@ export const LEVELS = [
   },
   {
     id: 26, chapter: 3, name: '菱形冻土',
-    rows: 9, cols: 9, mask: MASK.diamond, colors: 6, moves: 26,
-    goals: [{ type: 'score', target: 2200 }, { type: 'clearBlockers', target: 6 }],
+    rows: 9, cols: 9, mask: MASK.diamond, colors: 4, moves: 26,
+    goals: [{ type: 'score', target: 5100 }, { type: 'clearBlockers', target: 11 }],
     blockers: [
       ice(1, 4), ice(2, 3), ice(2, 4), ice(2, 5),
       ice(3, 2), ice(3, 3), ice(3, 5), ice(3, 6),
@@ -446,8 +451,8 @@ export const LEVELS = [
   },
   {
     id: 27, chapter: 3, name: '十字分仓',
-    rows: 9, cols: 9, mask: MASK.crossSplit, colors: 6, moves: 26,
-    goals: [{ type: 'collect', color: 6, target: 9 }, { type: 'clearBlockers', target: 5 }],
+    rows: 9, cols: 9, mask: MASK.crossSplit, colors: 4, moves: 26,
+    goals: [{ type: 'collect', color: 2, target: 17 }, { type: 'clearBlockers', target: 6 }],
     blockers: [
       lock(0, 4), lock(1, 4), lock(3, 4), lock(5, 4),
       lock(6, 4), lock(8, 4), stone(2, 0), stone(2, 8),
@@ -456,8 +461,8 @@ export const LEVELS = [
   },
   {
     id: 28, chapter: 3, name: '石阶工坊',
-    rows: 10, cols: 9, mask: MASK.stair, colors: 6, moves: 28,
-    goals: [{ type: 'score', target: 2100 }, { type: 'clearBlockers', target: 4 }],
+    rows: 10, cols: 9, mask: MASK.stair, colors: 4, moves: 28,
+    goals: [{ type: 'score', target: 3400 }, { type: 'clearBlockers', target: 4 }],
     blockers: [
       stone(0, 4), stone(2, 4), stone(4, 4), stone(5, 4), stone(7, 4),
       stone(9, 4), ice(1, 3), ice(1, 5), ice(8, 3), ice(8, 5),
@@ -466,8 +471,8 @@ export const LEVELS = [
   },
   {
     id: 29, chapter: 3, name: '花朵炼狱',
-    rows: 9, cols: 9, mask: MASK.flower, colors: 6, moves: 30,
-    goals: [{ type: 'clearBlockers', target: 6 }, { type: 'collect', color: 2, target: 11 }],
+    rows: 9, cols: 9, mask: MASK.flower, colors: 4, moves: 30,
+    goals: [{ type: 'clearBlockers', target: 8 }, { type: 'collect', color: 2, target: 29 }],
     blockers: [
       stone(2, 2), stone(2, 3), stone(2, 4), stone(2, 5), stone(2, 6),
       stone(6, 2), stone(6, 3), stone(6, 4), stone(6, 5), stone(6, 6),
@@ -477,11 +482,11 @@ export const LEVELS = [
   },
   {
     id: 30, chapter: 3, name: '糖果工坊总检',
-    rows: 10, cols: 9, mask: MASK.mixed, colors: 6, moves: 30,
+    rows: 10, cols: 9, mask: MASK.mixed, colors: 4, moves: 30,
     goals: [
-      { type: 'score', target: 1800 },
-      { type: 'collect', color: 1, target: 9 },
-      { type: 'clearBlockers', target: 4 },
+      { type: 'score', target: 2900 },
+      { type: 'collect', color: 1, target: 23 },
+      { type: 'clearBlockers', target: 5 },
     ],
     blockers: [
       ice(0, 2), ice(0, 4), ice(0, 6),

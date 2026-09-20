@@ -107,6 +107,69 @@
   color: var(--theme-accent, #27ae60);
 }
 
+/* 本步得分：每步重算，用偏蓝的主色与总分（强调色）区分 */
+.m3-hud-value--gain {
+  color: var(--theme-primary, #007bff);
+}
+
+/* 实时连消：连锁层数用金色，与最高连锁（强调色）区分 */
+.m3-hud-value--combo {
+  color: #e8a90c;
+}
+
+/* ===== 棋盘浮层反馈（连消 / 本步得分，见 board.js 的 popFloat）===== */
+.m3-floats {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.m3-float {
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  animation: m3-float 900ms ease-out forwards;
+}
+
+.m3-float--score {
+  font-size: 14px;
+  background: rgba(39, 174, 96, 0.85);
+}
+
+.m3-float--combo {
+  font-size: 17px;
+  background: rgba(232, 169, 12, 0.9);
+}
+
+@keyframes m3-float {
+  0% {
+    transform: translateY(10px) scale(0.8);
+    opacity: 0;
+  }
+
+  25% {
+    transform: translateY(0) scale(1.12);
+    opacity: 1;
+  }
+
+  60% {
+    transform: translateY(-8px) scale(1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(-30px) scale(1);
+    opacity: 0;
+  }
+}
+
 /* ===== 棋盘 ===== */
 .m3-board-host {
   position: relative;
@@ -410,6 +473,146 @@
 
 .m3-result-line {
   font-size: 14px;
+}
+
+/* 肉鸽结算：不进棋盘浮层，改成页内一块正常排版的结算卡 */
+.m3-result--inline {
+  position: static;
+  inset: auto;
+  padding: 16px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  background: var(--theme-panel-bg, #fff);
+  color: var(--theme-title-color, #2c3e50);
+}
+
+.m3-result--inline .m3-result-title {
+  color: var(--theme-accent, #27ae60);
+}
+
+/* ===== 肉鸽：已获祝福条 ===== */
+.m3-perks-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.m3-perks-chip {
+  padding: 3px 10px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--theme-status-color, #4a5568);
+  background: var(--theme-panel-bg, #fff);
+  cursor: default;
+}
+
+/* ===== 肉鸽：层间三选一祝福 ===== */
+.m3-perks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+
+.m3-perk {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 180px;
+  padding: 16px 12px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 12px;
+  background: var(--theme-panel-bg, #fff);
+  color: var(--theme-title-color, #2c3e50);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.m3-perk:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.m3-perk-icon {
+  font-size: 26px;
+}
+
+.m3-perk-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.m3-perk-desc {
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-perk-own {
+  font-size: 11px;
+  color: var(--theme-accent, #27ae60);
+}
+
+/* ===== 肉鸽：加成数据面板（把祝福折算成逐层实际生效的数值）===== */
+.m3-stats-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.m3-stats-title {
+  font-size: 12px;
+  color: var(--theme-status-color, #4a5568);
+  opacity: 0.85;
+}
+
+.m3-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  justify-content: center;
+}
+
+.m3-stat {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 12px;
+  font-size: 12px;
+  background: var(--theme-panel-bg, #fff);
+}
+
+.m3-stat-label {
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-stat-value {
+  font-weight: 700;
+  color: var(--theme-accent, #27ae60);
+}
+
+/* 三选一卡片里的「下一层」变化：原值 → 新值 */
+.m3-perk-delta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--theme-primary, #007bff);
+}
+
+.m3-perk-delta-title {
+  color: var(--theme-status-color, #4a5568);
 }
 
 /* ===== 操作区 ===== */

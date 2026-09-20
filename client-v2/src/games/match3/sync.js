@@ -31,6 +31,48 @@ function writeStore(key, value) {
 }
 
 /**
+ * 经验奖励配置：由服务端随 match3_progress 下发（server.js 的 match3_game_end 是唯一权威）
+ *
+ * 刻意不在客户端镜像数值：改了服务端配置客户端跟着变，不会漂移。
+ * 未登录 / 离线拿不到配置时保持 null，界面据此隐藏「预计经验」。
+ */
+let rewardConfig = null;
+
+/**
+ * 预计经验：与服务端 match3_game_end 的算法保持一致（基础 + 分数换算 + 闯关星级加成）
+ * 服务端还有反刷分校验，未通过时不发经验，因此这里只是「预计」值。
+ * @param {{mode:string, score:number, stars?:number}} options mode 为 level / endless / endless3 / rogue
+ * @returns {number|null} 配置未下发时返回 null
+ */
+export function estimateExp({ mode, score = 0, stars = 0 }) {
+  const rewards = rewardConfig;
+  if (!rewards) return null;
+
+  const divisorByMode = {
+    level: rewards.expPerScoreDivisor,
+    endless: rewards.endlessExpPerScoreDivisor || rewards.expPerScoreDivisor,
+    endless3:
+      rewards.endless3ExpPerScoreDivisor
+      || rewards.endlessExpPerScoreDivisor
+      || rewards.expPerScoreDivisor,
+    // 肉鸽试炼一轮累计总分约 120 万（标定中位 22 层），尺度与标准无尽的 30 万接近，独立除数并逐级回退
+    rogue:
+      rewards.rogueExpPerScoreDivisor
+      || rewards.endlessExpPerScoreDivisor
+      || rewards.expPerScoreDivisor,
+  };
+  const divisor = divisorByMode[mode] || rewards.expPerScoreDivisor;
+  // 星级加成只有闯关模式有；无尽模式服务端固定按 0 星发
+  const starCount = mode === 'level' ? Math.max(0, Math.min(3, Math.floor(stars || 0))) : 0;
+
+  return (
+    (rewards.baseExp || 0)
+    + Math.floor(Math.max(0, score) / divisor)
+    + starCount * (rewards.starBonus || 0)
+  );
+}
+
+/**
  * 把服务端进度合并进本地存档
  *
  * 注意语义差异：本地 maxLevel 是「已解锁的最高关」（从 1 起），
@@ -67,6 +109,14 @@ export function mergeRemoteProgress(remote) {
     highScore: Math.max(best3.highScore || 0, endless3.highScore || 0),
     bestCombo: Math.max(best3.bestCombo || 0, endless3.bestCombo || 0),
   });
+
+  // 肉鸽试炼的成绩独立于其它模式（层数与分数都取最大，避免离线游玩丢进度）
+  const bestRogue = readStore(STORAGE_KEYS.rogueBest) || {};
+  const rogue = remote.rogue || {};
+  writeStore(STORAGE_KEYS.rogueBest, {
+    maxFloor: Math.max(bestRogue.maxFloor || 0, rogue.maxFloor || 0),
+    highScore: Math.max(bestRogue.highScore || 0, rogue.highScore || 0),
+  });
 }
 
 /** 拉取服务端进度（进入消消乐时调用一次） */
@@ -77,6 +127,7 @@ export function requestProgress() {
 /** 订阅服务端进度：先合并到本地，再回调（用于刷新界面） */
 export function onProgress(handler) {
   return eventBus.on('match3:progress', (data) => {
+    if (data?.rewards) rewardConfig = data.rewards; // 预计经验用的奖励配置，随进度一起下发
     mergeRemoteProgress(data);
     if (handler) handler(data);
   });
@@ -96,7 +147,7 @@ export function reportStart({ mode, level = null }) {
   emit('match3_game_start', { mode, level });
 }
 
-/** 上报结算 */
-export function reportEnd({ mode, level = null, score, maxCombo, moves, durationMs, cleared, stars = 0 }) {
-  emit('match3_game_end', { mode, level, score, maxCombo, moves, durationMs, cleared, stars });
+/** 上报结算；floor 仅肉鸽试炼使用（本轮到达的层数） */
+export function reportEnd({ mode, level = null, floor = null, score, maxCombo, moves, durationMs, cleared, stars = 0 }) {
+  emit('match3_game_end', { mode, level, floor, score, maxCombo, moves, durationMs, cleared, stars });
 }
