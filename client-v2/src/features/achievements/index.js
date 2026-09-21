@@ -8,12 +8,13 @@ import { emit } from '../../core/socket.js';
 import { el, viewRoot } from '../../utils/dom.js';
 import { modal } from '../../components/modal.js';
 
-const GAME_ORDER = ['gobang', 'chinese-chess', 'go', 'snake'];
+const GAME_ORDER = ['gobang', 'chinese-chess', 'go', 'snake', 'match3'];
 const GAME_CONFIG = {
   gobang: { name: '五子棋成就', icon: '⚫', displayName: '五子棋' },
   'chinese-chess': { name: '象棋成就', icon: '♟️', displayName: '象棋' },
   go: { name: '围棋成就', icon: '⚫', displayName: '围棋' },
   snake: { name: '贪吃蛇成就', icon: '🐍', displayName: '贪吃蛇' },
+  match3: { name: '消消乐成就', icon: '🍬', displayName: '消消乐' },
 };
 const BASE_CATEGORY_CONFIG = {
   game: { name: '胜利成就', icon: '🏆', displayName: '胜利成就' },

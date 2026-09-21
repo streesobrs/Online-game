@@ -7,14 +7,23 @@
  *   剩余步数可以继续用出去刷分，也可以随时点「提前结算」收下成绩
  * - 星级：通关后按「达成目标那一刻」的剩余步数占比给 2 / 3 星（阈值在 config.js 的 STAR_RULES）
  *
- * 进度：localStorage 的 match3Progress = { maxLevel, stars: { 关号: 星数 } }
- * 服务端只做存档 / 经验 / 榜单，进度按「服务端为准 + 本地 max 合并」同步（开发方案 5.4）
+ * 进度：服务端为唯一真相，match3_progress 下发后写入本地缓存
+ * （match3Progress = { maxLevel, stars }，仅供离线时展示与解锁判断）。
+ * 本地通关不再自行解锁下一关——服务端 maxLevel 才是解锁依据（开发方案 9.4），
+ * 否则本地进度会跑在服务端前面，被判「跳关」后永远追不上。
  */
 import { COLOR_NAMES, STAR_RULES, STORAGE_KEYS } from './config.js';
 import { CHAPTERS, LEVEL_COUNT, getLevel, levelsOfChapter } from './levels.js';
 import { createMatch3Board } from './board.js';
 import { showScoreDetails } from './scoreDetails.js';
-import { estimateExp, onProgress, reportEnd, reportStart, requestProgress } from './sync.js';
+import {
+  estimateExp,
+  onProgress,
+  onResult,
+  reportEnd,
+  reportStart,
+  requestProgress,
+} from './sync.js';
 import { el } from '../../utils/dom.js';
 import { toast } from '../../components/toast.js';
 
@@ -27,15 +36,7 @@ function readStore(key) {
   }
 }
 
-function writeStore(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // 隐私模式 / 容量满：进度存不下不影响本局
-  }
-}
-
-/** 本地闯关进度 { maxLevel, stars } */
+/** 闯关进度缓存 { maxLevel, stars }，由服务端进度刷新 */
 export function loadProgress() {
   const saved = readStore(STORAGE_KEYS.progress);
   return {
@@ -79,17 +80,6 @@ export function goalProgress(level, info) {
     }
     return { goal, current: info.blockersCleared, done: info.blockersCleared >= goal.target };
   });
-}
-
-/** 记录通关：解锁下一关 + 星级取历史最好 */
-function recordClear(levelId, stars) {
-  const progress = loadProgress();
-  const next = {
-    maxLevel: Math.max(progress.maxLevel, Math.min(levelId + 1, LEVEL_COUNT)),
-    stars: { ...progress.stars, [levelId]: Math.max(progress.stars[levelId] || 0, stars) },
-  };
-  writeStore(STORAGE_KEYS.progress, next);
-  return next;
 }
 
 /**
@@ -305,10 +295,10 @@ export function renderLevelMode(container, { onExit }) {
       board.lock();
       // 星级按「目标达成那一刻」的剩余步数算，达成后继续用掉的步数不再影响星级
       const stars = success ? starsFor(level, achieved ? achievedMovesLeft : info.movesLeft) : 0;
-      if (success) recordClear(level.id, stars);
       const nextLevel = success ? getLevel(level.id + 1) : null;
 
-      reportEnd({
+      // 进度、经验、解锁都由服务端结算（match3:result），本地不自行推进
+      const reported = reportEnd({
         mode: 'level',
         level: level.id,
         score: info.score,
@@ -318,6 +308,7 @@ export function renderLevelMode(container, { onExit }) {
         cleared: info.cleared,
         stars,
       });
+      if (!reported) toast.info('未连接服务端，本局不计入进度与经验');
 
       host.appendChild(
         el(
@@ -337,7 +328,21 @@ export function renderLevelMode(container, { onExit }) {
             'div',
             { class: 'm3-actions' },
             success && nextLevel
-              ? el('button', { class: 'm3-btn', onClick: () => renderPlay(nextLevel) }, '下一关')
+              ? el(
+                'button',
+                {
+                  class: 'm3-btn',
+                  onClick: () => {
+                    // 解锁以服务端结算为准：被反刷分拦下或未连接时进度不会前进，这里就不再放行
+                    if (!isUnlocked(nextLevel.id, loadProgress())) {
+                      toast.info('本局成绩未被服务端记录，下一关尚未解锁');
+                      return;
+                    }
+                    renderPlay(nextLevel);
+                  },
+                },
+                '下一关',
+              )
               : null,
             el('button', { class: 'm3-btn', onClick: () => renderPlay(level) }, '再来一次'),
             el(
@@ -384,15 +389,20 @@ export function renderLevelMode(container, { onExit }) {
 
   renderList();
 
-  // 拉取服务端进度：到达后合并进本地，并刷新列表（对局中不打断）；奖励配置到达后补显预计经验
+  // 拉取服务端进度：到达后写入本地缓存并刷新列表（对局中不打断）；奖励配置到达后补显预计经验
   const offProgress = onProgress(() => {
     if (viewing === 'list') renderList();
     else refreshExp?.();
+  });
+  // 结算回执：解锁与星数由服务端推进，回执到达后刷新列表（停在结算浮层时不动）
+  const offResult = onResult(() => {
+    if (viewing === 'list') renderList();
   });
   requestProgress();
 
   return () => {
     offProgress();
+    offResult();
     disposeBoard();
     container.replaceChildren();
   };

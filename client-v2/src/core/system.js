@@ -40,12 +40,16 @@ const SYSTEM_STYLE = `
 
 // ========== 经验 / 升级动画（对齐 v1 showExpAnimation / showLevelUpAnimation）==========
 function showExpAnimation(expGained) {
+  // 动画样式与横幅共用同一份懒注入样式表，这里必须先注入：
+  // 否则飘字没有样式，追加到 body 末尾会变成页面左下角的裸文本（v1 是内联样式所以没这问题）
+  ensureStyle();
   const div = el('div', { class: 'exp-animation' }, `+${expGained} EXP`);
   document.body.appendChild(div);
   setTimeout(() => div.remove(), 2000);
 }
 
 function showLevelUpAnimation(oldLevel, newLevel) {
+  ensureStyle();
   const div = el('div', { class: 'levelup-animation' }, [
     el('div', { style: 'font-size:48px;margin-bottom:10px;' }, '🎉'),
     el('div', { style: 'font-size:36px;font-weight:bold;color:#f6ad55;' }, '升级啦！'),

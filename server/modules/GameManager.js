@@ -1395,6 +1395,13 @@ class GameManager {
       const rogueHighScore = isRogue ? Math.max(current.rogueHighScore || 0, score) : (current.rogueHighScore || 0);
       const countedScore = countsToTotals ? score : 0;
 
+      // 各玩法局数：排行榜按玩法拆分后，榜上的「局数」也必须只算本玩法，
+      // games.match3.totalGames 是全部玩法的合计，不能直接拿来用
+      const gamesByMode = { ...(current.gamesByMode || {}) };
+      if (isLevel || isEndless3 || isRogue || mode === 'endless') {
+        gamesByMode[mode] = (gamesByMode[mode] || 0) + 1;
+      }
+
       // 只更新具体字段，避免覆盖 security 等敏感字段
       // totalGames / lastPlayedAt 交给 AccountManager.updateGameStats 统一维护，此处不重复累加
       const updates = {
@@ -1405,6 +1412,7 @@ class GameManager {
         'games.match3.maxCombo3': maxCombo3,
         'games.match3.rogueMaxFloor': rogueMaxFloor,
         'games.match3.rogueHighScore': rogueHighScore,
+        'games.match3.gamesByMode': gamesByMode,
         'games.match3.maxLevel': maxLevel,
         'games.match3.totalStars': totalStars,
         'stats.totalScore': (account.stats?.totalScore || 0) + countedScore,

@@ -2067,6 +2067,41 @@ function recordSessionClient(socket, session, data) {
   }
 }
 
+// 汇总各 gameType 的成就判定用统计（结算检查与成就页共用，避免两处各拼一套字段）
+// 消消乐四种玩法成绩互相隔离：标准无尽 highScore/maxCombo、三色爽局 highScore3/maxCombo3、
+// 肉鸽试炼 rogueMaxFloor/rogueHighScore，成就条件与这里一一对应
+function buildGameTypeStats(games) {
+  const stats = {
+    bestStreak: 0,
+    bestMaxStreak: 0,
+    gameTypeWins: {},
+    gameTypeHighScores: {},
+    gameTypeMaxLevel: {},
+    gameTypeMaxCombo: {},
+    gameTypeStars: {},
+    gameTypeHighScores3: {},
+    gameTypeMaxCombo3: {},
+    gameTypeRogueFloor: {},
+    gameTypeRogueScore: {},
+    gameTypeGames: {}
+  };
+  for (const [gameKey, gd] of Object.entries(games || {})) {
+    stats.bestStreak = Math.max(stats.bestStreak, gd.streak || 0);
+    stats.bestMaxStreak = Math.max(stats.bestMaxStreak, gd.maxStreak || 0);
+    stats.gameTypeWins[gameKey] = gd.wins || 0;
+    stats.gameTypeHighScores[gameKey] = gd.highScore || 0;
+    stats.gameTypeMaxLevel[gameKey] = gd.maxLevel || 0;
+    stats.gameTypeMaxCombo[gameKey] = gd.maxCombo || 0;
+    stats.gameTypeStars[gameKey] = gd.totalStars || 0;
+    stats.gameTypeHighScores3[gameKey] = gd.highScore3 || 0;
+    stats.gameTypeMaxCombo3[gameKey] = gd.maxCombo3 || 0;
+    stats.gameTypeRogueFloor[gameKey] = gd.rogueMaxFloor || 0;
+    stats.gameTypeRogueScore[gameKey] = gd.rogueHighScore || 0;
+    stats.gameTypeGames[gameKey] = gd.totalGames || 0;
+  }
+  return stats;
+}
+
 // 主命名空间
 io.on('connection', (socket) => {
   logger.connectEvent(socket.id, { ip: socket.handshake.address });
@@ -2975,21 +3010,8 @@ io.on('connection', (socket) => {
       const activity = account?.account?.activity || {};
       const level = account?.account?.profile?.level || 1;
 
-      // 聚合所有游戏类型的胜利数据和最高分数据
-      let bestStreak = 0;
-      let bestMaxStreak = 0;
-      const gameTypeWins = {};
-      const gameTypeHighScores = {};
-      if (account?.games) {
-        Object.values(account.games).forEach(g => {
-          bestStreak = Math.max(bestStreak, g.streak || 0);
-          bestMaxStreak = Math.max(bestMaxStreak, g.maxStreak || 0);
-        });
-        for (const [gameKey, gameData] of Object.entries(account.games)) {
-          gameTypeWins[gameKey] = gameData.wins || 0;
-          gameTypeHighScores[gameKey] = gameData.highScore || 0;
-        }
-      }
+      // 聚合所有游戏类型的统计（胜利 / 最高分 / 消消乐各玩法进度），供 game_type 类成就使用
+      const gameTypeStats = buildGameTypeStats(account?.games);
 
       // 兼容新旧成就格式：统一转为纯ID数组
       const rawAchievements = account?.achievements || [];
@@ -3004,15 +3026,14 @@ io.on('connection', (socket) => {
         ...(stats.flags || {}),       // 展开 flags：firstGame, nightGame 等
         ...activity,                   // activity 字段：chatMessages, dailyGames, weeklyGames, monthlyGames
         level,
-        streak: bestStreak,            // 当前连胜
-        maxStreak: bestMaxStreak,      // 历史最大连胜
+        streak: gameTypeStats.bestStreak,     // 当前连胜
+        maxStreak: gameTypeStats.bestMaxStreak, // 历史最大连胜
         achievementCount: userAchievementIds.length,
         badges: stats.badges || 0,
         wins: stats.totalWins || 0,
         losses: stats.totalLosses || 0,
         draws: stats.totalDraws || 0,
-        gameTypeWins,
-        gameTypeHighScores,
+        ...gameTypeStats,
       });
 
       // 为每个成就添加解锁状态
@@ -3892,25 +3913,8 @@ io.on('connection', (socket) => {
             ? Object.keys(postAccount.games).filter(k => postAccount.games[k].totalGames > 0).length
             : 0;
 
-          // 聚合各游戏类型的最高分 / 闯关进度，供 game_type 类成就使用
-          const gameTypeWins = {};
-          const gameTypeHighScores = {};
-          const gameTypeMaxLevel = {};
-          const gameTypeMaxCombo = {};
-          const gameTypeStars = {};
-          let bestStreak = 0;
-          let bestMaxStreak = 0;
-          if (postAccount.games) {
-            for (const [gk, gd] of Object.entries(postAccount.games)) {
-              gameTypeWins[gk] = gd.wins || 0;
-              gameTypeHighScores[gk] = gd.highScore || 0;
-              gameTypeMaxLevel[gk] = gd.maxLevel || 0;
-              gameTypeMaxCombo[gk] = gd.maxCombo || 0;
-              gameTypeStars[gk] = gd.totalStars || 0;
-              bestStreak = Math.max(bestStreak, gd.streak || 0);
-              bestMaxStreak = Math.max(bestMaxStreak, gd.maxStreak || 0);
-            }
-          }
+          // 聚合各游戏类型的最高分 / 闯关进度 / 消消乐各玩法成绩，供 game_type 类成就使用
+          const gameTypeStats = buildGameTypeStats(postAccount.games);
 
           const unlockedAchievements = await gameManager.achievementManager.checkAchievements(accountId, {
             ...postAccount.stats,
@@ -3920,18 +3924,14 @@ io.on('connection', (socket) => {
             score: safeScore,
             stars: starCount,
             level: postAccount.account?.profile?.level || 1,
-            streak: bestStreak,
-            maxStreak: bestMaxStreak,
+            streak: gameTypeStats.bestStreak,
+            maxStreak: gameTypeStats.bestMaxStreak,
             allGameTypes: playedGameTypes >= 3,
             singleGameType: playedGameTypes === 1 && (postAccount.stats?.totalGames || 0) > 1,
             wins: postAccount.stats?.totalWins || 0,
             losses: postAccount.stats?.totalLosses || 0,
             draws: postAccount.stats?.totalDraws || 0,
-            gameTypeWins,
-            gameTypeHighScores,
-            gameTypeMaxLevel,
-            gameTypeMaxCombo,
-            gameTypeStars,
+            ...gameTypeStats,
             timestamp: Date.now()
           });
 

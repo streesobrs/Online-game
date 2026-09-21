@@ -24,6 +24,9 @@ import { renderLoginPage } from './features/auth/login-page.js';
 import { renderGames } from './features/games/index.js';
 import { renderChat, initFloatingChat } from './features/chat/index.js';
 import { startOnboardingIfNeeded } from './components/onboarding.js';
+// 成就模块顶层注册了「成就解锁弹窗」的常驻监听：任何对局结算都可能触发，
+// 不能等打开个人中心的成就 Tab 才加载（否则弹窗永远不出现）
+import './features/achievements/index.js';
 
 console.log('[v2] main.js 已加载');
 

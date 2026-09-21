@@ -3,9 +3,10 @@
  *
  * - 上报：match3_game_start / match3_game_end（服务端做反刷分校验后发经验、记榜）
  * - 拉取：match3_sync_progress → match3_progress
- * - 合并：服务端为准，本地参与 max 合并，避免离线游玩丢进度
+ * - 合并：闯关进度以服务端为唯一真相，本地存档只是服务端进度的缓存
+ *   （本地自行推进会让服务端判「跳关」且无法自愈，见 9.4）
  *
- * 未登录或未连接时静默跳过：消消乐离线可玩，服务端只负责存档、经验与榜单。
+ * 未登录或未连接时不上报：消消乐离线可玩，但进度与经验都以服务端记录为准。
  */
 import { emit } from '../../core/socket.js';
 import { eventBus } from '../../core/eventBus.js';
@@ -73,7 +74,10 @@ export function estimateExp({ mode, score = 0, stars = 0 }) {
 }
 
 /**
- * 把服务端进度合并进本地存档
+ * 用服务端进度刷新本地缓存
+ *
+ * 闯关进度以服务端为唯一真相：本地不做 max 合并——本地一旦领先（换账号、未登录时打的关卡），
+ * 服务端会一直判「跳关」，而合并取 max 又让本地永远领先，玩家就再也拿不到经验、也进不了榜。
  *
  * 注意语义差异：本地 maxLevel 是「已解锁的最高关」（从 1 起），
  * 服务端 maxLevel 是「已通关的最高关」（从 0 起）。
@@ -81,18 +85,9 @@ export function estimateExp({ mode, score = 0, stars = 0 }) {
 export function mergeRemoteProgress(remote) {
   if (!remote) return;
 
-  const local = readStore(STORAGE_KEYS.progress) || {};
-  const localCleared = Math.max(0, (local.maxLevel || 1) - 1);
-  const cleared = Math.max(localCleared, Math.max(0, remote.maxLevel || 0));
-
-  const stars = { ...(local.stars || {}) };
-  for (const [levelId, count] of Object.entries(remote.stars || {})) {
-    stars[levelId] = Math.max(stars[levelId] || 0, count || 0);
-  }
-
   writeStore(STORAGE_KEYS.progress, {
-    maxLevel: Math.min(cleared + 1, LEVEL_COUNT),
-    stars,
+    maxLevel: Math.min(Math.max(0, remote.maxLevel || 0) + 1, LEVEL_COUNT),
+    stars: { ...(remote.stars || {}) },
   });
 
   const best = readStore(STORAGE_KEYS.best) || {};
@@ -147,7 +142,10 @@ export function reportStart({ mode, level = null }) {
   emit('match3_game_start', { mode, level });
 }
 
-/** 上报结算；floor 仅肉鸽试炼使用（本轮到达的层数） */
+/**
+ * 上报结算；floor 仅肉鸽试炼使用（本轮到达的层数）
+ * @returns {boolean} 是否已上报（未连接时为 false，本局不计进度与经验）
+ */
 export function reportEnd({ mode, level = null, floor = null, score, maxCombo, moves, durationMs, cleared, stars = 0 }) {
-  emit('match3_game_end', { mode, level, floor, score, maxCombo, moves, durationMs, cleared, stars });
+  return emit('match3_game_end', { mode, level, floor, score, maxCombo, moves, durationMs, cleared, stars });
 }

@@ -205,12 +205,16 @@ const droppedEventWarned = new Set();
  * 主动发送 socket 事件
  * @param {string} event - 事件名（与 v1 一致，见附录 A）
  * @param {*} [data] - 数据
+ * @returns {boolean} 是否已发出（未连接时为 false，调用方可据此提示玩家）
  */
 export function emit(event, data) {
   if (socket.connected) {
     socket.emit(event, data);
-  } else if (!droppedEventWarned.has(event)) {
+    return true;
+  }
+  if (!droppedEventWarned.has(event)) {
     droppedEventWarned.add(event);
     console.warn(`[Socket] 未连接，事件已丢弃: ${event}（连接后将自动恢复）`);
   }
+  return false;
 }

@@ -665,7 +665,7 @@ class AchievementManager {
       },
       {
         id: 146,
-        name: '全星章节',
+        name: '星辉初现',
         description: '累计获得30颗星',
         type: 'game_type',
         condition: { gameType: 'match3', totalStars: 30 },
@@ -673,11 +673,124 @@ class AchievementManager {
       },
       {
         id: 147,
-        name: '无尽之王',
+        name: '无尽好手',
         description: '无尽模式最高分达到150000',
         type: 'game_type',
         condition: { gameType: 'match3', highScore: 150000 },
         reward: { exp: 2000, badge: 'match3_king' }
+      },
+      {
+        id: 148,
+        name: '闯关二十关',
+        description: '通关第20关',
+        type: 'game_type',
+        condition: { gameType: 'match3', maxLevel: 20 },
+        reward: { exp: 1200, badge: 'match3_level_20' }
+      },
+      {
+        id: 149,
+        name: '星辉渐盛',
+        description: '累计获得60颗星',
+        type: 'game_type',
+        condition: { gameType: 'match3', totalStars: 60 },
+        reward: { exp: 2500, badge: 'match3_stars_60' }
+      },
+      {
+        id: 150,
+        name: '星海巡游',
+        description: '累计获得90颗星',
+        type: 'game_type',
+        condition: { gameType: 'match3', totalStars: 90 },
+        reward: { exp: 4000, badge: 'match3_all_3star' }
+      },
+      {
+        id: 151,
+        name: '连锁狂人',
+        description: '单局最高连锁达到15',
+        type: 'game_type',
+        condition: { gameType: 'match3', maxCombo: 15 },
+        reward: { exp: 1500, badge: 'match3_combo_15' }
+      },
+      {
+        id: 152,
+        name: '无尽高手',
+        description: '无尽模式最高分达到300000',
+        type: 'game_type',
+        condition: { gameType: 'match3', highScore: 300000 },
+        reward: { exp: 3000, badge: 'match3_score_300000' }
+      },
+      // 娱乐玩法（三色爽局 / 肉鸽试炼）的成绩与标准无尽隔离，各自的里程碑单独定义
+      {
+        id: 153,
+        name: '三色入门',
+        description: '三色爽局单局分数达到300000',
+        type: 'game_type',
+        condition: { gameType: 'match3', highScore3: 300000 },
+        reward: { exp: 800, badge: 'match3_three_300000' }
+      },
+      {
+        id: 154,
+        name: '三色狂潮',
+        description: '三色爽局单局分数达到1000000',
+        type: 'game_type',
+        condition: { gameType: 'match3', highScore3: 1000000 },
+        reward: { exp: 2000, badge: 'match3_three_1000000' }
+      },
+      {
+        id: 155,
+        name: '三色巨浪',
+        description: '三色爽局单局分数达到3000000',
+        type: 'game_type',
+        condition: { gameType: 'match3', highScore3: 3000000 },
+        reward: { exp: 4000, badge: 'match3_three_king' }
+      },
+      {
+        id: 156,
+        name: '爽局连锁',
+        description: '三色爽局单局最高连锁达到10',
+        type: 'game_type',
+        condition: { gameType: 'match3', maxCombo3: 10 },
+        reward: { exp: 800, badge: 'match3_combo3_10' }
+      },
+      {
+        id: 157,
+        name: '肉鸽新兵',
+        description: '肉鸽试炼到达第5层',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueMaxFloor: 5 },
+        reward: { exp: 300, badge: 'match3_rogue_floor_5' }
+      },
+      {
+        id: 158,
+        name: '肉鸽老手',
+        description: '肉鸽试炼到达第15层',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueMaxFloor: 15 },
+        reward: { exp: 1500, badge: 'match3_rogue_floor_15' }
+      },
+      {
+        id: 159,
+        name: '肉鸽达人',
+        description: '肉鸽试炼到达第30层',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueMaxFloor: 30 },
+        reward: { exp: 3000, badge: 'match3_rogue_floor_30' }
+      },
+      {
+        id: 160,
+        name: '肉鸽金库',
+        description: '肉鸽试炼单轮分数达到500000',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueHighScore: 500000 },
+        reward: { exp: 1200, badge: 'match3_rogue_score_500000' }
+      },
+      {
+        id: 161,
+        name: '消消乐常客',
+        description: '累计游玩50局消消乐（含各玩法）',
+        type: 'game_type',
+        condition: { gameType: 'match3', totalGames: 50 },
+        reward: { exp: 800, badge: 'match3_games_50' }
       }
     ];
   }
@@ -810,6 +923,23 @@ class AchievementManager {
         }
         if (achievement.condition.stars !== undefined) {
           return (stats.stars || 0) >= achievement.condition.stars;
+        }
+        // 消消乐娱乐玩法：三色爽局 / 肉鸽试炼的成绩与标准无尽隔离，各读各的字段（见 5.5 / 5.6）
+        if (achievement.condition.highScore3 !== undefined) {
+          return (stats.gameTypeHighScores3?.[achievement.condition.gameType] || 0) >= achievement.condition.highScore3;
+        }
+        if (achievement.condition.maxCombo3 !== undefined) {
+          return (stats.gameTypeMaxCombo3?.[achievement.condition.gameType] || 0) >= achievement.condition.maxCombo3;
+        }
+        if (achievement.condition.rogueMaxFloor !== undefined) {
+          return (stats.gameTypeRogueFloor?.[achievement.condition.gameType] || 0) >= achievement.condition.rogueMaxFloor;
+        }
+        if (achievement.condition.rogueHighScore !== undefined) {
+          return (stats.gameTypeRogueScore?.[achievement.condition.gameType] || 0) >= achievement.condition.rogueHighScore;
+        }
+        // 累计局数：不分玩法，读 games.match3.totalGames
+        if (achievement.condition.totalGames !== undefined) {
+          return (stats.gameTypeGames?.[achievement.condition.gameType] || 0) >= achievement.condition.totalGames;
         }
         return false;
       case 'ai':
@@ -957,6 +1087,28 @@ class AchievementManager {
             current: stats.gameTypeHighScores?.[achievement.condition.gameType] || 0,
             target: achievement.condition.highScore,
             percent: Math.min(100, Math.round(((stats.gameTypeHighScores?.[achievement.condition.gameType] || 0) / achievement.condition.highScore) * 100))
+          };
+        }
+        // 消消乐：闯关进度 / 各类最高分与连锁 / 肉鸽层数 / 累计局数，
+        // 条件字段与统计字段一一对应，取数口径同 checkCondition（标准无尽、三色爽局、肉鸽互不串味）
+        const gameTypeProgressFields = [
+          ['maxLevel', 'gameTypeMaxLevel'],
+          ['maxCombo', 'gameTypeMaxCombo'],
+          ['totalStars', 'gameTypeStars'],
+          ['highScore3', 'gameTypeHighScores3'],
+          ['maxCombo3', 'gameTypeMaxCombo3'],
+          ['rogueMaxFloor', 'gameTypeRogueFloor'],
+          ['rogueHighScore', 'gameTypeRogueScore'],
+          ['totalGames', 'gameTypeGames']
+        ];
+        for (const [condKey, statsKey] of gameTypeProgressFields) {
+          const target = achievement.condition[condKey];
+          if (target === undefined) continue;
+          const current = stats[statsKey]?.[achievement.condition.gameType] || 0;
+          return {
+            current,
+            target,
+            percent: Math.min(100, Math.round((current / target) * 100))
           };
         }
         break;
@@ -1107,6 +1259,24 @@ class AchievementManager {
       match3_level_10: '🔟',
       match3_all_star_chapter: '🌟',
       match3_king: '👑',
+      // 消消乐闯关 / 无尽进阶
+      match3_level_20: '🚩',
+      match3_stars_60: '⭐',
+      match3_all_3star: '🌟',
+      match3_combo_15: '🔥',
+      match3_score_300000: '💎',
+      // 消消乐三色爽局
+      match3_three_300000: '🌈',
+      match3_three_1000000: '⚡',
+      match3_three_king: '👑',
+      match3_combo3_10: '✨',
+      // 消消乐肉鸽试炼
+      match3_rogue_floor_5: '🚪',
+      match3_rogue_floor_15: '🗺️',
+      match3_rogue_floor_30: '🏰',
+      match3_rogue_score_500000: '💰',
+      // 消消乐累计局数
+      match3_games_50: '🎮',
       // 等级系列
       level_5: '5️',
       level_10: '🔟',

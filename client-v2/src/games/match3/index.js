@@ -11,6 +11,7 @@ import { ENDLESS3, ENDLESS } from './config.js';
 import { renderEndless, renderEndless3, loadBest, loadSession } from './mode-endless.js';
 import { renderRogue, loadRogueBest } from './mode-rogue.js';
 import { renderLevelMode, loadProgress, totalStars } from './mode-level.js';
+import { onProgress, requestProgress } from './sync.js';
 import { LEVEL_COUNT } from './levels.js';
 import { viewRoot, el } from '../../utils/dom.js';
 
@@ -23,12 +24,16 @@ export function renderMatch3(container = viewRoot()) {
   const wrap = el('section', { class: 'm3-view' });
   container.replaceChildren(wrap);
   let modeCleanup = null;
+  // 当前界面若为菜单（模式选择 / 娱乐），服务端进度到达时直接重绘；
+  // 进入具体模式后置空，交给各模式模块自己刷新，避免打断对局
+  let currentScreen = null;
 
   function disposeMode() {
     if (modeCleanup) {
       modeCleanup();
       modeCleanup = null;
     }
+    currentScreen = null;
   }
 
   // ---- 模式选择 ----
@@ -42,6 +47,7 @@ export function renderMatch3(container = viewRoot()) {
 
   function renderMenu() {
     disposeMode();
+    currentScreen = renderMenu;
     const progress = loadProgress();
 
     wrap.replaceChildren(
@@ -93,6 +99,7 @@ export function renderMatch3(container = viewRoot()) {
 
   function renderFunView() {
     disposeMode();
+    currentScreen = renderFunView;
     wrap.replaceChildren(
       el(
         'div',
@@ -146,9 +153,13 @@ export function renderMatch3(container = viewRoot()) {
     modeCleanup = renderRogue(wrap, { onExit: renderFunView });
   }
 
+  // 进度以服务端为准：进入消消乐先拉一次，菜单上的「已通关 N 关」与最佳分才不会显示成空
+  const offProgress = onProgress(() => currentScreen?.());
   renderMenu();
+  requestProgress();
 
   return () => {
+    offProgress();
     disposeMode();
     wrap.remove();
   };

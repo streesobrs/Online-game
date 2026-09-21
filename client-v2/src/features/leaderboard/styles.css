@@ -49,6 +49,38 @@
   transform: scale(1.05);
 }
 
+/* ===== 消消乐玩法二级筛选（一级选中消消乐时出现） ===== */
+.leaderboard-subcontrols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin: -8px 0 16px;
+}
+
+.leaderboard-subcontrols .lobby-btn {
+  padding: 5px 14px;
+  border: 1px dashed #e2e8f0;
+  border-radius: 16px;
+  background: var(--surface, #fff);
+  font-size: 12px;
+  color: var(--text-secondary, #4a5568);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.leaderboard-subcontrols .lobby-btn:hover {
+  border-color: var(--theme-primary, #3498db);
+}
+
+.leaderboard-subcontrols .lobby-btn.active {
+  border-style: solid;
+  border-color: var(--theme-primary, #3498db);
+  background: var(--surface-alt, #e3f2fd);
+  color: var(--accent-blue, #1976d2);
+  font-weight: 600;
+}
+
 /* ===== 榜单 ===== */
 .leaderboard-list {
   display: flex;
@@ -318,9 +350,21 @@
     gap: 4px;
   }
 
-  /* 胜/负/平明细：小屏隐藏，只留胜率条 */
-  .leaderboard-player-detail {
+  /* 胜/负/平明细：小屏隐藏，只留胜率条；得分型榜单（贪吃蛇 / 消消乐各玩法）没有胜率条，明细必须保留 */
+  .leaderboard-player-detail:not(.is-score) {
     display: none;
+  }
+
+  .leaderboard-player-detail.is-score {
+    gap: 10px;
+  }
+
+  .leaderboard-player-detail.is-score .leaderboard-stat-value {
+    font-size: 14px;
+  }
+
+  .leaderboard-player-detail.is-score .leaderboard-stat-label {
+    font-size: 9px;
   }
 
   /* 胜率列：缩小 */
@@ -381,5 +425,10 @@
   .leaderboard-controls .lobby-btn {
     padding: 6px 12px;
     font-size: 12px;
+  }
+
+  .leaderboard-subcontrols .lobby-btn {
+    padding: 4px 10px;
+    font-size: 11px;
   }
 }

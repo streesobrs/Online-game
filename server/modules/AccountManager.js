@@ -7,6 +7,10 @@ const dataStore = require('../utils/dataStore');
 const fs = require('fs');
 const path = require('path');
 
+// 排行榜里消消乐的榜单键：各玩法得分尺度不可比（见 GameManager.saveMatch3Record 的分开存档），
+// 因此不设「消消乐总榜」，按玩法各排各的，每个榜只取本玩法的字段
+const MATCH3_LEADERBOARD_TYPES = ['match3-level', 'match3-endless', 'match3-endless3', 'match3-rogue'];
+
 class AccountManager {
   constructor(io = null) {
     // 密码哈希迭代次数 - 可根据需要调整
@@ -548,11 +552,35 @@ class AccountManager {
           const streak = lastGameType ? (games[lastGameType]?.streak || 0) : 0;
           return { wins: totalWins, losses: totalLosses, draws: totalDraws, totalGames, streak, maxStreak: maxStreakOverall };
         }
-        // 单人游戏（贪吃蛇 / 消消乐）：无胜负概念，排序看最高分
-        if (type === 'snake' || type === 'match3') {
-          const g = account.games?.[type] || {};
-          const score = account.stats?.[`${type}Games`]?.highScore || g.highScore || 0;
+        // 单人游戏（贪吃蛇）：无胜负概念，排序看最高分
+        if (type === 'snake') {
+          const g = account.games?.snake || {};
+          const score = account.stats?.snakeGames?.highScore || g.highScore || 0;
           return { wins: 0, losses: 0, draws: 0, totalGames: g.totalGames || 0, streak: 0, maxStreak: 0, score };
+        }
+        // 消消乐：每个榜单只取本玩法的成绩字段，避免不同玩法的分数混在一起比
+        if (MATCH3_LEADERBOARD_TYPES.includes(type)) {
+          const m3 = account.games?.match3 || {};
+          const stats = account.stats?.match3Games || {};
+          // 榜单键后缀即玩法名（level / endless / endless3 / rogue），与 gamesByMode 的键一致
+          const mode = type.slice('match3-'.length);
+          const base = {
+            wins: 0, losses: 0, draws: 0,
+            // 局数只算本玩法：games.match3.totalGames 是全部玩法的合计
+            totalGames: m3.gamesByMode?.[mode] || 0,
+            streak: 0, maxStreak: 0
+          };
+          if (type === 'match3-level') {
+            return { ...base, score: m3.maxLevel || 0, maxLevel: m3.maxLevel || 0, totalStars: m3.totalStars || 0 };
+          }
+          if (type === 'match3-endless3') {
+            return { ...base, score: m3.highScore3 || 0 };
+          }
+          if (type === 'match3-rogue') {
+            return { ...base, score: m3.rogueHighScore || 0, maxFloor: m3.rogueMaxFloor || 0 };
+          }
+          // match3-endless：标准无尽最高分（stats 兜底兼容旧存档）
+          return { ...base, score: stats.highScore || m3.highScore || 0 };
         }
         const g = account.games?.[type] || {};
         const wins = g.wins || 0;
@@ -562,23 +590,31 @@ class AccountManager {
         return { wins, losses, draws, totalGames, streak: g.streak || 0, maxStreak: g.maxStreak || 0, score: 0 };
       };
 
-      // 计算排序分数
-      const getSortScore = (account, type) => {
+      // 计算排序依据：返回可逐项比较的数值数组（主指标在前，同主指标时比后面的）
+      const getSortValues = (account, type) => {
         if (!type || type === 'all') {
-          return Object.values(account.games || {}).reduce((sum, g) => sum + (g.wins || 0), 0);
+          return [Object.values(account.games || {}).reduce((sum, g) => sum + (g.wins || 0), 0)];
         }
-        if (type === 'snake' || type === 'match3') {
-          return account.stats?.[`${type}Games`]?.highScore || account.games?.[type]?.highScore || 0;
+        if (type === 'snake') {
+          return [account.stats?.snakeGames?.highScore || account.games?.snake?.highScore || 0];
         }
-        return account.games?.[type]?.wins || 0;
+        // 闯关比「已通关的最高关」，同关数比总星数；肉鸽比到达层数，同层数比本轮最高分
+        const m3 = account.games?.match3 || {};
+        if (type === 'match3-level') return [m3.maxLevel || 0, m3.totalStars || 0];
+        if (type === 'match3-endless') return [account.stats?.match3Games?.highScore || m3.highScore || 0];
+        if (type === 'match3-endless3') return [m3.highScore3 || 0];
+        if (type === 'match3-rogue') return [m3.rogueMaxFloor || 0, m3.rogueHighScore || 0];
+        return [account.games?.[type]?.wins || 0];
       };
 
       return uniqueAccounts
         .sort((a, b) => {
-          const scoreA = getSortScore(a, gameType);
-          const scoreB = getSortScore(b, gameType);
-          if (scoreB !== scoreA) return scoreB - scoreA;
-          // 分数相同时按等级排序
+          const valuesA = getSortValues(a, gameType);
+          const valuesB = getSortValues(b, gameType);
+          for (let i = 0; i < valuesA.length; i++) {
+            if (valuesB[i] !== valuesA[i]) return valuesB[i] - valuesA[i];
+          }
+          // 并列时按等级排序
           const lvA = a.account?.profile?.level || 1;
           const lvB = b.account?.profile?.level || 1;
           return lvB - lvA;
@@ -604,6 +640,9 @@ class AccountManager {
             streak: stats.streak,
             maxStreak: stats.maxStreak,
             score: stats.score || 0,
+            maxLevel: stats.maxLevel || 0,
+            totalStars: stats.totalStars || 0,
+            maxFloor: stats.maxFloor || 0,
             winrate: `${winrateNum}%`,
             winrateNum: winrateNum
           };
