@@ -4,6 +4,7 @@
  * - 实时通知：friend:request / friend:accepted 由模块级监听，应用启动即生效
  */
 import { eventBus } from '../../core/eventBus.js';
+import { store } from '../../core/store.js';
 import { api } from '../../core/api.js';
 import { el, viewRoot } from '../../utils/dom.js';
 import { toast } from '../../components/toast.js';
@@ -18,14 +19,23 @@ const views = new Set();          // 订阅视图（渲染回调）
 const friendIds = new Set();      // 已是好友
 const requestedIds = new Set();   // 已发申请待同意
 
-const myId = () => localStorage.getItem('currentAccountId');
+/** 当前登录账号 id：优先取 store（登录瞬间即可用），回退到本地存储 */
+const myId = () => {
+  const user = store.get('user');
+  const inner = user?.account?.account || user?.account;
+  return inner?.id || localStorage.getItem('currentAccountId');
+};
 
 export function subscribeFriends(fn) {
   views.add(fn);
   return () => views.delete(fn);
 }
 
-function refresh() { views.forEach((fn) => fn()); }
+function refresh() {
+  // 待处理申请数写入 store：导航红点等全局 UI 据此显示提醒
+  store.set('friendRequestCount', state.pendingIn.length);
+  views.forEach((fn) => fn());
+}
 
 /** 拉取好友状态并通知所有视图 */
 export async function loadFriends() {
@@ -95,6 +105,19 @@ eventBus.on('friend:request', (data) => {
 eventBus.on('friend:accepted', (data) => {
   toast.success(`${data.withNickname || '对方'} 已同意你的好友申请`);
   loadFriends();
+});
+
+// 登录（含自动登录）后立即拉取一次：离线期间收到的申请也能显示红点；
+// 登出则清空本地状态，避免把上一个账号的申请数带给下一个人
+store.subscribe('user', (user) => {
+  if (user) {
+    loadFriends();
+    return;
+  }
+  state = { friends: [], pendingIn: [], pendingOut: [] };
+  friendIds.clear();
+  requestedIds.clear();
+  refresh();
 });
 
 /** 打开与某人的私信（跳转聊天页并自动打开该会话） */

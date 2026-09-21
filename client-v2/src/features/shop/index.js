@@ -52,6 +52,116 @@ function currentUserId() {
 }
 
 /**
+ * 绘制动态价格道具的价格曲线（对齐 v1 商城）
+ * @param {HTMLCanvasElement} canvas - 已挂载到 DOM 的画布
+ * @param {Object} item - 含 priceTable / currentLevel 的商品
+ * @param {number} discount - 当前生效的 VIP 折扣百分比
+ */
+function drawPriceChart(canvas, item, discount = 0) {
+  const table = item.priceTable || [];
+  if (!canvas || table.length === 0) return;
+
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.clientWidth || 600;
+  const H = canvas.clientHeight || 180;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  ctx.scale(dpr, dpr);
+
+  const padL = 48;
+  const padR = 12;
+  const padT = 14;
+  const padB = 26;
+  const cw = Math.max(1, W - padL - padR);
+  const ch = Math.max(1, H - padT - padB);
+
+  const minLevel = table[0].level;
+  const maxLevel = table[table.length - 1].level;
+  const maxPrice = Math.max(...table.map((r) => r.price)) || 1;
+  const lvSpan = Math.max(1, maxLevel - minLevel);
+  const toX = (lv) => padL + ((lv - minLevel) / lvSpan) * cw;
+  const toY = (p) => padT + (1 - p / maxPrice) * ch;
+
+  ctx.font = '11px Arial, sans-serif';
+
+  // 横向网格线 + Y 轴价格刻度
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  const gridCount = 4;
+  for (let i = 0; i <= gridCount; i++) {
+    const gy = padT + (ch * i) / gridCount;
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padL, gy);
+    ctx.lineTo(padL + cw, gy);
+    ctx.stroke();
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText(String(Math.round(maxPrice * (1 - i / gridCount))), padL - 6, gy);
+  }
+
+  // X 轴等级刻度
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = '#94a3b8';
+  const step = Math.max(1, Math.ceil(lvSpan / 5));
+  for (let lv = minLevel; lv <= maxLevel; lv += step) {
+    ctx.fillText(`${lv}级`, toX(lv), padT + ch + 6);
+  }
+
+  // 折后价折线（VIP 生效时才有）
+  if (discount > 0) {
+    ctx.beginPath();
+    ctx.strokeStyle = '#10b981';
+    ctx.lineWidth = 2;
+    table.forEach((r, i) => {
+      const px = toX(r.level);
+      const py = toY(Math.floor(r.price * (100 - discount) / 100));
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    });
+    ctx.stroke();
+  }
+
+  // 原价折线 + 面积填充
+  const points = table.map((r) => ({ x: toX(r.level), y: toY(r.price), level: r.level }));
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, padT + ch);
+  points.forEach((p) => ctx.lineTo(p.x, p.y));
+  ctx.lineTo(points[points.length - 1].x, padT + ch);
+  ctx.closePath();
+  const gradient = ctx.createLinearGradient(0, padT, 0, padT + ch);
+  gradient.addColorStop(0, 'rgba(245, 158, 11, 0.22)');
+  gradient.addColorStop(1, 'rgba(245, 158, 11, 0.02)');
+  ctx.fillStyle = gradient;
+  ctx.fill();
+
+  ctx.beginPath();
+  points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+  ctx.strokeStyle = '#f59e0b';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // 当前等级标记
+  const current = points.find((p) => p.level === item.currentLevel);
+  if (current) {
+    ctx.save();
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(current.x, padT);
+    ctx.lineTo(current.x, padT + ch);
+    ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#3b82f6';
+    ctx.beginPath();
+    ctx.arc(current.x, current.y, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/**
  * 渲染商城视图
  * @param {HTMLElement} container - 内容容器（#view-root）
  * @returns {Function} cleanup 函数
@@ -74,6 +184,30 @@ export function renderShop(container) {
   const inventoryEl = el('div', { class: 'shop-inventory' });
   const tabsEl = el('div', { class: 'shop-tabs' });
   const loadingEl = el('div', { class: 'text-muted', style: 'text-align:center;padding:40px;' }, '⏳ 加载中...');
+
+  // ---- VIP 折扣（服务端仅下单时算价，展示需客户端对齐同一算法） ----
+  /** 生效中的 VIP 折扣百分比（未开通/无折扣时为 0） */
+  function vipDiscountPercent() {
+    return vipInfo?.isActive ? (vipInfo.discountPercent || 0) : 0;
+  }
+
+  /** 某商品是否享受 VIP 折扣：会员卡本身不参与（与特权对比表一致） */
+  function hasVipDiscount(item, cat = currentCat()) {
+    return cat?.key !== 'vip' && vipDiscountPercent() > 0 && Number(item.price) > 0;
+  }
+
+  /** 实付单价：享受折扣时向下取整，与服务端 purchaseItem 一致 */
+  function effectivePrice(item, cat = currentCat()) {
+    const base = Number(item.price) || 0;
+    if (!hasVipDiscount(item, cat)) return base;
+    return Math.floor(base * (100 - vipDiscountPercent()) / 100);
+  }
+
+  /** 折扣提示（无折扣时为空字符串） */
+  function discountHint(item, cat = currentCat()) {
+    if (!hasVipDiscount(item, cat)) return '';
+    return `（原价 ${item.price}，VIP -${vipDiscountPercent()}%）`;
+  }
 
   // ---- 数据加载 ----
   async function loadAll() {
@@ -133,7 +267,8 @@ export function renderShop(container) {
   function renderHeader() {
     balanceEl.textContent = `💎 ${balance}`;
     if (vipInfo?.isActive) {
-      vipEl.textContent = `👑 VIP ${vipInfo.remainingDays}天`;
+      const d = vipDiscountPercent();
+      vipEl.textContent = `👑 VIP ${vipInfo.remainingDays}天${d > 0 ? ` · 购物${(100 - d) / 10}折` : ''}`;
       vipEl.style.display = '';
     } else {
       vipEl.style.display = 'none';
@@ -188,7 +323,7 @@ export function renderShop(container) {
       gridEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:40px;' }, '暂无下架商品'));
       return;
     }
-    entries.forEach(({ cat, item }) => gridEl.append(itemCard(item, cat)));
+    entries.forEach(({ cat, item }) => gridEl.append(itemCard(item, cat, { fromInventory: true })));
   }
 
   /** 收集玩家拥有的所有下架商品（附带其所属分类） */
@@ -211,21 +346,29 @@ export function renderShop(container) {
   }
 
   // ---- 单个商品卡片（cat 可指定所属分类，下架分类中传入原分类） ----
-  function itemCard(item, cat = currentCat()) {
+  function itemCard(item, cat = currentCat(), detailOpts = {}) {
     const isItem = !cat.cosmetic && item.category !== 'pack' && item.category !== 'vip';
     const ownedCount = inventory[item.id] || 0;
 
-    const priceEl = el('span', { class: 'shop-price' }, `💎 ${item.price ?? 0}`);
     const rarity = item.rarity || 'common';
 
     const isDisabled = item.enabled === false;
+
+    // VIP 折扣价：下架商品只做展示，不标折扣
+    const showDiscount = !isDisabled && hasVipDiscount(item, cat);
+    const priceEl = showDiscount
+      ? el('span', { class: 'shop-price' }, [
+        el('span', { class: 'shop-price-original' }, `💎 ${item.price}`),
+        el('span', { class: 'shop-price-final' }, `💎 ${effectivePrice(item, cat)}`),
+      ])
+      : el('span', { class: 'shop-price' }, `💎 ${item.price ?? 0}`);
 
     // 购买按钮（已下架商品禁用）
     const buyBtn = isDisabled
       ? el('button', { class: 'btn shop-buy-btn', disabled: true }, '🚫 已下架')
       : el('button', {
         class: 'btn shop-buy-btn',
-        onClick: () => buyItem(item),
+        onClick: (e) => { e.stopPropagation(); buyItem(item); },
       }, '购买');
 
     // 外观卡片：已拥有/已装备状态 + 装备按钮
@@ -241,7 +384,7 @@ export function renderShop(container) {
       if (isOwned) {
         equipBtn = el('button', {
           class: 'btn shop-equip-btn' + (isEquipped ? ' equipped' : ''),
-          onClick: () => equipItem(cat.equipCat, item.id),
+          onClick: (e) => { e.stopPropagation(); equipItem(cat.equipCat, item.id); },
         }, isEquipped ? '✔ 已装备' : '装备');
       }
     }
@@ -254,12 +397,16 @@ export function renderShop(container) {
       if (ownedCount > 0 && item.usable) {
         useBtn = el('button', {
           class: 'btn shop-use-btn',
-          onClick: () => useItem(item),
+          onClick: (e) => { e.stopPropagation(); useItem(item); },
         }, '使用');
       }
     }
 
-    return el('div', { class: 'shop-card', style: `border-top:3px solid ${RARITY_COLORS[rarity] || '#718096'};` }, [
+    return el('div', {
+      class: 'shop-card shop-card--clickable',
+      style: `border-top:3px solid ${RARITY_COLORS[rarity] || '#718096'};`,
+      onClick: () => showItemDetail(item, cat, detailOpts),
+    }, [
       el('div', { class: 'shop-card-icon' }, [
         item.icon || '🎁',
         item.tradable === false
@@ -268,10 +415,15 @@ export function renderShop(container) {
       ]),
       el('div', { class: 'shop-card-body' }, [
         el('div', { class: 'shop-card-name' }, [
-          item.name,
-          el('span', { class: 'shop-rarity', style: `color:${RARITY_COLORS[rarity] || '#718096'};` }, rarity),
+          el('span', { class: 'shop-card-name-text' }, item.name),
+          el('span', { class: 'shop-card-name-tags' }, [
+            // VIP 折扣标记，与服务端实收价对应
+            showDiscount ? el('span', { class: 'shop-discount-tag' }, `-${vipDiscountPercent()}%`) : null,
+            el('span', { class: 'shop-rarity', style: `color:${RARITY_COLORS[rarity] || '#718096'};` }, rarity),
+          ]),
         ]),
-        el('div', { class: 'shop-card-desc' }, item.description || ''),
+        // 描述限高三行，超出部分用 title 兜底查看
+        el('div', { class: 'shop-card-desc', title: item.description || '' }, item.description || ''),
         el('div', { class: 'shop-card-foot' }, [
           priceEl,
           statusEl || countEl,
@@ -301,7 +453,12 @@ export function renderShop(container) {
 
     const renderItemCard = (it, isPack) => {
       const rarity = it.rarity || 'common';
-      return el('div', { class: 'shop-card', style: `border-top:3px solid ${RARITY_COLORS[rarity] || '#718096'};` }, [
+      const cat = CATEGORIES.find((c) => c.key === (isPack ? 'packs' : 'items')) || CATEGORIES[0];
+      return el('div', {
+        class: 'shop-card shop-card--clickable',
+        style: `border-top:3px solid ${RARITY_COLORS[rarity] || '#718096'};`,
+        onClick: () => showItemDetail(it, cat, { fromInventory: true }),
+      }, [
         el('div', { class: 'shop-card-icon' }, [
           it.icon || '📦',
           it.enabled === false
@@ -319,7 +476,10 @@ export function renderShop(container) {
           ]),
         ]),
         el('div', { class: 'shop-card-actions' }, [
-          el('button', { class: 'btn shop-use-btn', onClick: () => useItem(it) }, isPack ? '🎁 开启' : '✋ 使用'),
+          el('button', {
+            class: 'btn shop-use-btn',
+            onClick: (e) => { e.stopPropagation(); useItem(it); },
+          }, isPack ? '🎁 开启' : '✋ 使用'),
         ]),
       ]);
     };
@@ -328,7 +488,12 @@ export function renderShop(container) {
       const it = shopData?.[cat.key]?.[id] || { icon: '📦', name: id, description: '', rarity: 'common' };
       const rarity = it.rarity || 'common';
       const isEquipped = cosmetics?.equipped?.[cat.equipCat] === id;
-      return el('div', { class: 'shop-card', style: `border-top:3px solid ${RARITY_COLORS[rarity] || '#718096'};` }, [
+      return el('div', {
+        class: 'shop-card shop-card--clickable',
+        style: `border-top:3px solid ${RARITY_COLORS[rarity] || '#718096'};`,
+        // 兜底数据可能缺少 id，详情里需要用到
+        onClick: () => showItemDetail({ ...it, id }, cat, { fromInventory: true }),
+      }, [
         el('div', { class: 'shop-card-icon' }, [
           it.icon || '📦',
           it.enabled === false
@@ -348,7 +513,10 @@ export function renderShop(container) {
         el('div', { class: 'shop-card-actions' }, [
           isEquipped
             ? null
-            : el('button', { class: 'btn shop-equip-btn', onClick: () => equipItem(cat.equipCat, id) }, '✨ 装备'),
+            : el('button', {
+              class: 'btn shop-equip-btn',
+              onClick: (e) => { e.stopPropagation(); equipItem(cat.equipCat, id); },
+            }, '✨ 装备'),
         ]),
       ]);
     };
@@ -440,6 +608,169 @@ export function renderShop(container) {
     ]);
   }
 
+  // ---- 商品详情弹窗（对齐 v1 商城：描述 / 价格曲线 / 礼包内容 / 会员特权 / 标签 / 信息） ----
+  function showItemDetail(item, cat = currentCat(), { fromInventory = false } = {}) {
+    const rarity = item.rarity || 'common';
+    const rarityColor = RARITY_COLORS[rarity] || '#718096';
+    const isPack = cat.key === 'packs' || item.category === 'pack';
+    const isVip = cat.key === 'vip' || item.category === 'vip';
+    const ownedCount = inventory[item.id] || 0;
+    const ownedCosmetic = cat.cosmetic && (cosmetics?.owned?.[cat.key] || []).includes(item.id);
+    const isDisabled = item.enabled === false;
+    // 与卡片一致：下架商品不展示折扣
+    const discount = !isDisabled && hasVipDiscount(item, cat) ? vipDiscountPercent() : 0;
+
+    const section = (title, ...nodes) => el('div', { class: 'shop-detail-section' }, [
+      el('h4', {}, title),
+      ...nodes,
+    ]);
+    const infoRow = (label, value) => el('div', { class: 'shop-detail-row' }, [
+      el('span', {}, label),
+      el('span', { class: 'shop-detail-row-value' }, value),
+    ]);
+
+    const body = el('div', { class: 'shop-detail' });
+
+    // 头部：图标 + 名称 + 稀有度 / 持有状态
+    body.append(el('div', { class: 'shop-detail-head' }, [
+      el('div', { class: 'shop-detail-icon' }, item.icon || '🎁'),
+      el('div', {}, [
+        el('div', { class: 'shop-detail-name', style: `color:${rarityColor};` }, item.name),
+        el('div', { class: 'shop-detail-badges' }, [
+          el('span', { class: 'shop-detail-rarity', style: `color:${rarityColor};` }, rarity.toUpperCase()),
+          ownedCount > 0 ? el('span', { class: 'shop-detail-badge' }, `持有 ×${ownedCount}`) : null,
+          ownedCosmetic ? el('span', { class: 'shop-detail-badge' }, '✅ 已拥有') : null,
+          isDisabled ? el('span', { class: 'shop-detail-badge' }, '🚫 已下架') : null,
+        ]),
+      ]),
+    ]));
+
+    // 描述（此处展示完整描述，不做卡片上的截断）
+    const descSection = section('📋 描述', el('p', {}, item.description || '暂无描述'));
+    if (item.dynamic && item.currentLevel) {
+      descSection.append(el('div', { class: 'shop-detail-note' }, [
+        el('div', { class: 'shop-detail-note-title' }, '⏳ 动态价格道具'),
+        el('div', {}, `· 当前等级：${item.currentLevel} 级`),
+        el('div', {}, `· 使用后可获得：+${item.lockedExp || 0} 经验`),
+        el('div', {}, '· 购买时锁定经验值，等级提升后价格会变化'),
+        el('div', {}, '· 每个道具的经验值独立计算，购买后不再变动'),
+      ]));
+    }
+    body.append(descSection);
+
+    // 价格曲线 + 完整价格表（动态定价道具）
+    let chartCanvas = null;
+    if (item.dynamic && Array.isArray(item.priceTable) && item.priceTable.length > 0) {
+      chartCanvas = el('canvas', { class: 'shop-detail-chart' });
+      const tableEl = el('div', { class: 'shop-detail-price-table' },
+        item.priceTable.map((row) => el('div', {
+          class: 'shop-detail-price-row' + (row.level === item.currentLevel ? ' current' : ''),
+        }, [
+          el('span', {}, `${row.level} 级`),
+          el('span', { class: 'shop-detail-price-value' }, `💎${row.price}`),
+        ])));
+      body.append(section(
+        '📊 价格曲线',
+        el('div', { class: 'shop-detail-chart-wrap' }, chartCanvas),
+        el('div', { class: 'shop-detail-legend' }, [
+          el('span', { class: 'legend-price' }, '— 原价'),
+          discount > 0 ? el('span', { class: 'legend-discount' }, '— 折后价') : null,
+          el('span', { class: 'legend-current' }, '┆ 当前等级'),
+        ]),
+        el('div', { class: 'shop-detail-table-title' }, `📋 完整价格表（${item.priceTable.length} 个等级）`),
+        tableEl,
+      ));
+    }
+
+    // 礼包内容
+    if (item.content && typeof item.content === 'object' && Object.keys(item.content).length > 0) {
+      body.append(section('🎁 礼包内容',
+        ...Object.entries(item.content).map(([id, count]) => {
+          const info = shopData?.items?.[id] || shopData?.packs?.[id];
+          return infoRow(`${info?.icon || '📦'} ${info?.name || id}`, `×${count}`);
+        })));
+    }
+
+    // 会员特权 + 每日邮件礼包
+    if (isVip) {
+      const benefits = (Array.isArray(item.benefits) && item.benefits.length > 0)
+        ? item.benefits
+        : [
+          `⚡ 对战经验 ×${item.expBonus || 2}`,
+          item.discountPercent ? `💎 全场商品 ${(100 - item.discountPercent) / 10}折` : '💎 专属会员标识',
+        ];
+      body.append(section('✨ 会员特权', ...benefits.map((text) => el('div', { class: 'shop-detail-benefit' }, [
+        el('span', { class: 'shop-detail-check', style: `color:${rarityColor};` }, '✓'),
+        el('span', {}, text),
+      ]))));
+
+      const daily = item.dailyReward;
+      if (daily) {
+        body.append(section('📬 每日邮件礼包', ...[
+          daily.starCoins ? infoRow('💎 星钻', `+${daily.starCoins}/天`) : null,
+          daily.exp ? infoRow('📈 经验', `+${daily.exp}/天`) : null,
+          ...(daily.items || []).map((it) => {
+            const info = shopData?.items?.[it.id];
+            return infoRow(`${info?.icon || '📦'} ${info?.name || it.id}`, `×${it.count}/天`);
+          }),
+        ].filter(Boolean)));
+      }
+    }
+
+    // 标签
+    if (Array.isArray(item.tags) && item.tags.length > 0) {
+      body.append(section('🏷️ 标签', el('div', { class: 'shop-detail-tags' },
+        item.tags.map((tag) => el('span', { class: 'shop-detail-tag' }, tag)))));
+    }
+
+    // 信息
+    const periodMap = { monthly: '每月', weekly: '每周', daily: '每日', total: '累计' };
+    const infoItems = [
+      ['价格', discount > 0
+        ? el('span', {}, [
+          el('span', { class: 'shop-detail-price-original' }, `💎 ${item.price}`),
+          el('span', { class: 'shop-detail-price-final' }, `💎 ${effectivePrice(item, cat)}`),
+          el('span', { class: 'shop-detail-discount' }, `-${discount}%`),
+        ])
+        : `💎 ${item.price ?? 0}`],
+      ['分类', cat.label || item.category || '未知'],
+      item.maxStack ? ['最大堆叠', String(item.maxStack)] : null,
+      ['可交易', item.tradable ? '✅ 可交易' : '❌ 不可交易'],
+      item.days ? ['有效期', `${item.days} 天`] : null,
+      item.expBonus ? ['经验加成', `×${item.expBonus}`] : null,
+      item.discountPercent ? ['购物折扣', `${(100 - item.discountPercent) / 10} 折`] : null,
+      item.purchaseLimit ? ['限购', `${periodMap[item.purchaseLimit.period] || item.purchaseLimit.period} ${item.purchaseLimit.max} 个`] : null,
+    ].filter(Boolean);
+    body.append(section('📊 信息', el('div', { class: 'shop-detail-info' },
+      infoItems.map(([label, value]) => el('div', { class: 'shop-detail-info-item' }, [
+        el('span', { class: 'shop-detail-info-label' }, label),
+        el('span', { class: 'shop-detail-info-value' }, value),
+      ])))));
+
+    // 底部操作：背包里以使用/装备为主，商城里以购买为主
+    let primary = null;
+    if (fromInventory && cat.cosmetic) {
+      const equipped = cosmetics?.equipped?.[cat.equipCat] === item.id;
+      if (!equipped) primary = { text: '✨ 装备', run: () => equipItem(cat.equipCat, item.id) };
+    } else if (fromInventory && (item.usable || isPack)) {
+      primary = { text: isPack ? '🎁 开启' : '✋ 使用', run: () => useItem(item) };
+    } else if (!isDisabled && Number(item.price) > 0) {
+      primary = { text: `💎 ${effectivePrice(item, cat)} · 购买`, run: () => buyItem(item) };
+    }
+
+    modal.show({
+      title: '商品详情',
+      content: body,
+      confirmText: primary ? primary.text : '关闭',
+      cancelText: '关闭',
+      showCancel: Boolean(primary),
+      onConfirm: primary ? primary.run : undefined,
+    });
+
+    // 弹窗挂载后再绘制曲线（需要真实布局宽度）
+    if (chartCanvas) requestAnimationFrame(() => drawPriceChart(chartCanvas, item, discount));
+  }
+
   // ---- 购买 ----
   function buyItem(item) {
     const userId = currentUserId();
@@ -465,7 +796,7 @@ export function renderShop(container) {
           qtyInput,
         ]),
         el('div', { class: 'text-muted', style: 'font-size:12px;' },
-          `💎 单价 ${item.price ?? 0}（余额 ${balance}💎）`),
+          `💎 单价 ${effectivePrice(item, cat)}${discountHint(item, cat)}（余额 ${balance}💎）`),
       ]);
       modal.show({
         title: `购买 ${item.name}`,
@@ -481,7 +812,7 @@ export function renderShop(container) {
     }
     modal.show({
       title: `购买 ${item.name}`,
-      content: `${item.icon} ${item.description || ''}\n\n💎 价格：${item.price ?? 0} 星钻（余额 ${balance}💎）`,
+      content: `${item.icon} ${item.description || ''}\n\n💎 价格：${effectivePrice(item, cat)} 星钻${discountHint(item, cat)}（余额 ${balance}💎）`,
       confirmText: '确认购买',
       showCancel: true,
       onConfirm: () => doBuy(item, 1),

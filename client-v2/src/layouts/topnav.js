@@ -22,6 +22,8 @@ function navButton(item) {
     el('span', { class: 'nav-btn__icon' }, item.icon),
     el('span', { class: 'nav-btn__name' }, item.name),
     item.shortcut ? el('sup', { class: 'nav-btn__shortcut' }, item.shortcut) : null,
+    // 好友申请红点：数量由 store.friendRequestCount 驱动
+    item.id === 'friends' ? el('span', { class: 'nav-btn__badge hidden' }) : null,
   ]);
 }
 
@@ -287,12 +289,22 @@ export function renderTopNav(container) {
 
   const buttons = Array.from(container.querySelectorAll('[data-nav]'));
 
+  // 好友申请红点：有待处理申请时亮起，处理完自动消失
+  const friendBadge = container.querySelector('[data-nav="friends"] .nav-btn__badge');
+  const unsubscribeBadge = store.subscribe('friendRequestCount', (count) => {
+    if (!friendBadge) return;
+    const n = Number(count) || 0;
+    friendBadge.textContent = n > 9 ? '9+' : String(n);
+    friendBadge.classList.toggle('hidden', n <= 0);
+  });
+
   const unsubscribe = store.subscribe('currentView', (view) => {
     buttons.forEach((btn) => btn.classList.toggle('active', btn.dataset.nav === view));
   });
 
   return () => {
     unsubscribe();
+    unsubscribeBadge();
     container.innerHTML = '';
   };
 }

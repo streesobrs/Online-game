@@ -216,6 +216,7 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    position: relative;
     padding: 4px 10px;
     font-size: 13px;
     color: var(--theme-nav-btn-color);
@@ -269,6 +270,29 @@ a.nav-btn.nav-btn--legacy:hover {
     background: var(--theme-shortcut-bg);
     color: var(--theme-shortcut-color);
     margin-left: 2px;
+}
+
+/* ---- 好友申请红点（顶部导航 / 全局抽屉共用）---- */
+.nav-btn__badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 4px;
+    box-sizing: border-box;
+    border-radius: 8px;
+    background: #e53e3e;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 15px;
+    text-align: center;
+    pointer-events: none;
+}
+
+.nav-btn__badge.hidden {
+    display: none;
 }
 
 /* ---- 顶部悬浮账号条（脱离文档流，可拖动） ---- */
@@ -806,6 +830,26 @@ body.nav-account-drawer #account-root {
 .nav-drawer-item__icon {
     font-size: 16px;
     line-height: 1;
+}
+
+/* 抽屉里的好友申请红点：贴右边缘显示数量 */
+.nav-drawer-item__badge {
+    margin-left: auto;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 5px;
+    box-sizing: border-box;
+    border-radius: 8px;
+    background: #e53e3e;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+}
+
+.nav-drawer-item__badge.hidden {
+    display: none;
 }
 
 .nav-drawer-legacy {

@@ -114,7 +114,18 @@ export function renderNavDrawer(container) {
     }, [
       el('span', { class: 'nav-drawer-item__icon' }, item.icon),
       el('span', { class: 'nav-drawer-item__name' }, item.name),
+      // 好友申请红点：数量由 store.friendRequestCount 驱动
+      item.id === 'friends' ? el('span', { class: 'nav-drawer-item__badge hidden' }) : null,
     ]));
+  }
+
+  /** 好友申请红点：有待处理申请时亮起 */
+  function updateFriendBadge(count) {
+    const badge = panel.querySelector('[data-nav="friends"] .nav-drawer-item__badge');
+    if (!badge) return;
+    const n = Number(count) || 0;
+    badge.textContent = n > 9 ? '9+' : String(n);
+    badge.classList.toggle('hidden', n <= 0);
   }
 
   /** 整体重渲染面板 */
@@ -132,6 +143,8 @@ export function renderNavDrawer(container) {
       ]),
       el('a', { class: 'nav-drawer-legacy', href: '/', title: '切换回旧版客户端' }, '🕰️ 返回旧版客户端'),
     );
+    // 导航项是重建的，重建后按当前申请数补齐红点
+    updateFriendBadge(store.get('friendRequestCount'));
   }
 
   // ---- 把手拖动：沿右边缘上下移动，位置记忆 ----
@@ -223,9 +236,13 @@ export function renderNavDrawer(container) {
     });
   });
 
+  // 好友申请红点：有待处理申请时亮起，处理完自动消失
+  const unsubscribeBadge = store.subscribe('friendRequestCount', updateFriendBadge);
+
   return () => {
     unsubscribeUser();
     unsubscribeView();
+    unsubscribeBadge();
     handle.removeEventListener('pointerdown', onPointerDown);
     handle.removeEventListener('pointermove', onPointerMove);
     handle.removeEventListener('pointerup', onPointerUp);
