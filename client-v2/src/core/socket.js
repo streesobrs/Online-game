@@ -34,8 +34,16 @@ fetch('/version')
   })
   .catch(() => { });
 
+// 服务端踢人（管理员踢出 / 封禁 / 长时间未活动）会先下发 kicked 再断开，
+// 此时不应自动重连，否则等于把被踢用户又拉回来。
+let kickedByServer = false;
+socket.on('kicked', () => {
+  kickedByServer = true;
+});
+
 socket.on('connect', () => {
   store.set('socketConnected', true);
+  kickedByServer = false;
   console.log('[Socket] 已连接');
   // 对齐 v1：发送 client_connect（含版本号与 token），
   // 服务端 handleUserConnection 据此绑定账号并置 status='online'，
@@ -48,10 +56,17 @@ socket.on('connect', () => {
   eventBus.emit('socket:connect');
 });
 
-socket.on('disconnect', () => {
+socket.on('disconnect', (reason) => {
   store.set('socketConnected', false);
-  console.warn('[Socket] 连接断开');
-  eventBus.emit('socket:disconnect');
+  console.warn('[Socket] 连接断开', reason);
+  // io server disconnect：socket.io 不会自动重连，不手动恢复会导致后续事件被静默丢弃
+  // （对局结算上报丢失、界面显示「正在自动重连」却永远连不上）
+  if (reason === 'io server disconnect' && !kickedByServer) {
+    setTimeout(() => {
+      if (!socket.connected) socket.connect();
+    }, 500);
+  }
+  eventBus.emit('socket:disconnect', reason);
 });
 
 socket.on('reconnect', () => {
@@ -168,6 +183,7 @@ const EVENT_MAP = {
 
   // 系统与维护
   error: 'system:error',
+  kicked: 'system:kicked',
   system_broadcast: 'system:broadcast',
   admin_message: 'system:adminMessage',
   maintenance_notice: 'system:maintenanceNotice',

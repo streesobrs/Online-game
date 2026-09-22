@@ -23,7 +23,6 @@ import { hasMatch } from './match.js';
 import { makeSpecial } from './special.js';
 import { createRng } from './rng.js';
 import { el } from '../../utils/dom.js';
-import { fitBoard } from '../../utils/responsive.js';
 
 /** 特殊元素在棋子上的标记（彩球用配色表示，不叠符号） */
 const SPECIAL_MARK = {
@@ -42,7 +41,8 @@ const wait = (ms) => new Promise((done) => setTimeout(done, ms));
  *   通用字段：rows / cols / mask / colors / moves / blockers / id；
  *   可选表现与规则字段：colorScaling（按颜色数缩放得分，仅无尽模式）、
  *   scoreMult（额外得分倍率，肉鸽模式的自选祝福用）、cascadeMax（连锁倍率上限，默认 SCORE.cascadeMax）、
- *   specials（开局注入的特殊元素，形如 [{ kind, count }]，肉鸽模式的「军火库」类祝福用）
+ *   specials（开局注入的特殊元素，形如 [{ kind, count }]，肉鸽模式的「军火库」类祝福用）、
+ *   colorWeights（各颜色的出现权重数组，缺省等概率，肉鸽模式的「同色磁石」祝福用）
  * @param {number} [options.seed] - 覆盖默认种子（默认取 payload.id，保证同一关可复现）
  * @param {Object} [options.snapshot] - 局内续存快照（无尽模式刷新后续玩）
  * @param {Function} [options.onUpdate] - 每次状态变化回调 (info)
@@ -53,7 +53,10 @@ const wait = (ms) => new Promise((done) => setTimeout(done, ms));
 export function createMatch3Board(container, options = {}) {
   const payload = options.payload || {};
   const { rows, cols } = payload;
-  const cell = LAYOUT.cellSize;
+  // 单元格边长：随容器自适应取整数像素（见 fitBoardCells）。
+  // 刻意不用 zoom / scale 整体缩放棋盘——小数缩放会让棋子的渐变、圆角与内阴影
+  // 落在半像素上，渲染发虚并出现重影，且各设备可用宽度不同、缩放比不同导致观感不一致
+  let cell = LAYOUT.cellSize;
   const onUpdate = options.onUpdate || (() => { });
   const onStep = options.onStep || (() => { });
   const onGameOver = options.onGameOver || (() => { });
@@ -75,6 +78,7 @@ export function createMatch3Board(container, options = {}) {
       colors: payload.colors || COLOR_LIMITS.default,
       seed,
       blockers: payload.blockers || null,
+      weights: payload.colorWeights || null,
     }).grid;
   }
   const rng = createRng(seed);
@@ -133,7 +137,6 @@ export function createMatch3Board(container, options = {}) {
     boardEl.appendChild(node);
   }
   container.appendChild(boardEl);
-  const fit = fitBoard(boardEl, container);
 
   // 棋盘浮层反馈（连消 / 本步得分）：盖在棋子之上、不拦截指针，飘一次即自行移除
   const floatEl = el('div', { class: 'm3-floats' });
@@ -191,6 +194,41 @@ export function createMatch3Board(container, options = {}) {
     boardEl.classList.remove('m3-no-anim');
   }
 
+  /**
+   * 棋盘自适应：按容器可用宽度取「整数」格边长后整体重排，不做任何整体缩放。
+   *
+   * 与棋类棋盘（go/gobang/chinese-chess）的处理保持一致：缩放整个棋盘会让棋子
+   * 落不到整像素上，渐变与描边被半像素混合后发虚、出现重影，且不同设备可用宽度
+   * 不同、缩放比不同，同一颗棋子的观感就会不一致。
+   */
+  function fitBoardCells() {
+    const MIN_CELL = 28; // 触控最小可点尺寸
+    const MAX_CELL = LAYOUT.cellSize; // 设计尺寸，只缩不放
+
+    function apply() {
+      const avail = (container && container.clientWidth) || window.innerWidth;
+      if (!avail) return;
+      const next = Math.max(MIN_CELL, Math.min(MAX_CELL, Math.floor(avail / cols)));
+      if (next === cell) return;
+      cell = next;
+      boardEl.style.setProperty('--m3-cell', `${cell}px`);
+      boardEl.style.width = `${cols * cell}px`;
+      boardEl.style.height = `${rows * cell}px`;
+      snap(); // 格边长变了：位置与内容一次性重排
+    }
+
+    apply();
+    requestAnimationFrame(apply); // 挂载后布局稳定，再量一次
+    window.addEventListener('resize', apply);
+
+    return {
+      refresh: apply,
+      destroy() {
+        window.removeEventListener('resize', apply);
+      },
+    };
+  }
+
   /** 当前状态的可读快照（onUpdate 与 onGameOver 共用同一份字段，避免两条路径口径不一致） */
   function snapshotInfo(extra = {}) {
     return {
@@ -214,10 +252,18 @@ export function createMatch3Board(container, options = {}) {
   // 颜色数得分倍率：仅无尽模式启用（payload.colorScaling）。
   // 闯关关卡的颜色数与目标值已逐关标定，不能再缩放，故默认关闭。
   const colorScaling = payload.colorScaling === true;
-  // 额外得分倍率：肉鸽模式的自选祝福在此累乘（与颜色数倍率同时生效）
-  const scoreMult = Number.isFinite(payload.scoreMult) && payload.scoreMult > 0 ? payload.scoreMult : 1;
+  // 额外得分倍率：肉鸽模式的自选祝福在此累乘（与颜色数倍率同时生效）。
+  // 用 let 是因为肉鸽的局内任务奖励（「狂暴」）会在层中临时抬高它，见 setScoreMult
+  let scoreMult = Number.isFinite(payload.scoreMult) && payload.scoreMult > 0 ? payload.scoreMult : 1;
+  // 续存快照里的倍率优先于开局 payload：肉鸽的局内任务「狂暴」会在层中抬过它，
+  // 不还原的话「刷新一下奖励就没了」（见 setScoreMult）
+  if (snapshot && Number.isFinite(snapshot.scoreMult) && snapshot.scoreMult > 0) {
+    scoreMult = snapshot.scoreMult;
+  }
   // 连锁倍率上限：肉鸽模式的「连环爆发」祝福可抬高，默认与全局配置一致
   const cascadeMax = Number.isFinite(payload.cascadeMax) ? payload.cascadeMax : SCORE.cascadeMax;
+  // 各颜色的出现权重（肉鸽的「同色磁石」祝福），缺省等概率
+  const weights = payload.colorWeights || null;
   const currentColorMult = () => (colorScaling ? colorScoreMultiplier(state.colors) : 1) * scoreMult;
 
   // ---- 动画 ----
@@ -312,7 +358,7 @@ export function createMatch3Board(container, options = {}) {
 
     const result =
       rainbowIndex == null
-        ? resolve(grid, { rng, colors: state.colors, focus: b, colorMult: currentColorMult(), cascadeMax })
+        ? resolve(grid, { rng, colors: state.colors, focus: b, colorMult: currentColorMult(), cascadeMax, weights })
         : resolveRainbowSwap(grid, {
           rng,
           colors: state.colors,
@@ -320,6 +366,7 @@ export function createMatch3Board(container, options = {}) {
           targetIndex: target,
           colorMult: currentColorMult(),
           cascadeMax,
+          weights,
         });
 
     state.score += result.gained;
@@ -404,6 +451,7 @@ export function createMatch3Board(container, options = {}) {
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);
   window.addEventListener('pointercancel', onUp);
+  const fit = fitBoardCells();
   snap();
 
   return {
@@ -412,6 +460,22 @@ export function createMatch3Board(container, options = {}) {
     /** 更新元素种类（无尽模式按分数升档时调用，只影响后续补充的方块） */
     setColors(next) {
       state.colors = next;
+    },
+    /**
+     * 层中改写得分倍率（肉鸽的局内任务奖励「狂暴」用：本层剩余步数内得分翻倍）
+     * 只影响之后的结算，已经落袋的分数不回滚
+     */
+    setScoreMult(next) {
+      if (Number.isFinite(next) && next > 0) scoreMult = next;
+    },
+    /**
+     * 层中就地注入特殊元素（肉鸽的局内任务奖励「爆破 / 彩球」用）
+     * 与开局注入同一套逻辑：在已有糖果上加标记、不动颜色，不会凭空造出连线
+     */
+    addSpecials(list) {
+      if (state.disposed || !Array.isArray(list) || list.length === 0) return;
+      injectSpecials(list);
+      snap();
     },
     /** 局内续存快照（纯数据，可直接 JSON 序列化） */
     getSnapshot: () => ({
@@ -432,6 +496,7 @@ export function createMatch3Board(container, options = {}) {
       cleared: state.cleared,
       moves: state.moves,
       movesLeft: state.movesLeft,
+      scoreMult, // 层中被改过的倍率（肉鸽的局内任务奖励），不带上就还原不回来
       collected: { ...state.collected },
       blockersCleared: state.blockersCleared,
       breakdown: mergeBreakdown(state.breakdown, null),

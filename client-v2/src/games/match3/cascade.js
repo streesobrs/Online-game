@@ -12,23 +12,47 @@ import { expandSpecials, makeSpecial, rainbowCopyTargets, rainbowSwapTargets } f
 import { findValidMove, isResolvable, shuffleBoard } from './deadlock.js';
 import { createRng } from './rng.js';
 
+/**
+ * 掷一个颜色（开发方案 3.2 的「颜色权重」：肉鸽的「同色磁石」祝福用）
+ *
+ * weights 为按颜色下标（color - 1）排列的权重数组，缺省项按 1 计。
+ * 不传 weights 时退化为等概率的 `1 + rng.int(colors)`，与旧行为逐位一致——
+ * 这一点是硬约束：所有非肉鸽模式与历史关卡的复现性都依赖它。
+ * @param {object} rng - 随机数发生器
+ * @param {number} colors - 元素种类数
+ * @param {Array<number>} [weights] - 各颜色权重
+ */
+export function pickColor(rng, colors, weights) {
+  if (!weights) return 1 + rng.int(colors);
+  let total = 0;
+  // 缺省项按 1 计（只有显式写 0 才是「永不出现」），短数组不会静默吞掉后面的颜色
+  for (let c = 1; c <= colors; c += 1) total += weights[c - 1] ?? 1;
+  if (!(total > 0)) return 1 + rng.int(colors);
+  let roll = rng.next() * total;
+  for (let c = 1; c <= colors; c += 1) {
+    roll -= weights[c - 1] ?? 1;
+    if (roll < 0) return c;
+  }
+  return colors;
+}
+
 /** 随机铺满可自由下落的格子（洞与障碍格不铺） */
-function fillRandom(grid, rng, colors) {
+function fillRandom(grid, rng, colors, weights) {
   for (const i of grid.cellIndex) {
     if (hasBlocker(grid, i)) continue;
-    setAt(grid, i, { color: 1 + rng.int(colors), special: null });
+    setAt(grid, i, { color: pickColor(rng, colors, weights), special: null });
   }
 }
 
 /** 消除现成三连：重掷被匹配格子的颜色，直到棋盘上没有现成连线 */
-function clearInitialMatches(grid, rng, colors) {
+function clearInitialMatches(grid, rng, colors, weights) {
   for (let round = 0; round < MATCH_RULES.maxInitialFixRounds; round += 1) {
     const groups = findMatches(grid);
     if (groups.length === 0) return true;
     for (const group of groups) {
       for (const i of group.cells) {
         const cell = getAt(grid, i);
-        if (cell) cell.color = 1 + rng.int(colors);
+        if (cell) cell.color = pickColor(rng, colors, weights);
       }
     }
   }
@@ -38,18 +62,20 @@ function clearInitialMatches(grid, rng, colors) {
 /**
  * 生成初始棋盘（开发方案 4.2 初始化规则）
  * 必须满足两个约束：棋盘上不存在现成的三连、至少存在一个可行交换
- * @param {{rows:number, cols:number, mask?:any, colors:number, seed?:number, blockers?:Array}} options
+ * @param {{rows:number, cols:number, mask?:any, colors:number, seed?:number,
+ *          blockers?:Array, weights?:Array<number>}} options
+ *   weights 为各颜色的出现权重（缺省等概率），见 pickColor
  * @returns {{grid:object, ok:boolean, attempts:number}}
  */
-export function createInitialBoard({ rows, cols, mask = null, colors, seed = 1, blockers = null }) {
+export function createInitialBoard({ rows, cols, mask = null, colors, seed = 1, blockers = null, weights = null }) {
   const grid = createGrid({ rows, cols, mask });
   const rng = createRng(seed);
 
   for (let attempt = 1; attempt <= SHUFFLE.maxAttempts; attempt += 1) {
-    fillRandom(grid, rng, colors);
+    fillRandom(grid, rng, colors, weights);
     placeBlockers(grid, blockers); // 障碍铺在糖果之后：覆盖掉的格子交给下一次填充
-    fillRandom(grid, rng, colors);
-    clearInitialMatches(grid, rng, colors);
+    fillRandom(grid, rng, colors, weights);
+    clearInitialMatches(grid, rng, colors, weights);
     if (findValidMove(grid)) {
       return { grid, ok: true, attempts: attempt };
     }
@@ -95,8 +121,8 @@ export function applyGravity(grid) {
   return moves;
 }
 
-/** 补充：把每段顶部的空格填满新方块 */
-export function refill(grid, rng, colors) {
+/** 补充：把每段顶部的空格填满新方块（weights 见 pickColor） */
+export function refill(grid, rng, colors, weights) {
   const added = [];
 
   for (let c = 0; c < grid.cols; c += 1) {
@@ -104,7 +130,7 @@ export function refill(grid, rng, colors) {
       for (let r = seg.from; r <= seg.to; r += 1) {
         const i = index(grid, r, c);
         if (getAt(grid, i)) continue;
-        const cell = { color: 1 + rng.int(colors), special: null };
+        const cell = { color: pickColor(rng, colors, weights), special: null };
         setAt(grid, i, cell);
         added.push({ index: i, cell });
       }
@@ -162,14 +188,16 @@ export function mergeBreakdown(a, b) {
 /**
  * 连锁循环：反复 消除 → 触发特殊元素 → 下落 → 补充，直到没有可消除的连线
  * @param {object} grid 棋盘（就地修改）
- * @param {{rng:object, colors:number, focus?:number, cascadeStart?:number, colorMult?:number, cascadeMax?:number}} options
+ * @param {{rng:object, colors:number, focus?:number, cascadeStart?:number, colorMult?:number,
+ *          cascadeMax?:number, weights?:Array<number>}} options
  *   focus 为玩家刚交换的格子；cascadeStart 用于接在已有的连锁之后（彩球交换先算一次）；
  *   colorMult 为按颜色数给的得分倍率（仅无尽模式传，见 config.js 的 COLOR_SCORE_MULTIPLIER），默认 1；
- *   cascadeMax 为连锁倍率上限，默认 SCORE.cascadeMax（肉鸽模式的祝福可抬高它）
+ *   cascadeMax 为连锁倍率上限，默认 SCORE.cascadeMax（肉鸽模式的祝福可抬高它）；
+ *   weights 为补充新方块时的颜色权重，缺省等概率（见 pickColor）
  * @returns {{steps:Array, gained:number, maxCascade:number, resolvable:boolean,
  *            colors:Object, blockersCleared:number, breakdown:Object}}
  */
-export function resolve(grid, { rng, colors, focus = null, cascadeStart = 1, colorMult = 1, cascadeMax = SCORE.cascadeMax }) {
+export function resolve(grid, { rng, colors, focus = null, cascadeStart = 1, colorMult = 1, cascadeMax = SCORE.cascadeMax, weights = null }) {
   const steps = [];
   let cascade = cascadeStart - 1;
   let gained = 0;
@@ -218,7 +246,7 @@ export function resolve(grid, { rng, colors, focus = null, cascadeStart = 1, col
     for (const item of spawned) setAt(grid, item.index, makeSpecial(item.shape, item.color));
 
     const moves = applyGravity(grid);
-    const added = refill(grid, rng, colors);
+    const added = refill(grid, rng, colors, weights);
 
     gained += stepGained;
     breakdown.tile += tileScore;
@@ -267,11 +295,13 @@ export function resolve(grid, { rng, colors, focus = null, cascadeStart = 1, col
  * 两种结算方式：
  * - 目标是条状 / 炸弹：把该特殊效果复制给全部同色棋子，再逐颗触发
  * - 目标是普通方块 / 彩球：清除全场同色；被波及到的特殊元素（含同色条状 / 炸弹）立即触发
- * @param {{rng:object, colors:number, rainbowIndex:number, targetIndex:number, colorMult?:number, cascadeMax?:number}} options
+ * @param {{rng:object, colors:number, rainbowIndex:number, targetIndex:number,
+ *          colorMult?:number, cascadeMax?:number, weights?:Array<number>}} options
+ *   weights 为后续补充新方块的颜色权重，缺省等概率（见 pickColor）
  * @returns {{steps:Array, gained:number, maxCascade:number, resolvable:boolean,
  *            colors:Object, blockersCleared:number, breakdown:Object}}
  */
-export function resolveRainbowSwap(grid, { rng, colors, rainbowIndex, targetIndex, colorMult = 1, cascadeMax = SCORE.cascadeMax }) {
+export function resolveRainbowSwap(grid, { rng, colors, rainbowIndex, targetIndex, colorMult = 1, cascadeMax = SCORE.cascadeMax, weights = null }) {
   const copy = rainbowCopyTargets(grid, targetIndex);
   const cleared = new Set([rainbowIndex]);
   const triggered = [];
@@ -332,7 +362,7 @@ export function resolveRainbowSwap(grid, { rng, colors, rainbowIndex, targetInde
 
   for (const i of candyCleared) setAt(grid, i, null);
   const moves = applyGravity(grid);
-  const added = refill(grid, rng, colors);
+  const added = refill(grid, rng, colors, weights);
 
   const first = {
     cascade: 1,
@@ -347,7 +377,7 @@ export function resolveRainbowSwap(grid, { rng, colors, rainbowIndex, targetInde
     added,
   };
 
-  const rest = resolve(grid, { rng, colors, cascadeStart: 2, colorMult, cascadeMax });
+  const rest = resolve(grid, { rng, colors, cascadeStart: 2, colorMult, cascadeMax, weights });
   return {
     steps: [first, ...rest.steps],
     gained: gained + rest.gained,

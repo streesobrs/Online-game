@@ -209,11 +209,32 @@ export const ROGUE = {
   movesPerFloor: 10,    // 每层基准步数（「补给包」祝福与层数成长都在这之上叠加）
   movesPerFloorStep: 2, // 层数成长来源：每 N 层多发 1 步
   baseGoal: 900,        // 第 1 层目标分（6 色 10 步的中位分约 1750，首层几乎必过）
-  goalGrowth: 1.28,     // 每层目标分的增长系数
+  goalGrowth: 1.33,     // 每层目标分的增长系数（配合层数成长祝福：倍率随深度线性上涨，目标指数上涨，两者在 28 层上下交汇）
   perkGoalWeight: 0.1,  // 每层额外提高目标分的比例（与层数挂钩）
   perkChoices: 3,       // 每次过关给出几个祝福备选
   friendlyPicks: 2,     // 前几次三选一只出成长类祝福，避免开局连出保命牌导致第 2 层就翻车
   shieldMoves: 3,       // 「免死金牌」生效时补的步数
+  magnetMult: 1.7,      // 「同色磁石」每叠一层的出现权重倍率（权重数组见 perks.js 的 floorOptions）
+  // 标定（tests/match3-rogue-balance.mjs，10 步中位分）：
+  //   6 色 ×1=1755 ×1.7=1935 ×2.9=2205 ×4=3080（温和）
+  //   4 色 ×1=6155 ×1.7=7670 ×2.9=12075 ×4=20145（越过 ×3 后连锁密度突变，收益非线性起飞）
+  // 叠满上限（max 2）×1.7² = ×2.89 正好卡在爆发点之前：既是「改了机制」的强牌，又不会让盘面一色独大到自动连
+  /**
+   * 局内任务（肉鸽专属机制，见 perks.js 的 questFor / QUEST_REWARDS）
+   * 每层随机给一个「收集某颜色 N 个」的目标，**不设失败惩罚**，达成即当场发放一个改机制的奖励；
+   * 它的定位是给层内制造一个额外的决策焦点（要不要为了它换一种消法），而不是加难度
+   */
+  quest: {
+    fromFloor: 2,       // 从第几层开始出任务（第 1 层步数少、还没祝福，给不出决策空间）
+    baseNeed: 16,       // 第 1 层的收集目标数
+    // 每层目标数的增长系数。模拟里「实际能收到的个数」按约 ×1.11/层上涨，
+    // needGrowth 取 1.12（略高于它）：前期轻松达成，约第 27 层起追不上，
+    // 全程达成率约 60%——正好是「想拿就得主动换一种消法」的强度
+    needGrowth: 1.12,
+    movesReward: 5,     // 「补给」奖励：立即追加步数
+    frenzyMult: 2,      // 「狂暴」奖励：本层剩余步数内的得分倍率
+    specialsReward: 2,  // 「爆破」奖励：场上随机变成条状的个数
+  },
 };
 
 /** 本地存档键（开发方案 8） */
@@ -223,7 +244,31 @@ export const STORAGE_KEYS = {
   session: 'match3Session',
   bestEndless3: 'match3BestEndless3',
   sessionEndless3: 'match3SessionEndless3',
-  rogueBest: 'match3BestRogue', // 肉鸽试炼最佳：{ maxFloor, highScore }
+  rogueBest: 'match3BestRogue',   // 肉鸽试炼最佳：{ maxFloor, highScore }
+  rogueSession: 'match3SessionRogue', // 肉鸽试炼未结算的一轮（5.6 的暂存）
+};
+
+/**
+ * 局内暂存与云同步（开发方案 5.4 / 8）
+ *
+ * 暂存 = 「未结算的一局」。本地每次状态变化都覆盖写（刷新即续），
+ * 云端按下面的节奏收一份，于是换设备 / 清缓存后仍能接着打。
+ */
+export const SESSION = {
+  cloudPushMs: 15000,     // 云端上传的最小间隔：局内每次连锁都会回调，只能按节奏推，不能跟着写
+  maxAgeMs: 7 * 24 * 60 * 60 * 1000, // 与 server/config.js 的 match3Session.maxAgeMs 一致：更旧的暂存不再提示续玩
+};
+
+/**
+ * 玩法 key → 本地暂存键
+ *
+ * 云端 `sessions` 按同一套 key 分档（见 sync.js 的 pushSession 与 server.js 的
+ * match3_save_session），所以两边永远对得上，不需要各维护一份映射。
+ */
+export const SESSION_KEYS = {
+  [ENDLESS.type]: STORAGE_KEYS.session,
+  [ENDLESS3.type]: STORAGE_KEYS.sessionEndless3,
+  [ROGUE.type]: STORAGE_KEYS.rogueSession,
 };
 
 /** 洗牌规则 */

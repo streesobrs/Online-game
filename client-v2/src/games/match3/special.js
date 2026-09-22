@@ -94,7 +94,7 @@ export function effectCells(grid, cellIndex) {
 
 /**
  * 彩球 + 普通方块 / 彩球交换：清除目标颜色的全部方块
- * 彩球 + 彩球是唯一例外（清空全盘），开发方案 1.3 的"不做两两组合"针对的是条状 / 炸弹
+ * 彩球 + 彩球是唯一例外（清空全盘，场上其他彩球除外），开发方案 1.3 的"不做两两组合"针对的是条状 / 炸弹
  * 目标是条状 / 炸弹时另走 rainbowCopyTargets（效果复制给同色），不走这里
  * @returns {number[]} 去重后的待清除格子
  */
@@ -102,7 +102,13 @@ export function rainbowSwapTargets(grid, rainbowIndex, targetIndex) {
   const target = getAt(grid, targetIndex);
   const out = new Set([rainbowIndex, targetIndex]);
   if (!target) return [...out];
-  if (target.special === SPECIAL.RAINBOW) return grid.cellIndex.slice();
+  if (target.special === SPECIAL.RAINBOW) {
+    // 双彩球清空全盘，但场上的其他彩球依旧「扫到也原地保留」：
+    // 参与本次交换的两颗照常消耗，其余的既不消除、也不引爆（不触发、不消耗）
+    return grid.cellIndex.filter(
+      (i) => i === rainbowIndex || i === targetIndex || getAt(grid, i)?.special !== SPECIAL.RAINBOW,
+    );
+  }
 
   const color = target.color;
   if (color == null) return [...out];

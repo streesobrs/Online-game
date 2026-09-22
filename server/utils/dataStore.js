@@ -272,7 +272,10 @@ class DataStore {
       } catch (err) {
         if (attempt === retries) throw err;
         const delay = config.dataStore.retryDelayBaseMs * attempt;
-        logger.warn('rename 失败，准备重试', {
+        // 降级为 debug：Windows 上目标文件被 Defender 扫描、被 IDE 的文件监听短时占用都会
+        // EPERM/EACCES，下一次重试基本都能成功，报 warn 只是噪声（真正失败会在最后 throw，
+        // 由调用方记 error），需要排查时把 config.log.level 调到 debug 即可看到
+        logger.debug('rename 失败，准备重试', {
           tmpPath,
           targetPath,
           attempt,

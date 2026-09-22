@@ -23,6 +23,7 @@ import { store } from '../../core/store.js';
 import { eventBus } from '../../core/eventBus.js';
 import { GAMES } from '../../data/navItems.js';
 import { go } from '../../core/router.js';
+import { startGameActivity, stopGameActivity } from '../../core/activity.js';
 import { startGameTour } from '../../components/onboarding.js';
 
 const GAME_MAP = Object.fromEntries(GAMES.map((g) => [g.id, g]));
@@ -47,6 +48,7 @@ function runCleanup() {
     try { currentCleanup(); } catch (e) { console.error(e); }
   }
   currentCleanup = null;
+  stopGameActivity(); // 退出对局：停止活跃续期心跳
 }
 
 /**
@@ -334,6 +336,7 @@ export function renderGames(container) {
         if (typeof cleanupFn === 'function') cleanupFn();
         if (typeof prevCleanup === 'function') prevCleanup();
       };
+      startGameActivity(); // 进入对局：开始活跃续期
       // 首次进入对局：落子/悔棋/认输操作引导
       startGameTour();
     } catch (err) {
@@ -465,6 +468,7 @@ export function renderGames(container) {
         if (typeof cleanupFn === 'function') cleanupFn();
         if (typeof prevCleanup === 'function') prevCleanup();
       };
+      startGameActivity(); // 进入对局：开始活跃续期
       // 首次进入对局：落子/悔棋/认输操作引导
       startGameTour();
     } catch (err) {

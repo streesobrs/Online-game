@@ -207,7 +207,6 @@
   inset: 3px;
   border-radius: 10px;
   background: linear-gradient(160deg, var(--m3-gem-a), var(--m3-gem-b));
-  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.16), inset 0 2px 0 rgba(255, 255, 255, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -273,13 +272,11 @@
 
 .m3-empty {
   background: transparent;
-  box-shadow: none;
 }
 
 /* ===== 障碍物（冰块 / 锁链 / 石头）===== */
 .m3-blocker {
   font-size: 22px;
-  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.2);
 }
 
 .m3-blocker-ice {
@@ -432,6 +429,44 @@
   font-weight: 700;
 }
 
+/* ===== 局内任务（肉鸽专属，见 perks.js 的 questFor） ===== */
+.m3-quest {
+  border-color: #f0b429;
+  background: rgba(240, 180, 41, 0.08);
+  color: #b9770e;
+}
+
+/* 达成后整条转为「已完成 + 奖励说明」，绿底绿字，与达标的本层目标同色 */
+.m3-quest--done {
+  border-color: var(--theme-accent, #27ae60);
+  background: rgba(39, 174, 96, 0.12);
+  color: var(--theme-accent, #27ae60);
+}
+
+.m3-quest-title {
+  font-weight: 700;
+}
+
+/* 任务颜色小圆点：直接复用宝石配色变量（.m3-c1 ~ .m3-c8 定义 --m3-gem-*） */
+.m3-swatch {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--m3-gem-a, #cbd5e0), var(--m3-gem-b, #a0aec0));
+  box-shadow: inset 0 -1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.m3-quest-progress {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.m3-quest-reward {
+  color: #e8a90c;
+}
+
 .m3-result-stars {
   font-size: 24px;
   color: #ffd54a;
@@ -555,6 +590,318 @@
 .m3-perk-own {
   font-size: 11px;
   color: var(--theme-accent, #27ae60);
+}
+
+/* ===== 肉鸽：层间三选一的模态框 =====
+ * 盖在刚达标的那层盘面上（盘面已 lock），背景保留当前局面与左栏数据。
+ * z-index 1200：要在悬浮账号条（1100）与导航抽屉（1150）之上，
+ * 但在登录/全局模态（2000 / 9998）与 toast（9999）之下。
+ */
+.m3-perk-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.45);
+  animation: m3-perk-fade 0.18s ease;
+}
+
+.m3-perk-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 620px;
+  max-height: 88vh;
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: var(--theme-panel-bg, #fff);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+  animation: m3-perk-pop 0.18s ease;
+  overflow-y: auto;
+}
+
+.m3-perk-dialog-head {
+  text-align: center;
+}
+
+.m3-perk-dialog-title {
+  margin: 0;
+  font-size: 18px;
+  color: var(--theme-title-color, #2c3e50);
+}
+
+.m3-perk-dialog-sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-perk-dialog-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--theme-border-color, #e2e8f0);
+}
+
+.m3-perk-dialog-hint {
+  font-size: 12px;
+  color: var(--theme-status-color, #4a5568);
+}
+
+@keyframes m3-perk-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes m3-perk-pop {
+  from {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 窄屏：三张卡折成竖排，一屏一张（对话框自身可滚动） */
+@media (max-width: 640px) {
+  .m3-perk-dialog {
+    padding: 16px;
+  }
+
+  .m3-perks {
+    flex-direction: column;
+  }
+
+  .m3-perks .m3-perk {
+    width: 100%;
+  }
+
+  .m3-perk-dialog-foot {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .m3-perk-dialog-hint {
+    text-align: center;
+  }
+}
+
+/* ===== 肉鸽：对局双栏布局 + 左侧数据面板 =====
+ * 详细数据（本层进度 / 本轮加成 / 已获祝福）都放左栏，棋盘独占右栏。
+ * 原来全部横排在棋盘上方，只能挤成一行小标签，看不出「本层得分与目标的关系」，
+ * 也看不出祝福叠了几层。
+ */
+.m3-rogue-shell {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  /* 棋盘格边长上限 48px（棋盘最宽 384px），容器再宽也只是徒增两侧空白，
+     所以整块收口到「左栏 240 + 间隙 + 棋盘列」的宽度并居中 */
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+/* 右列：标题 / HUD / 棋盘 / 按钮纵向排在同一竖轴上，彼此中心对齐 */
+.m3-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.m3-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 12px;
+  background: var(--theme-panel-bg, #fff);
+  font-size: 12px;
+}
+
+.m3-side-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.m3-side-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--theme-title-color, #2c3e50);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--theme-border-color, #e2e8f0);
+}
+
+.m3-side-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.m3-side-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.m3-side-label {
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-side-value {
+  font-weight: 700;
+  color: var(--theme-title-color, #2c3e50);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 达标进度：条 + 百分比 */
+.m3-side-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.m3-goalbar {
+  flex: 1 1 auto;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.m3-goalbar-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--theme-primary, #007bff);
+  transition: width 0.2s ease;
+}
+
+.m3-side-pct {
+  flex: 0 0 auto;
+  min-width: 32px;
+  text-align: right;
+  color: var(--theme-status-color, #4a5568);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 达标后条与数字一起转绿，与「过关」同一套语义 */
+.m3-goalbar--done .m3-goalbar-fill {
+  background: var(--theme-accent, #27ae60);
+}
+
+.m3-side-pct--done {
+  color: var(--theme-accent, #27ae60);
+  font-weight: 700;
+}
+
+/* 侧栏里的加成表：竖排两列（左标签右数值），比横排小标签好逐项对照 */
+.m3-side .m3-stats-block {
+  align-items: stretch;
+  gap: 6px;
+  margin-bottom: 0;
+}
+
+.m3-side .m3-stats-title {
+  text-align: left;
+  font-weight: 700;
+  color: var(--theme-title-color, #2c3e50);
+  opacity: 1;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--theme-border-color, #e2e8f0);
+}
+
+.m3-side .m3-stats {
+  flex-direction: column;
+  gap: 4px;
+}
+
+.m3-side .m3-stat {
+  justify-content: space-between;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+}
+
+/* 局内任务在窄栏里要能折行（默认是横排的一整串） */
+.m3-side .m3-quest {
+  flex-wrap: wrap;
+  border-radius: 10px;
+}
+
+.m3-side-perks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.m3-side-perk {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.m3-side-perk-icon {
+  flex: 0 0 auto;
+}
+
+.m3-side-perk-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--theme-title-color, #2c3e50);
+}
+
+.m3-side-perk-count {
+  flex: 0 0 auto;
+  font-weight: 700;
+  color: var(--theme-accent, #27ae60);
+  font-variant-numeric: tabular-nums;
+}
+
+.m3-side-empty {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--theme-status-color, #4a5568);
+  opacity: 0.85;
+}
+
+/* 窄屏：数据面板折到棋盘下方（棋盘优先占满宽度），面板本身仍是竖排表格 */
+@media (max-width: 900px) {
+  .m3-rogue-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .m3-main {
+    order: 1;
+  }
+
+  .m3-side {
+    order: 2;
+  }
 }
 
 /* ===== 肉鸽：加成数据面板（把祝福折算成逐层实际生效的数值）===== */

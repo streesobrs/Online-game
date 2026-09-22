@@ -261,6 +261,12 @@ export function initSystemEvents() {
     if (data?.message) toast.show(data.message);
   });
 
+  // 被服务端踢下线（管理员踢出 / 封禁 / 长时间未活动）：
+  // socket.js 收到 kicked 后不会自动重连，这里明确告知用户需刷新页面
+  eventBus.on('system:kicked', (data) => {
+    toast.show(`已被服务器断开连接：${data?.reason || '未知原因'}，请刷新页面后重试`, 'error', 15000);
+  });
+
   // 游戏警告
   eventBus.on('game:warning', (data) => {
     if (data?.message) toast.warn(`⚠️ ${data.message}`);

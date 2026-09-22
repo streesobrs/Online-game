@@ -18,6 +18,8 @@ class OperationLogger {
   constructor() {
     this.logDir = path.join(config.paths.data, 'operation_logs');
     this._clientResolver = null;
+    // 每个账号一条索引更新队列（值为该账号「队列尾巴」的 Promise），见 _updateUserIndex
+    this._indexQueues = new Map();
     this._initDir();
   }
 
@@ -87,32 +89,58 @@ class OperationLogger {
     }
   }
 
+  /**
+   * 更新用户日志索引（把这次记录的位置追加进去）
+   *
+   * 索引是「读 → push → 覆盖写」的读改写，必须按账号串行，并发会出两个问题：
+   * 1. 读改写交错时，后写的那份会把前一份刚 push 的条目吃掉，条目从索引里永久消失；
+   * 2. 旧实现直接 writeFile 覆盖，它会先把文件截断成 0 字节，并发的读若落在
+   *    「截断之后、写回之前」就会 JSON.parse('') 抛 "Unexpected end of JSON input"，
+   *    解析失败会退化成空索引 —— 而 queryLogs 查 userId 完全依赖这份索引，等于查不到日志。
+   * 所以这里既按账号串行，也改成 tmp + rename 原子替换（读者只会看到旧全文或新全文）。
+   */
   async _updateUserIndex(userId, entry, filePath) {
+    // _writeUserIndex 内部已消化所有异常（索引只是查询用的加速表，
+    // 日志正文此时已追加进 jsonl，不该因为索引写失败把 log() 调用方带崩）
+    const prev = this._indexQueues.get(userId) || Promise.resolve();
+    const task = prev.then(() => this._writeUserIndex(userId, entry, filePath));
+    this._indexQueues.set(userId, task);
+    return task;
+  }
+
+  async _writeUserIndex(userId, entry, filePath) {
     const indexFile = this._userIndexFile(userId);
-    let index = { userId, positions: [] };
     try {
-      const data = await fs.promises.readFile(indexFile, 'utf8');
-      index = JSON.parse(data);
-    } catch (e) {
-      if (e.code !== 'ENOENT') {
-        logger.warn('读取用户日志索引失败', { userId, error: e.message });
+      let index = { userId, positions: [] };
+      try {
+        const data = await fs.promises.readFile(indexFile, 'utf8');
+        // 空文件（旧版非原子写截断留下的）当「还没有索引」重建，而不是 parse 报错
+        if (data.trim()) index = JSON.parse(data);
+      } catch (e) {
+        if (e.code !== 'ENOENT') {
+          logger.warn('读取用户日志索引失败', { userId, error: e.message });
+        }
       }
+
+      index.positions.push({
+        date: this._dateStr(entry.timestamp),
+        category: entry.category === 'trace' ? 'trace' : 'default',
+        file: path.basename(filePath),
+        timestamp: entry.timestamp,
+        id: entry.id
+      });
+
+      // 限制索引长度
+      if (index.positions.length > MAX_RECORDS_PER_USER) {
+        index.positions = index.positions.slice(index.positions.length - MAX_RECORDS_PER_USER);
+      }
+
+      const tmpPath = indexFile + '.tmp';
+      await fs.promises.writeFile(tmpPath, JSON.stringify(index), 'utf8');
+      await dataStore.atomicRename(tmpPath, indexFile);
+    } catch (e) {
+      logger.error('写入用户日志索引失败', { userId, error: e.message });
     }
-
-    index.positions.push({
-      date: this._dateStr(entry.timestamp),
-      category: entry.category === 'trace' ? 'trace' : 'default',
-      file: path.basename(filePath),
-      timestamp: entry.timestamp,
-      id: entry.id
-    });
-
-    // 限制索引长度
-    if (index.positions.length > MAX_RECORDS_PER_USER) {
-      index.positions = index.positions.slice(index.positions.length - MAX_RECORDS_PER_USER);
-    }
-
-    await fs.promises.writeFile(indexFile, JSON.stringify(index), 'utf8');
   }
 
   _sanitizeValue(value, maxDepth = 3, currentDepth = 0) {
@@ -236,7 +264,12 @@ class OperationLogger {
       let index = { userId, positions: [] };
       try {
         const data = await fs.promises.readFile(indexFile, 'utf8');
-        index = JSON.parse(data);
+        if (data.trim()) {
+          index = JSON.parse(data);
+        } else {
+          // 空索引文件：旧版非原子写被截断留下的，这个账号的日志按 userId 就查不出来了
+          logger.warn('用户日志索引为空，该账号将查不到历史日志', { userId });
+        }
       } catch (e) {
         if (e.code !== 'ENOENT') {
           logger.warn('读取用户日志索引失败', { userId, error: e.message });

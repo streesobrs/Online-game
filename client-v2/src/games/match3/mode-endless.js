@@ -6,14 +6,18 @@
  * - 三色爽局：固定 3 色、不升档、不缩放得分，成绩独立存档
  *
  * 共同点：棋盘固定 8×8 标准矩形（所有玩家面对同一棋盘，分数才可比）、
- * 无步数 / 时间限制、玩家自由结算、局内状态落 localStorage 刷新后可续玩。
+ * 无步数 / 时间限制、玩家自由结算、局内状态落本地并可推云（刷新、换设备都能续玩，见 sync.js）。
  *
- * 服务端只做存档 / 经验 / 榜单，最高分按「服务端为准 + 本地 max 合并」同步。
+ * 服务端只做存档 / 经验 / 榜单，最高分按「服务端为准 + 本地 max 合并」同步；
+ * 未结算的那一局不取 max，只认 ts 最新的那份（见 mergeRemoteProgress）。
  */
 import { ENDLESS, ENDLESS3, ENDLESS_TIERS, STORAGE_KEYS, colorScoreMultiplier } from './config.js';
 import { createMatch3Board } from './board.js';
 import { showScoreDetails } from './scoreDetails.js';
-import { estimateExp, onProgress, reportEnd, reportStart, requestProgress } from './sync.js';
+import {
+  estimateExp, finishedSession, loadLocalSession, onProgress, pushSession,
+  reportEnd, reportStart, requestProgress, saveLocalSession,
+} from './sync.js';
 import { el } from '../../utils/dom.js';
 import { toast } from '../../components/toast.js';
 
@@ -27,7 +31,6 @@ const VARIANTS = {
     title: '♾ 无尽模式',
     sub: '标准 8×8 棋盘，无步数限制；分数越高元素种类越多',
     bestKey: STORAGE_KEYS.best,
-    sessionKey: STORAGE_KEYS.session,
     tiered: true,        // 按分数升档颜色数
     colorScaling: true,  // 按当前颜色数缩放得分
   },
@@ -36,7 +39,6 @@ const VARIANTS = {
     title: '🧨 无尽三色',
     sub: '固定 3 色，连锁根本停不下来；成绩单独记录',
     bestKey: STORAGE_KEYS.bestEndless3,
-    sessionKey: STORAGE_KEYS.sessionEndless3,
     tiered: false,
     colorScaling: false, // 固定 3 色不做缩放，保留最原始的分数爽感
   },
@@ -92,17 +94,15 @@ export function loadBest(variant = ENDLESS.type) {
 
 /**
  * 某玩法下未结算的局内会话（刷新后续玩）
+ *
+ * 走 sync.js 的本地暂存：它会滤掉过期与「已结束」的墓碑，
+ * 而暂存与云端合并的时机在 mergeRemoteProgress（拿到服务端进度时）。
  * @param {string} [variant] 玩法 key
  */
 export function loadSession(variant = ENDLESS.type) {
   const spec = variantOf(variant);
-  const session = readStore(spec.sessionKey);
+  const session = loadLocalSession(spec.config.type);
   return session && session.mode === spec.config.type ? session : null;
-}
-
-/** 清掉某玩法的局内会话 */
-export function clearSession(variant = ENDLESS.type) {
-  writeStore(variantOf(variant).sessionKey, null);
 }
 
 /**
@@ -212,10 +212,10 @@ export function renderEndless(container, { onExit, variant = ENDLESS.type }) {
       }
     }
 
-    /** 局内续存：每次状态变化覆盖写，刷新后从同一局面继续 */
+    /** 局内续存：本地每次状态变化覆盖写（刷新即续），云端按节流收一份（换设备即续） */
     function persist() {
       const snap = board.getSnapshot();
-      writeStore(spec.sessionKey, {
+      const session = {
         mode: spec.config.type,
         board: snap,
         score: snap.score,
@@ -226,7 +226,9 @@ export function renderEndless(container, { onExit, variant = ENDLESS.type }) {
         elapsedMs: elapsed(),
         level: null,
         ts: Date.now(),
-      });
+      };
+      saveLocalSession(spec.config.type, session);
+      pushSession(spec.config.type, session);
     }
 
     function finish() {
@@ -239,7 +241,11 @@ export function renderEndless(container, { onExit, variant = ENDLESS.type }) {
         clearInterval(timerId);
         timerId = null;
       }
-      clearSession(spec.config.type);
+      // 本局结束：本地写墓碑占位，并把墓碑推上云端（详见 sync.js 的 finishedSession）。
+      // 只删本地是不够的——离线结算时清除推不上去，下次进来会把打完的局又同步回来
+      const tomb = finishedSession(spec.config.type);
+      saveLocalSession(spec.config.type, tomb);
+      pushSession(spec.config.type, tomb, { force: true });
 
       reportEnd({
         mode: spec.config.type,

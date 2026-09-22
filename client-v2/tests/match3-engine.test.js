@@ -34,6 +34,7 @@ import {
   createInitialBoard,
   emptyBreakdown,
   mergeBreakdown,
+  pickColor,
   refill,
   resolve,
   resolveRainbowSwap,
@@ -389,17 +390,26 @@ test('彩球交换：清除目标颜色全部方块并作为第 1 连锁', () =>
   assert.equal(findMatches(grid).length, 0);
 });
 
-test('彩球 + 彩球：清空全盘', () => {
+test('彩球 + 彩球：清空全盘，但场上其他彩球原地保留（不引爆）', () => {
   const grid = makeGrid(BASE);
   setAt(grid, 0, { color: null, special: 'rainbow' });
   setAt(grid, 1, { color: null, special: 'rainbow' });
+  setAt(grid, 2, { color: null, special: 'rainbow' }); // 第三颗：不参与本次交换
   const result = resolveRainbowSwap(grid, {
     rng: createRng(3),
     colors: 6,
     rainbowIndex: 0,
     targetIndex: 1,
   });
-  assert.equal(result.steps[0].cleared.length, grid.cellIndex.length);
+  const step = result.steps[0];
+  // 全盘 25 格，去掉第三颗彩球后剩 24 格被清除
+  assert.equal(step.cleared.length, grid.cellIndex.length - 1);
+  assert.equal(step.cleared.includes(2), false);
+  // 只有参与交换的两颗算「引爆」，第三颗不触发
+  assert.equal(step.triggered.filter((t) => t.special === SPECIAL.RAINBOW).length, 2);
+  // 后续消除-下落-补充结束后，第三颗彩球仍留在棋盘上（只是随下落下移了）
+  const survivors = grid.cellIndex.filter((i) => getAt(grid, i)?.special === SPECIAL.RAINBOW);
+  assert.equal(survivors.length, 1);
 });
 
 test('彩球 + 横条：把横条效果复制给全部同色方块并逐颗触发', () => {
@@ -856,6 +866,86 @@ test('colorMult：彩球交换及其后续连锁同样按倍率缩放', () => {
     Math.abs(half.gained - full.gained * 0.5) <= full.steps.length * 2 + 2,
     `full=${full.gained} half=${half.gained} steps=${full.steps.length}`,
   );
+});
+
+// ========== 颜色权重（肉鸽「同色磁石」） ==========
+section('颜色权重');
+
+test('pickColor：不传 weights 时与旧的 1 + rng.int(colors) 逐位一致', () => {
+  // 复现性硬约束：所有非肉鸽模式与历史关卡都依赖「不传权重 = 等概率」
+  const withWeightParam = createRng(2024);
+  const plain = createRng(2024);
+  for (let n = 0; n < 200; n += 1) {
+    assert.equal(pickColor(withWeightParam, 6, null), 1 + plain.int(6));
+    assert.equal(pickColor(withWeightParam, 4, undefined), 1 + plain.int(4));
+  }
+});
+
+test('pickColor：权重按倍数放大该颜色的出现占比', () => {
+  const rng = createRng(11);
+  const weights = [4, 1, 1, 1]; // 颜色 1 权重 4：期望占比 4/7 ≈ 0.571
+  const counts = [0, 0, 0, 0];
+  const total = 4000;
+  for (let n = 0; n < total; n += 1) counts[pickColor(rng, 4, weights) - 1] += 1;
+
+  const share = counts[0] / total;
+  assert.ok(share > 0.5, `颜色 1 占比应显著高于等概率，实为 ${share.toFixed(3)}`);
+  counts.slice(1).forEach((n) => assert.ok(counts[0] > n * 2, '权重色应明显多于其它色'));
+});
+
+test('pickColor：权重项缺失按 1 计，总和为 0 时退化为等概率', () => {
+  const rng = createRng(5);
+  // 只给前两项：颜色 3、4 缺省按 1 计，四种颜色都取得到
+  const seen = new Set();
+  for (let n = 0; n < 400; n += 1) seen.add(pickColor(rng, 4, [3, 1]));
+  assert.deepEqual([...seen].sort(), [1, 2, 3, 4]);
+
+  // 全零权重不能让引擎掷不出颜色：退回等概率分支
+  const fallback = createRng(9);
+  const plain = createRng(9);
+  for (let n = 0; n < 50; n += 1) {
+    assert.equal(pickColor(fallback, 5, [0, 0, 0, 0, 0]), 1 + plain.int(5));
+  }
+});
+
+test('createInitialBoard：带权重生成时目标色成为盘面多数', () => {
+  const { grid, ok } = createInitialBoard({ rows: 8, cols: 8, colors: 5, seed: 42, weights: [5, 1, 1, 1, 1] });
+  assert.equal(ok, true);
+  assert.equal(findMatches(grid).length, 0, '带权重也不能留下现成三连');
+
+  const counts = {};
+  for (const i of grid.cellIndex) {
+    const cell = getAt(grid, i);
+    if (cell) counts[cell.color] = (counts[cell.color] || 0) + 1;
+  }
+  const others = [2, 3, 4, 5].map((c) => counts[c] || 0);
+  assert.ok(counts[1] > Math.max(...others), `颜色 1 应为多数：${JSON.stringify(counts)}`);
+});
+
+test('refill：补充方块同样吃权重', () => {
+  const grid = makeGrid(BASE);
+  for (const i of grid.cellIndex) setAt(grid, i, null);
+  refill(grid, createRng(77), 4, [6, 1, 1, 1]);
+
+  const counts = [0, 0, 0, 0];
+  for (const i of grid.cellIndex) counts[getAt(grid, i).color - 1] += 1;
+  assert.ok(counts[0] > counts[1] * 2, `颜色 1 应明显占多：${counts.join('/')}`);
+});
+
+test('resolve：权重透传到连锁补充，且不改变计分口径', () => {
+  const build = () => {
+    const matrix = clone(BASE);
+    matrix[2] = [1, 1, 1, 3, 2];
+    return makeGrid(matrix);
+  };
+  const weightedGrid = build();
+  const weighted = resolve(weightedGrid, { rng: createRng(99), colors: 4, weights: [4, 1, 1, 1] });
+  const plain = resolve(build(), { rng: createRng(99), colors: 4 });
+
+  // 首次消除的分数与权重无关（权重只影响补充进来的新方块）
+  assert.equal(weighted.steps[0].gained, plain.steps[0].gained);
+  // 带权重也必须收敛到无连线的稳定局面
+  assert.equal(findMatches(weightedGrid).length, 0);
 });
 
 // ========== 关卡配置 ==========

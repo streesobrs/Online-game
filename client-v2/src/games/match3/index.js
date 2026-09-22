@@ -7,13 +7,14 @@
  * - 娱乐：二级菜单，放不设目标的爽快玩法，当前有「无尽三色」与「肉鸽试炼」
  *   （mode-endless.js 的 endless3 变体，固定 3 色，成绩独立；mode-rogue.js 限步冲层）
  */
-import { ENDLESS3, ENDLESS } from './config.js';
+import { ENDLESS3, ENDLESS, ROGUE } from './config.js';
 import { renderEndless, renderEndless3, loadBest, loadSession } from './mode-endless.js';
 import { renderRogue, loadRogueBest } from './mode-rogue.js';
 import { renderLevelMode, loadProgress, totalStars } from './mode-level.js';
-import { onProgress, requestProgress } from './sync.js';
+import { loadLocalSession, onProgress, requestProgress } from './sync.js';
 import { LEVEL_COUNT } from './levels.js';
 import { viewRoot, el } from '../../utils/dom.js';
+import { startGameActivity, stopGameActivity } from '../../core/activity.js';
 
 /**
  * 渲染消消乐视图
@@ -23,6 +24,9 @@ import { viewRoot, el } from '../../utils/dom.js';
 export function renderMatch3(container = viewRoot()) {
   const wrap = el('section', { class: 'm3-view' });
   container.replaceChildren(wrap);
+  // 消消乐为本地判定玩法，局中几乎不与服务端通信，进入本视图即开始活跃续期，
+  // 否则长时间游玩会被服务端判为挂机踢下线，结算上报（match3_game_end）随之丢失
+  startGameActivity();
   let modeCleanup = null;
   // 当前界面若为菜单（模式选择 / 娱乐），服务端进度到达时直接重绘；
   // 进入具体模式后置空，交给各模式模块自己刷新，避免打断对局
@@ -90,8 +94,10 @@ export function renderMatch3(container = viewRoot()) {
   }
 
   // ---- 娱乐：二级菜单（不设目标的玩法都收在这里）----
-  /** 肉鸽卡片副标题：本地记录的最深层数与最高总分 */
+  /** 肉鸽卡片副标题：有未结算的一轮就提示续玩，否则显示历史最佳 */
   function rogueMeta() {
+    const session = loadLocalSession(ROGUE.type);
+    if (session) return `未结算的一轮：第 ${session.floor} 层（点击继续）`;
     const best = loadRogueBest();
     if (best.maxFloor <= 0) return '限步冲层 · 每层三选一祝福';
     return `最深 ${best.maxFloor} 层 · 最高分 ${best.highScore}`;
@@ -161,6 +167,7 @@ export function renderMatch3(container = viewRoot()) {
   return () => {
     offProgress();
     disposeMode();
+    stopGameActivity();
     wrap.remove();
   };
 }

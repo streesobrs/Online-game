@@ -2909,7 +2909,8 @@ class AccountManager {
       for (const [level, count] of Object.entries(legacy)) {
         stars[level] = Math.max(stars[level] || 0, count || 0);
       }
-      await dataStore.writeOne('match3', userId, { userId, stars });
+      // 走 _patchMatch3Store 而不是整文件写：同一文件里还有局内暂存，不能被迁移顺手清掉
+      await this._patchMatch3Store(userId, () => ({ stars }));
       delete account.games.match3.stars;
       await this._saveAccount(userId, account);
       logger.info('消消乐逐关星表已迁移到独立存储', { userId, levels: Object.keys(stars).length });
@@ -2927,10 +2928,75 @@ class AccountManager {
    */
   async saveMatch3Stars(userId, stars) {
     try {
-      await dataStore.writeOne('match3', userId, { userId, stars: stars || {} });
+      await this._patchMatch3Store(userId, () => ({ stars: stars || {} }));
       return true;
     } catch (err) {
       logger.error('保存消消乐逐关明细失败', { userId, error: err.message });
+      return false;
+    }
+  }
+
+  /**
+   * 读改写「消消乐用户级数据文件」（data/match3/<用户ID>.json）
+   *
+   * 这个文件同时装两样东西：逐关星表 `stars` 与局内暂存 `sessions`。
+   * 都不能整文件覆盖写——否则一方会把另一方抹掉，必须走这里在锁内合并。
+   *
+   * 传「变更函数」而不是算好的 patch：星表在结算时写，暂存在进层与每 15s 写，
+   * 两边若在锁外先各自 read 再 patch，那份旧 `sessions` 仍会互相覆盖（丢星或丢暂存）；
+   * 只有把取旧值也关进锁里，合并才真的基于最新内容。
+   * @param {string} userId 账号 ID
+   * @param {(store: object) => object} mutate 基于锁内的最新 store 返回要合并进去的字段
+   */
+  async _patchMatch3Store(userId, mutate) {
+    // 锁键不能复用 writeOne 内部的 `match3:<id>`（同一把锁里再取会自锁），另开一把包住整个读改写
+    const release = await dataStore.acquireLock(`match3:merge:${userId}`);
+    try {
+      const store = (await dataStore.readOne('match3', userId)) || {};
+      const next = { ...store, ...mutate(store), userId };
+      // writeOne 失败时返回 false 而不是抛错，这里必须显式转成异常，否则静默丢数据
+      const ok = await dataStore.writeOne('match3', userId, next);
+      if (!ok) throw new Error('写入消消乐用户级数据失败');
+      return next;
+    } finally {
+      release();
+    }
+  }
+
+  /**
+   * 读取消消乐局内暂存（未结算的一局，按玩法分档）
+   * @param {string} userId 账号 ID
+   * @returns {Promise<object>} { endless?: object, endless3?: object, rogue?: object }
+   */
+  async getMatch3Sessions(userId) {
+    try {
+      const store = await dataStore.readOne('match3', userId);
+      return store?.sessions || {};
+    } catch (err) {
+      logger.error('读取消消乐局内暂存失败', { userId, error: err.message });
+      return {};
+    }
+  }
+
+  /**
+   * 保存某玩法的局内暂存（同一玩法只留最新一份，session 传 null 表示清除）
+   * @param {string} userId 账号 ID
+   * @param {string} variant 玩法 key（endless / endless3 / rogue）
+   * @param {object|null} session
+   */
+  async saveMatch3Session(userId, variant, session) {
+    try {
+      // 合并必须在锁内基于最新 store 做：先在锁外读 sessions 再 patch，
+      // 两个玩法（或两台设备）并发推暂存时，后写的那份会把先写的整块 sessions 覆盖掉
+      await this._patchMatch3Store(userId, (store) => {
+        const sessions = { ...(store.sessions || {}) };
+        if (session) sessions[variant] = session;
+        else delete sessions[variant];
+        return { sessions };
+      });
+      return true;
+    } catch (err) {
+      logger.error('保存消消乐局内暂存失败', { userId, variant, error: err.message });
       return false;
     }
   }

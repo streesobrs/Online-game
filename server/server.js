@@ -2102,6 +2102,25 @@ function buildGameTypeStats(games) {
   return stats;
 }
 
+/**
+ * 过滤消消乐局内暂存：丢掉过期与结构不完整的，只留下发得出去的
+ *
+ * 暂存由客户端生成，服务端不解析内容（棋盘快照与玩法强耦合，解释它等于在服务端
+ * 再实现一遍引擎），只做三件事：形状检查、过期丢弃、体积上限——见 match3_save_session
+ */
+function pruneMatch3Sessions(sessions) {
+  const { maxAgeMs, variants } = config.match3Session;
+  const now = Date.now();
+  const out = {};
+  for (const variant of variants) {
+    const session = sessions?.[variant];
+    if (!session || typeof session !== 'object') continue;
+    if (!Number.isFinite(session.ts) || now - session.ts > maxAgeMs) continue;
+    out[variant] = session;
+  }
+  return out;
+}
+
 // 主命名空间
 io.on('connection', (socket) => {
   logger.connectEvent(socket.id, { ip: socket.handshake.address });
@@ -2832,6 +2851,15 @@ io.on('connection', (socket) => {
       userManager.updateUserStatus(userSession.accountId, 'online', data.game);
       userManager.broadcastUserStatus(userSession.accountId, 'online', io);
     }
+  });
+
+  // 活跃续期：单机/本地判定的玩法（消消乐、AI 对战等）长时间不产生其它事件，
+  // 客户端在对局中定时上报，避免被「长时间无操作」判定误踢，导致对局结算上报丢失
+  socket.on('user_activity', () => {
+    const userSession = userManager.getUserBySocketId(socket.id);
+    if (!userSession) return;
+    // 登录用户以 accountId 为会话键，匿名用户以 socket.id 为会话键
+    userManager.updateUserActivity(userSession.accountId || socket.id);
   });
 
   // 获取排行榜
@@ -3978,10 +4006,55 @@ io.on('connection', (socket) => {
         },
         // 经验奖励配置：客户端据此实时显示「预计经验」（公式见上面的 match3_game_end），
         // 避免客户端镜像一份常量而与服务端漂移。服务器仍以本次下发的值为准发经验
-        rewards: config.match3Rewards
+        rewards: config.match3Rewards,
+        // 局内暂存（未结算的一局，按玩法分档）：换设备 / 清缓存后还能接着打。
+        // 与最高分不同，暂存不做 max 合并——它是一份「当前进度」，只能取最新的那份
+        sessions: pruneMatch3Sessions(await gameManager.accountManager.getMatch3Sessions(user.accountId))
       });
     } catch (err) {
       logger.error('同步消消乐进度失败', { error: err.message });
+    }
+  });
+
+  // 上报消消乐局内暂存（客户端每次状态变化都写本地，云端按节奏推一份）
+  socket.on('match3_save_session', async (data) => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user || !user.accountId) {
+      return; // 未登录用户不处理：暂存留在本地，登录后下一次上报会补上
+    }
+
+    const { variant, session } = data || {};
+    if (!config.match3Session.variants.includes(variant)) {
+      logger.warn('消消乐暂存玩法非法', { accountId: user.accountId, variant });
+      return;
+    }
+
+    try {
+      if (session) {
+        // 只做边界校验，不解释内容（见 pruneMatch3Sessions 的说明）：
+        // 体积挡住把暂存当免费云盘用；mode 必须与玩法一致，避免把 A 玩法的快照塞进 B
+        if (typeof session !== 'object' || session.mode !== variant) {
+          logger.warn('消消乐暂存结构非法', { accountId: user.accountId, variant });
+          return;
+        }
+        let payload;
+        try {
+          payload = JSON.stringify(session);
+        } catch {
+          return; // 循环引用等无法序列化的情况：静默丢弃，不值得污染日志
+        }
+        if (payload.length > config.match3Session.maxBytes) {
+          logger.warn('消消乐暂存超出体积上限', {
+            accountId: user.accountId, variant, bytes: payload.length
+          });
+          return;
+        }
+      }
+
+      const ok = await gameManager.accountManager.saveMatch3Session(user.accountId, variant, session || null);
+      socket.emit('match3_session_saved', { variant, ok });
+    } catch (err) {
+      logger.error('保存消消乐暂存失败', { accountId: user.accountId, variant, error: err.message });
     }
   });
 
@@ -4170,7 +4243,7 @@ io.on('connection', (socket) => {
     // 贪吃蛇
     'snake_game_start', 'snake_game_end', 'snake_sync_highscore', 'snake_request_full_state',
     // 消消乐
-    'match3_game_start', 'match3_game_end', 'match3_sync_progress',
+    'match3_game_start', 'match3_game_end', 'match3_sync_progress', 'match3_save_session',
     // 聊天
     'chat_global', 'chat_game', 'chat_private',
     'get_private_history', 'get_private_conversations',
@@ -4179,6 +4252,13 @@ io.on('connection', (socket) => {
   ]);
 
   socket.use(([event, ...args], next) => {
+    // 任何客户端消息都视为「有操作」，刷新会话活跃时间，
+    // 避免一直在操作的玩家（落子、聊天、对局事件等）被误判为挂机踢下线
+    const session = userManager.getUserBySocketId(socket.id);
+    if (session) {
+      userManager.updateUserActivity(session.accountId || socket.id);
+    }
+
     if (TRACE_ACTIONS.has(event)) {
       const user = getSocketUser();
       if (user) {
