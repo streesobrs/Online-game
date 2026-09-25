@@ -361,9 +361,11 @@ module.exports = {
     // 取约 2 倍余量避免误杀正常长连锁；改 client-v2 的 COLOR_SCORE_MULTIPLIER 后需同步复核
     endless3MaxScorePerMove: 60000,                 // 三色爽局的单步上限（同上规则）
     // 固定 3 色连锁极长，实测人类水平每步均分约 16,600、单步最高约 15 万，故单独放宽到 60000（约 3.6 倍余量）
-    rogueExpPerScoreDivisor: 45000,                 // 肉鸽试炼经验换算除数（整轮累计总分约 4700 万，换算约 1050 经验/轮
-    // →加上 baseExp 30 与旧版（1123）同档，保住「经验/分钟」不变。改 perks.js / config.js 的
-    // ROGUE 数值或 goalGrowth 后必须重跑 tests/match3-rogue-balance.mjs 并同步此除数）
+    rogueExpFloorFactor: 1.16,                      // 肉鸽试炼经验换算系数：经验 = ⌊到达层数² × 本值⌋ × 局外「经验共鸣」
+    // 不再按「整轮总分 ÷ 除数」换算：深层得分倍率能堆到 ×45，标定实测满级玩家整轮总分是未养成者的 72 倍，
+    // 按分发等于把「堆分」直接白送成账号等级。系数 1.16 让第 30 层 ≈ 1044 经验，与旧版（30 + 4709万/45000 ≈ 1076）同档，
+    // 未养成玩家的一轮收益基本不变，只有后期那条爆发被压平（第 39 层约 1764 × 倍率）
+    // （改 config.js / perks.js 的 ROGUE 数值后需重跑 tests/match3-rogue-balance.mjs 复核此项）
     rogueMaxScorePerMove: 300000,                   // 肉鸽试炼的单步上限（同上规则）
     // 肉鸽是娱乐玩法，刻意放宽：层数成长祝福（每深 1 层倍率再乘一档）+「同色磁石」（某色出现概率翻倍）
     // 会把深层单步得分推到 10 万量级；模拟 16 次 run 的整轮均步得分最高 77,969，真人水平更高，
@@ -379,6 +381,68 @@ module.exports = {
     maxBytes: 32768,                                // 单份暂存的序列化上限（棋盘快照实测 2~4KB，留余量同时挡住异常载荷）
     maxAgeMs: 7 * 24 * 60 * 60 * 1000,              // 超过此时长视为过期：换季回来不该再提示「继续上一局」
     variants: ['endless', 'endless3', 'rogue']      // 允许云同步的玩法（兼作 variant 合法性校验白名单）
+  },
+
+  // ========== 肉鸽试炼局外养成（精华 / 祝福解锁与升级，开发方案 5.7） ==========
+  // 这里是**权威**：精华余额、祝福等级、里程碑领取都只由服务端发放与扣减，客户端只展示与发起请求。
+  // 数值与 client-v2/src/games/match3/config.js 的 ROGUE_META 是一份手工同步的镜像
+  // （那边供引擎、图鉴与标定脚本使用）；改一边必须同步改另一边。
+  match3Rogue: {
+    // 稀有度 → 等级上限与费用（maxLevel=2 表示 lv1 之外还能升 1 次）
+    rarities: {
+      common: { maxLevel: 2, unlockCost: 20, upgradeCost: 25, costGrowth: 1.5 },
+      rare: { maxLevel: 3, unlockCost: 50, upgradeCost: 70, costGrowth: 1.5 },
+      epic: { maxLevel: 4, unlockCost: 100, upgradeCost: 150, costGrowth: 1.5 }
+    },
+    // 祝福池：id → 稀有度。服务端不需要祝福的具体效果，只要这张表来定价 + 校验 id 合法性；
+    // 新增祝福必须两边同时登记（客户端 perks.js 的 rarity 字段 + 这里）
+    perks: {
+      supply: 'common', minimal: 'common', arsenal: 'common', bomber: 'common',
+      scout: 'common', shield: 'common', shuffle: 'common',
+      focus: 'rare', rainbow: 'rare', deepsteps: 'rare',
+      magnet: 'epic', abyss: 'epic', storm: 'epic', barrage: 'epic', bloodpact: 'epic'
+    },
+    // 共鸣树（跨轮常驻的局外增益）：id → 定义。与祝福共用同一张稀有度表与同一种精华，但**不进三选一池**。
+    // 结构与客户端 perks.js 的 META_BUFFS 一一对应，改一边必须同步改另一边：
+    // - rarity：定价用（数值节点的等级上限也由它决定）
+    // - kind：'value' 数值节点（可逐级升级）/ 'mechanic' 机制节点（一次性解锁，上限固定 1，不看稀有度）
+    // - requires：前置节点 id（连线）。买之前必须已点亮，客户端置灰、这里是权威拦截
+    // - base / per：只有**结算侧**要用到的倍率才登记（经验 / 精华共鸣是服务端乘上去的）；
+    //   其余节点（起始补给 / 常驻护盾 / 免费洗牌等）只在客户端局内生效，服务端不重算，故不登记效果
+    buffs: {
+      expboost: { rarity: 'epic', kind: 'value', requires: [], base: 1.2, per: 0.15 },
+      essenceboost: { rarity: 'rare', kind: 'value', requires: ['expboost'], base: 1.1, per: 0.1 },
+      harvest: { rarity: 'epic', kind: 'mechanic', requires: ['essenceboost'] },
+      opening: { rarity: 'common', kind: 'value', requires: [] },
+      rainbowgift: { rarity: 'rare', kind: 'value', requires: ['opening'] },
+      planning: { rarity: 'epic', kind: 'mechanic', requires: ['rainbowgift'] },
+      shieldwall: { rarity: 'common', kind: 'value', requires: [] },
+      reshuffle: { rarity: 'common', kind: 'value', requires: ['shieldwall'] },
+      rewind: { rarity: 'epic', kind: 'mechanic', requires: ['reshuffle'] }
+    },
+    // 机制节点参数（共鸣树末端的大节点，见客户端 config.js 的 ROGUE_META.mechanics）：
+    // 只有「丰收闭环」是**结算侧**的——服务端要自己算，必须与客户端 essenceForRun 同口径；
+    // 另两个（先手规划 / 时光倒流）只在客户端局内生效，登记在这里只为保持一份完整镜像
+    mechanics: {
+      harvest: { milestoneMult: 2, essencePerFloor: 2 },
+      planning: { firstFloorMovesMult: 2, firstFloorPicks: 2 },
+      rewind: { retriesPerRun: 1 }
+    },
+    startingPerks: ['supply', 'minimal', 'focus'],  // 新号初始解锁（必须都是成长类，保证开局三选一有牌）
+    essenceDivisor: 5,                              // 本轮精华 = ⌊到达层数² / 这个数⌋
+    maxFloor: 100,                                  // 单轮层数上限：精华与经验都按它截断（正常打不到，只拦异常上报）
+    maxEssencePerRun: 50000,                        // 单轮发放上限：正常 50 层也就 500 精华，只为拦住异常上报
+    maxPicksPerRun: 50,                             // 单轮上报的祝福选取次数上限（统计字段，宽松校验）
+    // 图鉴收集里程碑（一次性领取，只发精华）
+    // kind：unlocked=已解锁种类数 / maxed=已满级张数 / all=集齐全部
+    milestones: [
+      { id: 'unlock3', name: '解锁 3 种祝福', kind: 'unlocked', need: 3, reward: 20 },
+      { id: 'unlock6', name: '解锁 6 种祝福', kind: 'unlocked', need: 6, reward: 40 },
+      { id: 'unlock10', name: '解锁 10 种祝福', kind: 'unlocked', need: 10, reward: 80 },
+      { id: 'unlockAll', name: '集齐全部祝福', kind: 'all', reward: 200 },
+      { id: 'maxAny', name: '任意一张升到满级', kind: 'maxed', need: 1, reward: 30 },
+      { id: 'max3', name: '3 张升到满级', kind: 'maxed', need: 3, reward: 120 }
+    ]
   },
 
   // ========== 各游戏关卡静态限制表（关卡平台结构校验用，不是引擎，只是数值） ==========

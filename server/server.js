@@ -3823,6 +3823,10 @@ io.on('connection', (socket) => {
 
     const accountId = user.accountId;
     const { mode, level, floor, score, maxCombo, moves, durationMs, cleared, stars } = data || {};
+    // 肉鸽：本轮选到的祝福次数与达成的局内任务数，只作养成存档的统计字段（不参与发放），
+    // 因此这里只做形状检查，具体白名单与次数上限由 AccountManager.addRogueEssence 过滤
+    const picks = data && typeof data.picks === 'object' && data.picks !== null ? data.picks : null;
+    const questsDone = Math.max(0, Math.floor(data?.questsDone || 0));
 
     try {
       logger.info('消消乐游戏结束', { accountId, mode, level, floor, score, maxCombo, moves, durationMs });
@@ -3854,6 +3858,11 @@ io.on('connection', (socket) => {
       }
       if (mode === 'level' && (!Number.isFinite(level) || level < 1 || level > currentMaxLevel + 1)) {
         violations.push('level_jump');
+      }
+      // 肉鸽：层数只由到达层数换算成精华与经验（不按分），所以必须挡住「层数报个大数」。
+      // 每层至少要花掉 1 步，层数不可能超过总步数——这条比单步得分上限更直接
+      if (mode === 'rogue' && Math.max(0, Math.floor(floor || 0)) > safeMoves) {
+        violations.push('floor_per_move');
       }
 
       if (violations.length > 0) {
@@ -3891,7 +3900,9 @@ io.on('connection', (socket) => {
         moves: safeMoves,
         durationMs: safeDuration,
         cleared,
-        stars
+        stars,
+        picks,
+        questsDone
       });
       if (!saved.success) {
         socket.emit('match3_result', { success: false, message: saved.message || '保存失败' });
@@ -3902,23 +3913,35 @@ io.on('connection', (socket) => {
       await gameManager.accountManager.updateGameStats(accountId, null, 'match3', false, null, safeDuration);
 
       // 经验：基础 + 分数换算，闯关模式按星级额外加成
-      // 各模式的得分数量级差很远（闯关几千 / 标准无尽数十万 / 三色爽局数百万 / 肉鸽数万），除数必须分开定，
+      // 各模式的得分数量级差很远（闯关几千 / 标准无尽数十万 / 三色爽局数百万），除数必须分开定，
       // 否则尺度最大的模式单位时间经验会被严重稀释。未配置时逐级回退。
+      // 肉鸽是例外：它**不按分数**，而是按到达层数换算再乘局外增益「经验共鸣」——
+      // 深层得分倍率能堆到 ×45，标定实测满级玩家整轮总分是未养成者的 72 倍，
+      // 按分发等于把「堆分」白送成账号等级（见开发方案 5.7）
       const starCount = mode === 'level' ? Math.max(0, Math.min(3, Math.floor(stars || 0))) : 0;
-      const scoreDivisorByMode = {
-        level: rewards.expPerScoreDivisor,
-        endless: rewards.endlessExpPerScoreDivisor || rewards.expPerScoreDivisor,
-        endless3: rewards.endless3ExpPerScoreDivisor
-          || rewards.endlessExpPerScoreDivisor
-          || rewards.expPerScoreDivisor,
-        rogue: rewards.rogueExpPerScoreDivisor
-          || rewards.endlessExpPerScoreDivisor
-          || rewards.expPerScoreDivisor
-      };
-      const scoreDivisor = scoreDivisorByMode[mode] || rewards.expPerScoreDivisor;
-      const expReward = rewards.baseExp +
-        Math.floor(safeScore / scoreDivisor) +
-        starCount * rewards.starBonus;
+      let expReward;
+      if (mode === 'rogue') {
+        const rogueFloor = Math.min(
+          config.match3Rogue.maxFloor,
+          Math.max(0, Math.floor(floor || 0))
+        );
+        // 倍率取本轮结算后的存档（结算不改增益等级）；口径与客户端 estimateExp 一致
+        const expMult = gameManager.accountManager.rogueBuffMult(saved.progress?.rogue?.meta, 'expboost');
+        const base = Math.floor(rogueFloor * rogueFloor * rewards.rogueExpFloorFactor);
+        expReward = rewards.baseExp + Math.floor(base * expMult);
+      } else {
+        const scoreDivisorByMode = {
+          level: rewards.expPerScoreDivisor,
+          endless: rewards.endlessExpPerScoreDivisor || rewards.expPerScoreDivisor,
+          endless3: rewards.endless3ExpPerScoreDivisor
+            || rewards.endlessExpPerScoreDivisor
+            || rewards.expPerScoreDivisor
+        };
+        const scoreDivisor = scoreDivisorByMode[mode] || rewards.expPerScoreDivisor;
+        expReward = rewards.baseExp +
+          Math.floor(safeScore / scoreDivisor) +
+          starCount * rewards.starBonus;
+      }
 
       if (expReward > 0) {
         const expResult = await gameManager.accountManager.addExp(accountId, expReward);
@@ -3999,10 +4022,15 @@ io.on('connection', (socket) => {
           highScore: match3.highScore3 || 0,
           bestCombo: match3.maxCombo3 || 0
         },
-        // 肉鸽试炼的隔离战绩：最高层数与最高分都不与其它模式互相污染
+        // 肉鸽试炼的隔离战绩：最高层数与最高分都不与其它模式互相污染。
+        // 外加局外养成：meta 是存档（精华余额 / 祝福等级 / 里程碑领取），
+        // cfg 是养成数值表（等级上限 / 费用 / 里程碑定义）——随进度一起下发，
+        // 客户端就不必镜像一份价格常量，服务端改一处数值即时生效
         rogue: {
           maxFloor: match3.rogueMaxFloor || 0,
-          highScore: match3.rogueHighScore || 0
+          highScore: match3.rogueHighScore || 0,
+          meta: await gameManager.accountManager.getMatch3Rogue(user.accountId),
+          cfg: config.match3Rogue
         },
         // 经验奖励配置：客户端据此实时显示「预计经验」（公式见上面的 match3_game_end），
         // 避免客户端镜像一份常量而与服务端漂移。服务器仍以本次下发的值为准发经验
@@ -4055,6 +4083,113 @@ io.on('connection', (socket) => {
       socket.emit('match3_session_saved', { variant, ok });
     } catch (err) {
       logger.error('保存消消乐暂存失败', { accountId: user.accountId, variant, error: err.message });
+    }
+  });
+
+  // 肉鸽局外养成：解锁 / 升级一条养成项（祝福或局外增益，开发方案 5.7）
+  // 客户端只发一个 id 过来，价格与等级上限都在服务端现算、精华在锁内扣，
+  // 所以改本地存档变不出等级来
+  socket.on('match3_rogue_upgrade', async (data) => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user || !user.accountId) {
+      socket.emit('match3_rogue_meta', { ok: false, message: '登录后才能解锁' });
+      return;
+    }
+
+    // 祝福与局外增益共用这条事件（同一张稀有度表、同一种精华），
+    // 所以 id 落在其中任意一张表里就算合法；两张表都没有则拒绝
+    const perkId = data && data.perkId;
+    const known = typeof perkId === 'string'
+      && (Object.prototype.hasOwnProperty.call(config.match3Rogue.perks, perkId)
+        || Object.prototype.hasOwnProperty.call(config.match3Rogue.buffs, perkId));
+    if (!known) {
+      socket.emit('match3_rogue_meta', { ok: false, message: '没有这个养成项' });
+      return;
+    }
+
+    try {
+      const res = await gameManager.accountManager.upgradeRoguePerk(user.accountId, perkId);
+      socket.emit('match3_rogue_meta', {
+        ok: res.ok,
+        message: res.message,
+        perkId,
+        scope: res.scope,
+        cost: res.cost,
+        lv: res.lv,
+        kind: res.kind,
+        meta: res.rogue
+      });
+
+      if (res.ok) {
+        logger.info('肉鸽养成项已升级', {
+          accountId: user.accountId, perkId, scope: res.scope, lv: res.lv, cost: res.cost
+        });
+        if (operationLogger) {
+          operationLogger.log({
+            userId: user.accountId,
+            username: user.nickname || '',
+            action: res.kind === 'unlock' ? 'match3_rogue_unlock' : 'match3_rogue_upgrade',
+            category: 'game',
+            targetName: 'match3',
+            amount: res.cost,
+            details: { perkId, scope: res.scope || 'perk', lv: res.lv },
+            ip: socket.handshake?.address || ''
+          });
+        }
+      }
+    } catch (err) {
+      logger.error('肉鸽养成项升级失败', { accountId: user.accountId, perkId, error: err.message });
+      socket.emit('match3_rogue_meta', { ok: false, message: '操作失败，请稍后再试' });
+    }
+  });
+
+  // 肉鸽局外养成：领取图鉴收集里程碑
+  // 达成条件由服务端按存档自己算（AccountManager._rogueMilestoneState），不采信客户端上报的进度
+  socket.on('match3_rogue_claim', async (data) => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user || !user.accountId) {
+      socket.emit('match3_rogue_meta', { ok: false, message: '登录后才能领取奖励' });
+      return;
+    }
+
+    const milestoneId = data && data.milestoneId;
+    if (typeof milestoneId !== 'string'
+      || !config.match3Rogue.milestones.some((m) => m.id === milestoneId)) {
+      socket.emit('match3_rogue_meta', { ok: false, message: '没有这个里程碑' });
+      return;
+    }
+
+    try {
+      const res = await gameManager.accountManager.claimRogueMilestone(user.accountId, milestoneId);
+      socket.emit('match3_rogue_meta', {
+        ok: res.ok,
+        message: res.message,
+        milestoneId,
+        reward: res.reward,
+        name: res.name,
+        meta: res.rogue
+      });
+
+      if (res.ok) {
+        logger.info('肉鸽图鉴里程碑已领取', {
+          accountId: user.accountId, milestoneId, reward: res.reward
+        });
+        if (operationLogger) {
+          operationLogger.log({
+            userId: user.accountId,
+            username: user.nickname || '',
+            action: 'match3_rogue_milestone',
+            category: 'game',
+            targetName: 'match3',
+            amount: res.reward,
+            details: { milestoneId, name: res.name },
+            ip: socket.handshake?.address || ''
+          });
+        }
+      }
+    } catch (err) {
+      logger.error('领取肉鸽里程碑失败', { accountId: user.accountId, milestoneId, error: err.message });
+      socket.emit('match3_rogue_meta', { ok: false, message: '操作失败，请稍后再试' });
     }
   });
 

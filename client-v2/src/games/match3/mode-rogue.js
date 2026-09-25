@@ -11,13 +11,17 @@
  * 一轮 run 会做局内暂存（本地 + 云端）：刷新、换设备都能接着打，见 persistSession。
  */
 import { COLOR_NAMES, ROGUE, STORAGE_KEYS } from './config.js';
-import { PERKS, QUEST_REWARDS, createBonus, floorOptions, goalOf, questFor, rollPerks } from './perks.js';
+import {
+  PERKS, QUEST_REWARDS, createBonus, descOf, floorOptions, goalOf, questFor, rollPerks,
+} from './perks.js';
+import { essenceForRun, applyMetaBuffs, mechanicCfg, mechanicOn, perkLevel, unlockedSet } from './meta.js';
 import { createMatch3Board } from './board.js';
 import { createRng } from './rng.js';
 import { showScoreDetails } from './scoreDetails.js';
+import { showPerkCodex } from './codex.js';
 import {
-  estimateExp, finishedSession, loadLocalSession, onProgress, pushSession,
-  reportEnd, reportStart, requestProgress, saveLocalSession,
+  estimateExp, finishedSession, getRogueMeta, loadLocalSession, onProgress, onResult, onRogueMeta,
+  pushSession, reportEnd, reportStart, requestProgress, saveLocalSession,
 } from './sync.js';
 import { el } from '../../utils/dom.js';
 import { toast } from '../../components/toast.js';
@@ -65,7 +69,7 @@ function cloneBonus(bonus) {
  * @param {number} floor - 层号（起手步数含层数成长，必须传对）
  * @returns {Array<{key:string, label:string, value:string}>}
  */
-function bonusStats(bonus, floor) {
+function bonusStats(bonus, floor, rewinds = 0) {
   const opts = floorOptions(bonus, floor);
   const rows = [
     { key: 'moves', label: '起手步数', value: `${opts.moves} 步` },
@@ -87,16 +91,18 @@ function bonusStats(bonus, floor) {
     const name = bonus.weightColor > 0 ? `${COLOR_NAMES[bonus.weightColor]}色` : '随机一色';
     rows.push({ key: 'magnet', label: '同色磁石', value: `${name} ×${bonus.weightMult}` });
   }
+  // 「时光倒流」是机制节点给的一次性重打机会，攒着不用就浪费了——摆出来让玩家看得见
+  if (rewinds > 0) rows.push({ key: 'rewind', label: '时光倒流', value: `×${rewinds}` });
   return rows;
 }
 
 /** bonusStats → Map，便于按 key 比较「选祝福前 / 后」 */
-function statsMap(bonus, floor) {
-  return new Map(bonusStats(bonus, floor).map((row) => [row.key, row]));
+function statsMap(bonus, floor, rewinds = 0) {
+  return new Map(bonusStats(bonus, floor, rewinds).map((row) => [row.key, row]));
 }
 
 /** 加成数据条（悬浮在棋盘上方，随祝福变化即时刷新） */
-function renderStats(bonus, floor, title) {
+function renderStats(bonus, floor, title, rewinds = 0) {
   return el(
     'div',
     { class: 'm3-stats-block' },
@@ -104,7 +110,7 @@ function renderStats(bonus, floor, title) {
     el(
       'div',
       { class: 'm3-stats' },
-      ...bonusStats(bonus, floor).map((row) =>
+      ...bonusStats(bonus, floor, rewinds).map((row) =>
         el(
           'span',
           { class: 'm3-stat' },
@@ -134,14 +140,25 @@ export function renderRogue(container, { onExit }) {
   let maxCombo = 0;
   let totalMoves = 0;
   let totalCleared = 0;
+  let questsDone = 0;      // 本轮达成的局内任务数（只作养成存档的统计字段，见 reportEnd）
   let shufflesLeft = 0;    // 本层剩余免费洗牌次数
+  let rewindsLeft = 0;     // 「时光倒流」机制：本轮剩余的重打次数（0 = 没解锁 / 已用完）
+  let extraPicks = 0;      // 「先手规划」机制：第 1 层过关后还要多抽几次
+  let rewinding = false;   // 「时光倒流」正在重建本层：挡住这期间重复触发的结束判定
   let startedAt = 0;
   let elapsedMs = 0;       // 已累计的游玩时长（本轮之前的），配合 startedAt 得到总时长
   let runRng = null;
   let floorCleared = false;
   let refreshExp = null;
+  let paintMeta = () => { }; // 重画「精华」行（局外养成随服务端下发 / 解锁后变化），由 mountFloor 赋值
+  let gainEl = null;        // 结算页的「本轮精华」行，收到服务端回执后就地改成准确值
   let quest = null;        // 本层局内任务（perks.js 的 questFor），只在当层有效
   let perkModal = null;    // 三选一的模态框（盖在已达标的盘面上，见 renderPerkChoice）
+
+  /** 某条祝福的局外等级（0 = 未解锁；三选一池子已过滤，选中时必然 ≥1） */
+  function levelOf(perk) {
+    return perkLevel(getRogueMeta(), perk.id);
+  }
 
   function disposeBoard() {
     if (board) {
@@ -159,6 +176,8 @@ export function renderRogue(container, { onExit }) {
 
   function teardown() {
     refreshExp = null;
+    // 精华行随盘面一起被换掉，先摘掉引用，避免服务端下发时往已脱离文档的节点上写
+    paintMeta = () => { };
     closePerkModal();
     disposeBoard();
   }
@@ -215,9 +234,12 @@ export function renderRogue(container, { onExit }) {
       maxCombo,
       totalMoves,
       totalCleared,
+      questsDone,
       runRngState: runRng ? runRng.getState() : null,
       elapsedMs: runElapsed(),
       shufflesLeft,
+      rewindsLeft,
+      extraPicks,
       quest: quest
         ? {
           color: quest.color,
@@ -252,6 +274,9 @@ export function renderRogue(container, { onExit }) {
     teardown();
     finished = false;
     bonus = createBonus();
+    // 共鸣树里「局内生效」的节点加成在这里一次性灌进来（跨轮常驻，一轮中间不会变）：
+    // 起始补给 / 开箱彩球 / 常驻护盾 / 常驻洗牌走 apply，先手规划只改第 1 层的步数倍率
+    applyMetaBuffs(bonus, getRogueMeta());
     picks = {};
     pickedPerks = [];
     floor = 1;
@@ -259,6 +284,10 @@ export function renderRogue(container, { onExit }) {
     maxCombo = 0;
     totalMoves = 0;
     totalCleared = 0;
+    questsDone = 0;
+    rewindsLeft = mechanicOn(getRogueMeta(), 'rewind') ? mechanicCfg().rewind.retriesPerRun : 0;
+    extraPicks = 0;
+    gainEl = null;
     elapsedMs = 0;
     startedAt = Date.now();
     runRng = createRng(Date.now() % 2147483647);
@@ -287,7 +316,11 @@ export function renderRogue(container, { onExit }) {
     maxCombo = session.maxCombo || 0;
     totalMoves = session.totalMoves || 0;
     totalCleared = session.totalCleared || 0;
+    questsDone = session.questsDone || 0;
     shufflesLeft = session.shufflesLeft || 0;
+    // 机制资源也要接着存档走，否则刷新一次「时光倒流」就白送了 / 「连抽」被打断
+    rewindsLeft = Math.max(0, Math.floor(session.rewindsLeft || 0));
+    extraPicks = Math.max(0, Math.floor(session.extraPicks || 0));
     elapsedMs = session.elapsedMs || 0;
     startedAt = Date.now();
     runRng = createRng(1);
@@ -320,6 +353,7 @@ export function renderRogue(container, { onExit }) {
   function mountFloor(restore = null) {
     disposeBoard();
     floorCleared = false;
+    rewinding = false;
     const goal = goalOf(floor, bonus);
     const opts = floorOptions(bonus, floor);
     shufflesLeft = restore ? (restore.shufflesLeft || 0) : bonus.shuffles;
@@ -368,6 +402,7 @@ export function renderRogue(container, { onExit }) {
     /** 任务达成：奖励当场生效（加步 / 本层得分翻倍 / 就地注入特殊元素） */
     function grantQuestReward() {
       quest.done = true;
+      questsDone += 1;
       quest.reward.apply(board, opts);
       paintQuest();
       toast.success(`${quest.reward.icon} 任务达成：${quest.reward.name} · ${quest.reward.desc}`);
@@ -395,10 +430,10 @@ export function renderRogue(container, { onExit }) {
 
     const host = el('div', { class: 'm3-board-host' });
     const perkListEl = renderPerkList();
-    // 数据面板单独留引用：免死消耗后要就地刷新（层内唯一会变的加成）
-    let statsEl = renderStats(bonus, floor, '本轮加成');
+    // 数据面板单独留引用：免死 / 时光倒流消耗后要就地刷新（层内会变的加成）
+    let statsEl = renderStats(bonus, floor, '本轮加成', rewindsLeft);
     const paintStats = () => {
-      const next = renderStats(bonus, floor, '本轮加成');
+      const next = renderStats(bonus, floor, '本轮加成', rewindsLeft);
       statsEl.replaceWith(next);
       statsEl = next;
     };
@@ -411,7 +446,17 @@ export function renderRogue(container, { onExit }) {
       valueNode,
     );
 
-    // 左侧数据面板：本层进度 / 本轮加成 / 已获祝福。
+    // 精华（局外养成）：余额由服务端下发，这里只是读出来显示；
+    // 「本轮可得」按当前层数预览，层间多看一眼就能知道「再深一层多拿多少」
+    const essenceEl = el('span', { class: 'm3-side-value' }, String(getRogueMeta().essence));
+    const earnEl = el('span', { class: 'm3-side-value' }, `+${essenceForRun(floor, getRogueMeta())}`);
+    paintMeta = () => {
+      essenceEl.textContent = String(getRogueMeta().essence);
+      earnEl.textContent = `+${essenceForRun(floor, getRogueMeta())}`;
+    };
+    paintMeta();
+
+    // 左侧数据面板：本层进度 / 本轮加成 / 精华 / 已获祝福。
     // 这些数都随本轮成长，原来横排在棋盘上方只能挤成一行小标签，
     // 既放不下「本层得分 / 目标」的进度关系，也看不出祝福叠了几层
     const side = el(
@@ -436,7 +481,29 @@ export function renderRogue(container, { onExit }) {
       el(
         'div',
         { class: 'm3-side-block' },
-        el('div', { class: 'm3-side-title' }, '已获祝福'),
+        el(
+          'div',
+          { class: 'm3-side-titlerow' },
+          el('div', { class: 'm3-side-title' }, '✦ 精华'),
+          // 局内也能开养成面板：看到余额后顺手解锁一张，下一轮立刻生效
+          el('button', { class: 'm3-side-link', onClick: () => showPerkCodex(picks) }, '养成'),
+        ),
+        el(
+          'div',
+          { class: 'm3-side-rows' },
+          sideRow('余额', essenceEl),
+          sideRow('本轮可得', earnEl),
+        ),
+      ),
+      el(
+        'div',
+        { class: 'm3-side-block' },
+        el(
+          'div',
+          { class: 'm3-side-titlerow' },
+          el('div', { class: 'm3-side-title' }, '已获祝福'),
+          el('button', { class: 'm3-side-link', onClick: () => showPerkCodex(picks) }, '图鉴'),
+        ),
         perkListEl,
       ),
     );
@@ -473,13 +540,13 @@ export function renderRogue(container, { onExit }) {
       ),
     );
 
-    /** 预计经验：按本轮累计总分估算（奖励配置未下发时整项隐藏） */
+    /** 预计经验：按本轮到达层数估算，再乘局外「经验共鸣」（奖励配置未下发时整项隐藏） */
     function paintExp() {
-      const exp = estimateExp({ mode: ROGUE.type, score: totalScore() });
+      const exp = estimateExp({ mode: ROGUE.type, score: totalScore(), floor });
       expItem.classList.toggle('m3-hidden', exp == null);
       if (exp != null) {
         expEl.textContent = `+${exp}`;
-        expItem.title = '基础 + 分数换算（以服务端结算为准）';
+        expItem.title = '按到达层数换算 × 局外「经验共鸣」（以服务端结算为准）';
       }
     }
 
@@ -518,12 +585,25 @@ export function renderRogue(container, { onExit }) {
     }
 
     function onGameOver(info) {
-      if (finished || floorCleared || info.score >= goal) return;
+      if (finished || floorCleared || rewinding || info.score >= goal) return;
       if (bonus.shields > 0) {
         bonus.shields -= 1;
         toast.info(`🛡 免死金牌生效，补 ${ROGUE.shieldMoves} 步`);
         board.addMoves(ROGUE.shieldMoves);
         paintStats();
+        return;
+      }
+      // 「时光倒流」机制：本轮还留着次数时把这层整个重打一遍（新盘面、满步数，不判结束）。
+      // 必须推迟到当前回调栈之外再重建棋盘——onGameOver 是从 board 内部回调出来的，
+      // 就地 mountFloor → disposeBoard 会把正在执行的棋盘对象拆掉
+      if (rewindsLeft > 0) {
+        rewindsLeft -= 1;
+        rewinding = true;
+        toast.info(`⏳ 时光倒流：第 ${floor} 层重打（还剩 ${rewindsLeft} 次）`);
+        paintStats();
+        setTimeout(() => {
+          if (!finished) mountFloor();
+        }, 0);
         return;
       }
       finishRun();
@@ -580,7 +660,7 @@ export function renderRogue(container, { onExit }) {
       ...Array.from(counts.entries()).map(([perk, n]) =>
         el(
           'span',
-          { class: 'm3-perks-chip', title: `${perk.name}：${perk.desc}` },
+          { class: 'm3-perks-chip', title: `${perk.name} Lv.${levelOf(perk)}：${descOf(perk, levelOf(perk))}` },
           `${perk.icon}${perk.name}${n > 1 ? ` ×${n}` : ''}`,
         )),
     );
@@ -604,7 +684,7 @@ export function renderRogue(container, { onExit }) {
       ...Array.from(counts.entries()).map(([perk, n]) =>
         el(
           'div',
-          { class: 'm3-side-perk', title: perk.desc },
+          { class: 'm3-side-perk', title: `${perk.name} Lv.${levelOf(perk)}：${descOf(perk, levelOf(perk))}` },
           el('span', { class: 'm3-side-perk-icon' }, perk.icon),
           el('span', { class: 'm3-side-perk-name' }, perk.name),
           el('span', { class: 'm3-side-perk-count' }, `×${n}`),
@@ -622,9 +702,18 @@ export function renderRogue(container, { onExit }) {
     totalMoves += info.moves;
     totalCleared += info.cleared;
 
-    const offered = rollPerks(runRng, picks);
+    // 「先手规划」机制：第 1 层过关后连抽 2 次（多拿一张）。只在第 1 层给——
+    // 它的定位是「抢跑」，越往后给越接近纯白送，就不再是机制而是数值了
+    if (floor === 1 && mechanicOn(getRogueMeta(), 'planning')) {
+      extraPicks = Math.max(extraPicks, mechanicCfg().planning.firstFloorPicks - 1);
+    }
+
+    // 只在**已解锁**的祝福里抽（局外养成决定池子）：没解锁过的不会出现在三选一里，
+    // 所以「集齐祝福」是有实际收益的目标，而不只是图鉴里的一个数字
+    const offered = rollPerks(runRng, picks, unlockedSet(getRogueMeta()));
     if (offered.length === 0) {
-      // 祝福全部叠满：没有可选项就不再打断节奏，直接进下一层
+      // 已解锁的祝福全部叠满：没有可选项就不再打断节奏，直接进下一层
+      extraPicks = 0;
       floor += 1;
       mountFloor();
       return;
@@ -634,10 +723,12 @@ export function renderRogue(container, { onExit }) {
 
   /** 选中某祝福后，下一层相对本层的数值变化（本层 → 下一层的实际值，含层数成长） */
   function perkDelta(perk) {
-    const before = statsMap(bonus, floor);
+    const lv = levelOf(perk);
+    const before = statsMap(bonus, floor, rewindsLeft);
     const preview = cloneBonus(bonus);
-    perk.apply(preview);
-    const after = statsMap(preview, floor + 1);
+    // 预览不传 rng：「同色磁石」锁色是选中时才发生的副作用，预览只体现倍率变化
+    perk.apply(preview, { lv });
+    const after = statsMap(preview, floor + 1, rewindsLeft);
     const lines = [];
     for (const [key, row] of after) {
       const prev = before.get(key);
@@ -650,12 +741,19 @@ export function renderRogue(container, { onExit }) {
   /** 三选一卡片（模态框内横排三张，窄屏由 CSS 折成竖排） */
   function perkCard(perk) {
     const owned = picks[perk.id] || 0;
+    const lv = levelOf(perk);
     return el(
       'button',
       { class: 'm3-perk', onClick: () => choosePerk(perk) },
       el('span', { class: 'm3-perk-icon' }, perk.icon),
-      el('span', { class: 'm3-perk-name' }, perk.name),
-      el('span', { class: 'm3-perk-desc' }, perk.desc),
+      el(
+        'span',
+        { class: 'm3-perk-namerow' },
+        el('span', { class: 'm3-perk-name' }, perk.name),
+        // 卡片上的等级来自局外养成：升级后同一张牌在本轮更强，这是解锁与升级的直接回报
+        el('span', { class: 'm3-perk-lv' }, `Lv.${lv}`),
+      ),
+      el('span', { class: 'm3-perk-desc' }, descOf(perk, lv)),
       el(
         'span',
         { class: 'm3-perk-delta' },
@@ -696,7 +794,8 @@ export function renderRogue(container, { onExit }) {
         el(
           'p',
           { class: 'm3-perk-dialog-sub' },
-          `累计 ${baseScore} 分 · 选中的祝福从第 ${floor + 1} 层开始生效`,
+          `累计 ${baseScore} 分 · 选中的祝福从第 ${floor + 1} 层开始生效`
+          + (extraPicks > 0 ? ` · 🎁 先手规划：本层还能连选 ${extraPicks + 1} 张` : ''),
         ),
       ),
       el('div', { class: 'm3-perks' }, ...offered.map(perkCard)),
@@ -704,7 +803,13 @@ export function renderRogue(container, { onExit }) {
         'div',
         { class: 'm3-perk-dialog-foot' },
         el('span', { class: 'm3-perk-dialog-hint' }, '点卡片即选中，选完自动进入下一层'),
-        el('button', { class: 'm3-btn m3-btn--ghost', onClick: () => onExit() }, '返回选择'),
+        el(
+          'div',
+          { class: 'm3-perk-dialog-btns' },
+          // 只出 3 张，看不到池子里还有什么；这里给一个不用退出对局就能查的入口
+          el('button', { class: 'm3-btn m3-btn--ghost', onClick: () => showPerkCodex(picks) }, '📖 图鉴'),
+          el('button', { class: 'm3-btn m3-btn--ghost', onClick: () => onExit() }, '返回选择'),
+        ),
       ),
     );
 
@@ -719,8 +824,18 @@ export function renderRogue(container, { onExit }) {
   function choosePerk(perk) {
     picks[perk.id] = (picks[perk.id] || 0) + 1;
     pickedPerks.push(perk);
-    // 传 runRng 给需要入局随机的祝福（「同色磁石」用它锁定一种颜色）
-    perk.apply(bonus, runRng);
+    // ctx 里带两样东西：局外等级（决定这张牌这一轮有多强）与 runRng
+    // （「同色磁石」要用它锁定一种颜色）。两者缺一都会静默降级成 lv1 / 不锁色
+    perk.apply(bonus, { lv: levelOf(perk), rng: runRng });
+    // 「先手规划」还欠一张：原地再抽一次，层数不动（这一层已经过关了，只是多拿一张牌）
+    if (extraPicks > 0) {
+      extraPicks -= 1;
+      const again = rollPerks(runRng, picks, unlockedSet(getRogueMeta()));
+      if (again.length > 0) {
+        renderPerkChoice(again);
+        return;
+      }
+    }
     floor += 1;
     closePerkModal();
     mountFloor();
@@ -737,6 +852,8 @@ export function renderRogue(container, { onExit }) {
     totalMoves += info.moves;
     totalCleared += info.cleared;
     board.lock();
+    // 侧栏（含精华行）马上要被结算页替换掉，先摘掉重画回调
+    paintMeta = () => { };
 
     // 本轮结束：本地写墓碑占位，并把墓碑推上云端（详见 sync.js 的 finishedSession）。
     // 只删本地是不够的——离线结算时清除推不上去，下次进来会把打完的局又同步回来
@@ -753,6 +870,10 @@ export function renderRogue(container, { onExit }) {
       durationMs,
       cleared: totalCleared,
       stars: 0,
+      // 本轮选到的祝福次数与达成的局内任务数：服务端只记进养成存档的统计字段（不参与发放），
+      // 但「记录全」能支撑以后基于它做的功能（如常用 build 统计）
+      picks,
+      questsDone,
     });
 
     const before = loadRogueBest();
@@ -762,6 +883,13 @@ export function renderRogue(container, { onExit }) {
     });
     if (floor > before.maxFloor) toast.success(`新的最深记录：第 ${floor} 层！`);
     else if (score > before.highScore) toast.success('新的最高总分！');
+
+    // 本轮精华：先按同一公式就地算一个（离线也能看到收益），服务端回执到达后改成权威值
+    gainEl = el(
+      'div',
+      { class: 'm3-result-line m3-result-essence' },
+      essenceLine(essenceForRun(floor, getRogueMeta())),
+    );
 
     container.replaceChildren(
       el(
@@ -778,6 +906,7 @@ export function renderRogue(container, { onExit }) {
         el('div', { class: 'm3-result-line' }, `累计消除 ${totalCleared} 个 · 用时 ${formatDuration(durationMs)}`),
         el('div', { class: 'm3-result-line' }, `祝福 ${pickedPerks.length} 张`),
         renderPerkStrip(),
+        gainEl,
         el(
           'div',
           { class: 'm3-result-line' },
@@ -789,6 +918,8 @@ export function renderRogue(container, { onExit }) {
         'div',
         { class: 'm3-actions' },
         el('button', { class: 'm3-btn', onClick: () => startRun() }, '再来一轮'),
+        // 结算是最想花精华的时点：直接给一个去解锁 / 升级的入口
+        el('button', { class: 'm3-btn', onClick: () => showPerkCodex() }, '📖 图鉴与养成'),
         el(
           'button',
           {
@@ -802,6 +933,11 @@ export function renderRogue(container, { onExit }) {
     );
   }
 
+  /** 结算页的精华行文案 */
+  function essenceLine(gain) {
+    return `✦ 本轮精华 +${gain}（按到达层数结算，可在图鉴里解锁 / 升级祝福与局外增益）`;
+  }
+
   // 有未结算的一轮就直接接着打：刷新、换设备回来都落在同一个入口上
   // （云端那份由 mergeRemoteProgress 在收到服务端进度时并进本地，菜单上的续玩提示同源）
   const saved = loadLocalSession(ROGUE.type);
@@ -810,10 +946,21 @@ export function renderRogue(container, { onExit }) {
 
   // 拉取服务端最佳成绩（合并后本地记录才是准的）；奖励配置到达后补显预计经验
   const offProgress = onProgress(() => refreshExp?.());
+  // 精华余额与祝福等级：进模式拉一次进度、局内解锁一张、里程碑领取，都会触发重画
+  const offMeta = onRogueMeta(() => paintMeta());
+  // 本轮结算回执：精华按到达层数在服务端算，回来后把结算页那行换成权威值 + 最新余额
+  const offResult = onResult((data) => {
+    const rogue = data?.progress?.rogue;
+    if (!gainEl || !rogue || typeof rogue.essenceGain !== 'number') return;
+    gainEl.textContent = `✦ 本轮精华 +${rogue.essenceGain} · 当前余额 ${getRogueMeta().essence}`
+      + '（可在图鉴里解锁 / 升级祝福与局外增益）';
+  });
   requestProgress();
 
   return () => {
     offProgress();
+    offMeta();
+    offResult();
     teardown();
   };
 }

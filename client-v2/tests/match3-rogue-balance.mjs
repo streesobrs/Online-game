@@ -11,8 +11,43 @@ import { colOf, index, isPlayable, rowOf } from '../src/games/match3/grid.js';
 import { hasMatch } from '../src/games/match3/match.js';
 import { makeSpecial } from '../src/games/match3/special.js';
 import { createRng } from '../src/games/match3/rng.js';
-import { SCORE, SPECIAL, ROGUE } from '../src/games/match3/config.js';
-import { QUEST_REWARDS, createBonus, floorOptions, goalOf, questFor, rollPerks } from '../src/games/match3/perks.js';
+import { SCORE, SPECIAL, ROGUE, ROGUE_META } from '../src/games/match3/config.js';
+import {
+  META_BUFFS, PERKS, QUEST_REWARDS, createBonus, floorOptions, goalOf, questFor, rollPerks, valueAt,
+} from '../src/games/match3/perks.js';
+// 局外养成（共鸣树）的推导也直接 import：等级上限、机制节点生效判定、本轮起手的加成注入
+// 都只有一份实现，标定口径跟产品完全一致
+import { applyMetaBuffs, maxLevelOf, mechanicCfg, mechanicOn } from '../src/games/match3/meta.js';
+
+/**
+ * 服务端**结算口径**（server/config.js 的 match3Rogue / match3Rewards，手工同步的两项）
+ *
+ * 精华与**经验**都只按到达层数换算（不按分结算），标定时需要把「中位层数」折成实际收益看一下尺度，
+ * 所以这里各留一个常量。刻意不 import 服务端配置：它是 CommonJS 且会拉起一串依赖，
+ * 标定脚本要保持能单独 `node tests/match3-rogue-balance.mjs` 跑。改了服务端就得同步改这里
+ */
+const EXP_FLOOR_FACTOR = 1.16;   // 经验 = ⌊层数² × 本值⌋ × 局外「经验共鸣」
+const MAX_SCORE_PER_MOVE = 300000; // 反刷分单步上限（server/config.js 的 rogueMaxScorePerMove）
+/**
+ * 局外**数值**增益按 id 取（算「买到满级能乘多少」用）
+ * 机制节点（共鸣树末端）没有数值曲线，按 valueAt 求值会得到 NaN，所以先滤掉
+ */
+const BUFFS_REF = Object.fromEntries(
+  META_BUFFS.filter((buff) => buff.kind !== 'mechanic').map((buff) => [buff.id, buff]),
+);
+/** 某条数值增益买到满级的倍率（上限由稀有度决定，见 ROGUE_META.rarities） */
+const buffMaxFactor = (id) => valueAt(BUFFS_REF[id], maxLevelOf(BUFFS_REF[id]));
+/** 中位层数 → 基础精华（未乘「精华共鸣」） */
+const essenceAt = (floor) => Math.floor((floor * floor) / ROGUE_META.essenceDivisor);
+/** 中位层数 → 基础经验（未乘「经验共鸣」） */
+const expAt = (floor) => Math.floor(floor * floor * EXP_FLOOR_FACTOR);
+
+/** 「共鸣树全点亮」档的养成存档：数值节点按稀有度上限、机制节点固定 1 级（见 meta.js 的 maxLevelOf） */
+function metaAllOn() {
+  const buffs = {};
+  for (const buff of META_BUFFS) buffs[buff.id] = { lv: maxLevelOf(buff) };
+  return { version: 1, essence: 0, perks: {}, buffs, claimed: {}, stats: {} };
+}
 
 function allValidMoves(grid) {
   const out = [];
@@ -76,6 +111,63 @@ function assertQuestRewardsCovered() {
   }
 }
 assertQuestRewardsCovered();
+
+/**
+ * 一致性与覆盖度检查：每条养成项（祝福 / 局外增益）声明的稀有度都必须在数值表里存在
+ *
+ * 等级上限 / 解锁费 / 升级费全靠 ROGUE_META.rarities 查表得来（见 meta.js 的 rarityOf），
+ * 若某条写了个不存在的稀有度，界面会静默退回 common 档——数值与预期不符还查不出原因，
+ * 所以在标定时先把它拦下来。顺便查 id 唯一性：服务端靠 id 落在 perks 表还是 buffs 表判断
+ * 该写哪一边，两边撞 id 会写错地方。
+ */
+function assertRarityCovered() {
+  const entries = [...PERKS, ...META_BUFFS];
+  const missing = entries.filter((entry) => !ROGUE_META.rarities[entry.rarity]).map((entry) => entry.id);
+  if (missing.length > 0) {
+    throw new Error(`稀有度不在 ROGUE_META.rarities 里：${missing.join(', ')}`);
+  }
+  const ids = entries.map((entry) => entry.id);
+  const dup = [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
+  if (dup.length > 0) {
+    throw new Error(`祝福与局外增益的 id 撞了：${dup.join(', ')}`);
+  }
+}
+assertRarityCovered();
+
+/**
+ * 共鸣树的结构检查（开发方案 5.7）
+ *
+ * 树是「数据驱动」的：连线由 `requires` 推、坐标由 `tree` 落格（见 codex.js）。
+ * 写错一个字（前置 id 拼错 / 两个节点挤在同一格）界面只会画歪或静默少一条线，排查很费劲，
+ * 所以在这里把所有约束一次查完：前置存在且在同一条流派、坐标不重复、机制节点没有数值曲线。
+ */
+function assertTreeCovered() {
+  const byId = Object.fromEntries(META_BUFFS.map((buff) => [buff.id, buff]));
+  const seen = new Set();
+  for (const buff of META_BUFFS) {
+    const key = `${buff.tree?.col},${buff.tree?.row}`;
+    if (seen.has(key)) throw new Error(`共鸣树坐标重复：${key}（${buff.id}）`);
+    seen.add(key);
+    for (const need of buff.requires || []) {
+      const prev = byId[need];
+      if (!prev) throw new Error(`${buff.id} 的前置 ${need} 不存在`);
+      if (prev.tree.col !== buff.tree.col) throw new Error(`${buff.id} 的前置 ${need} 不在同一条流派上`);
+      if (prev.tree.row >= buff.tree.row) throw new Error(`${buff.id} 的前置 ${need} 必须在它上一层`);
+    }
+    const limited = buff.kind === 'mechanic';
+    if (limited && buff.scales) throw new Error(`机制节点 ${buff.id} 不该有数值曲线（上限固定 1 级）`);
+    if (limited && (buff.requires || []).length === 0) throw new Error(`机制节点 ${buff.id} 必须有前置`);
+  }
+  // 每条流派必须刚好收在一个机制节点上：否则玩家点满一条线的钱花得没有意义
+  const cols = [...new Set(META_BUFFS.map((buff) => buff.tree.col))];
+  for (const col of cols) {
+    const line = META_BUFFS.filter((buff) => buff.tree.col === col);
+    if (line.filter((buff) => buff.kind === 'mechanic').length !== 1) {
+      throw new Error(`第 ${col} 条流派的机制节点不是恰好 1 个`);
+    }
+  }
+}
+assertTreeCovered();
 
 /**
  * 打一层
@@ -218,19 +310,34 @@ const VALUE_PER_STEP = 0.08;
 /** 每深 1 层的相对收益折算：深渊回响每张 +8%/层，与其它牌同一口径 */
 const ABYSS_PER_FLOOR = 0.08;
 
-function perkValue(perk, bonus, floor) {
+function perkValue(perk, bonus, floor, lv = 1) {
+  // 等级只放大「单次效果」，所以统一按 valueAt 的比例折算（lv1 为 1 倍，满级约 1.4~1.9 倍）。
+  // 不做逐张重测的原因：这里只需要「理性玩家会挑哪张」的相对排序，绝对值由下面的 run 模拟给出
+  const scale = valueAt(perk, lv) / valueAt(perk, 1);
   // 两条层数成长轴的价值随层数上涨：理性玩家越深越愿意补这两张
-  if (perk.id === 'abyss') return ABYSS_PER_FLOOR * (floor - 1);
+  if (perk.id === 'abyss') return ABYSS_PER_FLOOR * (floor - 1) * scale;
   if (perk.id === 'deepsteps') {
-    return VALUE_PER_STEP * Math.floor((floor - 1) / ROGUE.movesPerFloorStep);
+    return VALUE_PER_STEP * Math.floor((floor - 1) / ROGUE.movesPerFloorStep) * scale;
   }
-  if (perk.id !== 'minimal') return CHOICE_VALUE[perk.id] || 0;
-  const next = Math.max(ROGUE.minColors, ROGUE.colors - bonus.colorCut - 1);
-  return COLOR_GAIN[next] || 1;
+  if (perk.id !== 'minimal') return (CHOICE_VALUE[perk.id] || 0) * scale;
+  // 「极简主义」每级多降 1 档颜色，各档收益是相乘关系（见 COLOR_GAIN）
+  let v = 1;
+  let colors = ROGUE.colors - bonus.colorCut;
+  for (let k = 0; k < valueAt(perk, lv); k += 1) {
+    colors = Math.max(ROGUE.minColors, colors - 1);
+    v *= COLOR_GAIN[colors] || 1;
+  }
+  return v;
 }
 
 function simulateRun(cfg, runSeed) {
+  const levelOf = cfg.levelOf || (() => 1);
+  // 局外共鸣树：只有 `metaAllOn` 档才注入（等价产品的 startRun → applyMetaBuffs）
+  const meta = cfg.metaAllOn ? metaAllOn() : { buffs: {} };
   const bonus = createBonus();
+  applyMetaBuffs(bonus, meta);
+  // 「时光倒流」：每轮限 1 次本层重打，与产品同源（见 config.js 的 mechanics.rewind）
+  let rewindsLeft = mechanicOn(meta, 'rewind') ? mechanicCfg().rewind.retriesPerRun : 0;
   const picks = {};
   let floor = 1;
   let sumScore = 0;
@@ -268,6 +375,10 @@ function simulateRun(cfg, runSeed) {
         bonus.shields -= 1;
         continue; // 免死：本层重来（近似「补步继续」）
       }
+      if (rewindsLeft > 0) {
+        rewindsLeft -= 1;
+        continue; // 时光倒流：本层重打（每轮限 1 次，用完才判本轮结束）
+      }
       return {
         floor,
         cleared: floor - 1,
@@ -278,27 +389,34 @@ function simulateRun(cfg, runSeed) {
         questsDone,
       };
     }
-    const offered = rollPerks(rng, picks);
-    if (offered.length === 0) {
-      return {
-        floor,
-        cleared: floor,
-        perMove: sumMoves > 0 ? sumScore / sumMoves : 0,
-        totalScore: sumScore,
-        totalMoves: sumMoves,
-        quests,
-        questsDone,
-      };
+    // 三选一：理性挑一张。第 1 层若点亮了「先手规划」，本层连抽 2 次（多拿一张，层数只推进 1）
+    const draws = floor === 1 && mechanicOn(meta, 'planning')
+      ? Math.max(1, mechanicCfg().planning.firstFloorPicks)
+      : 1;
+    for (let d = 0; d < draws; d += 1) {
+      const offered = rollPerks(rng, picks);
+      if (offered.length === 0) {
+        return {
+          floor,
+          cleared: floor,
+          perMove: sumMoves > 0 ? sumScore / sumMoves : 0,
+          totalScore: sumScore,
+          totalMoves: sumMoves,
+          quests,
+          questsDone,
+        };
+      }
+      let pick = offered[0];
+      let best = -1;
+      for (const perk of offered) {
+        const v = perkValue(perk, bonus, floor, levelOf(perk));
+        if (v > best) { best = v; pick = perk; }
+      }
+      picks[pick.id] = (picks[pick.id] || 0) + 1;
+      // 与产品同源：选牌时把局外等级与 runRng 一起交给 apply
+      // （等级决定这张牌这一轮有多强、「同色磁石」靠 rng 锁色）
+      pick.apply(bonus, { lv: levelOf(pick), rng });
     }
-    let pick = offered[0];
-    let best = -1;
-    for (const perk of offered) {
-      const v = perkValue(perk, bonus, floor);
-      if (v > best) { best = v; pick = perk; }
-    }
-    picks[pick.id] = (picks[pick.id] || 0) + 1;
-    // 传 rng：产品代码在选牌时把 runRng 交给 apply（「同色磁石」靠它锁色）
-    pick.apply(bonus, rng);
     floor += 1;
     if (floor > cfg.maxFloor) {
       return {
@@ -351,14 +469,44 @@ try {
   const st = scan({}, 16);
   console.log(`中位 ${st.median} 层 · p25 ${st.p25} · 最低 ${st.min} · 最高 ${st.max} · 首层翻车 ${st.firstFloorFails}/16`);
   console.log(`局内任务达成率 ${(st.questRate * 100).toFixed(0)}%（need 曲线 ${ROGUE.quest.baseNeed}×${ROGUE.quest.needGrowth}^层）`);
-  console.log(`整轮总分中位 ${Math.round(st.medianTotal)}（经验除数按此标定：exp ≈ 总分 ÷ rogueExpPerScoreDivisor）`);
-  // 反刷分上限是 rogueMaxScorePerMove（肉鸽已放开到 200000，见 server/config.js），这里看整轮均步得分还有多少余量
-  console.log(`整轮均步得分最高 ${Math.round(st.maxPerMove)}（反刷分上限 200000，余量 ${(200000 / st.maxPerMove).toFixed(1)} 倍）`);
+  console.log(`整轮总分中位 ${Math.round(st.medianTotal)}（总分只用于展示与反刷分：经验与精华都按层数结算）`);
+  // 反刷分上限是 rogueMaxScorePerMove（肉鸽已放开到 300000，见 server/config.js），这里看整轮均步得分还有多少余量
+  console.log(`整轮均步得分最高 ${Math.round(st.maxPerMove)}（反刷分上限 ${MAX_SCORE_PER_MOVE}，余量 ${(MAX_SCORE_PER_MOVE / st.maxPerMove).toFixed(1)} 倍）`);
+  // 结算尺度：精华 ⌊层数²/divisor⌋、经验 ⌊层数²×factor⌋，两者都再乘对应的局外增益
+  console.log(`按中位层数结算：精华 +${essenceAt(st.median)}（÷${ROGUE_META.essenceDivisor}）`
+    + ` · 经验 +${expAt(st.median)}（×${EXP_FLOOR_FACTOR}）`);
 
   // 关掉局内任务再跑一遍：差值就是「任务机制」整体的强度贡献
   const off = scan({ quest: false }, 16);
   console.log(`关掉局内任务对照：中位 ${off.median} 层 · 整轮总分中位 ${Math.round(off.medianTotal)}`
     + `（任务带来的层数增益 ${st.median - off.median} 层、总分 ${((st.medianTotal / off.medianTotal - 1) * 100).toFixed(0)}%）`);
+
+  // 局外养成的两档对照：全 lv1（未养成的基线）vs 全满级。
+  // 这里的差值就是「把图鉴点亮/升满」能换来的强度，是精华定价（unlockCost / upgradeCost）的标定依据：
+  // 差值太大 → 不养成的人寸步难行；太小 → 养成没有意义
+  const maxed = scan({ levelOf: maxLevelOf }, 16);
+  console.log(`全满级对照：中位 ${maxed.median} 层 · 整轮总分中位 ${Math.round(maxed.medianTotal)}`
+    + `（相对全 lv1：层数 +${maxed.median - st.median}、总分 ${((maxed.medianTotal / st.medianTotal - 1) * 100).toFixed(0)}%）`);
+
+  // 共鸣树（v1.19）单独一档：局外增益跨轮常驻，与祝福等级是两个独立的成长轴。
+  // 树里唯一会往上抬层数的是「先手规划」（第 1 层步数 ×2 + 多一张祝福）与「时光倒流」（每轮多 1 次重打），
+  // 两者都是一次性机制、不可升级，所以这一档的作用是确认「全点亮也不会把层数抬飞」
+  const tree = scan({ metaAllOn: true }, 16);
+  console.log(`共鸣树全点亮：中位 ${tree.median} 层 · 整轮总分中位 ${Math.round(tree.medianTotal)}`
+    + `（相对全 lv1：层数 +${tree.median - st.median}、总分 ${((tree.medianTotal / st.medianTotal - 1) * 100).toFixed(0)}%）`);
+  const full = scan({ metaAllOn: true, levelOf: maxLevelOf }, 16);
+  console.log(`树 + 祝福全满：中位 ${full.median} 层 · 整轮总分中位 ${Math.round(full.medianTotal)}`
+    + `（相对全 lv1：层数 +${full.median - st.median}、总分 ${((full.medianTotal / st.medianTotal - 1) * 100).toFixed(0)}%）`);
+
+  // 经验改按层数结算后，满级的收益放大只体现在「多打的那几层」上，
+  // 不再被总分放大（否则 72 倍总分 = 72 倍经验，见开发方案 5.7 的遗留风险）
+  console.log(`经验尺度对照：全 lv1 +${expAt(st.median)} → 全满级 +${expAt(maxed.median)}`
+    + `（${(expAt(maxed.median) / expAt(st.median)).toFixed(2)} 倍；再乘「经验共鸣」最多 ×${buffMaxFactor('expboost')}，合计约 `
+    + `${((expAt(maxed.median) / expAt(st.median)) * buffMaxFactor('expboost')).toFixed(2)} 倍）`);
+  // 精华同理：`丰收闭环` 是按层数的定额（⌊层数 × 2⌋），层数不失控它就不会失控
+  console.log(`精华尺度对照：中位层基础 +${essenceAt(st.median)} → 「精华共鸣」满级 ×${buffMaxFactor('essenceboost')}`
+    + ` 即 +${Math.floor(essenceAt(maxed.median) * buffMaxFactor('essenceboost'))}`
+    + `，再叠加「丰收闭环」定额 +⌊${maxed.median} × 2⌋ = +${maxed.median * 2}`);
 } catch (err) {
   console.log('模拟出错：' + err.message);
   console.log(err.stack);

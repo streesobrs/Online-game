@@ -3001,6 +3001,314 @@ class AccountManager {
     }
   }
 
+  // ========== 肉鸽局外养成（精华 / 祝福等级 / 图鉴里程碑，开发方案 5.7） ==========
+
+  /**
+   * 归一化肉鸽养成存档
+   *
+   * 存档刻意**记录得全**：除等级外还留了解锁时间、最近升级时间、该祝福累计被选次数，
+   * 以及局数 / 最深层 / 累计花销等汇总。这些字段眼下的界面用不到，但往后做
+   * 「最常用祝福」「首通纪念」这类功能时就不用再补数据了。
+   * 等级按稀有度上限裁剪：将来调低上限或存档被改坏时，不会出现超过上限的等级。
+   */
+  _normalizeRogue(saved) {
+    const cfg = config.match3Rogue;
+    const src = saved && typeof saved === 'object' ? saved : {};
+    const num = (v, min, max) => Math.max(min, Math.min(max, Math.floor(Number(v) || 0)));
+    const BIG = Number.MAX_SAFE_INTEGER;
+
+    const perks = {};
+    for (const [id, rarity] of Object.entries(cfg.perks)) {
+      const raw = src.perks && src.perks[id];
+      const lv = num(raw?.lv, 0, cfg.rarities[rarity].maxLevel);
+      if (lv <= 0) continue;
+      perks[id] = {
+        lv,
+        unlockedAt: num(raw?.unlockedAt, 0, BIG),
+        upgradedAt: num(raw?.upgradedAt, 0, BIG),
+        picks: num(raw?.picks, 0, BIG)
+      };
+    }
+    // 初始解锁：unlockedAt 记 0 表示「开局赠送」，与后来花精华解锁的区分开
+    for (const id of cfg.startingPerks) {
+      if (!perks[id] && cfg.perks[id]) perks[id] = { lv: 1, unlockedAt: 0, upgradedAt: 0, picks: 0 };
+    }
+
+    // 共鸣树节点（跨轮常驻，不进三选一池）：与祝福分开存，形状一样但没有「开局赠送」这一说，
+    // 也没有被选次数的概念（它在三选一里根本不出现）
+    const buffs = {};
+    for (const [id, def] of Object.entries(cfg.buffs)) {
+      const raw = src.buffs && src.buffs[id];
+      const lv = num(raw?.lv, 0, this._rogueBuffMaxLevel(def));
+      if (lv <= 0) continue;
+      buffs[id] = {
+        lv,
+        unlockedAt: num(raw?.unlockedAt, 0, BIG),
+        upgradedAt: num(raw?.upgradedAt, 0, BIG)
+      };
+    }
+
+    const s = src.stats && typeof src.stats === 'object' ? src.stats : {};
+    const claimed = src.claimed && typeof src.claimed === 'object' ? src.claimed : {};
+    return {
+      version: 1,
+      essence: num(src.essence, 0, BIG),
+      essenceEarned: num(src.essenceEarned, 0, BIG),
+      perks,
+      buffs,
+      // 只保留配置里还存在的里程碑 id：删掉的里程碑不该继续占着「已领取」
+      claimed: Object.fromEntries(
+        Object.entries(claimed).filter(([id]) => cfg.milestones.some((m) => m.id === id))
+      ),
+      stats: {
+        runs: num(s.runs, 0, BIG),
+        bestFloor: num(s.bestFloor, 0, BIG),
+        totalCleared: num(s.totalCleared, 0, BIG),
+        questsDone: num(s.questsDone, 0, BIG),
+        picked: num(s.picked, 0, BIG),      // 累计拿过的祝福张数
+        spent: num(s.spent, 0, BIG),        // 累计花掉的精华
+        firstRunAt: num(s.firstRunAt, 0, BIG),
+        lastRunAt: num(s.lastRunAt, 0, BIG)
+      }
+    };
+  }
+
+  /**
+   * 读取肉鸽养成存档（未建过则返回初始形态：初始解锁三张 + 0 精华）
+   * @param {string} userId 账号 ID
+   */
+  async getMatch3Rogue(userId) {
+    try {
+      const store = await dataStore.readOne('match3', userId);
+      return this._normalizeRogue(store?.rogue);
+    } catch (err) {
+      logger.error('读取肉鸽局外养成失败', { userId, error: err.message });
+      return this._normalizeRogue(null);
+    }
+  }
+
+  /**
+   * 读改写肉鸽养成存档
+   *
+   * 它与逐关星表、局内暂存在同一个文件里（data/match3/<用户ID>.json），
+   * 所以必须走 _patchMatch3Store 在锁内合并——整文件覆盖写会把星表和暂存一起抹掉。
+   * mutate 拿到的是「归一化后的最新存档」，直接改即可；写回的就是它。
+   * @param {string} userId 账号 ID
+   * @param {(rogue: object) => void} mutate
+   * @returns {Promise<object>} 写回后的存档
+   */
+  async _patchMatch3Rogue(userId, mutate) {
+    let out = null;
+    await this._patchMatch3Store(userId, (store) => {
+      out = this._normalizeRogue(store && store.rogue);
+      mutate(out);
+      return { rogue: out };
+    });
+    return out;
+  }
+
+  /**
+   * 共鸣树节点的等级上限
+   * - 机制节点（末端那颗，`kind: 'mechanic'`）一次性解锁：上限固定 1，稀有度只决定它多贵
+   * - 数值节点：由稀有度决定
+   * 与客户端 meta.js 的 maxLevelOf 同一口径，改一边必须同步改另一边。
+   */
+  _rogueBuffMaxLevel(def) {
+    if (!def) return 0;
+    if (def.kind === 'mechanic') return 1;
+    return config.match3Rogue.rarities[def.rarity].maxLevel;
+  }
+
+  /** 某个机制节点是否已点亮（lv ≥ 1）。结算时判断「丰收闭环」等机制是否生效 */
+  _rogueMechanicOn(rogue, id) {
+    return Math.floor(rogue?.buffs?.[id]?.lv || 0) > 0;
+  }
+
+  /**
+   * 局外增益在某份养成存档下实际生效的倍率（未解锁 = 1）
+   *
+   * 局外增益都是「比例类」（经验 / 精华倍率），所以这里只做 mult 一种曲线：
+   * `base × (1 + per × (lv − 1))`，取两位小数——**必须与客户端 perks.js 的 valueAt 同口径**，
+   * 否则界面预览与结算会差一点。未解锁按 1 而不是 lv1：它是纯增益，没买就没有。
+   * @param {object} rogue 养成存档（_normalizeRogue 的形状）
+   * @param {string} buffId 增益 id（见 config.match3Rogue.buffs）
+   */
+  rogueBuffMult(rogue, buffId) {
+    const def = config.match3Rogue.buffs[buffId];
+    const lv = Math.max(0, Math.floor(rogue?.buffs?.[buffId]?.lv || 0));
+    if (!def || lv <= 0) return 1;
+    return Math.round(def.base * (1 + (def.per || 0) * (lv - 1)) * 100) / 100;
+  }
+
+  /**
+   * 结算发放精华 + 累计本轮统计（服务端主动发放，客户端不参与计算）
+   *
+   * 精华只按**到达层数**换算：肉鸽后期得分倍率能堆到几十倍，按分数结算会让
+   * 「打深」与「堆分」两条路的收益差几个量级，层数最直观也最好控。
+   * 再乘上局外增益「精华共鸣」（未解锁 ×1，与不买时逐位一致），
+   * 机制节点「丰收闭环」再加一笔按层数的定额（未解锁 +0）——两处都得与客户端
+   * meta.js 的 essenceForRun 保持同口径，否则结算页显示的数会与到账的对不上。
+   * @param {string} userId 账号 ID
+   * @param {object} run { floor, cleared, picks, questsDone }
+   * @returns {Promise<{rogue: object, gain: number}>} rogue 为写回后的存档，gain 为本轮发放数
+   */
+  async addRogueEssence(userId, run) {
+    const cfg = config.match3Rogue;
+    // 层数先截到上限：正常打不到（标定实测最深 44 层），只拦「层数报个大数」的异常上报
+    const floor = Math.min(cfg.maxFloor, Math.max(0, Math.floor(run?.floor || 0)));
+    const now = Date.now();
+    let gain = 0;
+
+    const rogue = await this._patchMatch3Rogue(userId, (r) => {
+      const base = Math.floor((floor * floor) / cfg.essenceDivisor);
+      gain = Math.floor(base * this.rogueBuffMult(r, 'essenceboost'));
+      if (this._rogueMechanicOn(r, 'harvest')) {
+        gain += Math.floor(floor * (cfg.mechanics?.harvest?.essencePerFloor || 0));
+      }
+      gain = Math.max(0, Math.min(cfg.maxEssencePerRun, gain));
+      r.essence += gain;
+      r.essenceEarned += gain;
+      r.stats.runs += 1;
+      r.stats.bestFloor = Math.max(r.stats.bestFloor, floor);
+      r.stats.totalCleared += Math.max(0, Math.floor(run?.cleared || 0));
+      r.stats.questsDone += Math.max(0, Math.floor(run?.questsDone || 0));
+      r.stats.firstRunAt = r.stats.firstRunAt || now;
+      r.stats.lastRunAt = now;
+
+      // 本轮选到的祝福计入累计统计。未解锁的不会被抽到，所以只累加存档里已有的条目；
+      // 次数按 maxPicksPerRun 截断，避免异常上报把统计顶成大数（统计字段，不参与任何发放）
+      let picked = 0;
+      for (const [id, n] of Object.entries(run?.picks || {}).slice(0, cfg.maxPicksPerRun)) {
+        const saved = r.perks[id];
+        if (!saved) continue;
+        const count = Math.max(0, Math.min(cfg.maxPicksPerRun, Math.floor(Number(n) || 0)));
+        if (count <= 0) continue;
+        saved.picks += count;
+        picked += count;
+      }
+      r.stats.picked += picked;
+    });
+    return { rogue, gain };
+  }
+
+  /**
+   * 解锁 / 升级一条养成项（祝福或共鸣树节点）
+   *
+   * 服务端权威：等级上限与价格都按 config.match3Rogue 现算，精华在锁内扣，
+   * 客户端只发一个 id 过来，改本地存档改不动数据。
+   * 祝福与共鸣树节点共用这一条路径——价格来自同一张稀有度表，只是 id 落在哪张表里就写回哪张表。
+   * 共鸣树节点多一道**前置校验**（连线的可视化就是它）：前置没点亮的话，客户端会置灰，
+   * 但改包一样能发请求，所以这里必须再拦一次。
+   * @param {string} userId 账号 ID
+   * @param {string} itemId 祝福 / 共鸣树节点 id
+   * @returns {Promise<{ok:boolean, message?:string, cost?:number, lv?:number, kind?:string, scope?:string, rogue:object}>}
+   */
+  async upgradeRoguePerk(userId, itemId) {
+    const cfg = config.match3Rogue;
+    const isBuff = Object.prototype.hasOwnProperty.call(cfg.buffs, itemId);
+    const buffDef = isBuff ? cfg.buffs[itemId] : null;
+    const rarity = isBuff ? buffDef.rarity : cfg.perks[itemId];
+    if (!rarity) return { ok: false, message: '没有这个养成项', rogue: null };
+    const rar = cfg.rarities[rarity];
+    const maxLevel = isBuff ? this._rogueBuffMaxLevel(buffDef) : rar.maxLevel;
+    const bag = isBuff ? 'buffs' : 'perks';
+
+    let result = { ok: false, message: '操作失败' };
+    const rogue = await this._patchMatch3Rogue(userId, (r) => {
+      const cur = r[bag][itemId]?.lv || 0;
+      // 共鸣树的连线即前置：只能沿着自己那条流派往下买
+      if (isBuff) {
+        const missing = (buffDef.requires || []).find((id) => (r.buffs[id]?.lv || 0) <= 0);
+        if (missing) {
+          result = { ok: false, message: `需要先点亮前置优势（${missing}）` };
+          return;
+        }
+      }
+      if (cur >= maxLevel) {
+        result = { ok: false, message: '已经满级了' };
+        return;
+      }
+      const cost = cur <= 0
+        ? rar.unlockCost
+        : Math.round(rar.upgradeCost * rar.costGrowth ** (cur - 1));
+      if (r.essence < cost) {
+        result = { ok: false, message: `精华不足，还差 ${cost - r.essence}` };
+        return;
+      }
+      const now = Date.now();
+      r.essence -= cost;
+      r.stats.spent += cost;
+      // 祝福多一个 picks（累计被选次数）；共鸣树节点不在三选一里，没有这个字段
+      const entry = r[bag][itemId]
+        || (isBuff ? { lv: 0, unlockedAt: 0, upgradedAt: 0 } : { lv: 0, unlockedAt: 0, upgradedAt: 0, picks: 0 });
+      entry.lv = cur + 1;
+      if (cur <= 0) entry.unlockedAt = now;
+      else entry.upgradedAt = now;
+      r[bag][itemId] = entry;
+      result = {
+        ok: true, cost, lv: entry.lv, kind: cur <= 0 ? 'unlock' : 'upgrade',
+        scope: isBuff ? 'buff' : 'perk'
+      };
+    });
+    return { ...result, rogue };
+  }
+
+  /**
+   * 领取图鉴收集里程碑（一次性）
+   *
+   * 达成条件由服务端按存档独立算一遍，不看客户端上报的进度，避免被伪造请求骗奖励。
+   * 机制节点「丰收闭环」会把奖励翻倍（未解锁 ×1，与不买时逐位一致）——
+   * 客户端 codex 的 milestoneReward 用同一份参数显示，两处必须一致。
+   * @param {string} userId 账号 ID
+   * @param {string} milestoneId 里程碑 id
+   */
+  async claimRogueMilestone(userId, milestoneId) {
+    const cfg = config.match3Rogue;
+    const def = cfg.milestones.find((m) => m.id === milestoneId);
+    if (!def) return { ok: false, message: '没有这个里程碑', rogue: null };
+
+    let result = { ok: false, message: '操作失败' };
+    const rogue = await this._patchMatch3Rogue(userId, (r) => {
+      if (r.claimed[def.id]) {
+        result = { ok: false, message: '已经领过了' };
+        return;
+      }
+      const mine = this._rogueMilestoneState(r).find((m) => m.id === def.id);
+      if (!mine || !mine.done) {
+        result = { ok: false, message: '还没达成' };
+        return;
+      }
+      const mult = this._rogueMechanicOn(r, 'harvest')
+        ? (cfg.mechanics?.harvest?.milestoneMult || 1)
+        : 1;
+      const reward = Math.floor(def.reward * mult);
+      r.essence += reward;
+      r.essenceEarned += reward;
+      r.claimed[def.id] = Date.now();
+      result = { ok: true, reward, name: def.name };
+    });
+    return { ...result, rogue };
+  }
+
+  /**
+   * 里程碑达成情况（服务端自己算，不信客户端）
+   * @returns {Array<{id:string, need:number, have:number, done:boolean}>}
+   */
+  _rogueMilestoneState(rogue) {
+    const cfg = config.match3Rogue;
+    const ids = Object.keys(cfg.perks);
+    const unlocked = ids.filter((id) => (rogue.perks[id]?.lv || 0) > 0).length;
+    const maxed = ids.filter((id) => {
+      const lv = rogue.perks[id]?.lv || 0;
+      return lv >= cfg.rarities[cfg.perks[id]].maxLevel;
+    }).length;
+    return cfg.milestones.map((m) => {
+      const have = m.kind === 'maxed' ? maxed : unlocked;
+      const need = m.kind === 'all' ? ids.length : m.need;
+      return { id: m.id, need, have, done: have >= need };
+    });
+  }
+
   // ========== 背包独立存储 ==========
 
   /**

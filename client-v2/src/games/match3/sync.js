@@ -12,6 +12,7 @@ import { emit } from '../../core/socket.js';
 import { eventBus } from '../../core/eventBus.js';
 import { SESSION, SESSION_KEYS, STORAGE_KEYS } from './config.js';
 import { LEVEL_COUNT } from './levels.js';
+import { buffFactor, normalizeMeta, rogueCfg, setRogueConfig } from './meta.js';
 import { toast } from '../../components/toast.js';
 
 function readStore(key) {
@@ -100,23 +101,28 @@ let rewardConfig = null;
 /**
  * 预计经验：与服务端 match3_game_end 的算法保持一致（基础 + 分数换算 + 闯关星级加成）
  * 服务端还有反刷分校验，未通过时不发经验，因此这里只是「预计」值。
- * @param {{mode:string, score:number, stars?:number}} options mode 为 level / endless / endless3 / rogue
+ * @param {{mode:string, score:number, stars?:number, floor?:number}} options
+ *   mode 为 level / endless / endless3 / rogue；floor 只有肉鸽用（经验按层数换算）
  * @returns {number|null} 配置未下发时返回 null
  */
-export function estimateExp({ mode, score = 0, stars = 0 }) {
+export function estimateExp({ mode, score = 0, stars = 0, floor = 0 }) {
   const rewards = rewardConfig;
   if (!rewards) return null;
+
+  // 肉鸽：经验按**到达层数**换算（与精华同口径），再乘局外增益「经验共鸣」。
+  // 不能按总分算——后期得分倍率能堆到 ×45，标定实测满级玩家整轮总分是未养成者的 72 倍，
+  // 按分发等于把「堆分」白送成账号等级（见开发方案 5.7 的遗留风险）
+  if (mode === 'rogue') {
+    const n = Math.min(rogueCfg().maxFloor, Math.max(0, Math.floor(floor) || 0));
+    const base = Math.floor(n * n * (rewards.rogueExpFloorFactor || 0));
+    return (rewards.baseExp || 0) + Math.floor(base * buffFactor(rogueMeta, 'expboost'));
+  }
 
   const divisorByMode = {
     level: rewards.expPerScoreDivisor,
     endless: rewards.endlessExpPerScoreDivisor || rewards.expPerScoreDivisor,
     endless3:
       rewards.endless3ExpPerScoreDivisor
-      || rewards.endlessExpPerScoreDivisor
-      || rewards.expPerScoreDivisor,
-    // 肉鸽试炼一轮累计总分约 4700 万（标定中位 30 层），尺度随层数指数上涨，独立除数并逐级回退
-    rogue:
-      rewards.rogueExpPerScoreDivisor
       || rewards.endlessExpPerScoreDivisor
       || rewards.expPerScoreDivisor,
   };
@@ -170,6 +176,11 @@ export function mergeRemoteProgress(remote) {
     maxFloor: Math.max(bestRogue.maxFloor || 0, rogue.maxFloor || 0),
     highScore: Math.max(bestRogue.highScore || 0, rogue.highScore || 0),
   });
+
+  // 肉鸽局外养成（精华 / 祝福等级 / 里程碑）：服务端是唯一权威，本地那份只是离线缓存。
+  // 数值表（等级上限 / 费用 / 里程碑定义）也随进度下发，客户端改了服务端配置即时生效
+  if (rogue.cfg) setRogueConfig(rogue.cfg);
+  if (rogue.meta) applyRogueMeta(rogue.meta);
 
   mergeRemoteSessions(remote.sessions);
 }
@@ -226,10 +237,78 @@ export function reportStart({ mode, level = null }) {
   emit('match3_game_start', { mode, level });
 }
 
+// ========== 肉鸽局外养成（开发方案 5.7）==========
+
+/**
+ * 养成存档的本地副本
+ *
+ * 服务端是权威，这份只是它最近一次下发的样子，写 localStorage 只为「离线 / 未登录也能看图鉴、
+ * 局内也能抽牌」——所以它只是一份**临时缓存**：一联网就被 match3_progress 覆盖。
+ * 缓存为空时用空存档的形态（初始解锁三张、0 精华）。
+ */
+let rogueMeta = normalizeMeta(readStore(STORAGE_KEYS.rogueMeta));
+
+/** 当前生效的养成存档（图鉴、娱乐菜单、局内抽牌都用它） */
+export function getRogueMeta() {
+  return rogueMeta;
+}
+
+/** 订阅养成存档变化（服务端每次下发、解锁 / 升级 / 领奖成功后都会触发） */
+export function onRogueMeta(handler) {
+  return eventBus.on('match3:rogueMeta', handler);
+}
+
+/**
+ * 收下一份养成存档：归一化 → 覆盖本地临时缓存 → 广播
+ *
+ * 这是**唯一**的写入点，两条来源都走这里：
+ * - match3_progress（进入消消乐 / 结算后下发）
+ * - match3_rogue_meta（解锁、升级、领里程碑的回执）
+ */
+function applyRogueMeta(raw) {
+  rogueMeta = normalizeMeta(raw);
+  writeStore(STORAGE_KEYS.rogueMeta, rogueMeta);
+  // 通知已打开的图鉴 / 娱乐菜单重画（余额、等级条、里程碑状态都会变）
+  eventBus.emit('match3:rogueMeta', rogueMeta);
+}
+
+// 解锁 / 升级 / 领里程碑的回执：服务端把扣费后的最新存档带回来，落到本地并给个提示。
+// 与合并进度那条路径的区别：这里带的是 { ok, message, meta }，而进度下发直接给存档本身
+eventBus.on('match3:rogueMeta', (data) => {
+  if (!data || !data.meta) return;
+  if (data.message) {
+    if (data.ok) toast.success(data.message);
+    else toast.info(data.message);
+  }
+  applyRogueMeta(data.meta);
+});
+
+/**
+ * 解锁 / 升级一条祝福：服务端扣精华并校验等级上限，回执走 onRogueMeta
+ * @returns {boolean} 是否已发出（未连接时为 false，调用方据此提示玩家）
+ */
+export function upgradeRoguePerk(perkId) {
+  return emit('match3_rogue_upgrade', { perkId });
+}
+
+/**
+ * 领取图鉴收集里程碑（一次性，达成条件由服务端按存档校验）
+ * @returns {boolean} 是否已发出（未连接时为 false）
+ */
+export function claimRogueMilestone(milestoneId) {
+  return emit('match3_rogue_claim', { milestoneId });
+}
+
 /**
  * 上报结算；floor 仅肉鸽试炼使用（本轮到达的层数）
+ * 肉鸽还会带上本轮选到的祝福次数与达成的局内任务数：它们不进发放，只作养成存档的统计字段
  * @returns {boolean} 是否已上报（未连接时为 false，本局不计进度与经验）
  */
-export function reportEnd({ mode, level = null, floor = null, score, maxCombo, moves, durationMs, cleared, stars = 0 }) {
-  return emit('match3_game_end', { mode, level, floor, score, maxCombo, moves, durationMs, cleared, stars });
+export function reportEnd({
+  mode, level = null, floor = null, score, maxCombo, moves, durationMs, cleared, stars = 0,
+  picks = null, questsDone = 0,
+}) {
+  return emit('match3_game_end', {
+    mode, level, floor, score, maxCombo, moves, durationMs, cleared, stars, picks, questsDone,
+  });
 }

@@ -237,6 +237,70 @@ export const ROGUE = {
   },
 };
 
+/**
+ * 肉鸽局外养成（开发方案 5.7）
+ *
+ * 与 `ROGUE` 的分工：`ROGUE` 是**局内**数值（每层步数、目标分曲线、局内任务），
+ * 这里是**跨轮**的长期成长 —— 打一局 run 攒「精华 ✦」，在图鉴里花掉：
+ * 解锁新祝福（进三选一池）与升级已有祝福（提升单张效果）。
+ *
+ * 数值按**稀有度**分组：祝福只在 perks.js 里声明自己属于哪一档，
+ * 等级上限 / 解锁费 / 升级费 / 每级费用增长都从这张表读，
+ * 于是调平衡时改一处就能整体收放，不用逐条祝福改数字。
+ *
+ * 服务端也有一份同名数值（server/config.js 的 match3Rogue），**那边是权威**（扣费与校验都在服务端做），
+ * 这份供引擎、图鉴与标定脚本使用；改一边必须同步改另一边。
+ */
+export const ROGUE_META = {
+  /**
+   * 稀有度 → 等级上限与费用
+   * - maxLevel：lv1 即「已解锁」，所以 2 表示还能升 1 次
+   * - upgradeCost 是 lv1 → lv2 的价格，之后每级乘 costGrowth（费用随等级递增，
+   *   避免精华全砸在一张牌上）
+   */
+  rarities: {
+    common: { label: '普通', maxLevel: 2, unlockCost: 20, upgradeCost: 25, costGrowth: 1.5 },
+    rare: { label: '稀有', maxLevel: 3, unlockCost: 50, upgradeCost: 70, costGrowth: 1.5 },
+    epic: { label: '史诗', maxLevel: 4, unlockCost: 100, upgradeCost: 150, costGrowth: 1.5 },
+  },
+  // 新号初始解锁的祝福：一进来就能组 build，不至于三选一里全是没见过的锁头
+  startingPerks: ['supply', 'minimal', 'focus'],
+  // 本轮精华 = ⌊到达层数² / 这个数⌋。只按层数给，不看分数：后期得分倍率能堆到 ×45，
+  // 按分结算会让「打深」与「堆分」两条路收益差几个量级，层数最直观也最好控
+  essenceDivisor: 5,
+  // 单轮层数上限：精华与经验都按它截断。正常打不到（标定上限 50 层、实测最深 44 层），
+  // 只为拦住「层数报个大数」的异常上报。服务端同名值在手，改一边必须同步改另一边
+  maxFloor: 100,
+  /**
+   * 机制节点参数（共鸣树末端的大节点，见 perks.js 的 META_BUFFS）
+   *
+   * 与数值节点的区别：机制节点**改规则**而不是加数值，一次性解锁（等级上限固定 Lv.1，不看稀有度），
+   * 所以效果没法用 scales 表达，只能在这里逐条声明。每个节点恰好对应一个落点：
+   * - harvest 丰收闭环：结算侧，两端必须同口径（meta.js 的 essenceForRun / 服务端 addRogueEssence、
+   *   claimRogueMilestone）
+   * - planning 先手规划：层内，floorOptions 的第 1 层步数 + mode-rogue 的首次三选一
+   * - rewind 时光倒流：层内，mode-rogue 的层失败判定
+   */
+  mechanics: {
+    harvest: { milestoneMult: 2, essencePerFloor: 2 },
+    planning: { firstFloorMovesMult: 2, firstFloorPicks: 2 },
+    rewind: { retriesPerRun: 1 },
+  },
+  /**
+   * 图鉴收集里程碑（一次性领取，只发精华）
+   * - kind：unlocked=已解锁种类数 / maxed=已满级张数 / all=集齐全部祝福
+   * - need：达标所需数量（kind=all 时忽略，按祝福总数算）
+   */
+  milestones: [
+    { id: 'unlock3', name: '解锁 3 种祝福', kind: 'unlocked', need: 3, reward: 20 },
+    { id: 'unlock6', name: '解锁 6 种祝福', kind: 'unlocked', need: 6, reward: 40 },
+    { id: 'unlock10', name: '解锁 10 种祝福', kind: 'unlocked', need: 10, reward: 80 },
+    { id: 'unlockAll', name: '集齐全部祝福', kind: 'all', reward: 200 },
+    { id: 'maxAny', name: '任意一张升到满级', kind: 'maxed', need: 1, reward: 30 },
+    { id: 'max3', name: '3 张升到满级', kind: 'maxed', need: 3, reward: 120 },
+  ],
+};
+
 /** 本地存档键（开发方案 8） */
 export const STORAGE_KEYS = {
   progress: 'match3Progress',
@@ -246,6 +310,9 @@ export const STORAGE_KEYS = {
   sessionEndless3: 'match3SessionEndless3',
   rogueBest: 'match3BestRogue',   // 肉鸽试炼最佳：{ maxFloor, highScore }
   rogueSession: 'match3SessionRogue', // 肉鸽试炼未结算的一轮（5.6 的暂存）
+  // 肉鸽局外养成的**临时缓存**：服务端是权威，这里存一份只为「未连接 / 离线时也能看图鉴与局内抽牌」，
+  // 每次 match3_progress 下发都会被覆盖（见 sync.js 的 mergeRemoteProgress）
+  rogueMeta: 'match3RogueMeta',
 };
 
 /**

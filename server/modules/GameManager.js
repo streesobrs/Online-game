@@ -1347,7 +1347,7 @@ class GameManager {
   // 账号文件里只留不随关卡数增长的汇总标量（最高分 / 最高连锁 / 最高关 / 总星数…）
   // @returns {{success:boolean, progress?:object}} progress 为合并后的进度摘要，回给客户端
   async saveMatch3Record(data) {
-    const { accountId, mode, level, floor } = data;
+    const { accountId, mode, level, floor, picks, questsDone } = data;
     const isLevel = mode === 'level';
     // 三色爽局每步得分比标准无尽高一个量级（实测 16,600 vs 2,400），
     // 因此它的分数与连锁只进独立字段，既不进无尽榜/成就，也不进任何跨模式累计，
@@ -1426,6 +1426,20 @@ class GameManager {
       await this.accountManager.updateUser(accountId, updates);
       await this.accountManager.saveMatch3Stars(accountId, starsMap);
 
+      // 肉鸽试炼：发精华（开发方案 5.7）
+      // 只按到达层数换算，且在服务端算——客户端改本地存档也变不出精华来。
+      // 顺手把本轮统计数据（选了哪些祝福 / 达成几个局内任务）记进养成存档
+      let rogueGain = null;
+      if (isRogue) {
+        const rogueRes = await this.accountManager.addRogueEssence(accountId, {
+          floor: rogueFloor,
+          cleared: Math.max(0, Math.floor(data.cleared || 0)),
+          picks,
+          questsDone
+        });
+        rogueGain = { gain: rogueRes.gain, meta: rogueRes.rogue };
+      }
+
       if (this.operationLogger) {
         const user = this.userManager.getUserByAccountId(accountId);
         this.operationLogger.log({
@@ -1446,7 +1460,8 @@ class GameManager {
             durationMs: data.durationMs || 0,
             highScore,
             maxLevel,
-            totalStars
+            totalStars,
+            essence: rogueGain ? rogueGain.gain : null
           }
         });
       }
@@ -1461,7 +1476,14 @@ class GameManager {
           totalStars,
           endless: { highScore, bestCombo: maxCombo },
           endless3: { highScore: highScore3, bestCombo: maxCombo3 },
-          rogue: { maxFloor: rogueMaxFloor, highScore: rogueHighScore }
+          // 肉鸽：战绩 + 本轮精华（gain）与发放后的养成存档（meta）。
+          // 结算时一并带回，客户端就不用为了刷新余额再拉一次进度
+          rogue: {
+            maxFloor: rogueMaxFloor,
+            highScore: rogueHighScore,
+            essenceGain: rogueGain ? rogueGain.gain : 0,
+            meta: rogueGain ? rogueGain.meta : null
+          }
         }
       };
     } catch (err) {

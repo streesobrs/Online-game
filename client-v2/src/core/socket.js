@@ -145,6 +145,7 @@ const EVENT_MAP = {
   // 消消乐专属
   match3_progress: 'match3:progress',
   match3_result: 'match3:result',
+  match3_rogue_meta: 'match3:rogueMeta',
 
   // AI 对战
   ai_game_start: 'ai:gameStart',

@@ -10,8 +10,11 @@
 import { ENDLESS3, ENDLESS, ROGUE } from './config.js';
 import { renderEndless, renderEndless3, loadBest, loadSession } from './mode-endless.js';
 import { renderRogue, loadRogueBest } from './mode-rogue.js';
+import { showPerkCodex } from './codex.js';
+import { claimableCount, buffLevel, poolProgress } from './meta.js';
+import { META_BUFFS } from './perks.js';
 import { renderLevelMode, loadProgress, totalStars } from './mode-level.js';
-import { loadLocalSession, onProgress, requestProgress } from './sync.js';
+import { getRogueMeta, loadLocalSession, onProgress, onRogueMeta, requestProgress } from './sync.js';
 import { LEVEL_COUNT } from './levels.js';
 import { viewRoot, el } from '../../utils/dom.js';
 import { startGameActivity, stopGameActivity } from '../../core/activity.js';
@@ -103,6 +106,31 @@ export function renderMatch3(container = viewRoot()) {
     return `最深 ${best.maxFloor} 层 · 最高分 ${best.highScore}`;
   }
 
+  /**
+   * 肉鸽养成状态行：精华余额 + 祝福收集度 + 可领里程碑
+   *
+   * 数据来自 sync.js 的养成存档（服务端权威），本地的只是它的缓存。
+   * 未连接时显示初始形态（0 精华 / 初始三张），点进去照样能看图鉴。
+   */
+  function rogueStatus() {
+    const meta = getRogueMeta();
+    const { unlocked, total, maxed } = poolProgress(meta);
+    const ready = claimableCount(meta);
+    // 局外增益单独计数：它不在祝福池里（见 5.7 的「局外 / 局内」两层）
+    const buffs = META_BUFFS.filter((buff) => buffLevel(meta, buff.id) > 0).length;
+    return el(
+      'div',
+      { class: 'm3-rogue-status' },
+      el('span', { class: 'm3-rogue-essence' }, '✦ ', el('b', {}, String(meta.essence))),
+      el('span', { class: 'm3-rogue-status-item' }, `祝福 ${unlocked}/${total}`),
+      el('span', { class: 'm3-rogue-status-item' }, `满级 ${maxed}`),
+      el('span', { class: 'm3-rogue-status-item' }, `增益 ${buffs}/${META_BUFFS.length}`),
+      ready > 0
+        ? el('span', { class: 'm3-rogue-status-ready' }, `🏅 ${ready} 项奖励可领`)
+        : null,
+    );
+  }
+
   function renderFunView() {
     disposeMode();
     currentScreen = renderFunView;
@@ -131,9 +159,12 @@ export function renderMatch3(container = viewRoot()) {
           el('span', { class: 'm3-menu-meta' }, rogueMeta()),
         ),
       ),
+      rogueStatus(),
       el(
         'div',
         { class: 'm3-actions' },
+        // 进对局之前也能先看看肉鸽池子里有哪些祝福，并顺手把攒下的精华花掉
+        el('button', { class: 'm3-btn m3-btn--ghost', onClick: () => showPerkCodex() }, '📖 图鉴与养成'),
         el('button', { class: 'm3-btn m3-btn--ghost', onClick: () => renderMenu() }, '返回选择'),
       ),
     );
@@ -161,11 +192,14 @@ export function renderMatch3(container = viewRoot()) {
 
   // 进度以服务端为准：进入消消乐先拉一次，菜单上的「已通关 N 关」与最佳分才不会显示成空
   const offProgress = onProgress(() => currentScreen?.());
+  // 养成存档（精华余额 / 祝福等级 / 可领里程碑）同样随服务端变化，菜单上的状态行要跟着刷新
+  const offMeta = onRogueMeta(() => currentScreen?.());
   renderMenu();
   requestProgress();
 
   return () => {
     offProgress();
+    offMeta();
     disposeMode();
     stopGameActivity();
     wrap.remove();

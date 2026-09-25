@@ -86,6 +86,37 @@
   color: var(--theme-status-color, #4a5568);
 }
 
+/* 娱乐菜单里的肉鸽养成状态行（精华 / 收集度 / 可领里程碑） */
+.m3-rogue-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 10px;
+  background: var(--theme-panel-bg, #fff);
+}
+
+.m3-rogue-essence {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--theme-accent, #27ae60);
+}
+
+.m3-rogue-status-item {
+  font-size: 12px;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-rogue-status-ready {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--theme-accent, #27ae60);
+}
+
 /* ===== HUD ===== */
 .m3-hud {
   display: flex;
@@ -543,6 +574,13 @@
   cursor: default;
 }
 
+/* 结算页的「本轮精华」：局外养成的唯一回流口，给足强调 */
+.m3-result-essence {
+  margin-top: 6px;
+  font-weight: 600;
+  color: var(--theme-accent, #27ae60);
+}
+
 /* ===== 肉鸽：层间三选一祝福 ===== */
 .m3-perks {
   display: flex;
@@ -580,6 +618,22 @@
   font-weight: 600;
 }
 
+/* 名称 + 局外等级：升级后的同一张牌在本轮更强，卡片上要直接看得出等级 */
+.m3-perk-namerow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.m3-perk-lv {
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--theme-accent, #27ae60);
+}
+
 .m3-perk-desc {
   font-size: 12px;
   line-height: 1.5;
@@ -590,6 +644,473 @@
 .m3-perk-own {
   font-size: 11px;
   color: var(--theme-accent, #27ae60);
+}
+
+/* ===== 肉鸽：祝福图鉴 / 养成面板 =====
+ * 内容节点在 codex.js，外框复用 components/modal（与「积分详情」同一套），
+ * 所以这里只管条目本身的排版。
+ * 条目比普通弹窗宽（每行要塞下效果说明与解锁按钮），借宿主节点的修饰类放宽：
+ * .modal 的 max-width 是 420px，这边覆盖成 560px。
+ */
+.modal-overlay--codex .modal {
+  max-width: 560px;
+}
+
+.m3-codex {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* 顶部：精华余额 + 收集度 + 局外统计 */
+.m3-codex-top {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--theme-panel-bg-hover, #f8f9fa);
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+}
+
+.m3-codex-toprow {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.m3-codex-essence {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--theme-accent, #27ae60);
+}
+
+.m3-codex-toplabel {
+  font-size: 12px;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-codex-topitem {
+  font-size: 12px;
+  color: var(--theme-status-color, #4a5568);
+}
+
+/* 「有奖励可领」的提示行：和里程碑按钮同一套强调色 */
+.m3-codex-ready {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--theme-accent, #27ae60);
+}
+
+.m3-codex-sub {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-codex-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.m3-codex-sec-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--theme-title-color, #2c3e50);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--theme-border-color, #e2e8f0);
+}
+
+.m3-codex-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.m3-codex-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 10px;
+  background: var(--theme-panel-bg, #fff);
+}
+
+/* 未解锁：整条压暗，图标位换成锁，一眼区分「还没见过」与「已经能用」 */
+.m3-codex-item--locked {
+  opacity: 0.72;
+  border-style: dashed;
+}
+
+/* 稀有度：左边框着色，扫一眼就知道哪几张贵 */
+.m3-codex-item--common {
+  border-left: 3px solid var(--theme-status-color, #4a5568);
+}
+
+.m3-codex-item--rare {
+  border-left: 3px solid var(--theme-btn-primary-bg, #007bff);
+}
+
+.m3-codex-item--epic {
+  border-left: 3px solid #b06cf0;
+}
+
+/* 里程碑：达成待领时整体点亮，领过之后压暗 */
+.m3-codex-ms--ready {
+  border-color: var(--theme-accent, #27ae60);
+  box-shadow: 0 0 0 1px var(--theme-accent, #27ae60) inset;
+}
+
+.m3-codex-ms--claimed {
+  opacity: 0.6;
+}
+
+.m3-codex-icon {
+  flex-shrink: 0;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.m3-codex-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.m3-codex-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.m3-codex-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--theme-title-color, #2c3e50);
+}
+
+/* 稀有度标签 */
+.m3-codex-fam {
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  line-height: 16px;
+  color: #fff;
+  background: var(--theme-status-color, #4a5568);
+}
+
+.m3-codex-fam--rare {
+  background: var(--theme-btn-primary-bg, #007bff);
+}
+
+.m3-codex-fam--epic {
+  background: #b06cf0;
+}
+
+.m3-codex-lv,
+.m3-codex-limit {
+  font-size: 11px;
+  color: var(--theme-status-color, #4a5568);
+  opacity: 0.9;
+}
+
+.m3-codex-desc {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--theme-status-color, #4a5568);
+}
+
+/* 下一级效果：用强调色与当前效果区分开（「花这笔钱买到什么」） */
+.m3-codex-next {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--theme-accent, #27ae60);
+}
+
+/* 等级条：lv / max 的可视化，满级时整条铺满 */
+.m3-codex-bar {
+  display: block;
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--theme-border-color, #e2e8f0);
+}
+
+.m3-codex-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--theme-accent, #27ae60);
+  transition: width 0.2s ease;
+}
+
+.m3-codex-meta {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--theme-status-color, #4a5568);
+  opacity: 0.85;
+}
+
+.m3-codex-owned {
+  flex-shrink: 0;
+  font-size: 11px;
+  white-space: nowrap;
+  color: var(--theme-accent, #27ae60);
+}
+
+.m3-codex-reward {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--theme-accent, #27ae60);
+}
+
+/* 解锁 / 升级 / 领取按钮：窄栏里也要点得中，故给足最小高度 */
+.m3-codex-buy {
+  flex-shrink: 0;
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid var(--theme-btn-primary-bg, #007bff);
+  border-radius: 8px;
+  font-size: 12px;
+  color: #fff;
+  background: var(--theme-btn-primary-bg, #007bff);
+  cursor: pointer;
+}
+
+.m3-codex-buy:hover:not(:disabled) {
+  background: var(--theme-btn-primary-bg-hover, #0056b3);
+}
+
+.m3-codex-buy:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.m3-codex-buy--ready {
+  border-color: var(--theme-accent, #27ae60);
+  background: var(--theme-accent, #27ae60);
+}
+
+/* 「已满级 / 已领取 / 未达成」这类不可点的状态：从按钮退化成标签 */
+.m3-codex-buy--max {
+  border-color: transparent;
+  background: none;
+  color: var(--theme-status-color, #4a5568);
+  opacity: 0.8;
+  cursor: default;
+}
+
+@media (max-width: 480px) {
+  .m3-codex-buy {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+}
+
+/* ===== 肉鸽：共鸣树（局外养成的天赋树，见 codex.js 的 treeSection） =====
+ * 3 条流派 × 3 层，节点按 perks.js 里的 `tree` 坐标落进 CSS grid。
+ * 列宽等分且无列间距，所以第 k 列的中心线正好在 (k+0.5)/列数 处（JS 按这个算出百分比）。
+ * 连线不用 SVG：横杆与下垂短线是绝对定位的小条，每格顶部再接一小段竖线——
+ * 网格行高会随内容变，写死坐标的 SVG 会飘。
+ */
+.m3-tree-grid {
+  --m3-tree-line: var(--theme-border-color, #cbd5e0);
+  display: grid;
+  row-gap: 0;
+  padding: 4px 0 2px;
+}
+
+/* 根：占满一行居中。它不是可买的节点，只是整棵树的起点 */
+.m3-tree-rootcell {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+}
+
+.m3-tree-rootnode {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 14px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 12px;
+  background: var(--theme-panel-bg-hover, #f8f9fa);
+}
+
+.m3-tree-rooticon {
+  font-size: 18px;
+  line-height: 1;
+  color: var(--theme-accent, #27ae60);
+}
+
+.m3-tree-rootname {
+  font-size: 11px;
+  color: var(--theme-status-color, #4a5568);
+}
+
+/* 分叉行：一根横杆 + 每列一根下垂短线，把根接到三条流派上 */
+.m3-tree-fan {
+  position: relative;
+  grid-column: 1 / -1;
+  height: 26px;
+}
+
+.m3-tree-fan-bar,
+.m3-tree-fan-up,
+.m3-tree-fan-stub {
+  position: absolute;
+  background: var(--m3-tree-line);
+}
+
+.m3-tree-fan-bar {
+  top: 12px;
+  height: 2px;
+}
+
+/* 根 → 横杆 */
+.m3-tree-fan-up {
+  top: 0;
+  width: 2px;
+  height: 12px;
+  margin-left: -1px;
+}
+
+/* 横杆 → 第 1 层节点（其余层的连线由每格的 .m3-tree-link 续上） */
+.m3-tree-fan-stub {
+  top: 12px;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+}
+
+.m3-tree-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.m3-tree-link {
+  flex-shrink: 0;
+  width: 2px;
+  height: 12px;
+  background: var(--m3-tree-line);
+}
+
+.m3-tree-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 100%;
+  max-width: 108px;
+  padding: 6px 4px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 10px;
+  background: var(--theme-panel-bg, #fff);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* 稀有度：窄节点上左边框不好看，改用顶边着色（与条目列表同一套配色） */
+.m3-tree-node--common {
+  border-top: 3px solid var(--theme-status-color, #4a5568);
+}
+
+.m3-tree-node--rare {
+  border-top: 3px solid var(--theme-btn-primary-bg, #007bff);
+}
+
+.m3-tree-node--epic {
+  border-top: 3px solid #b06cf0;
+}
+
+.m3-tree-node-icon {
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.m3-tree-node-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--theme-title-color, #2c3e50);
+}
+
+.m3-tree-node-lv {
+  font-size: 10px;
+  color: var(--theme-status-color, #4a5568);
+}
+
+/* 已点亮 */
+.m3-tree-node--on {
+  border-color: var(--theme-accent, #27ae60);
+}
+
+.m3-tree-node--on .m3-tree-node-lv {
+  color: var(--theme-accent, #27ae60);
+}
+
+/* 前置已满足、还没买：虚线框提示「这一格可以买」 */
+.m3-tree-node--next {
+  border-style: dashed;
+}
+
+.m3-tree-node--next:hover {
+  border-color: var(--theme-btn-primary-bg, #007bff);
+}
+
+/* 前置未满足：压暗且不可点（连线是前置关系的可视化，所以这条很重要） */
+.m3-tree-node--blocked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 机制节点（末端那颗）：比数值节点大一号、圆角更圆，一眼看出「这是改规则的」 */
+.m3-tree-node--mechanic {
+  max-width: 116px;
+  padding: 9px 6px;
+  border-radius: 14px;
+  border-width: 2px;
+}
+
+/* 选中：下面的详情卡跟着它走 */
+.m3-tree-node--sel {
+  box-shadow: 0 0 0 2px var(--theme-btn-primary-bg, #007bff) inset;
+}
+
+/* 「机制」标签：与稀有度标签并排，用反色小片区分 */
+.m3-codex-kind {
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--theme-panel-bg, #fff);
+  background: var(--theme-title-color, #2c3e50);
+  opacity: 0.85;
+}
+
+@media (max-width: 480px) {
+  .m3-tree-node {
+    max-width: 88px;
+    padding: 5px 3px;
+  }
+
+  .m3-tree-node--mechanic {
+    max-width: 96px;
+  }
+
+  .m3-tree-node-name {
+    font-size: 10px;
+  }
 }
 
 /* ===== 肉鸽：层间三选一的模态框 =====
@@ -654,6 +1175,12 @@
   color: var(--theme-status-color, #4a5568);
 }
 
+.m3-perk-dialog-btns {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 @keyframes m3-perk-fade {
   from {
     opacity: 0;
@@ -697,6 +1224,10 @@
 
   .m3-perk-dialog-hint {
     text-align: center;
+  }
+
+  .m3-perk-dialog-btns .m3-btn {
+    flex: 1;
   }
 }
 
@@ -746,6 +1277,34 @@
   color: var(--theme-title-color, #2c3e50);
   padding-bottom: 4px;
   border-bottom: 1px solid var(--theme-border-color, #e2e8f0);
+}
+
+/* 区块标题右侧挂个小入口（如「已获祝福」→ 图鉴）：下划线由这一行统一画 */
+.m3-side-titlerow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--theme-border-color, #e2e8f0);
+}
+
+.m3-side-titlerow .m3-side-title {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.m3-side-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 11px;
+  color: var(--theme-accent, #27ae60);
+  cursor: pointer;
+}
+
+.m3-side-link:hover {
+  text-decoration: underline;
 }
 
 .m3-side-rows {
