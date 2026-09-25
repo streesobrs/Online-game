@@ -3,10 +3,19 @@
  *
  * 生成命令：npm run changelog
  * 数据源：git 提交记录（遵循 .trae/rules/git-commit-message.md 提交规范）
- * 生成时间：2026-09-25T10:16:19.851Z
+ * 生成时间：2026-09-25T11:53:01.496Z
  */
 
 export const CHANGELOG = [
+  {
+    "tag": "Build 212",
+    "name": "重构代码结构，拆分模块并修复肉鸽Boss胜利闭环",
+    "type": "refactor",
+    "scope": "前端-消消乐",
+    "hash": "6c054e4",
+    "publishedAt": "2026-09-25T19:19:42+08:00",
+    "body": "### 后端改动\n- 新增肉鸽胜利闭环字段（win、bossKills、endless）到GameManager结算\n- 添加Boss定义、血量计算和阶段判定逻辑\n- 新增肉鸽成就\"肉鸽通关\"及判定逻辑\n- 新增Boss奖励徽章match3_rogue_win\n- 更新版本号build从770到775\n\n### 前端改动\n- 重构消消乐引擎代码，拆分grid、match、blockers、deadlock、special、validate等模块到engine目录\n- 重构游戏入口index.js的模块导入路径\n- 新增棋盘目标判定模块goals.js\n- 新增肉鸽Boss模块（boss.js、run-state.js）\n- 新增积分详情弹窗模块scoreDetails.js\n- 新增可播种随机数生成器rng.js\n- 新增肉鸽胜利徽章图标match3_rogue_win.svg\n- 更新changelog记录Build 770版本\n\n### 配置改动\n- 更新服务端config.js，新增肉鸽存档版本v2、胜利奖励配置和Boss表\n- 更新客户端config.js的导入路径\n\n### 测试改动\n- 更新match3-engine.test.js的导入路径\n- 新增match3-run-state.test.js测试run状态重置"
+  },
   {
     "tag": "Build 770",
     "name": "新增消消乐肉鸽局外养成系统（精华、祝福解锁升级与共鸣树）",

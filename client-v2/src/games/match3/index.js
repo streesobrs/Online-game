@@ -13,7 +13,7 @@ import { renderRogue, loadRogueBest } from './modes/mode-rogue.js';
 import { showPerkCodex } from './rogue/codex.js';
 import { claimableCount, buffLevel, poolProgress } from './rogue/meta.js';
 import { META_BUFFS } from './rogue/perks.js';
-import { renderLevelMode, loadProgress, totalStars } from './modes/mode-level.js';
+import { renderLevelMode, loadProgress, clearedCount, totalStars } from './modes/mode-level.js';
 import { getRogueMeta, loadLocalSession, onProgress, onRogueMeta, requestProgress } from './save/sync.js';
 import { LEVEL_COUNT } from './config/levels.js';
 import { viewRoot, el } from '../../utils/dom.js';
@@ -75,7 +75,7 @@ export function renderMatch3(container = viewRoot()) {
           el(
             'span',
             { class: 'm3-menu-meta' },
-            `${LEVEL_COUNT} 关 · 已通关 ${Math.max(0, progress.maxLevel - 1)} · ${totalStars(progress)} ★`,
+            `${LEVEL_COUNT} 关 · 已通关 ${clearedCount(progress)} · ${totalStars(progress)} ★`,
           ),
         ),
         el(

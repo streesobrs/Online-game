@@ -19,7 +19,10 @@ import { toast } from '../../components/toast.js';
 import { modal } from '../../components/modal.js';
 import { store } from '../../core/store.js';
 import { eventBus } from '../../core/eventBus.js';
-import { NAV_ITEMS } from '../../data/navItems.js';
+import { SHORTCUT_DEFS, SHORTCUT_SCOPES, scopeName } from '../../data/shortcutDefs.js';
+import {
+  getBinding, isCustomized, setBinding, resetBinding, resetAll, formatCombo, comboFromEvent,
+} from '../../core/shortcuts.js';
 import * as auth from '../../core/auth.js';
 import { requestReplay, showReplay } from '../replay/index.js';
 import { resetOnboarding, resetAllTours, startOnboarding, startMailTour, startAssetsTour, startShopTour } from '../../components/onboarding.js';
@@ -404,8 +407,9 @@ export function renderProfile(container) {
 
   // ---- 内容分发 ----
   async function renderContent() {
-    // 切换前先清理上一个嵌入视图的监听/订阅（成就/商城/主题）
+    // 切换前先清理上一个嵌入视图的监听/订阅（成就/商城/主题）与改键采集状态
     if (embeddedCleanup) { embeddedCleanup(); embeddedCleanup = null; }
+    stopKeyCapture();
     contentEl.innerHTML = '';
     const needsProfile = activeTab === 'info' || activeTab === 'avatar' || activeTab === 'assets' || activeTab === 'rewards';
     if (!profileData && needsProfile) {
@@ -455,19 +459,122 @@ export function renderProfile(container) {
   }
 
   // ---- 快捷键 Tab ----
+  let capturingId = null;     // 正在采集新键的绑定 id
+  let captureHandler = null;  // 采集期的 document keydown（捕获阶段，抢在全局快捷键监听之前）
+
+  /** 结束采集：移除拦截监听 */
+  function stopKeyCapture() {
+    if (captureHandler) {
+      document.removeEventListener('keydown', captureHandler, true);
+      captureHandler = null;
+    }
+    capturingId = null;
+  }
+
+  /** 进入采集状态：按下新键即写入，Esc 取消 */
+  function startKeyCapture(def, refresh) {
+    stopKeyCapture();
+    captureHandler = (e) => {
+      // 捕获阶段拦下按键，避免改键时误触发全局快捷键
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === 'Escape') { stopKeyCapture(); refresh(); return; }
+
+      const combo = comboFromEvent(e);
+      if (!combo) return; // 只按了修饰键：继续等主键
+
+      const res = setBinding(def.id, combo);
+      if (!res.ok) { toast.error(res.message); return; }
+
+      stopKeyCapture();
+      refresh();
+      toast.success(`「${def.name}」已改为 ${formatCombo(getBinding(def.id))}`);
+      if (res.crossScope) {
+        toast.info(`该键在「${scopeName(res.crossScope.scope)}」中也被「${res.crossScope.name}」使用，两者互不影响`);
+      }
+    };
+    document.addEventListener('keydown', captureHandler, true);
+    capturingId = def.id;
+    refresh();
+  }
+
+  function renderShortcutRow(def, refresh) {
+    const customized = isCustomized(def.id);
+    const capturing = capturingId === def.id;
+
+    const kbd = el('kbd', { class: 'profile-shortcut-key' + (capturing ? ' capturing' : '') },
+      capturing ? '按下新键…' : formatCombo(getBinding(def.id)));
+
+    const actionBtn = el('button', {
+      class: 'profile-shortcut-btn',
+      type: 'button',
+      onClick: () => {
+        if (capturing) { stopKeyCapture(); refresh(); return; }
+        startKeyCapture(def, refresh);
+      },
+    }, capturing ? '取消' : '改键');
+
+    const resetBtn = el('button', {
+      class: 'profile-shortcut-btn profile-shortcut-btn--ghost',
+      type: 'button',
+      disabled: !customized,
+      onClick: () => {
+        stopKeyCapture();
+        if (resetBinding(def.id)) toast.info(`「${def.name}」已恢复默认键位`);
+        refresh();
+      },
+    }, '重置');
+
+    return el('div', { class: 'profile-shortcut-row' + (capturing ? ' capturing' : '') }, [
+      el('span', { class: 'profile-shortcut-icon' }, def.icon),
+      el('span', { class: 'profile-shortcut-name' }, def.name),
+      customized ? el('span', { class: 'profile-shortcut-status' }, '已自定义') : null,
+      el('span', { class: 'profile-shortcut-spacer' }),
+      kbd,
+      actionBtn,
+      resetBtn,
+    ]);
+  }
+
   function renderShortcutsTab() {
-    const rows = NAV_ITEMS
-      .filter((i) => i.shortcut)
-      .map((item) => el('div', { class: 'profile-shortcut-row' }, [
-        el('kbd', { class: 'profile-shortcut-key' }, item.shortcut.toUpperCase()),
-        el('span', { class: 'profile-shortcut-icon' }, item.icon),
-        el('span', { class: 'profile-shortcut-name' }, item.inProfile ? `个人资料 · ${item.name}` : item.name),
-      ]));
+    const scopeListEl = el('div', { class: 'profile-shortcut-scopes' });
+    const resetAllBtn = el('button', {
+      class: 'profile-shortcut-btn profile-shortcut-btn--ghost',
+      type: 'button',
+      onClick: () => {
+        stopKeyCapture();
+        if (resetAll()) toast.info('已全部恢复默认键位');
+        refresh();
+      },
+    }, '全部恢复默认');
+
+    const refresh = () => {
+      scopeListEl.innerHTML = '';
+      SHORTCUT_SCOPES.forEach((scope) => {
+        const defs = SHORTCUT_DEFS.filter((d) => d.scope === scope.id);
+        if (!defs.length) return;
+        scopeListEl.append(el('div', { class: 'profile-shortcut-scope' }, [
+          el('div', { class: 'profile-shortcut-scope-head' }, [
+            el('span', { class: 'profile-shortcut-scope-name' }, scope.name),
+            el('span', { class: 'profile-shortcut-scope-desc' }, scope.desc),
+          ]),
+          el('div', { class: 'profile-shortcut-list' }, defs.map((d) => renderShortcutRow(d, refresh))),
+        ]));
+      });
+      resetAllBtn.disabled = !SHORTCUT_DEFS.some((d) => isCustomized(d.id));
+    };
+    refresh();
+
     return el('div', { class: 'panel profile-card' }, [
-      el('div', { class: 'profile-section-title' }, '⌨️ 全局快捷键'),
-      el('div', { class: 'profile-shortcut-list' }, rows),
+      el('div', { class: 'profile-shortcut-head' }, [
+        el('div', { class: 'profile-section-title' }, '⌨️ 快捷键'),
+        resetAllBtn,
+      ]),
+      el('p', { class: 'profile-shortcut-tip' },
+        '点「改键」后按下新键即可，支持 Ctrl / Alt / Shift 组合键（如 Ctrl+K）。同一分类内键位不可重复；不同分类之间允许同键，各自生效。'),
+      scopeListEl,
       el('p', { class: 'text-muted', style: 'margin-top:12px;font-size:12px;' },
-        '在输入框内按键不会触发；按 Ctrl / Alt / 组合键不会触发。'),
+        '在输入框内按键不会触发；改键时按 Esc 取消。'),
     ]);
   }
 
@@ -1417,6 +1524,7 @@ export function renderProfile(container) {
 
   return () => {
     if (embeddedCleanup) { embeddedCleanup(); embeddedCleanup = null; }
+    stopKeyCapture();
     offOpenTab();
     offProfileUpdated();
     container.innerHTML = '';

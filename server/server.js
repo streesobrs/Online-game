@@ -1745,6 +1745,8 @@ app.get('/api/profile/:accountId', async (req, res) => {
       success: true,
       // 把最终隐私设置也带回来，方便前端显示"公开/隐藏"状态（本人）或"🔒 私密"（他人）
       privacy: privacy,
+      // 自定义快捷键属于个人设置，只在本人查看时返回
+      shortcuts: isOwner ? (account.account?.shortcuts || {}) : undefined,
       isOwner: isOwner,
       data: {
         account: accountOut,
@@ -2578,10 +2580,10 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const { nickname, profile, privacy } = data;
+    const { nickname, profile, privacy, shortcuts } = data;
     // 更新前的快照，用于比对出真正发生变化的字段（客户端常回传整份 profile）
     const before = userSession.accountData?.account || {};
-    const result = await accountManager.updateProfile(userSession.accountId, { nickname, profile, privacy });
+    const result = await accountManager.updateProfile(userSession.accountId, { nickname, profile, privacy, shortcuts });
 
     if (result.success) {
       const account = await accountManager.getAccount(userSession.accountId);
@@ -2607,6 +2609,10 @@ io.on('connection', (socket) => {
             if (v !== before.privacy?.[k]) fields.push(`privacy.${k}`);
           }
         }
+        if (shortcuts && typeof shortcuts === 'object') {
+          // 快捷键整份替换，只记一次「有变化」
+          if (JSON.stringify(shortcuts) !== JSON.stringify(before.shortcuts || {})) fields.push('shortcuts');
+        }
 
         if (fields.length > 0) {
           operationLogger.log({
@@ -2620,7 +2626,8 @@ io.on('connection', (socket) => {
               fields,
               nickname: nickname || undefined,
               profile: profile && typeof profile === 'object' ? profile : undefined,
-              privacy: privacy && typeof privacy === 'object' ? privacy : undefined
+              privacy: privacy && typeof privacy === 'object' ? privacy : undefined,
+              shortcuts: shortcuts && typeof shortcuts === 'object' ? shortcuts : undefined
             }
           });
         }

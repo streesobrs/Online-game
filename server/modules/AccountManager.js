@@ -1341,6 +1341,27 @@ class AccountManager {
         updateData['account.privacy'] = rebuiltPrivacy;
       }
 
+      // 处理自定义快捷键：只存「与默认不同的覆盖项」，键位格式做白名单校验，
+      // 非法项丢弃而不整体报错（避免一个坏键位导致整份设置存不上）
+      if (updates.shortcuts !== undefined && typeof updates.shortcuts === 'object' && updates.shortcuts !== null && !Array.isArray(updates.shortcuts)) {
+        const rebuiltShortcuts = {};
+        for (const [key, value] of Object.entries(updates.shortcuts).slice(0, 128)) {
+          if (typeof key !== 'string' || !/^[a-zA-Z][\w.]{0,47}$/.test(key)) {
+            logger.warn('跳过非法快捷键 id', { id, key });
+            continue;
+          }
+          if (typeof value !== 'string') continue;
+          // 归一化键位串：小写字母数字 + 修饰键前缀，如 'g' / '1' / 'enter' / 'ctrl+shift+k' / 'num1'
+          const combo = value.trim().toLowerCase();
+          if (!combo || combo.length > 24 || !/^[a-z0-9+]+$/.test(combo)) {
+            logger.warn('跳过非法快捷键键位', { id, key, value });
+            continue;
+          }
+          rebuiltShortcuts[key] = combo;
+        }
+        updateData['account.shortcuts'] = rebuiltShortcuts;
+      }
+
       if (Object.keys(updateData).length === 0) {
         return { success: true, message: '无更新内容' };
       }

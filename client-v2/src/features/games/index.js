@@ -14,7 +14,8 @@
  * │          │                                          │
  * └──────────┴──────────────────────────────────────────┘
  *
- * 快捷键：1-4 切换游戏，T 联机/A AI，Enter 开始匹配
+ * 快捷键：1-4 切换游戏，T 联机/A AI，Enter 开始匹配（键位可在个人资料自定义，
+ * 见 core/shortcuts.js；本视图通过 registerScopeHandler 注册作用域处理函数）
  */
 import { el } from '../../utils/dom.js';
 import { toast } from '../../components/toast.js';
@@ -25,6 +26,7 @@ import { GAMES } from '../../data/navItems.js';
 import { go } from '../../core/router.js';
 import { startGameActivity, stopGameActivity } from '../../core/activity.js';
 import { startGameTour } from '../../components/onboarding.js';
+import { registerScopeHandler, getBinding, formatCombo } from '../../core/shortcuts.js';
 
 const GAME_MAP = Object.fromEntries(GAMES.map((g) => [g.id, g]));
 
@@ -139,8 +141,10 @@ export function renderGames(container) {
     } else {
       sidebarEl.append(el('div', { class: 'games-sidebar-tip' }, '💡 选择游戏和难度后开始 AI 对战'));
     }
+    const pickKeys = ['games.pick1', 'games.pick2', 'games.pick3', 'games.pick4']
+      .map((id) => formatCombo(getBinding(id))).join(' / ');
     sidebarEl.append(el('div', { class: 'games-sidebar-shortcuts' },
-      '快捷键: 1-4 切换 · T 联机 · A AI · Enter 开始 · Esc 取消'));
+      `快捷键: ${pickKeys} 选游戏 · ${formatCombo(getBinding('games.modeOnline'))} 联机 · ${formatCombo(getBinding('games.modeAi'))} AI · ${formatCombo(getBinding('games.start'))} 开始 · ${formatCombo(getBinding('games.cancel'))} 取消`));
   }
 
   // ---- 渲染主区域 ----
@@ -507,38 +511,26 @@ export function renderGames(container) {
     emit('get_current_game');
   }
 
-  // ---- 页面内快捷键 ----
-  function handlePageKeydown(e) {
-    const tag = (e.target.tagName || '').toLowerCase();
-    if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) return;
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (store.get('currentView') !== 'games') return;
-
+  // ---- 页面内快捷键（走统一分发，键位由个人资料「快捷键」决定）----
+  function runLobbyShortcut(op) {
+    if (!op) return;
     const gamesList = state.mode === 'ai' ? AI_GAMES : GAMES;
 
-    if (e.key === '1' || e.key === '2' || e.key === '3' || e.key === '4') {
-      const idx = parseInt(e.key, 10) - 1;
-      if (idx < gamesList.length && !state.isMatching) {
-        state.selectedGame = gamesList[idx].id;
+    if (op.type === 'pick') {
+      const target = gamesList[op.index];
+      if (target && !state.isMatching) {
+        state.selectedGame = target.id;
         renderSidebar();
         renderMain();
-        e.preventDefault();
       }
-    } else if (e.key === 't' || e.key === 'T') {
-      if (state.mode !== 'online' && !state.isMatching) {
-        state.mode = 'online';
+    } else if (op.type === 'mode') {
+      if (state.mode !== op.mode && !state.isMatching) {
+        state.mode = op.mode;
         renderModeTabs();
         renderSidebar();
         renderMain();
       }
-    } else if (e.key === 'a' || e.key === 'A') {
-      if (state.mode !== 'ai' && !state.isMatching) {
-        state.mode = 'ai';
-        renderModeTabs();
-        renderSidebar();
-        renderMain();
-      }
-    } else if (e.key === 'Enter') {
+    } else if (op.type === 'start') {
       if (!state.isMatching && state.mode === 'online') {
         if (state.reconnectGame) { toast.warn('存在未完成的对局，请先继续或放弃'); return; }
         if (!store.get('socketConnected')) { toast.error('未连接服务器'); return; }
@@ -547,7 +539,7 @@ export function renderGames(container) {
         renderMain();
         emit('match_request', { game: state.selectedGame });
       }
-    } else if (e.key === 'Escape') {
+    } else if (op.type === 'cancel') {
       if (state.isMatching) {
         state.isMatching = false;
         renderMain();
@@ -556,11 +548,12 @@ export function renderGames(container) {
     }
   }
 
-  window.addEventListener('keydown', handlePageKeydown);
+  // 视图挂载时注册，离开大厅时由 cleanup 注销
+  const unregisterLobbyShortcut = registerScopeHandler('games', runLobbyShortcut);
 
   // ---- 清理 ----
   return () => {
-    window.removeEventListener('keydown', handlePageKeydown);
+    unregisterLobbyShortcut();
     offMatchSuccess();
     offMatchTimeout();
     offSnakeFound();

@@ -775,6 +775,45 @@
 }
 
 /* ===== 快捷键 Tab ===== */
+.profile-shortcut-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.profile-shortcut-tip {
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-muted, #718096);
+}
+
+.profile-shortcut-scopes {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.profile-shortcut-scope-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.profile-shortcut-scope-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary, #2d3748);
+}
+
+.profile-shortcut-scope-desc {
+  font-size: 12px;
+  color: var(--text-muted, #718096);
+}
+
 .profile-shortcut-list {
   display: flex;
   flex-direction: column;
@@ -786,21 +825,52 @@
   align-items: center;
   gap: 12px;
   background: var(--surface-alt, #f7fafc);
+  border: 1px solid transparent;
   border-radius: 8px;
   padding: 10px 14px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+/* 采集新键中：高亮当前行 */
+.profile-shortcut-row.capturing {
+  border-color: var(--accent-indigo, #6366f1);
+  background: var(--surface, #fff);
 }
 
 .profile-shortcut-key {
   min-width: 34px;
   text-align: center;
   background: var(--surface, #fff);
-  border: 1px solid var(--border-color, var(--border-color, #e2e8f0));
+  border: 1px solid var(--border-color, #e2e8f0);
   border-bottom-width: 2px;
   border-radius: 6px;
   padding: 4px 8px;
+  font-family: inherit;
   font-size: 13px;
   font-weight: 700;
   color: var(--accent-indigo, #6366f1);
+  white-space: nowrap;
+}
+
+.profile-shortcut-key.capturing {
+  min-width: 96px;
+  color: var(--text-muted, #718096);
+  font-weight: 500;
+  border-style: dashed;
+  border-color: var(--accent-indigo, #6366f1);
+  animation: profile-shortcut-blink 1s ease-in-out infinite;
+}
+
+@keyframes profile-shortcut-blink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
 }
 
 .profile-shortcut-icon {
@@ -810,6 +880,47 @@
 .profile-shortcut-name {
   font-size: 13px;
   color: var(--text-secondary, #4a5568);
+}
+
+.profile-shortcut-status {
+  flex: none;
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 10px;
+  color: var(--accent-indigo, #6366f1);
+  background: rgba(99, 102, 241, 0.12);
+  background: color-mix(in srgb, var(--accent-indigo, #6366f1) 12%, transparent);
+}
+
+.profile-shortcut-spacer {
+  flex: 1;
+}
+
+.profile-shortcut-btn {
+  flex: none;
+  border: 1px solid var(--accent-indigo, #6366f1);
+  background: var(--accent-indigo, #6366f1);
+  color: #fff;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: filter 0.15s, opacity 0.15s;
+}
+
+.profile-shortcut-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.profile-shortcut-btn--ghost {
+  background: transparent;
+  color: var(--accent-indigo, #6366f1);
+}
+
+.profile-shortcut-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* ===== 嵌入子页面（成就/商城/主题）在个人资料页内隐藏重复标题 ===== */

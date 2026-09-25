@@ -68,6 +68,8 @@ function handleLoginSuccess(data) {
   store.set('user', account);
   store.set('token', resultData.token);
   localStorage.setItem(TOKEN_KEY, resultData.token);
+  // 通知快捷键等依赖账号设置的模块重新加载（account.shortcuts）
+  eventBus.emit('user:accountChanged', account);
 
   // 提取账号 ID 与昵称（兼容两种结构）
   const inner = resultData.account?.account || resultData.account;
@@ -103,7 +105,9 @@ export function initAuth() {
   eventBus.on('user:accountInfo', (data) => {
     if (data?.success && data.data) {
       if (data.data.token) saveToken(data.data.token);
-      store.set('user', normalizeAccount(data.data));
+      const account = normalizeAccount(data.data);
+      store.set('user', account);
+      eventBus.emit('user:accountChanged', account);
     }
   });
 
@@ -131,22 +135,27 @@ export function initAuth() {
       if (data.success) toast.success(data.message || '✅ 密码设置成功！');
       else toast.error(data.message || '❌ 密码设置失败');
     } else if (data.action === 'update_profile') {
+      const silent = pendingSilentUpdate;
+      pendingSilentUpdate = false;
       if (data.success) {
         // 更新资料成功后：同步本地存储与 store.user（保持 user 结构不变，只改昵称/资料字段）
         const newNick = data.account?.account?.nickname || data.account?.nickname;
         if (newNick) localStorage.setItem(NICKNAME_KEY, newNick);
         const newProfile = data.account?.account?.profile;
+        const newShortcuts = data.account?.account?.shortcuts;
         const current = store.get('user');
         if (current) {
           const inner = current.account?.account || current.account;
           if (inner) {
             if (newNick) inner.nickname = newNick;
             if (newProfile) inner.profile = newProfile;
+            if (newShortcuts && typeof newShortcuts === 'object') inner.shortcuts = newShortcuts;
           }
           store.set('user', { ...current });
         }
         eventBus.emit('user:profileUpdated', { nickname: newNick, profile: newProfile });
-        toast.success(data.message || '资料已更新');
+        // 只改快捷键时由调用方自己提示结果，这里不再弹「资料已更新」
+        if (!silent) toast.success(data.message || '资料已更新');
       } else {
         toast.error(data.message || '资料更新失败');
       }
@@ -161,6 +170,9 @@ export function initAuth() {
 
 // 待自动登录的注册凭据（服务端注册成功仅回 account_action_result，需客户端补发 account_login）
 let pendingRegister = null;
+
+// 本次 update_profile 是否只需静默处理（仅改快捷键时为 true）
+let pendingSilentUpdate = false;
 
 /** 账号密码登录 */
 export function login(username, password) {
@@ -223,16 +235,19 @@ export function updateNickname(nickname) {
 
 /**
  * 更新账号资料字段
- * 支持三种顶层字段：profile（个性签名等）、privacy（隐私设置）、nickname（昵称）
- * 服务端会分别走 account.profile.xxx / account.privacy.xxx / account.nickname 的 dot-notation 更新，
- * 不会互相干扰。调用方按需传入一种或多种。
- * @param {Object} params - { profile?: {...}, privacy?: {...}, nickname?: string }
+ * 支持四种顶层字段：profile（个性签名等）、privacy（隐私设置）、nickname（昵称）、shortcuts（自定义快捷键）
+ * 服务端会分别走 account.profile.xxx / account.privacy.xxx / account.nickname / account.shortcuts 的
+ * dot-notation 更新，不会互相干扰。调用方按需传入一种或多种。
+ * @param {Object} params - { profile?: {...}, privacy?: {...}, nickname?: string, shortcuts?: {...} }
  */
 export function updateProfile(params) {
+  // 只改快捷键时不弹「资料已更新」：由改键界面自己给更精确的提示
+  pendingSilentUpdate = !params.nickname && !params.profile && !params.privacy && !!params.shortcuts;
   emit('account_update_profile', {
     nickname: params.nickname,
     profile: params.profile,
     privacy: params.privacy,
+    shortcuts: params.shortcuts,
   });
 }
 

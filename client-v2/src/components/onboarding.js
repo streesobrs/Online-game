@@ -91,7 +91,7 @@ const MAIN_STEPS = [
     before: openShortcutsTab,
     icon: '⌨️',
     title: '快捷键',
-    text: '这里整理了全部快捷键：G 游戏大厅 · H 好友 · 1-4 快速选游戏 · T 联机对战 · A AI 对战 · Enter 开始匹配。熟记后操作更顺手！',
+    text: '这里整理了全部快捷键，并且键位可以自己改：点某一行右侧的「改键」再按下新键即可（支持 Ctrl / Alt / Shift 组合键），点「重置」恢复默认。熟记后操作更顺手！',
   },
 ];
 

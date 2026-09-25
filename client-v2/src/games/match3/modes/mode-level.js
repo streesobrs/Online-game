@@ -52,6 +52,15 @@ export function totalStars(progress) {
   return Object.values(progress.stars).reduce((sum, n) => sum + n, 0);
 }
 
+/**
+ * 已通关关数：通关即得星（最少 1 星），故以星表中有星的关数为准。
+ * 不要用 maxLevel - 1 反推——本地 maxLevel 是「已解锁的最高关」且被钳在 LEVEL_COUNT，
+ * 全通时它会等于 LEVEL_COUNT，减 1 就少算一关（30 关满星只显示 29）。
+ */
+export function clearedCount(progress) {
+  return Object.values(progress.stars).filter((n) => n > 0).length;
+}
+
 /** 关卡是否解锁（第 1 关始终开放，其余要求上一关已通关） */
 export function isUnlocked(levelId, progress) {
   return levelId <= Math.max(1, progress.maxLevel);
@@ -138,7 +147,7 @@ export function renderLevelMode(container, { onExit }) {
     container.replaceChildren(
       head(
         '🍭 闯关模式',
-        `已通关 ${Math.max(0, progress.maxLevel - 1)} / ${LEVEL_COUNT} 关 · 累计 ${totalStars(progress)} ★`,
+        `已通关 ${clearedCount(progress)} / ${LEVEL_COUNT} 关 · 累计 ${totalStars(progress)} ★`,
       ),
       el('div', { class: 'm3-chapters' }, sections),
       el(
