@@ -11,6 +11,13 @@ const path = require('path');
 // 因此不设「消消乐总榜」，按玩法各排各的，每个榜只取本玩法的字段
 const MATCH3_LEADERBOARD_TYPES = ['match3-level', 'match3-endless', 'match3-endless3', 'match3-rogue'];
 
+// 肉鸽 meta 存档当前版本认识的顶层字段（开发方案 4.7）；
+// 其余 key（排除弃用的 version 与客户端本地签名字段 _ck）归一化时收进 _ext 透传袋，
+// 版本回滚期间不把新版本写的字段抹掉
+const ROGUE_META_KNOWN_KEYS = new Set([
+  'saveVer', 'version', 'essence', 'essenceEarned', 'perks', 'buffs', 'claimed', 'stats'
+]);
+
 class AccountManager {
   constructor(io = null) {
     // 密码哈希迭代次数 - 可根据需要调整
@@ -3004,16 +3011,49 @@ class AccountManager {
   // ========== 肉鸽局外养成（精华 / 祝福等级 / 图鉴里程碑，开发方案 5.7） ==========
 
   /**
+   * 肉鸽 meta 存档版本迁移（开发方案 4.7）
+   *
+   * 纯数据、幂等，是 _normalizeRogue 的前置步骤：
+   * - 版本读取：saveVer ?? 旧别名 version ?? 1
+   * - 旧档按迁移链升到 config.match3Rogue.saveVer（v1→v2 只是改名，结构无破坏）
+   * - 高版本档（回滚场景）：不迁移、不报错，原样交归一化层（已知字段照常读、
+   *   未知字段进 _ext，saveVer 保留档上的高版本号）
+   * @returns {{data:object, future:boolean, ver:number, fresh:boolean}}
+   */
+  _migrateRogueMeta(saved) {
+    const current = config.match3Rogue.saveVer || 1;
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) {
+      return { data: {}, future: false, ver: current, fresh: true };
+    }
+
+    let ver = Math.floor(Number(saved.saveVer));
+    if (!Number.isInteger(ver) || ver < 1) {
+      const legacy = Math.floor(Number(saved.version));
+      ver = Number.isInteger(legacy) && legacy >= 1 ? legacy : 1;
+    }
+    if (ver > current) return { data: saved, future: true, ver, fresh: false };
+
+    // 迁移链：每步只增不改不删。v1→v2：version 改名 saveVer（旧字段不再写回，
+    // 弃用已登记，读时 saveVer ?? version 兼容老档）
+    const data = { ...saved };
+    if (ver < 2) data.saveVer = 2;
+    return { data, future: false, ver: current, fresh: false };
+  }
+
+  /**
    * 归一化肉鸽养成存档
    *
    * 存档刻意**记录得全**：除等级外还留了解锁时间、最近升级时间、该祝福累计被选次数，
    * 以及局数 / 最深层 / 累计花销等汇总。这些字段眼下的界面用不到，但往后做
    * 「最常用祝福」「首通纪念」这类功能时就不用再补数据了。
    * 等级按稀有度上限裁剪：将来调低上限或存档被改坏时，不会出现超过上限的等级。
+   *
+   * 先过版本迁移（_migrateRogueMeta），再白名单重建；不认识的顶层 key 收进
+   * _ext 透传袋原样回写（开发方案 4.7 回滚保护）。
    */
   _normalizeRogue(saved) {
     const cfg = config.match3Rogue;
-    const src = saved && typeof saved === 'object' ? saved : {};
+    const { data: src, future, ver } = this._migrateRogueMeta(saved);
     const num = (v, min, max) => Math.max(min, Math.min(max, Math.floor(Number(v) || 0)));
     const BIG = Number.MAX_SAFE_INTEGER;
 
@@ -3050,8 +3090,18 @@ class AccountManager {
 
     const s = src.stats && typeof src.stats === 'object' ? src.stats : {};
     const claimed = src.claimed && typeof src.claimed === 'object' ? src.claimed : {};
-    return {
-      version: 1,
+
+    // 透传袋：保留已有 _ext，再把当前版本不认识的顶层 key 收进来
+    // （version 是已登记弃用字段、_ck 是客户端本地缓存签名，都不进袋）
+    const ext = src._ext && typeof src._ext === 'object' ? { ...src._ext } : {};
+    for (const key of Object.keys(src)) {
+      if (key === '_ext' || key === '_ck' || ROGUE_META_KNOWN_KEYS.has(key)) continue;
+      ext[key] = src[key];
+    }
+
+    const out = {
+      // 高版本档保留档上的版本号（不盖成当前），让下一个读到它的节点继续走回滚分支
+      saveVer: future ? ver : cfg.saveVer,
       essence: num(src.essence, 0, BIG),
       essenceEarned: num(src.essenceEarned, 0, BIG),
       perks,
@@ -3067,10 +3117,15 @@ class AccountManager {
         questsDone: num(s.questsDone, 0, BIG),
         picked: num(s.picked, 0, BIG),      // 累计拿过的祝福张数
         spent: num(s.spent, 0, BIG),        // 累计花掉的精华
+        // 胜利闭环（开发方案 3.3）：通关次数 / 三个 Boss 的累计击败数（纯追加统计，不升 saveVer）
+        wins: num(s.wins, 0, BIG),
+        bossKills: num(s.bossKills, 0, BIG),
         firstRunAt: num(s.firstRunAt, 0, BIG),
         lastRunAt: num(s.lastRunAt, 0, BIG)
       }
     };
+    if (Object.keys(ext).length > 0) out._ext = ext;
+    return out;
   }
 
   /**
@@ -3148,22 +3203,38 @@ class AccountManager {
    * 再乘上局外增益「精华共鸣」（未解锁 ×1，与不买时逐位一致），
    * 机制节点「丰收闭环」再加一笔按层数的定额（未解锁 +0）——两处都得与客户端
    * meta.js 的 essenceForRun 保持同口径，否则结算页显示的数会与到账的对不上。
+   *
+   * 胜利闭环（开发方案 3.3）：win=true 额外发固定 winBonus；floor>30 的深渊段
+   * 不走平方曲线（基础封在 30 层），只叠加调和衰减增量，最终受 maxEssencePerRun 封顶。
    * @param {string} userId 账号 ID
-   * @param {object} run { floor, cleared, picks, questsDone }
+   * @param {object} run { floor, cleared, picks, questsDone, win, bossKills, endless }
    * @returns {Promise<{rogue: object, gain: number}>} rogue 为写回后的存档，gain 为本轮发放数
    */
   async addRogueEssence(userId, run) {
     const cfg = config.match3Rogue;
     // 层数先截到上限：正常打不到（标定实测最深 44 层），只拦「层数报个大数」的异常上报
     const floor = Math.min(cfg.maxFloor, Math.max(0, Math.floor(run?.floor || 0)));
+    // 兜底：通关标记只在到达第 30 层时生效（server.js 已做同一条校验，这里防内部调用方漏传）
+    const win = run?.win === true && floor >= 30;
+    const bossKills = Math.max(0, Math.min(3, Math.floor(run?.bossKills || 0)));
     const now = Date.now();
     let gain = 0;
 
     const rogue = await this._patchMatch3Rogue(userId, (r) => {
-      const base = Math.floor((floor * floor) / cfg.essenceDivisor);
+      // 基础层数在 30 层封口：深渊段再深也不进平方曲线
+      const baseFloor = floor > 30 ? 30 : floor;
+      const base = Math.floor((baseFloor * baseFloor) / cfg.essenceDivisor);
       gain = Math.floor(base * this.rogueBuffMult(r, 'essenceboost'));
       if (this._rogueMechanicOn(r, 'harvest')) {
-        gain += Math.floor(floor * (cfg.mechanics?.harvest?.essencePerFloor || 0));
+        gain += Math.floor(baseFloor * (cfg.mechanics?.harvest?.essencePerFloor || 0));
+      }
+      if (win) {
+        gain += Math.max(0, Math.floor(cfg.winBonus || 0));
+        // 深渊增量：第 k 层深渊（k=floor-30）给 round(abyssEssenceBase/k)，调和收敛
+        if (floor > 30) {
+          const abyssBase = Math.max(0, Number(cfg.abyssEssenceBase) || 0);
+          for (let k = 1; k <= floor - 30; k += 1) gain += Math.round(abyssBase / k);
+        }
       }
       gain = Math.max(0, Math.min(cfg.maxEssencePerRun, gain));
       r.essence += gain;
@@ -3172,6 +3243,9 @@ class AccountManager {
       r.stats.bestFloor = Math.max(r.stats.bestFloor, floor);
       r.stats.totalCleared += Math.max(0, Math.floor(run?.cleared || 0));
       r.stats.questsDone += Math.max(0, Math.floor(run?.questsDone || 0));
+      // 胜利闭环统计：通关次数与累计 Boss 击败数
+      if (win) r.stats.wins = (r.stats.wins || 0) + 1;
+      r.stats.bossKills = (r.stats.bossKills || 0) + bossKills;
       r.stats.firstRunAt = r.stats.firstRunAt || now;
       r.stats.lastRunAt = now;
 

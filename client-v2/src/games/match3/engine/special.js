@@ -11,7 +11,7 @@
  * 形态效果：row 整行 / col 整列 / bomb 半径内的方形区域（默认 3×3）/ rainbow 同色全部
  * 彩球组合：+ 普通方块 → 清除全场同色；+ 条状 / 炸弹 → 该效果复制给全部同色棋子并逐颗触发
  */
-import { SPECIAL, SPECIAL_RULES, SHAPE } from './config.js';
+import { SPECIAL, SPECIAL_RULES, SHAPE } from '../config/config.js';
 import { colOf, getAt, index, isPlayable, rowOf } from './grid.js';
 
 /** 按形态创建特殊元素（彩球不持有颜色） */

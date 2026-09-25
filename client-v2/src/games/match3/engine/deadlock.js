@@ -5,7 +5,7 @@
  * - 分仓棋盘以「区域」为粒度：某个区域死局时只重排该区域，
  *   不能整盘一起洗，否则会破坏其他区域的局面
  */
-import { SHUFFLE, SPECIAL } from './config.js';
+import { SHUFFLE, SPECIAL } from '../config/config.js';
 import { colOf, getAt, hasBlocker, index, isPlayable, regions, rowOf, setAt } from './grid.js';
 import { findMatches, hasMatch } from './match.js';
 

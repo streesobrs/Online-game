@@ -385,9 +385,13 @@ module.exports = {
 
   // ========== 肉鸽试炼局外养成（精华 / 祝福解锁与升级，开发方案 5.7） ==========
   // 这里是**权威**：精华余额、祝福等级、里程碑领取都只由服务端发放与扣减，客户端只展示与发起请求。
-  // 数值与 client-v2/src/games/match3/config.js 的 ROGUE_META 是一份手工同步的镜像
+  // 数值与 client-v2/src/games/match3/config/config.js 的 ROGUE_META 是一份手工同步的镜像
   // （那边供引擎、图鉴与标定脚本使用）；改一边必须同步改另一边。
   match3Rogue: {
+    // 局外 meta 存档版本号（开发方案 4.7）：服务端权威，随 match3_progress 下发，
+    // 客户端 config.js 的 ROGUE_META.saveVer 是手工同步的镜像；改存档结构先升这里再写迁移步。
+    // v1：只有 version 字段；v2：version 改名 saveVer，未知 key 进 _ext 透传袋
+    saveVer: 2,
     // 稀有度 → 等级上限与费用（maxLevel=2 表示 lv1 之外还能升 1 次）
     rarities: {
       common: { maxLevel: 2, unlockCost: 20, upgradeCost: 25, costGrowth: 1.5 },
@@ -433,6 +437,17 @@ module.exports = {
     maxFloor: 100,                                  // 单轮层数上限：精华与经验都按它截断（正常打不到，只拦异常上报）
     maxEssencePerRun: 50000,                        // 单轮发放上限：正常 50 层也就 500 精华，只为拦住异常上报
     maxPicksPerRun: 50,                             // 单轮上报的祝福选取次数上限（统计字段，宽松校验）
+    // 胜利闭环（开发方案 3.3）：通关固定精华 + 深渊 31+ 衰减增量基数（第 k 层深渊给 round(base/k)）
+    winBonus: 200,
+    abyssEssenceBase: 10,
+    // Boss 表：与客户端 config.js 的 ROGUE_BOSSES 手工镜像。
+    // 服务端不重算局内血量，但要用 depth / hpMult 做结算反刷分校验（win 必须真打过第 30 层），
+    // rewardRarity 只是声明（保底抽牌在客户端发生，服务端无法也无需验证）
+    bosses: {
+      chain_warden: { depth: 10, biome: 'plain', name: '锁链守卫', hpMult: 1.5, rewardRarity: 'epic' },
+      frost_reverent: { depth: 20, biome: 'frost', name: '霜蚀主教', hpMult: 1.6, rewardRarity: 'epic' },
+      core_titan: { depth: 30, biome: 'core', name: '熔核巨神', hpMult: 1.7, rewardRarity: 'epic' }
+    },
     // 图鉴收集里程碑（一次性领取，只发精华）
     // kind：unlocked=已解锁种类数 / maxed=已满级张数 / all=集齐全部
     milestones: [

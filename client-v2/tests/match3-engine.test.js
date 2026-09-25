@@ -14,7 +14,7 @@ import {
   SPECIAL,
   SPECIAL_RULES,
   colorScoreMultiplier,
-} from '../src/games/match3/config.js';
+} from '../src/games/match3/config/config.js';
 import {
   columnSegments,
   createGrid,
@@ -24,11 +24,11 @@ import {
   isPlayable,
   regions,
   setAt,
-} from '../src/games/match3/grid.js';
-import { countBlockers, damageBlockers, placeBlockers } from '../src/games/match3/blockers.js';
-import { findMatches, findRuns, hasMatch } from '../src/games/match3/match.js';
-import { effectCells, expandSpecials } from '../src/games/match3/special.js';
-import { findValidMove, isResolvable, shuffleRegion } from '../src/games/match3/deadlock.js';
+} from '../src/games/match3/engine/grid.js';
+import { countBlockers, damageBlockers, placeBlockers } from '../src/games/match3/engine/blockers.js';
+import { findMatches, findRuns, hasMatch } from '../src/games/match3/engine/match.js';
+import { effectCells, expandSpecials } from '../src/games/match3/engine/special.js';
+import { findValidMove, isResolvable, shuffleRegion } from '../src/games/match3/engine/deadlock.js';
 import {
   applyGravity,
   createInitialBoard,
@@ -38,10 +38,10 @@ import {
   refill,
   resolve,
   resolveRainbowSwap,
-} from '../src/games/match3/cascade.js';
-import { createRng } from '../src/games/match3/rng.js';
-import { validateLevel } from '../src/games/match3/validate.js';
-import { CHAPTERS, LEVELS, levelsOfChapter } from '../src/games/match3/levels.js';
+} from '../src/games/match3/engine/cascade.js';
+import { createRng } from '../src/games/match3/engine/rng.js';
+import { validateLevel } from '../src/games/match3/engine/validate.js';
+import { CHAPTERS, LEVELS, levelsOfChapter } from '../src/games/match3/config/levels.js';
 
 let passed = 0;
 const failures = [];

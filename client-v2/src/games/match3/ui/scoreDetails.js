@@ -10,9 +10,9 @@
  * breakdown 结构由 cascade.js 的 emptyBreakdown / mergeBreakdown 约定：
  *   { tile, special, blocker, specials: {row,col,bomb,rainbow}, cascades: {层数:次数} }
  */
-import { SCORE, SPECIAL, COLOR_NAMES, colorScoreMultiplier } from './config.js';
-import { el } from '../../utils/dom.js';
-import { modal } from '../../components/modal.js';
+import { SCORE, SPECIAL, COLOR_NAMES, colorScoreMultiplier } from '../config/config.js';
+import { el } from '../../../utils/dom.js';
+import { modal } from '../../../components/modal.js';
 
 const SPECIAL_NAMES = {
   [SPECIAL.ROW]: '横向条状',

@@ -4,7 +4,7 @@
  * 纯逻辑，不访问 DOM；随机数一律由外部传入的 rng 提供，
  * 引擎内不出现 Math.random，保证同一 payload 可复现（开发方案 4.5）
  */
-import { MATCH_RULES, SCORE, SHAPE, SHUFFLE, SPECIAL } from './config.js';
+import { MATCH_RULES, SCORE, SHAPE, SHUFFLE, SPECIAL } from '../config/config.js';
 import { columnSegments, createGrid, getAt, hasBlocker, index, setAt } from './grid.js';
 import { damageBlockers, placeBlockers } from './blockers.js';
 import { findMatches } from './match.js';

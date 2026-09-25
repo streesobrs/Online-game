@@ -12,10 +12,12 @@
  * 本地通关不再自行解锁下一关——服务端 maxLevel 才是解锁依据（开发方案 9.4），
  * 否则本地进度会跑在服务端前面，被判「跳关」后永远追不上。
  */
-import { COLOR_NAMES, STAR_RULES, STORAGE_KEYS } from './config.js';
-import { CHAPTERS, LEVEL_COUNT, getLevel, levelsOfChapter } from './levels.js';
-import { createMatch3Board } from './board.js';
-import { showScoreDetails } from './scoreDetails.js';
+import { STAR_RULES, STORAGE_KEYS } from '../config/config.js';
+import { CHAPTERS, LEVEL_COUNT, getLevel, levelsOfChapter } from '../config/levels.js';
+import { createMatch3Board } from '../ui/board.js';
+// 目标判定与肉鸽共用同一份纯逻辑（开发方案 3.2），re-export 保持本模块既有对外形状
+import { goalLabel, goalProgress } from '../engine/goals.js';
+import { showScoreDetails } from '../ui/scoreDetails.js';
 import {
   estimateExp,
   onProgress,
@@ -23,9 +25,9 @@ import {
   reportEnd,
   reportStart,
   requestProgress,
-} from './sync.js';
-import { el } from '../../utils/dom.js';
-import { toast } from '../../components/toast.js';
+} from '../save/sync.js';
+import { el } from '../../../utils/dom.js';
+import { toast } from '../../../components/toast.js';
 
 function readStore(key) {
   try {
@@ -61,25 +63,6 @@ export function starsFor(level, movesLeft) {
   if (ratio >= STAR_RULES.threeStarRemainRatio) return 3;
   if (ratio >= STAR_RULES.twoStarRemainRatio) return 2;
   return 1;
-}
-
-/** 目标文案 */
-export function goalLabel(goal) {
-  if (goal.type === 'score') return `得分达到 ${goal.target}`;
-  if (goal.type === 'collect') return `收集 ${COLOR_NAMES[goal.color] || goal.color}色 ${goal.target} 个`;
-  return `清除障碍 ${goal.target} 个`;
-}
-
-/** 目标当前进度（info 为 board 的 onUpdate 参数） */
-export function goalProgress(level, info) {
-  return level.goals.map((goal) => {
-    if (goal.type === 'score') return { goal, current: info.score, done: info.score >= goal.target };
-    if (goal.type === 'collect') {
-      const current = info.collected[goal.color] || 0;
-      return { goal, current, done: current >= goal.target };
-    }
-    return { goal, current: info.blockersCleared, done: info.blockersCleared >= goal.target };
-  });
 }
 
 /**
@@ -237,7 +220,7 @@ export function renderLevelMode(container, { onExit }) {
     /** 目标进度条 */
     function paintGoals(info) {
       goalList.replaceChildren(
-        ...goalProgress(level, info).map(({ goal, current, done }) =>
+        ...goalProgress(level.goals, info).map(({ goal, current, done }) =>
           el(
             'div',
             { class: `m3-goal${done ? ' m3-goal--done' : ''}` },
@@ -373,7 +356,7 @@ export function renderLevelMode(container, { onExit }) {
         paintGoals(info);
         paintExp(info);
         if (info.shuffled) toast.info('无可消除，已自动洗牌');
-        if (!finished && !achieved && goalProgress(level, info).every((item) => item.done)) {
+        if (!finished && !achieved && goalProgress(level.goals, info).every((item) => item.done)) {
           markAchieved(info);
         }
       },

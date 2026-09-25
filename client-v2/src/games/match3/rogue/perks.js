@@ -14,7 +14,7 @@
  * - `scales.base` 就是 **lv1 的数值**，即标定基线；升级只是让它变大（见 valueAt）
  * - lv0 = 未解锁，不进三选一池（由 meta.js 决定池子）
  */
-import { ROGUE, SCORE, SPECIAL } from './config.js';
+import { ROGUE, ROGUE_SHAPE, SCORE, SPECIAL } from '../config/config.js';
 
 /** 本轮加成的初始值（每开一轮 run 都要新建一个） */
 export function createBonus() {
@@ -438,14 +438,18 @@ export function goalOf(floor, bonus) {
  * 因此不加这两张牌时，行为与旧版完全一致。
  * @param {object} bonus - 本轮加成
  * @param {number} [floor] - 层号（层数成长来源）
+ * @param {object} [terrain] - 本层地形（floor-types.js 的 terrainFor 结果，开发方案 3.2）：
+ *   带 mask 时切到 9×9 异形盘并降色、透传 blockers；不传 = 旧版 8×8 满盘（标定脚本兼容）
  */
-export function floorOptions(bonus, floor = 1) {
+export function floorOptions(bonus, floor = 1, terrain = null) {
   const specials = [];
   if (bonus.specials.row) specials.push({ kind: SPECIAL.ROW, count: bonus.specials.row });
   if (bonus.specials.bomb) specials.push({ kind: SPECIAL.BOMB, count: bonus.specials.bomb });
   if (bonus.specials.rainbow) specials.push({ kind: SPECIAL.RAINBOW, count: bonus.specials.rainbow });
 
-  const colors = Math.max(ROGUE.minColors, ROGUE.colors - bonus.colorCut);
+  const baseColors = Math.max(ROGUE.minColors, ROGUE.colors - bonus.colorCut);
+  // 异形盘（挖洞 / 分仓）行列不贯通，6 色会频繁无解，强制降一档（见 levels.js 标定注释）
+  const colors = terrain?.mask ? Math.min(baseColors, ROGUE_SHAPE.maxColors) : baseColors;
   // 颜色权重：只有「同色磁石」会给出非均匀权重；其余情况保持 null（等概率），
   // 与旧版逐位一致——这一点在引擎侧同样是硬约束（见 cascade.js 的 pickColor）
   const colorWeights =
@@ -458,8 +462,10 @@ export function floorOptions(bonus, floor = 1) {
     + Math.floor((floor - 1) / ROGUE.movesPerFloorStep) * (1 + bonus.moveGrowth);
 
   return {
-    rows: ROGUE.rows,
-    cols: ROGUE.cols,
+    rows: terrain?.mask ? ROGUE_SHAPE.size : ROGUE.rows,
+    cols: terrain?.mask ? ROGUE_SHAPE.size : ROGUE.cols,
+    mask: terrain?.mask || null,
+    blockers: terrain?.blockers || null,
     colors,
     // 「先手规划」机制只放大第 1 层的起手步数（后面几层按原曲线走，否则等于白送一层成长）
     moves: floor === 1 ? Math.round(baseMoves * (bonus.firstFloorMult || 1)) : baseMoves,
@@ -475,19 +481,39 @@ export function floorOptions(bonus, floor = 1) {
  * @param {object} rng - 引擎的随机数发生器
  * @param {Record<string, number>} picks - 已选祝福 { 祝福id: 次数 }
  * @param {Set<string>|null} [allowed] - 已解锁的祝福 id；传 null / 不传表示不过滤（标定脚本用）
- * @returns {Array} 备选祝福（池子不够 3 张时会少于 3 张）
+ * @param {object} [opts]
+ * @param {'common'|'rare'|'epic'} [opts.minRarity] - 稀有度保底（精英层 rare / Boss 层 epic，开发方案 3.3）；
+ *   保底档池子为空（对应稀有度一张都没解锁）时自动回退到全池，保证三选一不空
+ * @param {number} [opts.choices] - 备选张数，缺省走 ROGUE.perkChoices；
+ *   遗物「宽幅选择」会把它调大（开发方案 3.5）
+ * @param {string[]|Set<string>} [opts.banned] - 被封禁的祝福 id（商店「移除服务」写入，
+ *   开发方案 3.6）：这些牌永不进池，即使已解锁 / 未叠满
+ * @returns {Array} 备选祝福（池子不够 choices 张时会少于该数）
  */
-export function rollPerks(rng, picks = {}, allowed = null) {
+export function rollPerks(rng, picks = {}, allowed = null, opts = {}) {
   const pickedTotal = Object.values(picks).reduce((sum, n) => sum + (n || 0), 0);
   const grownOnly = pickedTotal < ROGUE.friendlyPicks;
-  const rest = PERKS.filter((perk) => {
+  const rank = { common: 0, rare: 1, epic: 2 };
+  const minRank = opts.minRarity ? rank[opts.minRarity] ?? 0 : 0;
+  const banned = opts.banned instanceof Set
+    ? opts.banned
+    : new Set(Array.isArray(opts.banned) ? opts.banned : []);
+  const want = Number.isFinite(opts.choices) && opts.choices > 0
+    ? Math.floor(opts.choices)
+    : ROGUE.perkChoices;
+  const eligible = (perk) => {
+    if (banned.has(perk.id)) return false;
     if (allowed && !allowed.has(perk.id)) return false;
     if ((picks[perk.id] || 0) >= perk.max) return false;
-    return grownOnly ? perk.growth : true;
-  });
+    return !(grownOnly && !perk.growth);
+  };
+  const all = PERKS.filter(eligible);
+  // 保底池：达到稀有度档位的候选；不够凑一张就回退全池（新号也可能走到精英层）
+  const guaranteed = minRank > 0 ? all.filter((p) => rank[p.rarity] >= minRank) : all;
+  const rest = guaranteed.length > 0 ? guaranteed.slice() : all.slice();
 
   const out = [];
-  while (out.length < ROGUE.perkChoices && rest.length > 0) {
+  while (out.length < want && rest.length > 0) {
     out.push(rest.splice(rng.int(rest.length), 1)[0]);
   }
   return out;

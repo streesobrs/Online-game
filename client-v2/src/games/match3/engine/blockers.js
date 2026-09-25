@@ -9,7 +9,7 @@
  *
  * 纯逻辑，不访问 DOM；随机数一律外部传入
  */
-import { BLOCKERS, BLOCKER_KINDS, BLOCKER_RULES } from './config.js';
+import { BLOCKERS, BLOCKER_KINDS, BLOCKER_RULES } from '../config/config.js';
 import { colOf, getAt, index, isPlayable, neighbors, rowOf, setAt } from './grid.js';
 
 /** 取障碍的初始 hp：关卡可逐格覆盖，缺省用种类默认值 */

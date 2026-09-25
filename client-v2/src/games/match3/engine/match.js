@@ -7,7 +7,7 @@
  * 返回的 spawnIndex 是特殊元素的生成位置：优先玩家交换的那一格（手感最好），
  * 否则取交叉点 / 最长连线的中点（开发方案 3.5）
  */
-import { MATCH_RULES, SHAPE } from './config.js';
+import { MATCH_RULES, SHAPE } from '../config/config.js';
 import { getAt, index, isPlayable } from './grid.js';
 
 /** 取该格颜色：洞、空格、彩球一律返回 null（不参与同色连线） */

@@ -791,6 +791,15 @@ class AchievementManager {
         type: 'game_type',
         condition: { gameType: 'match3', totalGames: 50 },
         reward: { exp: 800, badge: 'match3_games_50' }
+      },
+      {
+        // 开发方案 3.3 胜利闭环：击败第 30 层熔核巨神、通关本轮肉鸽（rogueWin 由结算上报，rogue meta.stats.wins 兜底）
+        id: 162,
+        name: '肉鸽通关',
+        description: '通关肉鸽试炼（击败全部3个Boss）',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueWin: true },
+        reward: { exp: 5000, badge: 'match3_rogue_win' }
       }
     ];
   }
@@ -936,6 +945,10 @@ class AchievementManager {
         }
         if (achievement.condition.rogueHighScore !== undefined) {
           return (stats.gameTypeRogueScore?.[achievement.condition.gameType] || 0) >= achievement.condition.rogueHighScore;
+        }
+        // 肉鸽通关（开发方案 3.3）：本局结算上报 rogueWin，或历史累计已有通关（rogue meta.stats.wins）
+        if (achievement.condition.rogueWin !== undefined) {
+          return Boolean(stats.rogueWin) || (stats.gameTypeRogueWins?.[achievement.condition.gameType] || 0) >= 1;
         }
         // 累计局数：不分玩法，读 games.match3.totalGames
         if (achievement.condition.totalGames !== undefined) {
@@ -1091,6 +1104,16 @@ class AchievementManager {
         }
         // 消消乐：闯关进度 / 各类最高分与连锁 / 肉鸽层数 / 累计局数，
         // 条件字段与统计字段一一对应，取数口径同 checkCondition（标准无尽、三色爽局、肉鸽互不串味）
+        // 肉鸽通关是布尔成就：本局通关或历史已有通关即 1/1
+        if (achievement.condition.rogueWin !== undefined) {
+          const done = Boolean(stats.rogueWin)
+            || (stats.gameTypeRogueWins?.[achievement.condition.gameType] || 0) >= 1;
+          return {
+            current: done ? 1 : 0,
+            target: 1,
+            percent: done ? 100 : 0,
+          };
+        }
         const gameTypeProgressFields = [
           ['maxLevel', 'gameTypeMaxLevel'],
           ['maxCombo', 'gameTypeMaxCombo'],
@@ -1275,6 +1298,7 @@ class AchievementManager {
       match3_rogue_floor_15: '🗺️',
       match3_rogue_floor_30: '🏰',
       match3_rogue_score_500000: '💰',
+      match3_rogue_win: '🏆',
       // 消消乐累计局数
       match3_games_50: '🎮',
       // 等级系列

@@ -2070,7 +2070,9 @@ function recordSessionClient(socket, session, data) {
 // 汇总各 gameType 的成就判定用统计（结算检查与成就页共用，避免两处各拼一套字段）
 // 消消乐四种玩法成绩互相隔离：标准无尽 highScore/maxCombo、三色爽局 highScore3/maxCombo3、
 // 肉鸽试炼 rogueMaxFloor/rogueHighScore，成就条件与这里一一对应
-function buildGameTypeStats(games) {
+// rogueStatsByGame：可选的肉鸽养成 stats（{wins,bossKills}），按 gameKey 传入，
+// games 里不存这份数据（它在独立的 match3 存档文件里）
+function buildGameTypeStats(games, rogueStatsByGame = null) {
   const stats = {
     bestStreak: 0,
     bestMaxStreak: 0,
@@ -2083,6 +2085,8 @@ function buildGameTypeStats(games) {
     gameTypeMaxCombo3: {},
     gameTypeRogueFloor: {},
     gameTypeRogueScore: {},
+    gameTypeRogueWins: {},
+    gameTypeRogueBossKills: {},
     gameTypeGames: {}
   };
   for (const [gameKey, gd] of Object.entries(games || {})) {
@@ -2098,6 +2102,9 @@ function buildGameTypeStats(games) {
     stats.gameTypeRogueFloor[gameKey] = gd.rogueMaxFloor || 0;
     stats.gameTypeRogueScore[gameKey] = gd.rogueHighScore || 0;
     stats.gameTypeGames[gameKey] = gd.totalGames || 0;
+    const rogueStats = rogueStatsByGame?.[gameKey];
+    stats.gameTypeRogueWins[gameKey] = rogueStats?.wins || 0;
+    stats.gameTypeRogueBossKills[gameKey] = rogueStats?.bossKills || 0;
   }
   return stats;
 }
@@ -3039,7 +3046,12 @@ io.on('connection', (socket) => {
       const level = account?.account?.profile?.level || 1;
 
       // 聚合所有游戏类型的统计（胜利 / 最高分 / 消消乐各玩法进度），供 game_type 类成就使用
-      const gameTypeStats = buildGameTypeStats(account?.games);
+      // 肉鸽通关 / Boss 数在独立养成存档里，单独取一次（读缓存文件，开销与拉星表同级）
+      const rogueMeta = await accountManager.getMatch3Rogue(userSession.accountId);
+      const gameTypeStats = buildGameTypeStats(
+        account?.games,
+        rogueMeta?.stats ? { match3: rogueMeta.stats } : null,
+      );
 
       // 兼容新旧成就格式：统一转为纯ID数组
       const rawAchievements = account?.achievements || [];
@@ -3827,6 +3839,12 @@ io.on('connection', (socket) => {
     // 因此这里只做形状检查，具体白名单与次数上限由 AccountManager.addRogueEssence 过滤
     const picks = data && typeof data.picks === 'object' && data.picks !== null ? data.picks : null;
     const questsDone = Math.max(0, Math.floor(data?.questsDone || 0));
+    // 胜利闭环（开发方案 3.3）：非 rogue 模式一律按未通关处理，防伪造字段
+    const rogueWin = mode === 'rogue' && data?.win === true;
+    const rogueEndless = mode === 'rogue' && data?.endless === true;
+    const rogueBossKills = mode === 'rogue'
+      ? Math.max(0, Math.min(3, Math.floor(data?.bossKills || 0)))
+      : 0;
 
     try {
       logger.info('消消乐游戏结束', { accountId, mode, level, floor, score, maxCombo, moves, durationMs });
@@ -3861,8 +3879,27 @@ io.on('connection', (socket) => {
       }
       // 肉鸽：层数只由到达层数换算成精华与经验（不按分），所以必须挡住「层数报个大数」。
       // 每层至少要花掉 1 步，层数不可能超过总步数——这条比单步得分上限更直接
-      if (mode === 'rogue' && Math.max(0, Math.floor(floor || 0)) > safeMoves) {
+      const rogueFloor = Math.max(0, Math.floor(floor || 0));
+      if (mode === 'rogue' && rogueFloor > safeMoves) {
         violations.push('floor_per_move');
+      }
+      if (mode === 'rogue') {
+        // 胜利闭环自洽性（开发方案 3.3）：Boss 在 10/20/30，击败数必须与层数匹配；
+        // 通关必须到达第 30 层且三个 Boss 全击败；深渊（31+）只能发生在通关之后
+        const bossDepths = Object.values(config.match3Rogue.bosses)
+          .map((b) => b.depth).sort((a, b) => a - b);
+        if (rogueBossKills > 0 && rogueFloor < bossDepths[rogueBossKills - 1]) {
+          violations.push('rogue_boss_kills');
+        }
+        if (rogueWin && (rogueFloor < 30 || rogueBossKills < 3)) {
+          violations.push('rogue_win');
+        }
+        if (rogueEndless && (rogueFloor < 31 || !rogueWin)) {
+          violations.push('rogue_endless');
+        }
+        if (!rogueWin && rogueFloor > 30) {
+          violations.push('rogue_abyss_without_win');
+        }
       }
 
       if (violations.length > 0) {
@@ -3902,7 +3939,10 @@ io.on('connection', (socket) => {
         cleared,
         stars,
         picks,
-        questsDone
+        questsDone,
+        win: rogueWin,
+        bossKills: rogueBossKills,
+        endless: rogueEndless
       });
       if (!saved.success) {
         socket.emit('match3_result', { success: false, message: saved.message || '保存失败' });
@@ -3965,7 +4005,12 @@ io.on('connection', (socket) => {
             : 0;
 
           // 聚合各游戏类型的最高分 / 闯关进度 / 消消乐各玩法成绩，供 game_type 类成就使用
-          const gameTypeStats = buildGameTypeStats(postAccount.games);
+          // 肉鸽通关 / Boss 击败数来自独立养成存档（本局结算后的最新值）
+          const rogueStats = mode === 'rogue' ? saved.progress?.rogue?.meta?.stats : null;
+          const gameTypeStats = buildGameTypeStats(
+            postAccount.games,
+            rogueStats ? { match3: rogueStats } : null,
+          );
 
           const unlockedAchievements = await gameManager.achievementManager.checkAchievements(accountId, {
             ...postAccount.stats,
@@ -3983,6 +4028,9 @@ io.on('connection', (socket) => {
             losses: postAccount.stats?.totalLosses || 0,
             draws: postAccount.stats?.totalDraws || 0,
             ...gameTypeStats,
+            // 本局事件态：本局通关立刻解锁，不必等下一次读档
+            rogueWin: mode === 'rogue' && rogueWin === true,
+            rogueBossKills: mode === 'rogue' ? rogueBossKills : 0,
             timestamp: Date.now()
           });
 
@@ -4084,6 +4132,15 @@ io.on('connection', (socket) => {
     } catch (err) {
       logger.error('保存消消乐暂存失败', { accountId: user.accountId, variant, error: err.message });
     }
+  });
+
+  // 消消乐本地存档完整性校验失败打点（开发方案 4.7.5）：
+  // 只用于发现 localStorage 截断 / 写坏 / 版本混写这类客户端写入端 bug，不做任何处罚
+  socket.on('match3_integrity_fail', (data) => {
+    const user = userManager.getUserBySocketId(socket.id);
+    const kind = data?.kind === 'meta' || data?.kind === 'session' ? data.kind : 'unknown';
+    const reason = typeof data?.reason === 'string' ? data.reason.slice(0, 40) : 'unknown';
+    logger.warn('消消乐存档校验失败打点', { accountId: user?.accountId || null, kind, reason });
   });
 
   // 肉鸽局外养成：解锁 / 升级一条养成项（祝福或局外增益，开发方案 5.7）

@@ -7,15 +7,15 @@
  * - 娱乐：二级菜单，放不设目标的爽快玩法，当前有「无尽三色」与「肉鸽试炼」
  *   （mode-endless.js 的 endless3 变体，固定 3 色，成绩独立；mode-rogue.js 限步冲层）
  */
-import { ENDLESS3, ENDLESS, ROGUE } from './config.js';
-import { renderEndless, renderEndless3, loadBest, loadSession } from './mode-endless.js';
-import { renderRogue, loadRogueBest } from './mode-rogue.js';
-import { showPerkCodex } from './codex.js';
-import { claimableCount, buffLevel, poolProgress } from './meta.js';
-import { META_BUFFS } from './perks.js';
-import { renderLevelMode, loadProgress, totalStars } from './mode-level.js';
-import { getRogueMeta, loadLocalSession, onProgress, onRogueMeta, requestProgress } from './sync.js';
-import { LEVEL_COUNT } from './levels.js';
+import { ENDLESS3, ENDLESS, ROGUE } from './config/config.js';
+import { renderEndless, renderEndless3, loadBest, loadSession } from './modes/mode-endless.js';
+import { renderRogue, loadRogueBest } from './modes/mode-rogue.js';
+import { showPerkCodex } from './rogue/codex.js';
+import { claimableCount, buffLevel, poolProgress } from './rogue/meta.js';
+import { META_BUFFS } from './rogue/perks.js';
+import { renderLevelMode, loadProgress, totalStars } from './modes/mode-level.js';
+import { getRogueMeta, loadLocalSession, onProgress, onRogueMeta, requestProgress } from './save/sync.js';
+import { LEVEL_COUNT } from './config/levels.js';
 import { viewRoot, el } from '../../utils/dom.js';
 import { startGameActivity, stopGameActivity } from '../../core/activity.js';
 

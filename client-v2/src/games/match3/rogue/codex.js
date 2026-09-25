@@ -3,11 +3,13 @@
  *
  * 它同时承担两件事：
  * 1. **看**：三选一每次只出 3 张，玩家看不到池子里还有什么；这里把 perks.js 的
- *    PERKS / META_BUFFS / QUEST_REWARDS 原样铺开（数据源就是同一份常量，加一条不用改本文件）
+ *    PERKS / META_BUFFS / QUEST_REWARDS 与 relics.js 的 RELICS 原样铺开
+ *    （数据源就是同一份常量，加一条不用改本文件）
  * 2. **花**：打 run 攒的「精华 ✦」在这里花掉——解锁新祝福（进三选一池）、
  *    升级已有祝福（提升单张效果）、解锁升级局外增益（跨轮常驻）、领取收集里程碑
  *
- * 分两层：**局外增益**跨轮常驻、不进三选一；**祝福**是局内的，一轮结束清空。
+ * 分两层：**局外增益**跨轮常驻、不进三选一；**祝福 / 遗物**是局内的，一轮结束清空。
+ * 遗物只做「看」（不靠精华购买，也不进三选一池），见下方 relicSections。
  *
  * 数值推导全在 meta.js（等级上限、费用、里程碑判定、余额），本文件只管渲染与发起请求。
  * 所有改动都要经服务端：`upgradeRoguePerk` / `claimRogueMilestone` 只发 id 出去，
@@ -15,16 +17,17 @@
  *
  * 外框复用 components/modal（与「积分详情」同一套），所以这里只负责产出内容节点。
  */
-import { ROGUE } from './config.js';
+import { ROGUE } from '../config/config.js';
 import { META_BUFFS, PERKS, QUEST_REWARDS, descOf, valueAt } from './perks.js';
+import { relicsByRarity } from './relics.js';
 import {
   buffFactor, claimableCount, itemLevel, maxLevelOf, milestoneReward, milestoneState,
   nextStep, poolProgress, rarityOf, requiresMet, rogueCfg,
 } from './meta.js';
-import { claimRogueMilestone, getRogueMeta, onRogueMeta, upgradeRoguePerk } from './sync.js';
-import { el } from '../../utils/dom.js';
-import { modal } from '../../components/modal.js';
-import { toast } from '../../components/toast.js';
+import { claimRogueMilestone, getRogueMeta, onRogueMeta, upgradeRoguePerk } from '../save/sync.js';
+import { el } from '../../../utils/dom.js';
+import { modal } from '../../../components/modal.js';
+import { toast } from '../../../components/toast.js';
 
 /**
  * 某条养成项「现在生效的效果」一句话摘要
@@ -384,6 +387,33 @@ export function showPerkCodex(picks = null) {
     );
   }
 
+  /** 遗物流派的中文名（与 relics.js 的 group 同口径，仅用于图鉴展示） */
+  const RELIC_GROUP_LABEL = {
+    chain: '连锁流', special: '特殊元素流', economy: '经济流', survival: '生存流',
+  };
+
+  /**
+   * 遗物图鉴（开发方案 3.5 / 4.2）：**只读**分区
+   *
+   * 遗物是「玩法引擎」，不能靠精华买、也不进三选一池（那是祝福的位置），
+   * 所以这里只按稀有度铺开条目，让玩家知道宝箱 / Boss / 事件里可能开出什么。
+   * 稀有度顺序与祝福分区一致（普通 → 稀有 → 史诗），说明里点出「每轮最多 1 件」的硬边界。
+   */
+  function relicSections() {
+    const cfg = rogueCfg().rarities;
+    const byRarity = relicsByRarity();
+    return ['common', 'rare', 'epic']
+      .filter((key) => byRarity[key] && byRarity[key].length > 0)
+      .map((key) => {
+        const label = cfg[key]?.label || key;
+        return section(
+          `宝箱遗物 · ${label}`,
+          `共 ${byRarity[key].length} 件 · 每轮每件最多持有 1 个 · 不进三选一池，只从宝藏 / Boss / 事件 / 商店获得`,
+          byRarity[key].map((relic) => item(relic, RELIC_GROUP_LABEL[relic.group] || '遗物')),
+        );
+      });
+  }
+
   /** 按稀有度分组（普通 → 稀有 → 史诗），每组的说明带上该档的等级上限与费用 */
   function raritySections(meta) {
     const cfg = rogueCfg().rarities;
@@ -413,6 +443,7 @@ export function showPerkCodex(picks = null) {
         milestoneState(meta).map((ms) => milestoneRow(ms, meta)),
       ),
       ...raritySections(meta),
+      ...relicSections(),
       section(
         '局内任务奖励',
         `第 ${ROGUE.quest.fromFloor} 层起每层随机派一个「收集某颜色 N 个」的任务（不设失败惩罚），达成即当场生效`,

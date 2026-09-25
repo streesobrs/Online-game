@@ -1435,7 +1435,10 @@ class GameManager {
           floor: rogueFloor,
           cleared: Math.max(0, Math.floor(data.cleared || 0)),
           picks,
-          questsDone
+          questsDone,
+          win: data.win === true,
+          bossKills: Math.max(0, Math.min(3, Math.floor(data.bossKills || 0))),
+          endless: data.endless === true
         });
         rogueGain = { gain: rogueRes.gain, meta: rogueRes.rogue };
       }

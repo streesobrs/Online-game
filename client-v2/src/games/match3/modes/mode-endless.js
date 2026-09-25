@@ -11,15 +11,15 @@
  * 服务端只做存档 / 经验 / 榜单，最高分按「服务端为准 + 本地 max 合并」同步；
  * 未结算的那一局不取 max，只认 ts 最新的那份（见 mergeRemoteProgress）。
  */
-import { ENDLESS, ENDLESS3, ENDLESS_TIERS, STORAGE_KEYS, colorScoreMultiplier } from './config.js';
-import { createMatch3Board } from './board.js';
-import { showScoreDetails } from './scoreDetails.js';
+import { ENDLESS, ENDLESS3, ENDLESS_TIERS, STORAGE_KEYS, colorScoreMultiplier } from '../config/config.js';
+import { createMatch3Board } from '../ui/board.js';
+import { showScoreDetails } from '../ui/scoreDetails.js';
 import {
   estimateExp, finishedSession, loadLocalSession, onProgress, pushSession,
   reportEnd, reportStart, requestProgress, saveLocalSession,
-} from './sync.js';
-import { el } from '../../utils/dom.js';
-import { toast } from '../../components/toast.js';
+} from '../save/sync.js';
+import { el } from '../../../utils/dom.js';
+import { toast } from '../../../components/toast.js';
 
 /**
  * 两种无尽玩法的差异点，渲染流程完全共用

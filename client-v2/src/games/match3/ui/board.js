@@ -6,7 +6,7 @@
  * - 动画用 async/await 串 Promise，动画期间锁输入
  * - 引擎层不碰 DOM，本文件不写玩法规则
  */
-import { ANIM, BLOCKER_KINDS, BLOCKERS, COLOR_LIMITS, LAYOUT, SCORE, SPECIAL, colorScoreMultiplier } from './config.js';
+import { ANIM, BLOCKER_KINDS, BLOCKERS, COLOR_LIMITS, LAYOUT, SCORE, SPECIAL, colorScoreMultiplier } from '../config/config.js';
 import {
   colOf,
   createGrid,
@@ -16,13 +16,13 @@ import {
   rowOf,
   setAt,
   toPixel,
-} from './grid.js';
-import { createInitialBoard, mergeBreakdown, resolve, resolveRainbowSwap } from './cascade.js';
-import { shuffleBoard, findValidMove, swapCells } from './deadlock.js';
-import { hasMatch } from './match.js';
-import { makeSpecial } from './special.js';
-import { createRng } from './rng.js';
-import { el } from '../../utils/dom.js';
+} from '../engine/grid.js';
+import { createInitialBoard, mergeBreakdown, resolve, resolveRainbowSwap } from '../engine/cascade.js';
+import { shuffleBoard, findValidMove, swapCells } from '../engine/deadlock.js';
+import { hasMatch } from '../engine/match.js';
+import { makeSpecial } from '../engine/special.js';
+import { createRng } from '../engine/rng.js';
+import { el } from '../../../utils/dom.js';
 
 /** 特殊元素在棋子上的标记（彩球用配色表示，不叠符号） */
 const SPECIAL_MARK = {

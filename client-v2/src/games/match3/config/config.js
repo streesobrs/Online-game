@@ -238,6 +238,186 @@ export const ROGUE = {
 };
 
 /**
+ * 肉鸽区域（开发方案 3.2）
+ *
+ * 三个区域绑定「地形 + 障碍 + 目标池」，随深度切换节奏：
+ * - masks：异形形态名池（levels.js 的 MASKS，均为 9×9）；空数组表示永远 8×8 满盘
+ * - maskChance：该区域战斗层抽中异形盘的概率
+ * - blockers：各类障碍的基准铺设数量（精英 / Boss 的额外量见 ROGUE_NODES）
+ * - goalKinds / goalWeights：普通层硬目标的类型池与抽取权重
+ * 初版为保守值，接入标定脚本后按区域重新标定（文档 3.2）。
+ */
+export const ROGUE_BIOMES = [
+  {
+    id: 'plain', name: '风语平原', icon: '🍃', from: 1, to: 10,
+    masks: [], maskChance: 0,
+    // 平原无区域障碍（精英 / Boss 的额外量由 floor-types 用最弱的锁兜底）
+    blockers: {},
+    // 教学区以分数目标为主：collect 只偶发，且 floor-types 还会限定前三层不出条件硬目标
+    goalKinds: ['score', 'collect'], goalWeights: [0.9, 0.1],
+  },
+  {
+    id: 'frost', name: '霜蚀冰原', icon: '❄️', from: 11, to: 20,
+    masks: ['diamond', 'ring', 'hourglass'], maskChance: 0.5,
+    // 障碍量按文档 3.2 草案：中量冰块（hp2）+ 锁链；清障是本区主打目标
+    blockers: { ice: 4, lock: 2 },
+    goalKinds: ['score', 'collect', 'clearBlockers'], goalWeights: [0.45, 0.2, 0.35],
+  },
+  {
+    id: 'core', name: '熔核深窟', icon: '🌋', from: 21, to: 30,
+    masks: ['bowtie', 'castle', 'flower'], maskChance: 0.55,
+    // 文档草案：大量石头（hp3）+ 冰；终盘多目标、要规划清障
+    blockers: { stone: 5, ice: 3 },
+    goalKinds: ['score', 'clearBlockers', 'collect'], goalWeights: [0.4, 0.35, 0.25],
+  },
+];
+
+/**
+ * 节点类型相对普通战斗层的修正（开发方案 3.2 多目标 / 3.3 精英与 Boss）
+ * - goalMult：分数目标系数
+ * - extraBlockers：在区域基准障碍数上的额外铺设量
+ * - goals：硬目标数量（精英 / Boss 双目标：score + 一个条件目标）
+ */
+export const ROGUE_NODES = {
+  battle: { goalMult: 1, extraBlockers: 0, goals: 1 },
+  elite: { goalMult: 1.3, extraBlockers: 2, goals: 2 },
+  boss: { goalMult: 1.5, extraBlockers: 3, goals: 2 },
+};
+
+/**
+ * Boss 定义表（开发方案 3.3「Boss 层」，P1 数值 Boss）
+ *
+ * 纯数据，boss.js 在其上做伤害换算 / 布阵 / 阶段判定（两端同口径：
+ * server/config.js match3Rogue.bosses 必须与本表一致，改一边同步另一边）。
+ *
+ * - hpMult：Boss 血量 = goalOf(层数) × hpMult（沿用已标定的目标分曲线，不新增经济尺度）。
+ *   本层得分即对 Boss 伤害，打空血条 = 击败。
+ * - layout：开局即定的固定机关盘（零引擎改动：P1 不能层中注障碍，
+ *   真正的「阶段主动施法 / addBlockers」属于 P1.x）。
+ * - phases：HP 百分比阈值的一次性**演出**节点（66% / 33%），P1 只做横幅提示；
+ *   描述里的机关效果待 P1.x 接 addBlockers / 锁色 / 收步后落地。
+ * - rewardRarity：击败后三选一祝福的保底稀有度（文档原设计是「遗物宝箱」，
+ *   遗物系统在 P3，P1 用保底史诗祝福替代）。
+ */
+export const ROGUE_BOSSES = {
+  chain_warden: {
+    id: 'chain_warden',
+    depth: 10,
+    biome: 'plain',
+    name: '锁链守卫',
+    icon: '🔗',
+    hpMult: 1.5,
+    layout: { kind: 'chains' },
+    phases: [
+      { at: 2 / 3, icon: '⚡', text: '锁链守卫暴怒：锁链阵开始收紧！' },
+      { at: 1 / 3, icon: '💢', text: '锁链守卫濒死，做最后的挣扎！' },
+    ],
+    rewardRarity: 'epic',
+  },
+  frost_reverent: {
+    id: 'frost_reverent',
+    depth: 20,
+    biome: 'frost',
+    name: '霜蚀主教',
+    icon: '🧊',
+    hpMult: 1.6,
+    // 全图冰：7 行棋盘格交错铺冰（约 28 块 hp2 冰块），清障与得分都要硬
+    layout: { kind: 'icefield', rows: 7 },
+    phases: [
+      { at: 2 / 3, icon: '❄️', text: '霜蚀主教召唤暴风雪，寒气逼人！' },
+      { at: 1 / 3, icon: '💢', text: '冰层崩裂，主教孤注一掷！' },
+    ],
+    rewardRarity: 'epic',
+  },
+  core_titan: {
+    id: 'core_titan',
+    depth: 30,
+    biome: 'core',
+    name: '熔核巨神',
+    icon: '🌋',
+    hpMult: 1.7,
+    // 分仓石头阵：两道纵向石墙（留缺口）+ 墙间散落冰块
+    layout: { kind: 'pillars', cols: [2, 5], gapRows: [2, 5], ice: 6 },
+    phases: [
+      { at: 2 / 3, icon: '🔥', text: '熔核巨神喷发：岩浆照亮深窟！' },
+      { at: 1 / 3, icon: '💢', text: '熔核巨神的核心外露，最后机会！' },
+    ],
+    rewardRarity: 'epic',
+  },
+};
+
+/** 按深度排序的三个 Boss（boss.js / 标定脚本用） */
+export const ROGUE_BOSS_ORDER = ['chain_warden', 'frost_reverent', 'core_titan'];
+
+/**
+ * 异形盘修正（开发方案 3.2「目标按可玩格比例折算」）
+ * 挖洞 / 分仓盘行列不贯通，6 色时频繁无解（见 levels.js 顶部标定注释），故降色并折算目标
+ */
+export const ROGUE_SHAPE = {
+  size: 9,                  // 异形盘边长（MASKS 全部 9×9）
+  maxColors: 5,             // 异形盘颜色数上限
+  scoreComp: 1.15,          // 分数目标在「可玩格比例」上的补偿系数（降色后连锁变长，待标定）
+  // 清障目标 = 障碍总数 × 此比例（至少 1）：冰 hp2 / 石 hp3 要多次命中，
+  // 0.5 意味着「解开场上一半的障碍」，随标定调整（文档 3.2 风险对策：渐进、避免前期翻车）
+  clearRatio: 0.5,
+  // 教学保护深度：前 N 层普通战斗只给 score 硬目标（铺 build，条件目标 11 层后才主打）
+  tutorialDepth: 3,
+};
+
+/**
+ * 局内金币（开发方案 3.6，P4）
+ *
+ * 与局外精华**完全隔离**：金币只在本轮有效、终局清零、不上报服务端（4.3「局内过程不上报」），
+ * 因此它既不能换成精华、也不参与反刷分——这条边界是刻意的，避免「刷金币」成为刷精华的旁路。
+ *
+ * 数值口径（标定脚本 match3-rogue-balance.mjs 输出「场均金币 / 有效消费次数」校准）：
+ * 目标是**一轮（约 18-30 层）能在商店做 2-4 次有效消费**，所以单价按「一轮总收入 ÷ 3」量级定。
+ */
+export const ROGUE_GOLD = {
+  start: 0,
+  perBattle: [8, 15],     // 普通战斗层过关掉落区间
+  perElite: 30,           // 精英层额外（文档 3.6）
+  perBoss: 60,            // Boss 层额外
+  perQuest: 5,            // 达成层内任务（文档 3.6）
+  perEvent: [0, 0],       // 事件由事件卡自己增减，这里只占位说明它不走统一掉落
+  moveRefund: 2,          // 超额完成本层时，每剩余 1 步折算的金币
+  moveRefundMax: 30,      // 折算上限，防止高倍率 build 一步一层刷钱
+  // 商店：每区域 Boss 前必有 1 个（mapgen 的 takeInRanges([b-1,b], SHOP)）
+  shopSlots: 5,
+  refreshCost: 15,
+  refreshMax: 2,          // 花金币刷新货架的次数上限
+  priceByRarity: { common: 45, rare: 80, epic: 130 },   // 卖祝福（加入本轮三选池并立即生效一张）
+  relicPrice: { common: 90, rare: 140, epic: 200 },     // 卖遗物
+  movesAmount: 4,         // 服务类「+N 步」的 N
+  movesPrice: 30,
+  shieldPrice: 40,        // 1 次「免死金牌」（消耗品）
+  rerollPrice: 35,        // 1 次三选一重随
+  removeCost: 120,        // 封禁一条不想要的祝福（消消乐版「删牌」）
+  removeRefund: 20,       // 封禁时返还的金币（文档：返还少量精华或换成金币，取金币以保持局内闭环）
+  discountMult: 0.8,      // 拥有「商店折扣」类遗物时的价格系数（见 relics.js 的 shopDiscount）
+};
+
+/**
+ * 遗物（开发方案 3.5，P3）
+ *
+ * 与祝福的分工：祝福是**数值底盘**（可叠加、进三选一池），遗物是**机制引擎**
+ * （每轮每件最多 1 个、不进三选一池，只从宝藏 / Boss / 事件 / 商店获得）。
+ *
+ * 掉落池**不做发现制门槛**（文档 4.2 的「发现制」是二选一里的可选项）：
+ * 理由是 relicsFound 属于局外存档、且不进签名白名单，若用它来解锁强力遗物，
+ * 就等于开了一个「改本地存档即变强」的口子。所以 18 件遗物从一开始全部可掉落，
+ * relicsFound 只做图鉴收集展示，不含任何玩法门槛。
+ */
+export const ROGUE_RELIC = {
+  slotMax: 6,             // 侧栏槽位数（文档：一轮通常持有 3-6 件）
+  choices: 3,             // Boss 遗物宝箱的三选一数量（宝藏为随机 1 件）
+  // 随机掉落时的稀有度权重（宝藏 / 事件 / 商店高价随机位共用）
+  dropWeights: { common: 6, rare: 3, epic: 1.5 },
+  // 无可用遗物时（池子抽空 / 该稀有度没有）按此顺序回落，保证节点不空过
+  fallback: 'perk',
+};
+
+/**
  * 肉鸽局外养成（开发方案 5.7）
  *
  * 与 `ROGUE` 的分工：`ROGUE` 是**局内**数值（每层步数、目标分曲线、局内任务），
@@ -252,6 +432,14 @@ export const ROGUE = {
  * 这份供引擎、图鉴与标定脚本使用；改一边必须同步改另一边。
  */
 export const ROGUE_META = {
+  /**
+   * 局外永久存档版本号（开发方案 4.7.2）
+   *
+   * 服务端 server/config.js 的 match3Rogue.saveVer 是权威（随 match3_progress 下发）；
+   * 这个值是离线 / 游客兜底镜像，两端手工同步。旧档的 version 字段读时视作本字段别名。
+   * 只在「读旧数据会产生错误语义」时升号，每次升号必须在 migrate.js 配迁移与 fixture。
+   */
+  saveVer: 2,
   /**
    * 稀有度 → 等级上限与费用
    * - maxLevel：lv1 即「已解锁」，所以 2 表示还能升 1 次
@@ -271,6 +459,12 @@ export const ROGUE_META = {
   // 单轮层数上限：精华与经验都按它截断。正常打不到（标定上限 50 层、实测最深 44 层），
   // 只为拦住「层数报个大数」的异常上报。服务端同名值在手，改一边必须同步改另一边
   maxFloor: 100,
+  // 通关固定精华奖励（开发方案 3.3 winBonus）：第 30 层基础收益是 180，
+  // 通关再给一笔引导「打 Boss」而非绕 Boss 刮痧堆层；两端同改
+  winBonus: 200,
+  // 无尽深渊 31+ 层的衰减增量基数：第 k 层深渊给 round(base/k)（调和收敛），
+  // 再深也只有有界的一小笔，防与最高分互刷；两端同改
+  abyssEssenceBase: 10,
   /**
    * 机制节点参数（共鸣树末端的大节点，见 perks.js 的 META_BUFFS）
    *
@@ -299,6 +493,82 @@ export const ROGUE_META = {
     { id: 'maxAny', name: '任意一张升到满级', kind: 'maxed', need: 1, reward: 30 },
     { id: 'max3', name: '3 张升到满级', kind: 'maxed', need: 3, reward: 120 },
   ],
+};
+
+/**
+ * 局内 session 的结构版本（开发方案 4.7.2）
+ *
+ * 与局外 saveVer 分开：session 离线就要能判定，不依赖服务端配置；
+ * 没有版本字段的老 session 一律视为 1。
+ *
+ * v3（开发方案 3.3 胜利闭环）：追加 victory / bossKills / endless / boss 四个字段
+ * v4（开发方案 3.4/3.5/3.6 局内经济与遗物同批落地）：追加 coins / relics /
+ *    upgradedPerkIds / bannedPerkIds 四个字段——三者（事件 / 遗物 / 商店）共用同一批
+ *    run 资源，所以一次性升一个版本，而不是分三次升版各带一套迁移。
+ */
+export const SESSION_SCHEMA_VER = 4;
+
+/**
+ * 参与签名的字段白名单（开发方案 4.7.5）
+ *
+ * 每个版本一份、随版本冻结、事后不改：验签时按**存档自己带的版本号**取这里的表，
+ * 而不是按当前代码版本，于是新版本新增字段天然不进旧档哈希，老档不会被误判损坏。
+ * 签名字段自身（session.sig / meta._ck）与透传袋 _ext 永不参与。
+ */
+export const SIGNED_FIELDS = {
+  session: {
+    // v1（旧线性冲层时代的实际字段，见 4.7.5）
+    1: ['mode', 'phase', 'floor', 'bonus', 'picks', 'baseScore', 'quest', 'board', 'runRngState', 'ts'],
+    // v2（地图状态机：地图 seed / 参数 / 节点状态 / 本层地形与多目标进档）
+    2: [
+      'mode', 'phase', 'sessionVer', 'floor',
+      'bonus', 'picks', 'baseScore', 'maxCombo', 'totalMoves', 'totalCleared', 'questsDone',
+      'runRngState', 'elapsedMs', 'shufflesLeft', 'rewindsLeft', 'extraPicks',
+      'mapSeed', 'mapParams', 'mapStates', 'nodeId', 'terrain', 'goals',
+      'quest', 'offered', 'board', 'ts',
+    ],
+    // v3（胜利闭环：通关标记 / Boss 击败数 / 无尽深渊 / Boss 运行时状态）
+    3: [
+      'mode', 'phase', 'sessionVer', 'floor',
+      'victory', 'bossKills', 'endless', 'boss',
+      'bonus', 'picks', 'baseScore', 'maxCombo', 'totalMoves', 'totalCleared', 'questsDone',
+      'runRngState', 'elapsedMs', 'shufflesLeft', 'rewindsLeft', 'extraPicks',
+      'mapSeed', 'mapParams', 'mapStates', 'nodeId', 'terrain', 'goals',
+      'quest', 'offered', 'board', 'ts',
+    ],
+    // v4（局内经济与遗物：金币 / 本轮遗物 / 篝火临时升级 / 商店封禁）。
+    // 这四个字段都直接改本轮强度（金币=购买力，遗物/升级=战力，封禁=改抽牌池），
+    // 所以必须进签名，防本地改档刷 build（与「金币不上报服务端」不矛盾：
+    // 不参与发奖不等于允许被改，改档只是让本轮更容易，仍属作弊，签名能拦住）
+    4: [
+      'mode', 'phase', 'sessionVer', 'floor',
+      'victory', 'bossKills', 'endless', 'boss',
+      'coins', 'relics', 'upgradedPerkIds', 'bannedPerkIds',
+      'bonus', 'picks', 'baseScore', 'maxCombo', 'totalMoves', 'totalCleared', 'questsDone',
+      'runRngState', 'elapsedMs', 'shufflesLeft', 'rewindsLeft', 'extraPicks',
+      'mapSeed', 'mapParams', 'mapStates', 'nodeId', 'terrain', 'goals',
+      'quest', 'offered', 'board', 'ts',
+    ],
+  },
+  meta: {
+    1: ['version', 'essence', 'essenceEarned', 'perks', 'buffs', 'claimed', 'stats'],
+    2: ['saveVer', 'essence', 'essenceEarned', 'perks', 'buffs', 'claimed', 'stats'],
+  },
+};
+
+/**
+ * 已废弃字段登记（开发方案 4.7.4 规则二）
+ *
+ * 废弃字段不删、只登记：读取兼容保留到 removeAfter，到期再发专门的清理迁移删除。
+ * - readShim：老字段 → 现行读法
+ */
+export const DEPRECATED = {
+  // meta.version：v2 起改名 saveVer；读时 saveVer = raw.saveVer ?? raw.version ?? 1
+  version: {
+    kind: 'meta', since: 2, removeAfter: 4,
+    readShim: (raw) => raw.saveVer ?? raw.version ?? 1,
+    reason: '改名为 saveVer，避免与关卡的 schemaVersion 混淆',
+  },
 };
 
 /** 本地存档键（开发方案 8） */

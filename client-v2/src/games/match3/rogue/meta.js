@@ -11,8 +11,9 @@
  * 客户端 config.js 的 ROGUE_META 只在**离线 / 游客**时兜底——这样服务端改一处数值就即时生效，
  * 不会出现「界面按旧价显示、点下去被服务端拒绝」的分歧。
  */
-import { ROGUE_META } from './config.js';
+import { ROGUE_META } from '../config/config.js';
 import { META_BUFFS, PERKS, valueAt } from './perks.js';
+import { CURRENT_META_VER, migrateMeta } from '../save/migrate.js';
 
 /** 服务端下发的数值表（未连接时为空，退回本地镜像） */
 let remoteCfg = null;
@@ -36,6 +37,9 @@ export function rogueCfg() {
     maxFloor: remoteCfg?.maxFloor || ROGUE_META.maxFloor,
     // 机制节点参数：服务端也有一份（「丰收闭环」是两端同口径结算的），优先用它
     mechanics: remoteCfg?.mechanics || ROGUE_META.mechanics,
+    // 胜利闭环（开发方案 3.3）：通关固定奖励 + 深渊段每层衰减增量的基数（调和级数，天然收敛）
+    winBonus: remoteCfg?.winBonus ?? ROGUE_META.winBonus,
+    abyssEssenceBase: remoteCfg?.abyssEssenceBase ?? ROGUE_META.abyssEssenceBase,
     startingPerks: ROGUE_META.startingPerks,
   };
 }
@@ -66,52 +70,76 @@ export function emptyMeta() {
   const perks = {};
   for (const id of ROGUE_META.startingPerks) perks[id] = { lv: 1 };
   return {
-    version: 1,
+    saveVer: ROGUE_META.saveVer,
     essence: 0,
     essenceEarned: 0,
     perks,
     buffs: {},
     claimed: {},
-    stats: { runs: 0, bestFloor: 0, totalCleared: 0, questsDone: 0 },
+    // 胜利闭环（开发方案 3.3）：wins 通关次数 / bossKills 累计击败 Boss 数（服务端权威下发）
+    stats: { runs: 0, bestFloor: 0, totalCleared: 0, questsDone: 0, wins: 0, bossKills: 0 },
   };
 }
+
+/** normalizeMeta 认识的顶层字段；其余 key（排除签名 / 透传袋自身）收进 _ext */
+const META_KNOWN_KEYS = new Set([
+  'saveVer', 'version', 'essence', 'essenceEarned', 'perks', 'buffs', 'claimed', 'stats',
+]);
 
 /**
  * 归一化服务端下发的存档
  *
- * 服务端存得比较全（每张祝福的解锁时间、累计选取次数、局数统计等），
- * 这里只保留客户端要用的部分，并把等级裁到 [0, 稀有度上限]：
- * 万一数值被改坏、或将来调低了上限，界面也不会画出「9/4 级」这种条。
- * 初始解锁的三张若不在存档里（老档 / 首次下发）就地补上。
+ * 流程（开发方案 4.7）：先过迁移链（旧档只增不改不删）→ 已知字段白名单重建并裁剪 →
+ * 未知字段收进透传袋 `_ext` 原样保留。这样版本回滚期间，老版本服务端 / 客户端读到
+ * 新版本存档时不会把不认识的 key 写没，恢复新版本后数据还在。
+ *
+ * 高版本档（future）不迁移、不报错：已知字段按老读法用、未知字段进 _ext，
+ * 档上的 saveVer 原样保留（不盖成当前版本）。
+ *
+ * 等级一律裁到 [0, 稀有度上限]：数值被改坏、或将来调低上限，界面也不会画出「9/4 级」。
  */
 export function normalizeMeta(raw) {
   const base = emptyMeta();
   if (!raw || typeof raw !== 'object') return base;
 
+  // 服务端配置已下发时以其 saveVer 为权威，否则用客户端镜像
+  const current = rogueCfg().saveVer || CURRENT_META_VER;
+  const { data, future, ver } = migrateMeta(raw, current);
+
+  // 未知 key → _ext（含既有 _ext 里已经兜住的 key；签名字段 _ck 不进）
+  const ext = data._ext && typeof data._ext === 'object' ? { ...data._ext } : {};
+  for (const key of Object.keys(data)) {
+    if (key === '_ext' || key === '_ck' || META_KNOWN_KEYS.has(key)) continue;
+    ext[key] = data[key];
+  }
+
   const perks = { ...base.perks };
   for (const perk of PERKS) {
-    const saved = raw.perks && raw.perks[perk.id];
+    const saved = data.perks && data.perks[perk.id];
     const lv = Math.max(0, Math.min(maxLevelOf(perk), Math.floor(Number(saved?.lv) || 0)));
     if (lv > 0) perks[perk.id] = { ...saved, lv };
-    else delete perks[perk.id];
+    // lv=0：base 里若有（初始赠送的三张）就保留，否则不写——不能 delete，否则补默认失效
   }
   // 局外增益同理，只是没有「开局赠送」这一说（全部从 0 起）
   const buffs = {};
   for (const buff of META_BUFFS) {
-    const saved = raw.buffs && raw.buffs[buff.id];
+    const saved = data.buffs && data.buffs[buff.id];
     const lv = Math.max(0, Math.min(maxLevelOf(buff), Math.floor(Number(saved?.lv) || 0)));
     if (lv > 0) buffs[buff.id] = { ...saved, lv };
   }
 
-  return {
-    version: Math.max(1, Math.floor(Number(raw.version) || 1)),
-    essence: Math.max(0, Math.floor(Number(raw.essence) || 0)),
-    essenceEarned: Math.max(0, Math.floor(Number(raw.essenceEarned) || 0)),
+  const out = {
+    // 高版本档保留原版本号；正常档迁移链已盖成 current
+    saveVer: future ? ver : current,
+    essence: Math.max(0, Math.floor(Number(data.essence) || 0)),
+    essenceEarned: Math.max(0, Math.floor(Number(data.essenceEarned) || 0)),
     perks,
     buffs,
-    claimed: raw.claimed && typeof raw.claimed === 'object' ? { ...raw.claimed } : {},
-    stats: { ...base.stats, ...(raw.stats || {}) },
+    claimed: data.claimed && typeof data.claimed === 'object' ? { ...data.claimed } : {},
+    stats: { ...base.stats, ...(data.stats || {}) },
   };
+  if (Object.keys(ext).length > 0) out._ext = ext;
+  return out;
 }
 
 /** 某条祝福当前的局外等级（0 = 未解锁） */
@@ -233,21 +261,46 @@ export function nextStep(meta, entry) {
 }
 
 /**
+ * 深渊段（31+ 层）的衰减精华增量：第 k 层深渊（k=floor-30）给 round(base/k)，
+ * 调和级数天然收敛——冲得再深也只拿到有界的一小笔，防与最高分互刷（开发方案 3.3）
+ */
+export function abyssEssence(floor) {
+  const cfg = rogueCfg();
+  const k = Math.floor(floor) - 30;
+  if (k <= 0) return 0;
+  let sum = 0;
+  for (let i = 1; i <= k; i += 1) sum += Math.round(cfg.abyssEssenceBase / i);
+  return sum;
+}
+
+/**
  * 本轮能拿多少精华：只按到达层数，与分数无关
  * 平方增长（第 10 层 20 / 20 层 80 / 30 层 180）——越深收益越高，
  * 而深层又得靠祝福堆起来，正好形成「打深 → 解锁 → 打更深」的正循环。
  * 局外增益「精华共鸣」在这里乘上去（未解锁 ×1，与不买时逐位一致），
  * 「丰收闭环」再加一笔按层数的定额（未解锁 +0）；
  * 层数上限与服务端同源，避免预览显示一个服务端不会发的数。
+ *
+ * 胜利闭环（开发方案 3.3）：
+ * - 通关（opts.win）额外给一笔固定 winBonus；
+ * - 31+ 深渊层不再走平方曲线（否则瞬间爆炸），基础值在 30 层封口，
+ *   深渊段只加 abyssEssence 的衰减增量；最终封顶由服务端 maxEssencePerRun 执行。
  * @param {number} floor - 本轮到达的层数
  * @param {object} [meta] - 养成存档（不传则只算基础值）
+ * @param {{win?:boolean}} [opts]
  */
-export function essenceForRun(floor, meta = null) {
+export function essenceForRun(floor, meta = null, opts = {}) {
   const cfg = rogueCfg();
-  const n = Math.min(cfg.maxFloor, Math.max(0, Math.floor(floor) || 0));
-  const base = Math.floor((n * n) / cfg.essenceDivisor);
+  const raw = Math.max(0, Math.floor(floor) || 0);
+  // 基础层数：深渊段封在 30；未通关的正常 run 本来也到不了 31，仍受 maxFloor 截断
+  const baseFloor = raw > 30 ? 30 : Math.min(cfg.maxFloor, raw);
+  const base = Math.floor((baseFloor * baseFloor) / cfg.essenceDivisor);
   let gain = Math.floor(base * buffFactor(meta, 'essenceboost'));
-  if (mechanicOn(meta, 'harvest')) gain += Math.floor(n * cfg.mechanics.harvest.essencePerFloor);
+  if (mechanicOn(meta, 'harvest')) gain += Math.floor(baseFloor * cfg.mechanics.harvest.essencePerFloor);
+  if (opts.win) {
+    gain += cfg.winBonus;
+    if (raw > 30) gain += abyssEssence(raw);
+  }
   return gain;
 }
 

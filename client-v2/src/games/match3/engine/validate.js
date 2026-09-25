@@ -4,7 +4,7 @@
  * 纯结构校验，不启动引擎。将来接入关卡平台时由上传前调用；
  * 服务端只有静态限制表、不做玩法校验（见《关卡平台-设计方案.md》第四章）
  */
-import { BLOCKER_KINDS, BOARD_LIMITS, COLOR_LIMITS, SHUFFLE } from './config.js';
+import { BLOCKER_KINDS, BOARD_LIMITS, COLOR_LIMITS, SHUFFLE } from '../config/config.js';
 import { parseMask } from './grid.js';
 
 /** 当前 payload 结构版本，结构不兼容变更时递增 */

@@ -8,12 +8,15 @@
  *
  * 未登录或未连接时不上报：消消乐离线可玩，但进度与经验都以服务端记录为准。
  */
-import { emit } from '../../core/socket.js';
-import { eventBus } from '../../core/eventBus.js';
-import { SESSION, SESSION_KEYS, STORAGE_KEYS } from './config.js';
-import { LEVEL_COUNT } from './levels.js';
-import { buffFactor, normalizeMeta, rogueCfg, setRogueConfig } from './meta.js';
-import { toast } from '../../components/toast.js';
+import { emit } from '../../../core/socket.js';
+import { eventBus } from '../../../core/eventBus.js';
+import { ROGUE, SESSION, SESSION_KEYS, SESSION_SCHEMA_VER, SIGNED_FIELDS, STORAGE_KEYS } from '../config/config.js';
+import { LEVEL_COUNT } from '../config/levels.js';
+import { buffFactor, normalizeMeta, rogueCfg, setRogueConfig } from '../rogue/meta.js';
+import {
+  checkSignature, migrateSession, sealMeta, sealSession,
+} from './migrate.js';
+import { toast } from '../../../components/toast.js';
 
 function readStore(key) {
   try {
@@ -56,19 +59,80 @@ export function finishedSession(mode) {
   return { mode, finished: true, ts: Date.now() };
 }
 
+/**
+ * 肉鸽 session 入场检验 + 迁移（开发方案 4.7，仅 rogue variant；其它玩法结构照旧不碰）
+ *
+ * - 高版本（回滚场景）：不迁移、不判损坏，拒绝续玩（高版本局面没有安全读法）
+ * - 签名不符：本地缓存被截断 / 写坏 / 结构混写，拒绝续玩
+ * - 无签名（v1 老档灰度期）：不判损坏，迁移到当前版本，下次写出自然带签名
+ * @returns {{ok:true,data:object}|{ok:false,reason:'future'|'bad-sig'}}
+ */
+function admitRogueSession(raw) {
+  const ver = Math.floor(Number(raw?.sessionVer)) || 1;
+  if (ver > SESSION_SCHEMA_VER) return { ok: false, reason: 'future' };
+  if (checkSignature(raw, SIGNED_FIELDS.session, 'sig') === 'bad') {
+    reportIntegrityFail('session', 'bad-sig');
+    return { ok: false, reason: 'bad-sig' };
+  }
+  return { ok: true, data: migrateSession(raw).data };
+}
+
+/** 不可续玩时写本地墓碑（防反复复活）并给一次轻提示 */
+function tombstoneRogue(variant, reason) {
+  writeStore(SESSION_KEYS[variant], finishedSession(variant));
+  if (reason === 'future') toast.info('该进度来自更新版本，当前版本无法继续，已开启新一轮');
+  else toast.info('本地进度已损坏，已为你开启新一轮');
+}
+
+/**
+ * 存档完整性校验失败打点（开发方案 4.7.5）
+ *
+ * 校验和只用于发现「localStorage 截断 / 写坏 / 多版本结构混写」这类写入端 bug，
+ * 不做任何处罚。失败时：本地留一条带统一标签的 warn（灰度期可直接在控制台统计），
+ * 在线时再把事件透传给服务端记日志，用于估算失败率、定位写坏路径。
+ * @param {'meta'|'session'} kind
+ * @param {'bad-sig'|'bad-checksum'} reason
+ */
+export function reportIntegrityFail(kind, reason) {
+  const payload = { kind, reason, at: new Date().toISOString() };
+  console.warn('[match3][integrity] 存档校验失败', payload);
+  try {
+    emit('match3_integrity_fail', payload);
+  } catch {
+    // 未连接 / socket 不可用：本地 warn 已足够，不影响开新轮
+  }
+}
+
 /** 读本地暂存；没有 / 已过期 / 已结束都返回 null */
 export function loadLocalSession(variant) {
   const key = SESSION_KEYS[variant];
   if (!key) return null;
   const session = readStore(key);
   if (!isFreshSession(session) || session.finished) return null;
-  return session;
+  if (variant !== ROGUE.type) return session;
+
+  const admitted = admitRogueSession(session);
+  if (!admitted.ok) {
+    tombstoneRogue(variant, admitted.reason);
+    return null;
+  }
+  // 旧档（无签名或版本落后）迁移后立即按新版本写出并盖签名，避免每次进入都重迁；
+  // 当前版本且签名完好的档不动写入时间
+  const oldVer = Math.floor(Number(session.sessionVer)) || 1;
+  if (session.sig == null || oldVer < SESSION_SCHEMA_VER) {
+    writeStore(key, sealSession(admitted.data));
+  }
+  return admitted.data;
 }
 
-/** 写本地暂存（每次状态变化覆盖写，刷新即续） */
+/** 写本地暂存（每次状态变化覆盖写，刷新即续）；肉鸽正式局落盘前盖版本号与签名 */
 export function saveLocalSession(variant, session) {
   const key = SESSION_KEYS[variant];
-  if (key) writeStore(key, session);
+  if (!key) return;
+  const sealed = variant === ROGUE.type && session && !session.finished
+    ? sealSession(session)
+    : session;
+  writeStore(key, sealed);
 }
 
 /** 各玩法上次推送云端的时间，用于节流（局内状态变化极频繁） */
@@ -87,7 +151,11 @@ export function pushSession(variant, session, { force = false } = {}) {
   const now = Date.now();
   if (!force && now - (lastPushAt[variant] || 0) < SESSION.cloudPushMs) return false;
   lastPushAt[variant] = now;
-  return emit('match3_save_session', { variant, session });
+  // 肉鸽正式局推云前同样盖版本号与签名（云端是不透明保管，取回时按签名验损）；墓碑不签
+  const payload = variant === ROGUE.type && session && !session.finished
+    ? sealSession(session)
+    : session;
+  return emit('match3_save_session', { variant, session: payload });
 }
 
 /**
@@ -198,14 +266,22 @@ function mergeRemoteSessions(remoteSessions) {
     const incoming = remoteSessions[variant];
     if (!isFreshSession(incoming)) continue;
 
-    const local = readStore(SESSION_KEYS[variant]);
+    const key = SESSION_KEYS[variant];
+    const local = readStore(key);
     // 用严格大于：相等说明本地就是这份（同一事件会被多个订阅者各合并一次），
     // 再推一遍只会白发一次上传
     if (isFreshSession(local) && local.ts > incoming.ts) {
       pushSession(variant, local, { force: true });
       continue;
     }
-    writeStore(SESSION_KEYS[variant], incoming);
+    if (variant === ROGUE.type) {
+      // 云端肉鸽档同样过版本 / 签名关：高版本或损坏档不覆盖本地、不会被救活
+      const admitted = admitRogueSession(incoming);
+      if (!admitted.ok) continue;
+      writeStore(key, sealSession(admitted.data));
+    } else {
+      writeStore(key, incoming);
+    }
   }
 }
 
@@ -246,7 +322,22 @@ export function reportStart({ mode, level = null }) {
  * 局内也能抽牌」——所以它只是一份**临时缓存**：一联网就被 match3_progress 覆盖。
  * 缓存为空时用空存档的形态（初始解锁三张、0 精华）。
  */
-let rogueMeta = normalizeMeta(readStore(STORAGE_KEYS.rogueMeta));
+/**
+ * 读入本地 meta 缓存：签名损坏就丢弃（开发方案 4.7.5）
+ *
+ * meta 是服务端权威数据的缓存，坏了不弹错、不动服务端——丢弃后界面用空存档兜底，
+ * 下一次 match3_progress 下发自然恢复。无签名（v1 老缓存 / 服务端直发）不算损坏。
+ */
+function loadCachedMeta() {
+  const raw = readStore(STORAGE_KEYS.rogueMeta);
+  if (raw && checkSignature(raw, SIGNED_FIELDS.meta, '_ck') === 'bad') {
+    reportIntegrityFail('meta', 'bad-checksum');
+    return normalizeMeta(null);
+  }
+  return normalizeMeta(raw);
+}
+
+let rogueMeta = loadCachedMeta();
 
 /** 当前生效的养成存档（图鉴、娱乐菜单、局内抽牌都用它） */
 export function getRogueMeta() {
@@ -259,7 +350,7 @@ export function onRogueMeta(handler) {
 }
 
 /**
- * 收下一份养成存档：归一化 → 覆盖本地临时缓存 → 广播
+ * 收下一份养成存档：迁移 + 归一化 → 盖签名覆盖本地临时缓存 → 广播
  *
  * 这是**唯一**的写入点，两条来源都走这里：
  * - match3_progress（进入消消乐 / 结算后下发）
@@ -267,7 +358,7 @@ export function onRogueMeta(handler) {
  */
 function applyRogueMeta(raw) {
   rogueMeta = normalizeMeta(raw);
-  writeStore(STORAGE_KEYS.rogueMeta, rogueMeta);
+  writeStore(STORAGE_KEYS.rogueMeta, sealMeta(rogueMeta));
   // 通知已打开的图鉴 / 娱乐菜单重画（余额、等级条、里程碑状态都会变）
   eventBus.emit('match3:rogueMeta', rogueMeta);
 }
@@ -302,13 +393,15 @@ export function claimRogueMilestone(milestoneId) {
 /**
  * 上报结算；floor 仅肉鸽试炼使用（本轮到达的层数）
  * 肉鸽还会带上本轮选到的祝福次数与达成的局内任务数：它们不进发放，只作养成存档的统计字段
+ * 胜利闭环（开发方案 3.3）：win 是否通关 / bossKills 三个 Boss 击败数 / endless 是否进过深渊
  * @returns {boolean} 是否已上报（未连接时为 false，本局不计进度与经验）
  */
 export function reportEnd({
   mode, level = null, floor = null, score, maxCombo, moves, durationMs, cleared, stars = 0,
-  picks = null, questsDone = 0,
+  picks = null, questsDone = 0, win = false, bossKills = 0, endless = false,
 }) {
   return emit('match3_game_end', {
     mode, level, floor, score, maxCombo, moves, durationMs, cleared, stars, picks, questsDone,
+    win, bossKills, endless,
   });
 }
