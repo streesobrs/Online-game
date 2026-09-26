@@ -245,7 +245,7 @@ function openUiSettingsModal() {
  * @returns {Function} cleanup 函数
  */
 export function renderProfile(container) {
-  const PROFILE_TAB_KEYS = ['info', 'avatar', 'history', 'mail', 'assets', 'rewards', 'achievements', 'shop', 'themes', 'shortcuts'];
+  const PROFILE_TAB_KEYS = ['info', 'avatar', 'history', 'mail', 'assets', 'rewards', 'achievements', 'shop', 'themes', 'shortcuts', 'calendar'];
   const INIT_TAB = store.get('profile.initTab');
   let activeTab = PROFILE_TAB_KEYS.includes(INIT_TAB) ? INIT_TAB : 'info';
   store.set('profile.initTab', null); // 初始 Tab 已消费，避免下次进入仍停留在上次 Tab
@@ -395,6 +395,7 @@ export function renderProfile(container) {
       { key: 'shop', label: '🛒 商城' },
       { key: 'themes', label: '🎨 主题' },
       { key: 'shortcuts', label: '⌨ 快捷键' },
+      { key: 'calendar', label: '📅 倍率日历' },
     ];
     tabs.forEach((t) => {
       const btn = el('button', {
@@ -426,6 +427,7 @@ export function renderProfile(container) {
     else if (activeTab === 'shop') await renderEmbedded('../shop/index.js', 'renderShop');
     else if (activeTab === 'themes') await renderEmbedded('../themes/index.js', 'renderThemePanel');
     else if (activeTab === 'shortcuts') contentEl.append(renderShortcutsTab());
+    else if (activeTab === 'calendar') await renderCalendarTab(contentEl);
 
     // 场景引导：首次进入邮件/资产/商城 Tab 时触发（内部带完成标记，不重复打扰）
     if (activeTab === 'mail') startMailTour();
@@ -576,6 +578,243 @@ export function renderProfile(container) {
       el('p', { class: 'text-muted', style: 'margin-top:12px;font-size:12px;' },
         '在输入框内按键不会触发；改键时按 Esc 取消。'),
     ]);
+  }
+
+  /**
+   * 经验倍率日历 Tab（紧凑扁平风格，参考 el-calendar）
+   * 格子内直接展示：日期 / 倍率徽章 / 节日或周末标签；
+   * 右侧展示当日详情 + 当月统计（加成天数、节日清单）。
+   */
+  async function renderCalendarTab(rootEl) {
+    const WEEK_CN = ['日', '一', '二', '三', '四', '五', '六'];
+    const now = new Date();
+    let viewYear = now.getFullYear();
+    let viewMonth = now.getMonth() + 1;
+    let viewData = null;
+    let selectedDate = null; // yyyy-mm-dd
+
+    // 倍率分档：0 工作日 / 1 周末×1.5 / 2 节假日×2 / 3 叠加×2.25+
+    const tierOf = (mult) => (!mult || mult <= 1 ? 0 : mult <= 1.5 ? 1 : mult < 2.25 ? 2 : 3);
+
+    const panel = el('div', { class: 'panel profile-card cal-panel' });
+    rootEl.append(panel);
+
+    const navEl = el('div', { class: 'cal-nav' });
+    const bodyEl = el('div', { class: 'cal-body' });
+    panel.append(navEl, bodyEl);
+
+    async function loadMonth(year, month) {
+      selectedDate = null;
+      navEl.innerHTML = '';
+      bodyEl.innerHTML = '';
+      bodyEl.append(el('div', { class: 'cal-loading text-muted' }, '加载中...'));
+
+      const shiftMonth = (delta) => {
+        let m = month + delta;
+        let y = year;
+        if (m < 1) { m = 12; y -= 1; }
+        if (m > 12) { m = 1; y += 1; }
+        viewYear = y; viewMonth = m;
+        loadMonth(y, m);
+      };
+      navEl.append(
+        el('button', { class: 'cal-nav-arrow', type: 'button', onClick: () => shiftMonth(-1) }, '‹'),
+        el('div', { class: 'cal-nav-title' }, `${year}年${month}月`),
+        el('button', { class: 'cal-nav-arrow', type: 'button', onClick: () => shiftMonth(1) }, '›'),
+        el('span', { style: 'flex:1' }),
+        el('button', {
+          class: 'cal-nav-today',
+          type: 'button',
+          onClick: () => { viewYear = now.getFullYear(); viewMonth = now.getMonth() + 1; loadMonth(viewYear, viewMonth); },
+        }, '今天'),
+      );
+
+      let data;
+      try {
+        data = await api.get(`/api/multiplier-calendar?year=${year}&month=${month}`);
+      } catch (err) {
+        bodyEl.innerHTML = '';
+        bodyEl.append(el('div', { class: 'cal-loading', style: 'color:#e53e3e;' }, `加载失败：${err.message || '服务暂不可用'}`));
+        return;
+      }
+      if (!data || !Array.isArray(data.days)) {
+        bodyEl.innerHTML = '';
+        bodyEl.append(el('div', { class: 'cal-loading text-muted' }, '该月暂无数据'));
+        return;
+      }
+      viewData = data;
+      render();
+    }
+
+    function render() {
+      const data = viewData;
+      bodyEl.innerHTML = '';
+
+      // ===== 左：日历 =====
+      const calendarEl = el('div', { class: 'cal-calendar' });
+
+      const weekRow = el('div', { class: 'cal-weekrow' });
+      WEEK_CN.forEach((w, i) => {
+        weekRow.append(el('div', { class: 'cal-weekhead' + (i === 0 || i === 6 ? ' weekend' : '') }, w));
+      });
+      calendarEl.append(weekRow);
+
+      const grid = el('div', { class: 'cal-grid' });
+      const firstDow = data.days[0].dayOfWeek;
+      for (let i = 0; i < firstDow; i++) grid.append(el('div', { class: 'cal-cell empty' }));
+
+      data.days.forEach((d, idx) => {
+        const dayNum = idx + 1;
+        const tier = tierOf(d.multiplier);
+        const isToday = data.today === dayNum;
+        const isSelected = selectedDate === d.date;
+        // 调休补班日虽然落在周末，但按工作日对待：不套周末色、显示「调休补班」
+        const isOffWeekend = d.isWeekend && !d.isMakeup;
+        const cellCls = [
+          'cal-cell',
+          `tier-${tier}`,
+          d.isMakeup ? ' is-makeup' : '',
+          isToday ? ' is-today' : '',
+          isSelected ? ' is-selected' : '',
+          isOffWeekend ? ' is-weekend-col' : '',
+        ].join(' ');
+
+        // 底部标签：调休补班 > 节日名 > 周末，普通工作日不显示
+        let tagText = '';
+        let tagCls = 'cal-cell-tag';
+        if (d.isMakeup) { tagText = '调休补班'; tagCls += ' cal-cell-tag--makeup'; }
+        else if (d.holidayName) tagText = d.holidayName;
+        else if (d.isWeekend) tagText = '周末';
+
+        const cell = el('button', {
+          type: 'button',
+          class: cellCls,
+          title: d.isMakeup ? `${d.date} · ${d.holidayName}调休补班（×1.0）` : undefined,
+          onClick: () => { selectedDate = d.date; render(); },
+        }, [
+          el('span', { class: 'cal-cell-num' + (isToday ? ' num-today' : '') }, String(dayNum)),
+          d.multiplier !== 1
+            ? el('span', { class: `cal-cell-mult tier-${tier}` }, `×${d.multiplier}`)
+            : null,
+          tagText ? el('span', { class: tagCls }, tagText) : null,
+        ]);
+        grid.append(cell);
+      });
+
+      const total = firstDow + data.days.length;
+      const rest = total % 7;
+      if (rest) for (let i = 0; i < 7 - rest; i++) grid.append(el('div', { class: 'cal-cell empty' }));
+      calendarEl.append(grid);
+
+      // ===== 右：当日详情 + 当月统计 =====
+      const sideEl = el('div', { class: 'cal-side' });
+      sideEl.append(renderDetailCard(data), renderMonthStats(data));
+
+      bodyEl.append(calendarEl, sideEl);
+    }
+
+    /** 选中日详情卡片（未选中时默认展示今天） */
+    function renderDetailCard(data) {
+      let d = data.days.find((x) => x.date === selectedDate);
+      if (!d && data.today) d = data.days[data.today - 1];
+      if (!d) d = data.days[0];
+
+      const tier = tierOf(d.multiplier);
+      const reasons = [];
+      if (d.isMakeup) {
+        reasons.push(el('li', {}, [el('b', {}, '调休补班'), `：${d.holidayName || '节假日'}调休，周末照常上班，无加成（×1.0）`]));
+      } else {
+        if (d.holidayName) reasons.push(el('li', {}, [el('b', {}, '节日'), `：${d.holidayName}`]));
+        if (d.isWeekend) reasons.push(el('li', {}, [el('b', {}, '周末'), '：周六/周日自动 ×1.5']));
+        if (!reasons.length) reasons.push(el('li', {}, [el('b', {}, '工作日'), '：无日期加成（×1.0）']));
+        if (d.holidayName && d.isWeekend) {
+          reasons.push(el('li', { class: 'cal-detail-note' }, '节日倍率与周末倍率叠加计算'));
+        }
+      }
+
+      return el('div', { class: 'cal-detail' }, [
+        el('div', { class: 'cal-detail-date' }, [
+          el('span', { class: 'cal-detail-month' }, `${data.month}月${Number(d.date.slice(-2))}日`),
+          el('span', { class: 'cal-detail-week' }, `周${WEEK_CN[d.dayOfWeek]}`),
+        ]),
+        el('div', { class: 'cal-detail-multrow' }, [
+          el('span', { class: `cal-detail-mult tier-${tier}` }, `×${d.multiplier}`),
+          el('span', { class: 'cal-detail-label' }, d.label || (tier === 0 ? '普通工作日' : '加成日')),
+        ]),
+        el('ul', { class: 'cal-detail-reasons' }, reasons),
+      ]);
+    }
+
+    /** 当月统计：天数分布 + 最高倍率 + 节日清单 */
+    function renderMonthStats(data) {
+      let workdays = 0, weekendDays = 0, holidayDays = 0, makeupDays = 0;
+      let maxMult = 1;
+      const makeupDates = [];
+      const holidayMap = new Map();
+      data.days.forEach((d, idx) => {
+        if (d.isHoliday) {
+          holidayDays += 1;
+          if (!holidayMap.has(d.holidayName)) holidayMap.set(d.holidayName, { days: [], mult: d.multiplier });
+          holidayMap.get(d.holidayName).days.push(idx + 1);
+        } else if (d.isMakeup) {
+          makeupDays += 1;   // 调休补班日（落在周末但算工作日）
+          makeupDates.push(idx + 1);
+          workdays += 1;
+        } else if (d.isWeekend) weekendDays += 1;
+        else workdays += 1;
+        if (d.multiplier > maxMult) maxMult = d.multiplier;
+      });
+
+      const statItems = [
+        { num: workdays, label: '工作日', cls: 'tier-0' },
+        { num: weekendDays, label: '周末', cls: 'tier-1' },
+        { num: holidayDays, label: '节假日', cls: 'tier-2' },
+      ];
+
+      // 节日日期聚合成区间（如 1-7）
+      const ranges = [];
+      holidayMap.forEach((info, name) => {
+        const ds = info.days.slice().sort((a, b) => a - b);
+        const parts = [];
+        let s = ds[0], p = ds[0];
+        for (let i = 1; i < ds.length; i++) {
+          if (ds[i] === p + 1) { p = ds[i]; continue; }
+          parts.push(s === p ? `${s}` : `${s}-${p}`);
+          s = p = ds[i];
+        }
+        parts.push(s === p ? `${s}` : `${s}-${p}`);
+        ranges.push({ name, range: parts.join('、'), mult: info.mult });
+      });
+
+      return el('div', { class: 'cal-stats' }, [
+        el('div', { class: 'cal-stats-title' }, '当月概览'),
+        el('div', { class: 'cal-stats-row' }, statItems.map((it) =>
+          el('div', { class: `cal-stats-item ${it.cls}` }, [
+            el('div', { class: 'cal-stats-num' }, String(it.num)),
+            el('div', { class: 'cal-stats-label' }, it.label),
+          ]),
+        )),
+        el('div', { class: 'cal-stats-max' }, [
+          '当月最高倍率 ',
+          el('b', { class: `tier-${tierOf(maxMult)}` }, `×${maxMult}`),
+        ]),
+        makeupDays
+          ? el('div', { class: 'cal-stats-makeup' }, `含 ${makeupDays} 天调休补班（${data.month}月${makeupDates.join('、')}日，周末上班无加成）`)
+          : null,
+        ranges.length
+          ? el('div', { class: 'cal-holidays' }, [
+            el('div', { class: 'cal-holidays-title' }, `当月节日（${ranges.length}）`),
+            ...ranges.map((r) => el('div', { class: 'cal-holiday-item' }, [
+              el('span', { class: 'cal-holiday-name' }, r.name),
+              el('span', { class: 'cal-holiday-range' }, `${data.month}月${r.range}日`),
+              el('span', { class: `cal-holiday-mult tier-${tierOf(r.mult)}` }, `×${r.mult}`),
+            ])),
+          ])
+          : el('div', { class: 'cal-holidays-empty text-muted' }, '当月无节日，周末仍有 ×1.5 加成'),
+      ]);
+    }
+
+    await loadMonth(viewYear, viewMonth);
   }
 
   /** Tab 切换淡入（减少切换跳跃感） */

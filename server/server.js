@@ -66,11 +66,22 @@ try {
 // 安全 HTTP 头中间件（优雅降级：未安装 helmet 时跳过）
 try {
   const helmet = require('helmet');
-  app.use(helmet({
-    contentSecurityPolicy: false, // 关闭CSP避免破坏内联脚本（前端单文件架构）
-    crossOriginEmbedderPolicy: false,
-    crossOriginResourcePolicy: { policy: 'cross-origin' }
-  }));
+  // COOP 与 Origin-Agent-Cluster 仅在「可信来源」（HTTPS 或 localhost）下有效；
+  // 通过明文 HTTP + IP 访问时浏览器会直接忽略并打印警告，故这类请求不下发。
+  app.use((req, res, next) => {
+    const host = String(req.headers.host || '').split(':')[0];
+    const isTrustedOrigin = req.secure
+      || req.headers['x-forwarded-proto'] === 'https'
+      || host === 'localhost'
+      || host === '127.0.0.1';
+    helmet({
+      contentSecurityPolicy: false, // 关闭CSP避免破坏内联脚本（前端单文件架构）
+      crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      crossOriginOpenerPolicy: isTrustedOrigin ? undefined : false,
+      originAgentCluster: isTrustedOrigin ? undefined : false,
+    })(req, res, next);
+  });
 } catch (e) {
   logger.warn('未安装 helmet 模块，安全头未启用。建议执行 npm install helmet');
 }
@@ -1632,6 +1643,66 @@ app.get('/api/event-multiplier', (req, res) => {
   } catch (err) {
     logger.error('获取经验倍率信息失败', { error: err.message });
     res.json({ event: { multiplier: 1.0, label: '' } });
+  }
+});
+
+/**
+ * 某月每日经验倍率日历
+ * 只看「日期相关」的倍率（工作日/周末/中国节假日/国际节假日），不包含等级段、VIP、道具等个人倍率。
+ * GET /api/multiplier-calendar?year=YYYY&month=M（month 1–12）
+ */
+app.get('/api/multiplier-calendar', async (req, res) => {
+  try {
+    let year = parseInt(req.query.year, 10);
+    let month = parseInt(req.query.month, 10);
+    const now = new Date();
+    if (!Number.isFinite(year) || !Number.isFinite(month)) {
+      year = now.getFullYear();
+      month = now.getMonth() + 1;
+    }
+    month = Math.max(1, Math.min(12, Math.round(month)));
+    // 允许 +/- 5 年范围，避免有人扫历史/未来爆请求
+    year = Math.max(now.getFullYear() - 5, Math.min(now.getFullYear() + 5, Math.round(year)));
+
+    // 确保该年的节假日缓存已加载（非当前年走按需加载）
+    if (year !== now.getFullYear() && !AccountManager.holidayCacheByYear[year]) {
+      try {
+        await AccountManager.loadHolidayCacheForYear(year);
+      } catch (e) {
+        // 加载失败就继续用降级逻辑（周末 + 国际节假日），接口本身不报错
+        logger.warn('日历查询：加载指定年份节假日失败', { year, error: e.message });
+      }
+    }
+
+    const lastDay = new Date(year, month, 0).getDate();
+    const days = [];
+    for (let d = 1; d <= lastDay; d++) {
+      const date = new Date(year, month - 1, d);
+      const mult = accountManager.getMultiplierForDate(date);
+      days.push({
+        date: `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
+        dayOfWeek: date.getDay(),
+        multiplier: mult.multiplier,
+        label: mult.label,
+        holidayName: mult.holidayName || null,
+        isWeekend: mult.isWeekend,
+        isHoliday: mult.isHoliday,
+        isMakeup: !!mult.isMakeup,
+      });
+    }
+
+    res.json({
+      success: true,
+      year,
+      month,
+      monthName: `${year}年${month}月`,
+      today: now.getFullYear() === year && now.getMonth() + 1 === month ? now.getDate() : null,
+      days,
+      fallback: year !== now.getFullYear() ? !AccountManager.holidayCacheByYear[year] : false,
+    });
+  } catch (err) {
+    logger.error('获取经验倍率日历失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取日历失败' });
   }
 });
 

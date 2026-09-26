@@ -70,6 +70,10 @@ class AccountManager {
   // 节假日缓存（静态）
   static holidayCache = null;
   static holidayCacheDate = null; // 缓存日期字符串，用于判断是否过期
+  /** 多年份节假日缓存，结构: { [year]: { [mmdd]: info } } */
+  static holidayCacheByYear = {};
+  /** 正在加载中的年份（Promise 去重，避免同月并发请求打多份） */
+  static holidayLoadingByYear = {};
 
   // 节假日缓存文件路径
   static get HOLIDAY_CACHE_PATH() {
@@ -86,6 +90,7 @@ class AccountManager {
         if (data.year === yearNow && data.cache) {
           AccountManager.holidayCache = data.cache;
           AccountManager.holidayCacheDate = yearNow;
+          AccountManager.holidayCacheByYear[yearNow] = data.cache;
           logger.info('节假日缓存加载成功', { year: yearNow, count: Object.keys(data.cache).length });
           return true;
         }
@@ -106,7 +111,54 @@ class AccountManager {
     }
   }
 
-  // 从 API 获取节假日数据
+  /**
+   * 从节假日 API 加载指定年份的数据，结果同时写入 holidayCacheByYear 和（若为当前年）holidayCache。
+   * 返回归一化的缓存对象；网络失败时返回 {}。
+   */
+  static async loadHolidayCacheForYear(year) {
+    if (AccountManager.holidayCacheByYear[year]) {
+      return AccountManager.holidayCacheByYear[year];
+    }
+    if (AccountManager.holidayLoadingByYear[year]) {
+      return AccountManager.holidayLoadingByYear[year];
+    }
+
+    const url = `https://api.jiejiariapi.com/v1/holidays/${year}`;
+    const promise = (async () => {
+      try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const cache = {};
+        for (const [dateStr, info] of Object.entries(data)) {
+          if (info.isOffDay) {
+            const mult = AccountManager.HOLIDAY_MULTIPLIERS[info.name] || config.holidays.normalHolidayMultiplier;
+            cache[dateStr] = { name: info.name, multiplier: mult };
+          } else {
+            cache[dateStr] = { name: info.name, multiplier: config.exp.workdayMultiplier, isMakeup: true };
+          }
+        }
+        AccountManager.holidayCacheByYear[year] = cache;
+        if (year === new Date().getFullYear()) {
+          AccountManager.holidayCache = cache;
+          AccountManager.holidayCacheDate = year;
+          AccountManager.saveHolidayCacheToFile(year, cache);
+        }
+        logger.info('节假日数据加载成功', { year, count: Object.keys(cache).length });
+        return cache;
+      } catch (err) {
+        logger.warn('节假日API获取失败，仅使用周末翻倍', { year, error: err.message });
+        AccountManager.holidayCacheByYear[year] = {};
+        return {};
+      } finally {
+        delete AccountManager.holidayLoadingByYear[year];
+      }
+    })();
+    AccountManager.holidayLoadingByYear[year] = promise;
+    return promise;
+  }
+
+  // 从 API 获取节假日数据（启动时一次性加载当前年，已委托给 loadHolidayCacheForYear）
   static async initHolidays() {
     // 先尝试加载本地缓存，有有效缓存则跳过API请求
     if (AccountManager.loadHolidayCacheFromFile()) {
@@ -114,32 +166,7 @@ class AccountManager {
     }
 
     const year = new Date().getFullYear();
-    const url = `https://api.jiejiariapi.com/v1/holidays/${year}`;
-    try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const cache = {};
-      for (const [dateStr, info] of Object.entries(data)) {
-        if (info.isOffDay) {
-          const mult = AccountManager.HOLIDAY_MULTIPLIERS[info.name] || config.holidays.normalHolidayMultiplier;
-          cache[dateStr] = { name: info.name, multiplier: mult };
-        } else {
-          cache[dateStr] = { name: info.name, multiplier: config.exp.workdayMultiplier, isMakeup: true };
-        }
-      }
-      AccountManager.holidayCache = cache;
-      AccountManager.holidayCacheDate = year;
-      AccountManager.saveHolidayCacheToFile(year, cache);
-      logger.info('节假日数据加载成功', { year, count: Object.keys(cache).length });
-    } catch (err) {
-      if (AccountManager.holidayCache && Object.keys(AccountManager.holidayCache).length > 0) {
-        logger.warn('节假日API获取失败，使用本地缓存', { error: err.message });
-      } else {
-        logger.warn('节假日API获取失败，仅使用周末翻倍', { error: err.message });
-        AccountManager.holidayCache = {};
-      }
-    }
+    await AccountManager.loadHolidayCacheForYear(year);
   }
 
   loadLevelExpConfig() {
@@ -1651,12 +1678,11 @@ class AccountManager {
     return date;
   }
 
-  // 获取国际节假日（如果有）
-  getInternationalHoliday() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1;
-    const day = now.getDate();
+  // 获取国际节假日（如果有），接受任意日期参数
+  getInternationalHoliday(date = new Date()) {
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
 
     const holidays = AccountManager.INTERNATIONAL_HOLIDAYS();
     for (const h of holidays) {
@@ -1674,40 +1700,66 @@ class AccountManager {
     return null;
   }
 
-  // 限时经验倍率：周末/节假日自动翻倍
-  getEventMultiplier() {
-    const now = new Date();
-    const day = now.getDay();
-    const isWeekend = (day === 0 || day === 6);
-    const mmdd = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  /**
+   * 通用版：按任意日期计算当天的「活动倍率」。
+   * 优先级（与 getEventMultiplier 一致）：中国节假日 > 国际节假日 > 周末 > 工作日。
+   * @param {Date} [date] - 默认为当前时刻
+   * @returns {{ multiplier: number, label: string, holidayName?: string, isWeekend: boolean, isHoliday: boolean }}
+   */
+  getMultiplierForDate(date = new Date()) {
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const dayOfWeek = date.getDay();
+    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+    const mmdd = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
-    // 1. 检查中国节假日（API 拉取，优先级最高）
-    if (AccountManager.holidayCache && AccountManager.holidayCache[mmdd]) {
-      const h = AccountManager.holidayCache[mmdd];
-      if (h.isMakeup) return { multiplier: config.exp.workdayMultiplier, label: '' }; // 补班日，无加成
-      if (isWeekend) {
-        const stacked = h.multiplier * config.exp.weekendHolidayMultiplier;
-        return { multiplier: stacked, label: `${h.name}·周末 限时翻倍×${stacked}` };
-      }
-      return { multiplier: h.multiplier, label: `${h.name} 限时翻倍×${h.multiplier}` };
+    // 1. 中国节假日（API 拉取，优先级最高）
+    // 先查当前年的静态缓存（holidayCache 或 holidayCacheByYear）
+    const currentYear = new Date().getFullYear();
+    let cnCache = null;
+    if (year === currentYear) {
+      cnCache = AccountManager.holidayCache || AccountManager.holidayCacheByYear[year] || null;
+    } else {
+      cnCache = AccountManager.holidayCacheByYear[year] || null;
     }
 
-    // 2. 检查国际节假日（计算规则）
-    const intl = this.getInternationalHoliday();
+    if (cnCache && cnCache[mmdd]) {
+      const h = cnCache[mmdd];
+      if (h.isMakeup) {
+        // 补班日 = 调休上班（即使落在周末也无加成）
+        return { multiplier: config.exp.workdayMultiplier, label: '', holidayName: h.name, isWeekend, isHoliday: false, isMakeup: true };
+      }
+      if (isWeekend) {
+        const stacked = h.multiplier * config.exp.weekendHolidayMultiplier;
+        return { multiplier: stacked, label: `${h.name}·周末 限时翻倍×${stacked}`, holidayName: h.name, isWeekend, isHoliday: true };
+      }
+      return { multiplier: h.multiplier, label: `${h.name} 限时翻倍×${h.multiplier}`, holidayName: h.name, isWeekend, isHoliday: true };
+    }
+
+    // 2. 国际节假日（计算规则，不依赖 API）
+    const intl = this.getInternationalHoliday(date);
     if (intl) {
+      const holidayName = intl.label.split('限时')[0];
       if (isWeekend) {
         const stacked = intl.multiplier * config.exp.weekendHolidayMultiplier;
-        return { multiplier: stacked, label: `${intl.label.split('限时')[0]}·周末 限时翻倍×${stacked}` };
+        return { multiplier: stacked, label: `${holidayName}·周末 限时翻倍×${stacked}`, holidayName, isWeekend, isHoliday: true };
       }
-      return intl;
+      return { multiplier: intl.multiplier, label: intl.label, holidayName, isWeekend, isHoliday: true };
     }
 
     // 3. 周末 1.5 倍
     if (isWeekend) {
-      return { multiplier: config.exp.weekendMultiplier, label: `周末 限时翻倍×${config.exp.weekendMultiplier}` };
+      return { multiplier: config.exp.weekendMultiplier, label: `周末 限时翻倍×${config.exp.weekendMultiplier}`, isWeekend, isHoliday: false };
     }
 
-    return { multiplier: config.exp.workdayMultiplier, label: '' };
+    return { multiplier: config.exp.workdayMultiplier, label: '', isWeekend, isHoliday: false };
+  }
+
+  // 限时经验倍率：周末/节假日自动翻倍（委托给通用版）
+  getEventMultiplier() {
+    const { multiplier, label } = this.getMultiplierForDate(new Date());
+    return { multiplier, label };
   }
 
   // 等级经验倍率：等级越高倍率越大，保证后期升级不吃力
