@@ -3133,7 +3133,9 @@ class AccountManager {
     const perks = {};
     for (const [id, rarity] of Object.entries(cfg.perks)) {
       const raw = src.perks && src.perks[id];
-      const lv = num(raw?.lv, 0, cfg.rarities[rarity].maxLevel);
+      // 单祝福封顶（perkCaps，如极简主义受 4 色下限约束）优先于稀有度默认上限
+      const cap = cfg.perkCaps?.[id] ?? cfg.rarities[rarity].maxLevel;
+      const lv = num(raw?.lv, 0, cap);
       if (lv <= 0) continue;
       perks[id] = {
         lv,
@@ -3357,7 +3359,10 @@ class AccountManager {
     const rarity = isBuff ? buffDef.rarity : cfg.perks[itemId];
     if (!rarity) return { ok: false, message: '没有这个养成项', rogue: null };
     const rar = cfg.rarities[rarity];
-    const maxLevel = isBuff ? this._rogueBuffMaxLevel(buffDef) : rar.maxLevel;
+    // 单祝福封顶（perkCaps）优先于稀有度上限；共鸣树节点走各自的节点上限
+    const maxLevel = isBuff
+      ? this._rogueBuffMaxLevel(buffDef)
+      : (cfg.perkCaps?.[itemId] ?? rar.maxLevel);
     const bag = isBuff ? 'buffs' : 'perks';
 
     let result = { ok: false, message: '操作失败' };
@@ -3375,9 +3380,12 @@ class AccountManager {
         result = { ok: false, message: '已经满级了' };
         return;
       }
+      // 升到 cur+1 的费用：单祝福单级定价（perkCosts，如极简主义终极档 1000）优先，
+      // 否则走稀有度「升级费 × 递增系数^(当前等级-1)」曲线
+      const formulaCost = Math.round(rar.upgradeCost * rar.costGrowth ** (cur - 1));
       const cost = cur <= 0
         ? rar.unlockCost
-        : Math.round(rar.upgradeCost * rar.costGrowth ** (cur - 1));
+        : (cfg.perkCosts?.[itemId]?.[cur + 1] ?? formulaCost);
       if (r.essence < cost) {
         result = { ok: false, message: `精华不足，还差 ${cost - r.essence}` };
         return;
@@ -3439,6 +3447,10 @@ class AccountManager {
 
   /**
    * 里程碑达成情况（服务端自己算，不信客户端）
+   *
+   * kind → 进度口径（与客户端 meta.js 的 milestoneState 必须一一对应）：
+   * unlocked/maxed/all 看祝福收集度；buffs 看共鸣树点亮数；
+   * runs/floor/quests/wins/boss 看累计战绩 stats。
    * @returns {Array<{id:string, need:number, have:number, done:boolean}>}
    */
   _rogueMilestoneState(rogue) {
@@ -3447,10 +3459,26 @@ class AccountManager {
     const unlocked = ids.filter((id) => (rogue.perks[id]?.lv || 0) > 0).length;
     const maxed = ids.filter((id) => {
       const lv = rogue.perks[id]?.lv || 0;
-      return lv >= cfg.rarities[cfg.perks[id]].maxLevel;
+      // 单祝福封顶（perkCaps，如极简主义）优先于稀有度上限，口径与客户端 poolProgress 一致
+      const cap = cfg.perkCaps?.[id] ?? cfg.rarities[cfg.perks[id]].maxLevel;
+      return lv >= cap;
     }).length;
+    // 共鸣树点亮数（buffs 表在归一化时已裁成只含 lv>0 的条目，这里仍按 lv>0 数，稳妥）
+    const buffsOn = Object.keys(cfg.buffs)
+      .filter((id) => (rogue.buffs[id]?.lv || 0) > 0).length;
+    const st = rogue.stats || {};
+    const haveOf = {
+      unlocked,
+      maxed,
+      buffs: buffsOn,
+      runs: st.runs || 0,
+      floor: st.bestFloor || 0,
+      quests: st.questsDone || 0,
+      wins: st.wins || 0,
+      boss: st.bossKills || 0
+    };
     return cfg.milestones.map((m) => {
-      const have = m.kind === 'maxed' ? maxed : unlocked;
+      const have = m.kind === 'all' ? unlocked : (haveOf[m.kind] ?? 0);
       const need = m.kind === 'all' ? ids.length : m.need;
       return { id: m.id, need, have, done: have >= need };
     });

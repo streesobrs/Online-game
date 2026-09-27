@@ -649,25 +649,86 @@
 /* ===== 肉鸽：祝福图鉴 / 养成面板 =====
  * 内容节点在 codex.js，外框复用 components/modal（与「积分详情」同一套），
  * 所以这里只管条目本身的排版。
- * 条目比普通弹窗宽（每行要塞下效果说明与解锁按钮），借宿主节点的修饰类放宽：
- * .modal 的 max-width 是 420px，这边覆盖成 560px。
+ * 手机竖屏维持窄弹窗单列；PC ≥769px 放宽到 1000px、≥1200px 放宽到 1120px 并启用多列（见本文件底部），
+ * 避免桌面端也是一条窄长列。
  */
 .modal-overlay--codex .modal {
-  max-width: 560px;
+  max-width: 1000px;
+}
+
+/* 顶部内边距挪给面板自身：这样分页栏 sticky 吸顶时能直接贴到弹窗上沿，
+   不会隔着 body 的 padding 露出滑过的内容（移动端同步，见底部媒体查询） */
+.modal-overlay--codex .modal__body {
+  padding-top: 0;
 }
 
 .m3-codex {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
+  padding-top: 16px;
+}
+
+/* 分页栏：吸顶，长列表滚动时随时可以切走 */
+.m3-codex-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  gap: 6px;
+  padding: 6px 0 8px;
+  background: var(--theme-modal-bg, var(--surface, #fff));
+  border-bottom: 1px solid var(--theme-border-color, #e2e8f0);
+}
+
+.m3-codex-tab {
+  position: relative;
+  flex: 1;
+  min-height: 34px;
+  padding: 6px 4px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 8px;
+  background: var(--theme-panel-bg, #fff);
+  font-size: 13px;
+  color: var(--theme-status-color, #4a5568);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.m3-codex-tab:hover {
+  border-color: var(--theme-btn-primary-bg, #007bff);
+}
+
+.m3-codex-tab--on {
+  border-color: var(--theme-btn-primary-bg, #007bff);
+  background: var(--theme-panel-bg-hover, #f0f6ff);
+  color: var(--theme-btn-primary-bg, #007bff);
+  font-weight: 700;
+}
+
+/* 可领里程碑的红点角标 */
+.m3-codex-tab-dot {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--theme-accent, #27ae60);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  box-sizing: border-box;
 }
 
 /* 顶部：精华余额 + 收集度 + 局外统计 */
 .m3-codex-top {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 12px;
+  gap: 4px;
+  padding: 8px 12px;
   border-radius: 10px;
   background: var(--theme-panel-bg-hover, #f8f9fa);
   border: 1px solid var(--theme-border-color, #e2e8f0);
@@ -696,12 +757,23 @@
   color: var(--theme-status-color, #4a5568);
 }
 
-/* 「有奖励可领」的提示行：和里程碑按钮同一套强调色 */
+/* 「有奖励可领」的提示行：做成可点按钮，点一下直接跳到养成页领奖 */
 .m3-codex-ready {
+  align-self: flex-start;
   margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
   font-size: 12px;
   font-weight: 600;
   color: var(--theme-accent, #27ae60);
+}
+
+.m3-codex-ready:hover {
+  text-decoration: underline;
 }
 
 .m3-codex-sub {
@@ -717,6 +789,25 @@
   gap: 6px;
 }
 
+/* 各分页主体：小节之间的间距原来由面板根 gap 承担，包进分页后在这里补回 */
+.m3-codex-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* 共鸣树 + 选中节点详情的布局包裹：默认上下排；宽屏左右分栏见下方 @media(min-width:769px)。
+   注意默认规则必须写在媒体查询前面——两者同优先级，写在后面会顶掉分栏 */
+.m3-tree-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.m3-tree-detail {
+  min-width: 0;
+}
+
 .m3-codex-sec-title {
   font-size: 13px;
   font-weight: 700;
@@ -729,6 +820,109 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+/* 只读图鉴卡（遗物 / 任务）：任何宽度下都是卡式内边距，列数交给下方媒体查询 */
+.m3-codex-list--relics .m3-codex-item,
+.m3-codex-list--quest .m3-codex-item {
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px;
+}
+
+.m3-codex-list--relics .m3-codex-head,
+.m3-codex-list--quest .m3-codex-head {
+  gap: 4px;
+}
+
+/* 平板（>480px）：遗物 / 任务先升到两列；手机竖屏仍是单列 */
+@media (min-width: 481px) {
+
+  .m3-codex-list--relics,
+  .m3-codex-list--quest {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    align-items: start;
+  }
+}
+
+/* PC / 横屏（≥769，与 modal 组件自己的 768 断点对齐）：弹窗加宽后各列表吃满横向空间。
+   注意：这里只切换「排列方式」，紧凑行的按钮 / 展开区等交互元素与命中区域一律不变，
+   避免布局分支改变事件路径 */
+@media (min-width: 769px) {
+
+  /* 祝福：两列紧凑行；某条展开时同排另一条不被拉高 */
+  .m3-codex-list--perks {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    align-items: start;
+  }
+
+  .m3-codex-list--perks>.m3-codex-item {
+    min-width: 0;
+  }
+
+  /* 遗物三列 */
+  .m3-codex-list--relics {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  /* 里程碑两列 */
+  .m3-codex-list--ms {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    align-items: start;
+  }
+}
+
+/* 更宽的桌面（≥960）：共鸣树左右分栏 + 任务四列 */
+@media (min-width: 960px) {
+  .m3-codex-list--quest {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  /* 树在左、选中节点详情卡贴右并吸顶跟随滚动。
+     比例偏向详情卡一些（1.35:1）：卡太窄时描述每行都折行、按钮又被拉成整行，显得空 */
+  .m3-tree-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+
+  .m3-tree-detail {
+    position: sticky;
+    /* 让开吸顶分页栏的高度 */
+    top: 58px;
+  }
+
+  /* 树节点在宽格里放大一点，避免三条流派之间空得太开。
+     基础 .m3-tree-node 规则在本文件后面，这里用双类选择器盖过它 */
+  .m3-tree-grid .m3-tree-node {
+    max-width: 170px;
+  }
+
+  /* 详情卡列偏窄：购买按钮折到内容下方，但保持自适应宽度贴右，
+     避免图标 / 描述 / 按钮挤一行，也不把按钮拉成整行长条 */
+  .m3-tree-detail .m3-codex-item {
+    flex-wrap: wrap;
+  }
+
+  .m3-tree-detail .m3-codex-buy {
+    flex: 0 0 auto;
+    align-self: flex-end;
+    margin-right: 2px;
+  }
+}
+
+/* 大屏桌面（≥1200）：弹窗进一步放宽，树与详情卡都更透气 */
+@media (min-width: 1200px) {
+  .modal-overlay--codex .modal {
+    max-width: 1120px;
+  }
 }
 
 .m3-codex-item {
@@ -907,10 +1101,101 @@
   cursor: default;
 }
 
+/* ===== 祝福紧凑行：默认只露一行，点开展开效果详情 =====
+ * 外层两行布局：第一行 = 展开按钮（占满）+ 购买按钮；
+ * 展开区 flex-basis:100% 折到第二行，收起时直接不占位。
+ */
+.m3-codex-item--compact {
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 5px 8px 5px 10px;
+}
+
+.m3-codex-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.m3-codex-toggle .m3-codex-name {
+  white-space: nowrap;
+}
+
+.m3-codex-toggle .m3-codex-lv {
+  white-space: nowrap;
+}
+
+/* 展开箭头：贴在购买按钮左边，展开时翻转 */
+.m3-codex-chevron {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--theme-status-color, #4a5568);
+  opacity: 0.55;
+  transition: transform 0.15s ease;
+}
+
+.m3-codex-item--open .m3-codex-chevron {
+  transform: rotate(180deg);
+}
+
+.m3-codex-detail {
+  flex-basis: 100%;
+  display: none;
+  /* 与图标后的文字起点对齐 */
+  padding: 2px 0 2px 26px;
+}
+
+.m3-codex-item--open .m3-codex-detail {
+  display: block;
+}
+
+.m3-codex-item--open {
+  padding-bottom: 8px;
+}
+
+@media (max-width: 768px) {
+  .m3-codex {
+    padding-top: 14px;
+  }
+
+  /* 覆盖前面的 1000px：手机 / 平板竖屏仍走 modal 组件默认的留边宽度，
+     避免 max-width 被高优先级选择器顶掉后面板贴到屏幕边缘 */
+  .modal-overlay--codex .modal {
+    width: 100%;
+    max-width: calc(100vw - 24px);
+  }
+}
+
 @media (max-width: 480px) {
   .m3-codex-buy {
     padding: 4px 8px;
     font-size: 11px;
+  }
+
+  /* 五个分页（养成 / 里程 / 祝福 / 遗物 / 任务）挤一行：收窄间距与按钮内边距 */
+  .m3-codex-tabs {
+    gap: 4px;
+  }
+
+  .m3-codex-tab {
+    font-size: 12px;
+    padding: 6px 2px;
+  }
+
+  .modal-overlay--codex .modal {
+    max-width: calc(100vw - 16px);
   }
 }
 

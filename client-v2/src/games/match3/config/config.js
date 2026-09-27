@@ -204,8 +204,8 @@ export const ROGUE = {
   type: 'rogue',
   rows: 8,
   cols: 8,
-  colors: 6,            // 基准元素种类；「极简主义」祝福在此基础上下调，下限 minColors
-  minColors: 4,         // 颜色数下限：4 色以下（3 色）每步得分会暴涨约 10 倍，留给无尽三色
+  colors: 6,            // 基准元素种类；「极简主义」祝福在此基础上下调，常规下限 minColors
+  minColors: 4,         // 常规颜色数下限：3 色每步得分会暴涨约 10 倍；仅极简主义 Lv3（1000 精华终极档）用 bonus.colorFloor 放开到 3
   movesPerFloor: 10,    // 每层基准步数（「补给包」祝福与层数成长都在这之上叠加）
   movesPerFloorStep: 2, // 层数成长来源：每 N 层多发 1 步
   baseGoal: 900,        // 第 1 层目标分（6 色 10 步的中位分约 1750，首层几乎必过）
@@ -234,6 +234,12 @@ export const ROGUE = {
     movesReward: 5,     // 「补给」奖励：立即追加步数
     frenzyMult: 2,      // 「狂暴」奖励：本层剩余步数内的得分倍率
     specialsReward: 2,  // 「爆破」奖励：场上随机变成条状的个数
+    bombReward: 2,      // 「轰炸」奖励：场上随机变成炸弹的个数
+    mixRows: 2,         // 「混装火力」奖励：变成条状的个数
+    mixBombs: 1,        // 「混装火力」奖励：变成炸弹的个数
+    rainbowRain: 2,     // 「星雨」奖励：立即获得的彩球个数
+    rushMoves: 3,       // 「冲刺」奖励：立即追加的步数
+    rushMult: 1.5,      // 「冲刺」奖励：本层剩余步数内的得分倍率（比「狂暴」温和，因为还带步数）
   },
 };
 
@@ -447,8 +453,12 @@ export const ROGUE_META = {
    *   避免精华全砸在一张牌上）
    */
   rarities: {
-    common: { label: '普通', maxLevel: 2, unlockCost: 20, upgradeCost: 25, costGrowth: 1.5 },
-    rare: { label: '稀有', maxLevel: 3, unlockCost: 50, upgradeCost: 70, costGrowth: 1.5 },
+    // 普通 / 稀有都是 5 级（便宜卡也有养成深度）；史诗维持 4 级，靠高单价充当后期精华池。
+    // 满级总花费：普通约 223、稀约 619、史诗约 813，梯度仍在。
+    // 个别祝福单独封顶并可单级定价（见 perks.js 定义上的 levelCap / costOverride），
+    // 如极简主义封到 3 级，且 Lv3 终极档单收 1000 精华
+    common: { label: '普通', maxLevel: 5, unlockCost: 20, upgradeCost: 25, costGrowth: 1.5 },
+    rare: { label: '稀有', maxLevel: 5, unlockCost: 50, upgradeCost: 70, costGrowth: 1.5 },
     epic: { label: '史诗', maxLevel: 4, unlockCost: 100, upgradeCost: 150, costGrowth: 1.5 },
   },
   // 新号初始解锁的祝福：一进来就能组 build，不至于三选一里全是没见过的锁头
@@ -482,16 +492,37 @@ export const ROGUE_META = {
   },
   /**
    * 图鉴收集里程碑（一次性领取，只发精华）
-   * - kind：unlocked=已解锁种类数 / maxed=已满级张数 / all=集齐全部祝福
+   * - kind：unlocked=已解锁祝福数 / maxed=已满级祝福数 / all=集齐全部祝福 /
+   *   buffs=共鸣树已点亮节点数 / runs=累计出战轮数 / floor=最深到达层 /
+   *   quests=累计完成局内任务数 / wins=通关次数 / boss=累计击败 Boss 数
    * - need：达标所需数量（kind=all 时忽略，按祝福总数算）
+   * 顺序即展示顺序；codex 按 kind 分成「祝福收集 / 共鸣树 / 历练挑战」三组。
+   * 与 server/config.js 手工镜像，改一边必须同步改另一边。
    */
   milestones: [
+    // ---- 祝福收集 ----
     { id: 'unlock3', name: '解锁 3 种祝福', kind: 'unlocked', need: 3, reward: 20 },
     { id: 'unlock6', name: '解锁 6 种祝福', kind: 'unlocked', need: 6, reward: 40 },
     { id: 'unlock10', name: '解锁 10 种祝福', kind: 'unlocked', need: 10, reward: 80 },
     { id: 'unlockAll', name: '集齐全部祝福', kind: 'all', reward: 200 },
     { id: 'maxAny', name: '任意一张升到满级', kind: 'maxed', need: 1, reward: 30 },
     { id: 'max3', name: '3 张升到满级', kind: 'maxed', need: 3, reward: 120 },
+    { id: 'max6', name: '6 张升到满级', kind: 'maxed', need: 6, reward: 260 },
+    // ---- 共鸣树 ----
+    { id: 'buff3', name: '点亮 3 个共鸣节点', kind: 'buffs', need: 3, reward: 60 },
+    { id: 'buff6', name: '点亮 6 个共鸣节点', kind: 'buffs', need: 6, reward: 150 },
+    { id: 'buffAll', name: '点亮整棵共鸣树', kind: 'buffs', need: 9, reward: 320 },
+    // ---- 历练挑战（进度取 stats，服务端权威） ----
+    { id: 'run5', name: '出战 5 轮', kind: 'runs', need: 5, reward: 30 },
+    { id: 'run20', name: '出战 20 轮', kind: 'runs', need: 20, reward: 100 },
+    { id: 'floor10', name: '最深抵达第 10 层', kind: 'floor', need: 10, reward: 40 },
+    { id: 'floor20', name: '最深抵达第 20 层', kind: 'floor', need: 20, reward: 100 },
+    { id: 'quest20', name: '累计完成 20 个局内任务', kind: 'quests', need: 20, reward: 50 },
+    { id: 'quest50', name: '累计完成 50 个局内任务', kind: 'quests', need: 50, reward: 130 },
+    { id: 'win1', name: '通关 1 次', kind: 'wins', need: 1, reward: 150 },
+    { id: 'win3', name: '通关 3 次', kind: 'wins', need: 3, reward: 360 },
+    { id: 'boss3', name: '累计击败 3 个 Boss', kind: 'boss', need: 3, reward: 120 },
+    { id: 'boss9', name: '累计击败 9 个 Boss', kind: 'boss', need: 9, reward: 300 },
   ],
 };
 

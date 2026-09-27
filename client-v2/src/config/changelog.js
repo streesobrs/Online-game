@@ -3,10 +3,19 @@
  *
  * 生成命令：npm run changelog
  * 数据源：git 提交记录（遵循 .trae/rules/git-commit-message.md 提交规范）
- * 生成时间：2026-09-26T03:03:29.555Z
+ * 生成时间：2026-09-27T07:22:55.320Z
  */
 
 export const CHANGELOG = [
+  {
+    "tag": "Build 783",
+    "name": "新增经验倍率日历功能，支持查看任意日期加成",
+    "type": "feat",
+    "scope": "全端",
+    "hash": "a2931cb",
+    "publishedAt": "2026-09-26T11:04:55+08:00",
+    "body": "### 后端改动\n- 新增多年份节假日缓存管理，支持按需加载指定年份节假日数据\n- 重构经验倍率计算逻辑，新增通用版 getMultiplierForDate 方法\n- 新增 /api/multiplier-calendar 接口，返回指定月份的经验倍率日历数据\n- 优化 helmet 安全头配置，仅在可信来源下发跨域策略\n\n### 前端改动\n- 新增个人资料页「倍率日历」Tab，提供日历视图和当月统计\n- 新增经验倍率日历样式，支持日期选择、倍率展示和调休标识"
+  },
   {
     "tag": "Build 779",
     "name": "实现自定义快捷键功能，支持用户在个人资料页修改键位",

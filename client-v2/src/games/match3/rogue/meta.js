@@ -53,10 +53,12 @@ export function rarityOf(perk) {
 /**
  * 养成项的等级上限
  * - 机制节点（共鸣树末端，`kind: 'mechanic'`）一次性解锁：上限固定 1，稀有度只决定它多贵
- * - 数值节点与祝福：由稀有度决定
+ * - 祝福定义上写了 levelCap 的（受机制硬上限约束，如极简主义只能降到 4 色）：用单独封顶
+ * - 其余数值节点与祝福：由稀有度决定
  */
 export function maxLevelOf(entry) {
   if (entry?.kind === 'mechanic') return 1;
+  if (Number.isInteger(entry?.levelCap) && entry.levelCap > 0) return entry.levelCap;
   return rarityOf(entry).maxLevel;
 }
 
@@ -237,11 +239,15 @@ export function unlockedSet(meta) {
  * 把某条祝福从当前等级往上推一级的花费
  * - 未解锁（lv0）→ 解锁费
  * - 已解锁 → 升级费 × 递增系数^(lv-1)：费用随等级上涨，避免精华全砸在一张牌上
+ * - 祝福定义上写了 costOverride 的，对应目标等级（key=升到几级）用单独定价，
+ *   如极简主义 Lv2→Lv3 的终极档收 1000，而不是普通曲线算出的几十精华
  * @returns {number} 精华数
  */
 export function costToUpgrade(perk, lv) {
   const cfg = rarityOf(perk);
   if (lv <= 0) return cfg.unlockCost;
+  const override = perk?.costOverride?.[lv + 1];
+  if (Number.isInteger(override) && override > 0) return override;
   return Math.round(cfg.upgradeCost * cfg.costGrowth ** (lv - 1));
 }
 
@@ -318,12 +324,33 @@ export function poolProgress(meta) {
 
 /**
  * 里程碑状态（含达成与已领取标记），顺序与数值表一致
+ *
+ * 进度口径（服务端 _rogueMilestoneState 是同一份映射，两边必须一致）：
+ * - unlocked / maxed / all：祝福收集度（poolProgress）
+ * - buffs：共鸣树已点亮节点数
+ * - runs / floor / quests / wins / boss：累计战绩（stats，服务端权威下发）
  * @returns {Array<object>} 每条 = 定义项 + { need, have, done, claimed }
  */
 export function milestoneState(meta) {
   const { unlocked, maxed } = poolProgress(meta);
+  let buffsOn = 0;
+  for (const buff of META_BUFFS) {
+    if (buffLevel(meta, buff.id) > 0) buffsOn += 1;
+  }
+  const stats = meta?.stats || {};
+  const haveOf = {
+    unlocked,
+    maxed,
+    buffs: buffsOn,
+    runs: stats.runs || 0,
+    floor: stats.bestFloor || 0,
+    quests: stats.questsDone || 0,
+    wins: stats.wins || 0,
+    boss: stats.bossKills || 0,
+  };
   return rogueCfg().milestones.map((def) => {
-    const have = def.kind === 'maxed' ? maxed : unlocked;
+    // kind=all 等价于「解锁全部祝福」，need 按祝福总数算（定义里不写 need）
+    const have = def.kind === 'all' ? unlocked : (haveOf[def.kind] ?? 0);
     const need = def.kind === 'all' ? PERKS.length : def.need;
     return { ...def, need, have, done: have >= need, claimed: !!meta?.claimed?.[def.id] };
   });

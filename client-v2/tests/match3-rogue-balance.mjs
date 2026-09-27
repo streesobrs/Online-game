@@ -39,7 +39,7 @@ import { buyItem, priceOf, rollShelf, shelfWithPrices } from '../src/games/match
  * 标定脚本要保持能单独 `node tests/match3-rogue-balance.mjs` 跑。改了服务端就得同步改这里
  */
 const EXP_FLOOR_FACTOR = 1.16;   // 经验 = ⌊层数² × 本值⌋ × 局外「经验共鸣」
-const MAX_SCORE_PER_MOVE = 300000; // 反刷分单步上限（server/config.js 的 rogueMaxScorePerMove）
+const MAX_SCORE_PER_MOVE = 18000000; // 反刷分单步上限（server/config.js 的 rogueMaxScorePerMove）
 /**
  * 局外**数值**增益按 id 取（算「买到满级能乘多少」用）
  * 机制节点（共鸣树末端）没有数值曲线，按 valueAt 求值会得到 NaN，所以先滤掉
@@ -113,6 +113,14 @@ const QUEST_SIM = {
   frenzy: (ctx) => { ctx.scoreMult *= ROGUE.quest.frenzyMult; },
   boom: (ctx) => injectSpecials(ctx.grid, ctx.rng, [{ kind: SPECIAL.ROW, count: ROGUE.quest.specialsReward }]),
   rainbow: (ctx) => injectSpecials(ctx.grid, ctx.rng, [{ kind: SPECIAL.RAINBOW, count: 1 }]),
+  bombard: (ctx) => injectSpecials(ctx.grid, ctx.rng, [{ kind: SPECIAL.BOMB, count: ROGUE.quest.bombReward }]),
+  mixfire: (ctx) => injectSpecials(ctx.grid, ctx.rng, [
+    { kind: SPECIAL.ROW, count: ROGUE.quest.mixRows },
+    { kind: SPECIAL.BOMB, count: ROGUE.quest.mixBombs },
+  ]),
+  starshower: (ctx) => injectSpecials(ctx.grid, ctx.rng, [{ kind: SPECIAL.RAINBOW, count: ROGUE.quest.rainbowRain }]),
+  // 与产品代码同口径：补步数 + 温和倍率（产品里倍率基于 opts.scoreMult 连乘，首拿等价 ×rushMult）
+  rush: (ctx) => { ctx.left += ROGUE.quest.rushMoves; ctx.scoreMult *= ROGUE.quest.rushMult; },
 };
 
 function assertQuestRewardsCovered() {
@@ -348,7 +356,7 @@ for (const colors of [6, 4]) {
 }
 
 // ---- 局内任务：把 need 压到必达，量出每个奖励单独值多少分 ----
-console.log('\n=== 局内任务三档奖励的收益（6 色 10 步，need 压到必达）===');
+console.log('\n=== 局内任务各奖励的收益（6 色 10 步，need 压到必达）===');
 const questAll = (rewardId) => measure({ quest: { color: 1, need: 1, rewardId } });
 for (const reward of QUEST_REWARDS) {
   console.log(`${reward.icon} ${reward.name} = ${questAll(reward.id)}（对照 无任务 ${measure({ quest: { color: 1, need: 99, rewardId: 'moves' } })}）`);
@@ -387,11 +395,14 @@ function perkValue(perk, bonus, floor, lv = 1) {
     return VALUE_PER_STEP * Math.floor((floor - 1) / ROGUE.movesPerFloorStep) * scale;
   }
   if (perk.id !== 'minimal') return (CHOICE_VALUE[perk.id] || 0) * scale;
-  // 「极简主义」每级多降 1 档颜色，各档收益是相乘关系（见 COLOR_GAIN）
+  // 「极简主义」每级多降 1 档颜色，各档收益是相乘关系（见 COLOR_GAIN）。
+  // 下限与产品同口径：常规夹在 4 色，Lv3 终极档（1000 精华）放开到 3 色；
+  // COLOR_GAIN 目前只标定了 6/5 色档，4/3 色回落 ×1，补齐档位后这里自动生效
   let v = 1;
   let colors = ROGUE.colors - bonus.colorCut;
+  const colorFloor = lv >= 3 ? 3 : ROGUE.minColors;
   for (let k = 0; k < valueAt(perk, lv); k += 1) {
-    colors = Math.max(ROGUE.minColors, colors - 1);
+    colors = Math.max(colorFloor, colors - 1);
     v *= COLOR_GAIN[colors] || 1;
   }
   return v;
@@ -526,9 +537,9 @@ function simulateRun(cfg, runSeed) {
       addMoves: (n) => { bonus.moves += Math.round(n || 0); },
       addMovesNextFloor: (n) => { pendingMoves += Math.max(0, Math.round(n || 0)); },
       addShield: (n) => { bonus.shields = Math.max(0, bonus.shields + Math.round(n || 0)); },
-      addReroll: () => {},
-      banPerk: () => {},
-      removePerk: () => {},
+      addReroll: () => { },
+      banPerk: () => { },
+      removePerk: () => { },
       removeRelic: (id) => {
         const at = relics.indexOf(id);
         if (at < 0) return false;
@@ -935,7 +946,8 @@ try {
     + `${st.breaches.length > 0 ? `（${JSON.stringify(st.breaches.slice(0, 3))}）` : ''}`);
   console.log(`局内任务达成率 ${(st.questRate * 100).toFixed(0)}%（need 曲线 ${ROGUE.quest.baseNeed}×${ROGUE.quest.needGrowth}^层）`);
   console.log(`整轮总分中位 ${Math.round(st.medianTotal)}（总分只用于展示与反刷分：经验与精华都按层数结算）`);
-  // 反刷分上限是 rogueMaxScorePerMove（肉鸽已放开到 300000，见 server/config.js），这里看整轮均步得分还有多少余量
+  // 反刷分上限是 rogueMaxScorePerMove（肉鸽已放开到 18000000，见 server/config.js），这里看整轮均步得分还有多少余量。
+  // 基准看「全满级 / 树 + 祝福全满」两档（含极简主义 Lv3 的 3 色），不用默认档
   console.log(`整轮均步得分最高 ${Math.round(st.maxPerMove)}（反刷分上限 ${MAX_SCORE_PER_MOVE}，余量 ${(MAX_SCORE_PER_MOVE / st.maxPerMove).toFixed(1)} 倍）`);
   // 结算尺度：精华 ⌊层数²/divisor⌋、经验 ⌊层数²×factor⌋，两者都再乘对应的局外增益
   console.log(`按中位层数结算：精华 +${essenceAt(st.median)}（÷${ROGUE_META.essenceDivisor}）`
@@ -982,6 +994,7 @@ try {
   // 差值太大 → 不养成的人寸步难行；太小 → 养成没有意义
   const maxed = scan({ levelOf: maxLevelOf }, 16);
   console.log(`全满级对照：中位 ${maxed.median} 层 · 整轮总分中位 ${Math.round(maxed.medianTotal)}`
+    + ` · 均步最高 ${Math.round(maxed.maxPerMove)}（上限 ${MAX_SCORE_PER_MOVE}，余量 ${(MAX_SCORE_PER_MOVE / maxed.maxPerMove).toFixed(1)} 倍）`
     + `（相对全 lv1：层数 +${maxed.median - st.median}、总分 ${((maxed.medianTotal / st.medianTotal - 1) * 100).toFixed(0)}%）`);
 
   // 共鸣树（v1.19）单独一档：局外增益跨轮常驻，与祝福等级是两个独立的成长轴。
@@ -992,6 +1005,7 @@ try {
     + `（相对全 lv1：层数 +${tree.median - st.median}、总分 ${((tree.medianTotal / st.medianTotal - 1) * 100).toFixed(0)}%）`);
   const full = scan({ metaAllOn: true, levelOf: maxLevelOf }, 16);
   console.log(`树 + 祝福全满：中位 ${full.median} 层 · 整轮总分中位 ${Math.round(full.medianTotal)}`
+    + ` · 均步最高 ${Math.round(full.maxPerMove)}（上限 ${MAX_SCORE_PER_MOVE}，余量 ${(MAX_SCORE_PER_MOVE / full.maxPerMove).toFixed(1)} 倍）`
     + `（相对全 lv1：层数 +${full.median - st.median}、总分 ${((full.medianTotal / st.medianTotal - 1) * 100).toFixed(0)}%）`);
 
   // 经验改按层数结算后，满级的收益放大只体现在「多打的那几层」上，

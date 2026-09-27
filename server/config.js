@@ -366,11 +366,12 @@ module.exports = {
     // 按分发等于把「堆分」直接白送成账号等级。系数 1.16 让第 30 层 ≈ 1044 经验，与旧版（30 + 4709万/45000 ≈ 1076）同档，
     // 未养成玩家的一轮收益基本不变，只有后期那条爆发被压平（第 39 层约 1764 × 倍率）
     // （改 config.js / perks.js 的 ROGUE 数值后需重跑 tests/match3-rogue-balance.mjs 复核此项）
-    rogueMaxScorePerMove: 300000,                   // 肉鸽试炼的单步上限（同上规则）
-    // 肉鸽是娱乐玩法，刻意放宽：层数成长祝福（每深 1 层倍率再乘一档）+「同色磁石」（某色出现概率翻倍）
-    // 会把深层单步得分推到 10 万量级；模拟 16 次 run 的整轮均步得分最高 77,969，真人水平更高，
-    // 故取 300000（约 3.8 倍余量）——对正常玩家等同不设限，只兜底拦住明显伪造的上报
-    // （改 perks.js 的祝福池或 config.js 的 goalGrowth / magnetMult 后需重新标定此项）
+    rogueMaxScorePerMove: 18000000,                 // 肉鸽试炼的单步上限（同上规则）
+    // 肉鸽是娱乐玩法且分数尺度刻意放大：层数成长祝福（每深 1 层倍率再乘一档）+「同色磁石」，
+    // 再叠加「极简主义」Lv3 把盘面压到 3 色（三色每步得分比 4 色高约 10 倍），满级 build 的整轮均步得分被推到百万量级。
+    // 标定脚本（tests/match3-rogue-balance.mjs）实测「全满级」档 16 次 run 的整轮均步得分最高 4,628,416，
+    // 故取 18000000（约 3.9 倍余量）——对正常玩家等同不设限，只兜底拦住明显伪造的上报
+    // （改 perks.js 的祝福池、config.js 的 goalGrowth / magnetMult，或放开 minColors 后需重新标定此项）
     minMsPerMove: 300                               // 单步最短合理耗时毫秒（反刷分：durationMs ≥ moves × 本值）
   },
 
@@ -394,9 +395,22 @@ module.exports = {
     saveVer: 2,
     // 稀有度 → 等级上限与费用（maxLevel=2 表示 lv1 之外还能升 1 次）
     rarities: {
-      common: { maxLevel: 2, unlockCost: 20, upgradeCost: 25, costGrowth: 1.5 },
-      rare: { maxLevel: 3, unlockCost: 50, upgradeCost: 70, costGrowth: 1.5 },
+      // 与客户端同表：普通 / 稀有 5 级，史诗 4 级
+      common: { maxLevel: 5, unlockCost: 20, upgradeCost: 25, costGrowth: 1.5 },
+      rare: { maxLevel: 5, unlockCost: 50, upgradeCost: 70, costGrowth: 1.5 },
       epic: { maxLevel: 4, unlockCost: 100, upgradeCost: 150, costGrowth: 1.5 }
+    },
+    // 单祝福等级封顶（覆盖稀有度默认上限）。
+    // 极简主义封到 3 级：Lv1/2 只把 6 色降到 5/4 色；Lv3 是 1000 精华终极档，能压到 3 色
+    // （3 色单步得分约暴涨 10 倍），故不再继续往上开
+    perkCaps: {
+      minimal: 3
+    },
+    // 单祝福单级升级定价覆盖：key=祝福 id，value={ 目标等级: 精华价 }。
+    // 极简主义 Lv2→Lv3 这一跳收 1000（普通曲线只会算到几十精华，撑不起「终极档」定位）。
+    // 与客户端 perks.js 里 minimal.costOverride 手工镜像
+    perkCosts: {
+      minimal: { 3: 1000 }
     },
     // 祝福池：id → 稀有度。服务端不需要祝福的具体效果，只要这张表来定价 + 校验 id 合法性；
     // 新增祝福必须两边同时登记（客户端 perks.js 的 rarity 字段 + 这里）
@@ -449,14 +463,34 @@ module.exports = {
       core_titan: { depth: 30, biome: 'core', name: '熔核巨神', hpMult: 1.7, rewardRarity: 'epic' }
     },
     // 图鉴收集里程碑（一次性领取，只发精华）
-    // kind：unlocked=已解锁种类数 / maxed=已满级张数 / all=集齐全部
+    // kind：unlocked=已解锁祝福数 / maxed=已满级祝福数 / all=集齐全部 /
+    // buffs=共鸣树已点亮节点数 / runs=累计出战轮数 / floor=最深到达层 /
+    // quests=累计完成局内任务数 / wins=通关次数 / boss=累计击败 Boss 数
+    // 与客户端 config.js 的 ROGUE_META.milestones 手工镜像，顺序即展示分组顺序
     milestones: [
+      // 祝福收集
       { id: 'unlock3', name: '解锁 3 种祝福', kind: 'unlocked', need: 3, reward: 20 },
       { id: 'unlock6', name: '解锁 6 种祝福', kind: 'unlocked', need: 6, reward: 40 },
       { id: 'unlock10', name: '解锁 10 种祝福', kind: 'unlocked', need: 10, reward: 80 },
       { id: 'unlockAll', name: '集齐全部祝福', kind: 'all', reward: 200 },
       { id: 'maxAny', name: '任意一张升到满级', kind: 'maxed', need: 1, reward: 30 },
-      { id: 'max3', name: '3 张升到满级', kind: 'maxed', need: 3, reward: 120 }
+      { id: 'max3', name: '3 张升到满级', kind: 'maxed', need: 3, reward: 120 },
+      { id: 'max6', name: '6 张升到满级', kind: 'maxed', need: 6, reward: 260 },
+      // 共鸣树
+      { id: 'buff3', name: '点亮 3 个共鸣节点', kind: 'buffs', need: 3, reward: 60 },
+      { id: 'buff6', name: '点亮 6 个共鸣节点', kind: 'buffs', need: 6, reward: 150 },
+      { id: 'buffAll', name: '点亮整棵共鸣树', kind: 'buffs', need: 9, reward: 320 },
+      // 历练挑战（进度取 stats）
+      { id: 'run5', name: '出战 5 轮', kind: 'runs', need: 5, reward: 30 },
+      { id: 'run20', name: '出战 20 轮', kind: 'runs', need: 20, reward: 100 },
+      { id: 'floor10', name: '最深抵达第 10 层', kind: 'floor', need: 10, reward: 40 },
+      { id: 'floor20', name: '最深抵达第 20 层', kind: 'floor', need: 20, reward: 100 },
+      { id: 'quest20', name: '累计完成 20 个局内任务', kind: 'quests', need: 20, reward: 50 },
+      { id: 'quest50', name: '累计完成 50 个局内任务', kind: 'quests', need: 50, reward: 130 },
+      { id: 'win1', name: '通关 1 次', kind: 'wins', need: 1, reward: 150 },
+      { id: 'win3', name: '通关 3 次', kind: 'wins', need: 3, reward: 360 },
+      { id: 'boss3', name: '累计击败 3 个 Boss', kind: 'boss', need: 3, reward: 120 },
+      { id: 'boss9', name: '累计击败 9 个 Boss', kind: 'boss', need: 9, reward: 300 }
     ]
   },
 

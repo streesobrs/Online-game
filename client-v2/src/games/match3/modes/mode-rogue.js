@@ -138,10 +138,11 @@ function bonusStats(bonus, floor, rewinds = 0) {
   if (specials.length > 0) rows.push({ key: 'specials', label: '开局附赠', value: specials.join(' ') });
   if (bonus.shields > 0) rows.push({ key: 'shields', label: '免死', value: `×${bonus.shields}` });
   if (bonus.shuffles > 0) rows.push({ key: 'shuffles', label: '免费洗牌', value: `×${bonus.shuffles}` });
-  // 同色磁石：锁色前（三选一卡片上的预览）显示为「随机一色」
+  // 同色磁石：锁色前（三选一卡片上的预览）显示为「随机一色」。
+  // 倍率是多张连乘（1.7×1.7=2.89），不夹小数会露出 2.8899999999999997 这种浮点尾数
   if (bonus.weightMult > 1) {
     const name = bonus.weightColor > 0 ? `${COLOR_NAMES[bonus.weightColor]}色` : '随机一色';
-    rows.push({ key: 'magnet', label: '同色磁石', value: `${name} ×${bonus.weightMult}` });
+    rows.push({ key: 'magnet', label: '同色磁石', value: `${name} ×${bonus.weightMult.toFixed(2)}` });
   }
   // 「时光倒流」是机制节点给的一次性重打机会，攒着不用就浪费了——摆出来让玩家看得见
   if (rewinds > 0) rows.push({ key: 'rewind', label: '时光倒流', value: `×${rewinds}` });

@@ -21,6 +21,7 @@ export function createBonus() {
   return {
     moves: 0,           // 每层起手步数加成
     colorCut: 0,        // 元素种类下调档数
+    colorFloor: ROGUE.minColors, // 颜色数下限；常规 4 色，极简主义 Lv3（终极档）单独放开到 3 色
     scoreMult: 1,       // 得分倍率（累乘，与层数无关的那部分）
     cascadeBonus: 0,    // 连锁倍率上限加成（实测无效，未进祝福池，见开发方案 5.6）
     specials: { row: 0, bomb: 0, rainbow: 0 }, // 每层开局注入的特殊元素数量
@@ -98,10 +99,22 @@ export const PERKS = [
     name: '极简主义',
     rarity: 'common',
     scales: { kind: 'add', base: 1, per: 1 },
-    desc(lv) { return `本局元素种类 −${valueAt(this, lv)}（最低 ${ROGUE.minColors} 色）`; },
+    // 养成单独封顶 3 级：Lv1/2 走普通降色（6→5→4 色，受 minColors=4 保护）；
+    // Lv3 是 1000 精华的终极档（costOverride），把盘面压到 3 色——3 色单步得分约暴涨 10 倍，
+    // 所以既贵又不继续往上开。服务端镜像：perkCaps.minimal=3、perkCosts.minimal['3']=1000
+    levelCap: 3,
+    costOverride: { 3: 1000 },
+    desc(lv) {
+      const floor = lv >= 3 ? 3 : ROGUE.minColors;
+      return `本局元素种类 −${valueAt(this, lv)}（最低 ${floor} 色）`;
+    },
     max: 2,
     growth: true,
-    apply(bonus, ctx) { bonus.colorCut += valueAt(this, lvOf(ctx)); },
+    apply(bonus, ctx) {
+      const lv = lvOf(ctx);
+      bonus.colorCut += valueAt(this, lv);
+      if (lv >= 3) bonus.colorFloor = 3;
+    },
   },
   {
     id: 'focus',
@@ -447,7 +460,8 @@ export function floorOptions(bonus, floor = 1, terrain = null) {
   if (bonus.specials.bomb) specials.push({ kind: SPECIAL.BOMB, count: bonus.specials.bomb });
   if (bonus.specials.rainbow) specials.push({ kind: SPECIAL.RAINBOW, count: bonus.specials.rainbow });
 
-  const baseColors = Math.max(ROGUE.minColors, ROGUE.colors - bonus.colorCut);
+  // colorFloor 默认 4 色；极简主义 Lv3 终极档会把它放到 3 色
+  const baseColors = Math.max(bonus.colorFloor ?? ROGUE.minColors, ROGUE.colors - bonus.colorCut);
   // 异形盘（挖洞 / 分仓）行列不贯通，6 色会频繁无解，强制降一档（见 levels.js 标定注释）
   const colors = terrain?.mask ? Math.min(baseColors, ROGUE_SHAPE.maxColors) : baseColors;
   // 颜色权重：只有「同色磁石」会给出非均匀权重；其余情况保持 null（等概率），
@@ -555,6 +569,42 @@ export const QUEST_REWARDS = [
     desc: '立即获得 1 个彩球（换到哪一色就清哪一色）',
     apply(board) { board.addSpecials([{ kind: SPECIAL.RAINBOW, count: 1 }]); },
   },
+  {
+    id: 'bombard',
+    icon: '💣',
+    name: '轰炸',
+    desc: `场上随机 ${ROGUE.quest.bombReward} 颗变成炸弹`,
+    apply(board) { board.addSpecials([{ kind: SPECIAL.BOMB, count: ROGUE.quest.bombReward }]); },
+  },
+  {
+    id: 'mixfire',
+    icon: '🧨',
+    name: '混装火力',
+    desc: `场上随机 ${ROGUE.quest.mixRows} 颗变条状、${ROGUE.quest.mixBombs} 颗变炸弹`,
+    apply(board) {
+      board.addSpecials([
+        { kind: SPECIAL.ROW, count: ROGUE.quest.mixRows },
+        { kind: SPECIAL.BOMB, count: ROGUE.quest.mixBombs },
+      ]);
+    },
+  },
+  {
+    id: 'starshower',
+    icon: '🌟',
+    name: '星雨',
+    desc: `立即获得 ${ROGUE.quest.rainbowRain} 个彩球`,
+    apply(board) { board.addSpecials([{ kind: SPECIAL.RAINBOW, count: ROGUE.quest.rainbowRain }]); },
+  },
+  {
+    id: 'rush',
+    icon: '⚡',
+    name: '冲刺',
+    desc: `立即 +${ROGUE.quest.rushMoves} 步，且本层剩余步数内得分 ×${ROGUE.quest.rushMult}`,
+    apply(board, opts) {
+      board.addMoves(ROGUE.quest.rushMoves);
+      board.setScoreMult(opts.scoreMult * ROGUE.quest.rushMult);
+    },
+  },
 ];
 
 /**
@@ -571,7 +621,7 @@ export const QUEST_REWARDS = [
 export function questFor(floor, bonus, rng) {
   const cfg = ROGUE.quest;
   if (floor < cfg.fromFloor) return null;
-  const colors = Math.max(ROGUE.minColors, ROGUE.colors - bonus.colorCut);
+  const colors = Math.max(bonus.colorFloor ?? ROGUE.minColors, ROGUE.colors - bonus.colorCut);
   return {
     color: 1 + rng.int(colors),
     need: Math.round(cfg.baseNeed * cfg.needGrowth ** (floor - 1)),

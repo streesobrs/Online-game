@@ -202,11 +202,13 @@ test('缺嵌套字段 / 脏值：全部回落到安全默认，不抛错', () =>
 test('超上限等级被裁；不存在的祝福 id 被丢', () => {
   const m = normalizeMeta({
     saveVer: 2,
-    perks: { supply: { lv: 99 }, ghost: { lv: 3 } },
+    perks: { supply: { lv: 99 }, minimal: { lv: 99 }, ghost: { lv: 3 } },
     buffs: { expboost: { lv: 99 } },
   });
-  // common 上限 2（server / client 同表）；epic 经验共鸣上限 4
-  assert.equal(m.perks.supply.lv, 2);
+  // common 默认上限 5；极简主义单独封顶 levelCap 3（Lv3 是压到 3 色的终极档）；
+  // epic 经验共鸣上限 4（server / client 同表）
+  assert.equal(m.perks.supply.lv, 5);
+  assert.equal(m.perks.minimal.lv, 3);
   assert.equal(m.perks.ghost, undefined);
   assert.equal(m.buffs.expboost.lv, 4);
 });
