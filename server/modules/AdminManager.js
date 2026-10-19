@@ -6,6 +6,14 @@ const dataStore = require('../utils/dataStore');
 const fs = require('fs');
 const path = require('path');
 
+// 常量时间字符串比较，避免通过响应时间推断 Token
+function safeTokenEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || !a || !b) return false;
+  const ha = crypto.createHash('sha256').update(a).digest();
+  const hb = crypto.createHash('sha256').update(b).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
+
 class AdminManager {
   constructor(userManager, gameManager, chatManager, accountManager = null, io = null, achievementManager = null) {
     this.userManager = userManager;
@@ -47,8 +55,9 @@ class AdminManager {
 
   // 生成动态管理员Token
   generateDynamicToken(identity = {}) {
-    if (!config.admin.enableDynamicTokens) {
-      return config.admin.token; // 回退到静态Token
+    // 仅当显式关闭动态Token且配置了静态Token时才回退，避免返回 null 作为 Token
+    if (!config.admin.enableDynamicTokens && config.admin.token) {
+      return config.admin.token;
     }
 
     const token = crypto.randomBytes(config.security.adminTokenBytes).toString('hex');
@@ -68,8 +77,12 @@ class AdminManager {
 
   // 验证管理员token
   verifyToken(token) {
-    // 首先检查静态Token
-    if (token === config.admin.token) {
+    if (typeof token !== 'string' || !token) {
+      return false;
+    }
+
+    // 首先检查静态Token（仅在显式配置 ADMIN_TOKEN 时存在）
+    if (config.admin.token && safeTokenEqual(token, config.admin.token)) {
       return true;
     }
 
@@ -93,7 +106,7 @@ class AdminManager {
 
   // 解析Token对应的管理员身份，供 REST 路由记录操作日志
   resolveIdentity(token) {
-    if (token === config.admin.token) {
+    if (config.admin.token && safeTokenEqual(token, config.admin.token)) {
       return { accountId: 'static-admin', username: '内置管理员' };
     }
     const tokenInfo = this.activeTokens.get(token);
@@ -221,8 +234,16 @@ class AdminManager {
 
   // 升级账号为管理员（凭升级密钥自助提权）
   async upgradeWithKey(accountId, upgradeKey) {
-    // 验证升级密钥
-    if (upgradeKey !== config.admin.upgradeKey) {
+    // 未配置升级密钥时直接关闭该功能，避免使用内置默认值提权
+    if (!config.admin.upgradeKey) {
+      return {
+        success: false,
+        message: '未配置管理员升级密钥，该功能已禁用'
+      };
+    }
+
+    // 验证升级密钥（常量时间比较）
+    if (!safeTokenEqual(String(upgradeKey || ''), config.admin.upgradeKey)) {
       return {
         success: false,
         message: '升级密钥错误'
@@ -547,6 +568,9 @@ class AdminManager {
 
   // 踢出用户
   kickUser(socket, accountId, reason = '管理员操作') {
+    // 先校验管理员身份，未认证连接不得执行任何管理动作
+    if (!this.checkAdminAuth(socket)) return;
+
     const adminInfo = this.adminSockets.get(socket.id);
     const success = this.userManager.kickUser(accountId, reason);
 

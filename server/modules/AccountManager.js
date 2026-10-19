@@ -4,6 +4,7 @@ const { execFile, execFileSync } = require('child_process');
 const logger = require('../utils/logger');
 const config = require('../config');
 const dataStore = require('../utils/dataStore');
+const sessionToken = require('../utils/sessionToken');
 const fs = require('fs');
 const path = require('path');
 
@@ -267,43 +268,14 @@ class AccountManager {
     return crypto.randomBytes(config.security.userIdBytes).toString('hex');
   }
 
-  // 生成会话token
+  // 生成会话token（带 HMAC 签名，客户端无法伪造 accountId）
   generateSessionToken(accountId) {
-    const timestamp = Date.now();
-    const random = crypto.randomBytes(config.security.sessionTokenBytes).toString('hex');
-    const tokenData = `${accountId}|${timestamp}|${random}`;
-    return Buffer.from(tokenData).toString('base64');
+    return sessionToken.signSessionToken(accountId);
   }
 
-  // 验证会话token
+  // 验证会话token，成功返回 accountId
   verifySessionToken(token) {
-    try {
-      if (!token) return null;
-
-      const tokenData = Buffer.from(token, 'base64').toString('utf8');
-      const parts = tokenData.split('|');
-
-      if (parts.length !== 3) return null;
-
-      const [accountId, timestamp, random] = parts;
-
-      // 验证token格式
-      if (!accountId || !timestamp || !random) return null;
-
-      // 验证token时效性（7天有效期）
-      const tokenAge = Date.now() - parseInt(timestamp);
-      const maxAge = config.security.sessionTokenExpiry; // 7天
-
-      if (tokenAge > maxAge) {
-        logger.warn('Token已过期', { accountId, tokenAge });
-        return null;
-      }
-
-      return accountId;
-    } catch (err) {
-      logger.error('验证token失败', { error: err.message });
-      return null;
-    }
+    return sessionToken.verifySessionToken(token);
   }
 
   // 检查用户名是否已存在
@@ -464,14 +436,6 @@ class AccountManager {
       logger.error('记录客户端类型失败', { accountId, clientType, error: err.message });
       return false;
     }
-  }
-
-  // 生成会话令牌
-  generateSessionToken(id) {
-    const timestamp = Date.now();
-    const random = crypto.randomBytes(config.security.sessionTokenBytes).toString('hex');
-    const tokenData = `${id}|${timestamp}|${random}`;
-    return Buffer.from(tokenData).toString('base64');
   }
 
   // 验证会话令牌并获取账号信息

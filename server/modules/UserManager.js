@@ -49,11 +49,6 @@ class UserManager {
     return crypto.randomBytes(config.security.guestUserIdBytes).toString('hex'); // 8位十六进制
   }
 
-  // 生成会话token
-  generateToken() {
-    return crypto.randomBytes(config.security.sessionTokenBytes).toString('hex'); // 32位十六进制
-  }
-
   // 处理用户连接 - 只负责连接管理，不自动分配ID
   async handleUserConnection(socket, data, io) {
     this.stats.totalConnections++;
@@ -244,14 +239,6 @@ class UserManager {
 
       return null;
     }
-  }
-
-  // 生成会话token
-  generateSessionToken(accountId) {
-    const timestamp = Date.now();
-    const random = crypto.randomBytes(16).toString('hex');
-    const tokenData = `${accountId}|${timestamp}|${random}`;
-    return Buffer.from(tokenData).toString('base64');
   }
 
   // 更新用户状态

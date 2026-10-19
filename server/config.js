@@ -139,7 +139,10 @@ module.exports = {
 
   // ========== 管理员后台配置 ==========
   admin: {
-    token: process.env.ADMIN_TOKEN || 'admin-secret-token',
+    // 静态管理员令牌：只有在显式配置 ADMIN_TOKEN 环境变量时才启用。
+    // 不再提供内置默认值，避免源码泄露后任何人都能获得后台权限。
+    token: process.env.ADMIN_TOKEN || null,
+    requireStaticTokenLength: 24,                  // 静态Token最小长度，过短会被拒绝
     updateInterval: 2000,                          // 管理后台数据自动刷新间隔（毫秒）
     tokenExpiry: 24 * 60 * 60 * 1000,              // 管理员登录Token有效期（24小时）
     maxActiveSessions: 3,                          // 同一管理员最大同时在线会话数
@@ -148,7 +151,7 @@ module.exports = {
     tokenBytes: 32,                                // 动态Token随机字节数（64位十六进制）
     defaultMuteMinutes: 10,                        // 管理员一键禁言默认时长（分钟）
     allowedUsernames: process.env.ADMIN_USERNAMES ? process.env.ADMIN_USERNAMES.split(',') : ['admin'],
-    upgradeKey: process.env.ADMIN_UPGRADE_KEY || 'ccccccccccccccccccc'
+    upgradeKey: process.env.ADMIN_UPGRADE_KEY || null   // 未配置时禁用「凭密钥升级管理员」功能
   },
 
   // ========== 系统运维配置 ==========

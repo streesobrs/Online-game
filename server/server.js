@@ -99,14 +99,9 @@ function authenticateToken(req, res, next) {
 
   if (adminManager && adminManager.verifyToken(token)) {
     // 附带管理员身份，供路由记录操作日志（时间/客户端/用户/操作）
+    // verifyToken 内部已包含静态 Token（仅在配置了 ADMIN_TOKEN 时）与动态 Token 的校验
     req.adminToken = token;
     req.adminIdentity = adminManager.resolveIdentity(token);
-    return next();
-  }
-
-  if (token === config.admin.token) {
-    req.adminToken = token;
-    req.adminIdentity = { accountId: 'static-admin', username: '内置管理员' };
     return next();
   }
 
@@ -123,9 +118,9 @@ function logAdminRest(req, action, details = {}, target = {}) {
   );
 }
 
-// 静态文件服务 - 优先 client 目录，fallback 到根目录
+// 静态文件服务 - 只暴露前端目录。
+// 注意：不要在这里挂载项目根目录，否则 data/（账号与密码哈希）、server/（源码）、.git 都能被直接下载。
 app.use(express.static(path.join(__dirname, '..', 'client')));
-app.use(express.static(path.join(__dirname, '..')));
 
 // 静态资源服务 - 勋章图标等
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
@@ -596,8 +591,8 @@ app.post('/api/auth/verify', (req, res) => {
     return res.json({ success: false, message: '缺少Token' });
   }
 
-  // 验证token是否与配置中的管理员Token匹配
-  if (token === config.admin.token || (adminManager && adminManager.verifyToken(token))) {
+  // 校验 token（静态 Token 仅在显式配置 ADMIN_TOKEN 时有效）
+  if (adminManager && adminManager.verifyToken(token)) {
     res.json({ success: true, message: 'Token有效' });
   } else {
     res.json({ success: false, message: 'Token无效' });
@@ -1972,6 +1967,20 @@ logger.info('聊天系统初始化完成');
 const adminManager = new AdminManager(userManager, gameManager, chatManager, accountManager, io, achievementManager);
 adminManager.operationLogger = operationLogger;
 logger.info('后台管理系统初始化完成');
+
+// 安全提示：静态管理员 Token 必须显式配置且足够随机，未配置时只允许管理员账号登录
+(function checkAdminTokenConfig() {
+  if (!config.admin.token) {
+    logger.warn('未配置 ADMIN_TOKEN：已禁用静态管理员令牌，请使用管理员账号登录后台');
+    return;
+  }
+  if (config.admin.token.length < config.admin.requireStaticTokenLength) {
+    logger.warn('ADMIN_TOKEN 长度不足，已忽略该配置（建议至少 24 位随机字符串）');
+    config.admin.token = null;
+    return;
+  }
+  logger.info('已启用静态管理员令牌（ADMIN_TOKEN）');
+})();
 
 const feedbackManager = FeedbackManager;
 logger.info('反馈系统初始化完成');
@@ -4556,6 +4565,9 @@ io.on('connection', (socket) => {
 
 const adminNamespace = io.of('/admin');
 
+// 未认证连接只允许调用登录相关事件，其余管理事件一律拒绝
+const ADMIN_LOGIN_EVENTS = new Set(['admin_account_login', 'admin_user_token_login']);
+
 adminNamespace.use((socket, next) => {
   const token = socket.handshake.auth.token || socket.handshake.query.token;
   // 允许不带 token 的连接（用于账号登录）
@@ -4571,6 +4583,15 @@ adminNamespace.use((socket, next) => {
 
 adminNamespace.on('connection', (socket) => {
   logger.info('管理员连接', { socketId: socket.id });
+
+  // 事件级鉴权：除登录事件外，未认证连接发出的事件全部丢弃。
+  // 这样即使有人绕过后台页面直接连接 /admin 命名空间，也无法调用任何管理接口。
+  // 这里静默丢弃而不回发 auth_error，避免后台登录过程中（登录请求尚未返回时）误触发前端登出。
+  socket.use(([event], next) => {
+    if (ADMIN_LOGIN_EVENTS.has(event)) return next();
+    if (adminManager.isAdmin(socket)) return next();
+    logger.debug('拒绝未认证的管理员事件', { socketId: socket.id, event });
+  });
 
   const token = socket.handshake.auth.token || socket.handshake.query.token;
 
