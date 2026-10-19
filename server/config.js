@@ -449,6 +449,29 @@ module.exports = {
       planning: { firstFloorMovesMult: 2, firstFloorPicks: 2 },
       rewind: { retriesPerRun: 1 }
     },
+    // 角色 / 职业（开发方案 3.8，P5）：与客户端 rogue/characters.js 手工镜像。
+    // 服务端不需要角色的数值细节，只登记「资格校验」够用的一层：解锁条件 + 角色自带起手。
+    // - unlock：null=默认开放；{ stat, value }=某项 stats 达标；{ win }=通关次数达标
+    // - startPerks / startRelics：仅为镜像留痕（角色起手在客户端注入，服务端不重算）
+    characters: {
+      sorcerer: { unlock: null, startPerks: ['focus'], startRelics: ['infinite_chain'] },
+      guardian: { unlock: { stat: 'bestFloor', value: 15 }, startPerks: [], startRelics: ['guardian_ward'] },
+      palette: { unlock: { win: 1 }, startPerks: ['magnet'], startRelics: ['recolor_pact'] }
+    },
+    defaultCharacter: 'sorcerer',
+    // 进阶难度（开发方案 3.10，P6）：与客户端 config.js 的 ROGUE_META.ascension 手工镜像。
+    // 服务端只用它算结算精华系数与夹住「已解锁最高进阶」（必须前一级有 win 记录才解锁下一级）
+    ascension: {
+      max: 10,
+      essenceMultPerLevel: 0.05,   // 每高 1 阶，本轮精华 ×(1 + 0.05×阶)
+      essenceMultCap: 1.5          // 系数上限：进阶 10 = ×1.5 封顶
+    },
+    // 硬核模式（开发方案 3.9，P6）：与客户端 config.js 的 ROGUE_META.hardcore 手工镜像。
+    // 关掉全部局外加成换更高精华系数（叠加在进阶系数之上）；unlockWins=通关 N 次后开放
+    hardcore: {
+      unlockWins: 1,
+      essenceMult: 1.5
+    },
     startingPerks: ['supply', 'minimal', 'focus'],  // 新号初始解锁（必须都是成长类，保证开局三选一有牌）
     essenceDivisor: 5,                              // 本轮精华 = ⌊到达层数² / 这个数⌋
     maxFloor: 100,                                  // 单轮层数上限：精华与经验都按它截断（正常打不到，只拦异常上报）

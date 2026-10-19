@@ -13,6 +13,8 @@
  */
 import { ROGUE_META } from '../config/config.js';
 import { META_BUFFS, PERKS, valueAt } from './perks.js';
+import { CHARACTERS } from './characters.js';
+import { ascensionEssenceMult } from './ascension.js';
 import { CURRENT_META_VER, migrateMeta } from '../save/migrate.js';
 
 /** 服务端下发的数值表（未连接时为空，退回本地镜像） */
@@ -40,6 +42,9 @@ export function rogueCfg() {
     // 胜利闭环（开发方案 3.3）：通关固定奖励 + 深渊段每层衰减增量的基数（调和级数，天然收敛）
     winBonus: remoteCfg?.winBonus ?? ROGUE_META.winBonus,
     abyssEssenceBase: remoteCfg?.abyssEssenceBase ?? ROGUE_META.abyssEssenceBase,
+    // 角色 / 进阶 / 硬核（P5/P6）：结算侧的系数与上限，服务端也有一份
+    ascension: remoteCfg?.ascension || ROGUE_META.ascension,
+    hardcore: remoteCfg?.hardcore || ROGUE_META.hardcore,
     startingPerks: ROGUE_META.startingPerks,
   };
 }
@@ -80,12 +85,18 @@ export function emptyMeta() {
     claimed: {},
     // 胜利闭环（开发方案 3.3）：wins 通关次数 / bossKills 累计击败 Boss 数（服务端权威下发）
     stats: { runs: 0, bestFloor: 0, totalCleared: 0, questsDone: 0, wins: 0, bossKills: 0 },
+    // 角色 / 进阶 / 硬核（开发方案 3.8–3.10，P5/P6）：都是服务端权威下发的跨轮养成字段。
+    // characters 用来解锁校验的统计口径在 unlockedCharacters()，不单独存解锁列表（可由 stats 推导）。
+    charStats: {},                    // { [角色id]: { runs, bestFloor, wins } } 各角色出战战绩
+    ascension: { max: 0 },            // 最高已解锁进阶等级（在进阶 N 通关后服务端解锁 N+1）
+    hardcore: { runs: 0, bestFloor: 0, wins: 0, unlocked: false }, // 硬核独立统计与解锁标记
   };
 }
 
 /** normalizeMeta 认识的顶层字段；其余 key（排除签名 / 透传袋自身）收进 _ext */
 const META_KNOWN_KEYS = new Set([
   'saveVer', 'version', 'essence', 'essenceEarned', 'perks', 'buffs', 'claimed', 'stats',
+  'charStats', 'ascension', 'hardcore',
 ]);
 
 /**
@@ -100,6 +111,30 @@ const META_KNOWN_KEYS = new Set([
  *
  * 等级一律裁到 [0, 稀有度上限]：数值被改坏、或将来调低上限，界面也不会画出「9/4 级」。
  */
+
+/** 非负整数裁剪：缺值 / 非法值一律落到 lo；hi 用于夹等级上限 */
+function clampInt(v, lo, hi) {
+  const n = Math.floor(Number(v));
+  if (!Number.isFinite(n)) return lo;
+  return Math.max(lo, Math.min(hi, n));
+}
+
+/** 角色战绩归一化：只保留还存在的角色 id，每项裁成非负整数；未知角色直接丢弃 */
+function normalizeCharStats(raw) {
+  const out = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const char of CHARACTERS) {
+    const s = raw[char.id];
+    if (!s || typeof s !== 'object') continue;
+    out[char.id] = {
+      runs: clampInt(s.runs, 0, Number.MAX_SAFE_INTEGER),
+      bestFloor: clampInt(s.bestFloor, 0, Number.MAX_SAFE_INTEGER),
+      wins: clampInt(s.wins, 0, Number.MAX_SAFE_INTEGER),
+    };
+  }
+  return out;
+}
+
 export function normalizeMeta(raw) {
   const base = emptyMeta();
   if (!raw || typeof raw !== 'object') return base;
@@ -139,6 +174,19 @@ export function normalizeMeta(raw) {
     buffs,
     claimed: data.claimed && typeof data.claimed === 'object' ? { ...data.claimed } : {},
     stats: { ...base.stats, ...(data.stats || {}) },
+    // 角色战绩：只保留还存在的角色 id，每项裁成非负整数；未知角色直接丢弃（不塞进 _ext）
+    charStats: normalizeCharStats(data.charStats),
+    // 最高已解锁进阶：夹到 [0, 配置上限]（防改档跳到未开放的阶）
+    ascension: {
+      max: clampInt(data.ascension?.max, 0, rogueCfg().ascension?.max || 0),
+    },
+    // 硬核独立统计：结构固定，逐项归一化
+    hardcore: {
+      unlocked: !!data.hardcore?.unlocked,
+      runs: clampInt(data.hardcore?.runs, 0, Number.MAX_SAFE_INTEGER),
+      bestFloor: clampInt(data.hardcore?.bestFloor, 0, Number.MAX_SAFE_INTEGER),
+      wins: clampInt(data.hardcore?.wins, 0, Number.MAX_SAFE_INTEGER),
+    },
   };
   if (Object.keys(ext).length > 0) out._ext = ext;
   return out;
@@ -293,7 +341,7 @@ export function abyssEssence(floor) {
  *   深渊段只加 abyssEssence 的衰减增量；最终封顶由服务端 maxEssencePerRun 执行。
  * @param {number} floor - 本轮到达的层数
  * @param {object} [meta] - 养成存档（不传则只算基础值）
- * @param {{win?:boolean}} [opts]
+ * @param {{win?:boolean, ascension?:number, hardcore?:boolean}} [opts] - 进阶 / 硬核系数（P6）
  */
 export function essenceForRun(floor, meta = null, opts = {}) {
   const cfg = rogueCfg();
@@ -307,6 +355,9 @@ export function essenceForRun(floor, meta = null, opts = {}) {
     gain += cfg.winBonus;
     if (raw > 30) gain += abyssEssence(raw);
   }
+  // 进阶 / 硬核结算系数（开发方案 3.9 / 3.10）：越高阶 / 硬核奖励越高，上限由配置夹住。
+  // 与服务端 addRogueEssence 同口径（进阶系数取 ascensionEssenceMult，硬核取 cfg.hardcore.essenceMult）
+  gain = Math.floor(gain * ascensionEssenceMult(opts.ascension) * (opts.hardcore ? (cfg.hardcore?.essenceMult || 1) : 1));
   return gain;
 }
 

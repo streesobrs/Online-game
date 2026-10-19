@@ -476,6 +476,31 @@ export const ROGUE_META = {
   // 再深也只有有界的一小笔，防与最高分互刷；两端同改
   abyssEssenceBase: 10,
   /**
+   * 进阶难度 Ascension（开发方案 3.10，P6）
+   *
+   * 给通关玩家持续追求：在进阶 N 通关后解锁 N+1，最高到 max。每级修正表（力量曲线）在
+   * 客户端 `rogue/ascension.js` 的 ASCENSIONS 里，这里只放**结算侧/服务端也要用到的参数**：
+   * - essenceMultPerLevel / essenceMultCap：进阶结算精华系数（越高阶奖励越高，设上限防刷）
+   * 与服务端 server/config.js 的 match3Rogue.ascension 手工镜像，改一边必须同步另一边。
+   */
+  ascension: {
+    max: 10,
+    essenceMultPerLevel: 0.05,   // 每高 1 阶，本轮精华 ×(1 + 0.05×阶)
+    essenceMultCap: 1.5,         // 系数上限：进阶 10 = ×1.5 封顶
+  },
+  /**
+   * 硬核模式（开发方案 3.9，P6）
+   *
+   * 关掉全部局外养成加成（共鸣树 / 祝福等级只在池子里、不额外加成），换独立统计与更高精华系数：
+   * - unlockWins：通关 N 次后开放（与「调色术士」同一门槛，复用 wins 统计，不新增解锁字段）
+   * - essenceMult：硬核结算精华系数（叠加在进阶系数之上，见 essenceForRun）
+   * 与服务端 server/config.js 手工镜像。
+   */
+  hardcore: {
+    unlockWins: 1,
+    essenceMult: 1.5,
+  },
+  /**
    * 机制节点参数（共鸣树末端的大节点，见 perks.js 的 META_BUFFS）
    *
    * 与数值节点的区别：机制节点**改规则**而不是加数值，一次性解锁（等级上限固定 Lv.1，不看稀有度），
@@ -536,8 +561,11 @@ export const ROGUE_META = {
  * v4（开发方案 3.4/3.5/3.6 局内经济与遗物同批落地）：追加 coins / relics /
  *    upgradedPerkIds / bannedPerkIds 四个字段——三者（事件 / 遗物 / 商店）共用同一批
  *    run 资源，所以一次性升一个版本，而不是分三次升版各带一套迁移。
+ * v5（开发方案 3.8/3.10 P5/P6 角色与进阶同批落地）：追加 character / ascension / hardcore
+ *    三个字段——三者都是「本轮起手的入口选择」，都在 startRun 时一次性决定、运行中不变，
+ *    所以同批升一个版本；它们直接改本轮难度与起手强度，因此必须进签名。
  */
-export const SESSION_SCHEMA_VER = 4;
+export const SESSION_SCHEMA_VER = 5;
 
 /**
  * 参与签名的字段白名单（开发方案 4.7.5）
@@ -573,6 +601,18 @@ export const SIGNED_FIELDS = {
     // 不参与发奖不等于允许被改，改档只是让本轮更容易，仍属作弊，签名能拦住）
     4: [
       'mode', 'phase', 'sessionVer', 'floor',
+      'victory', 'bossKills', 'endless', 'boss',
+      'coins', 'relics', 'upgradedPerkIds', 'bannedPerkIds',
+      'bonus', 'picks', 'baseScore', 'maxCombo', 'totalMoves', 'totalCleared', 'questsDone',
+      'runRngState', 'elapsedMs', 'shufflesLeft', 'rewindsLeft', 'extraPicks',
+      'mapSeed', 'mapParams', 'mapStates', 'nodeId', 'terrain', 'goals',
+      'quest', 'offered', 'board', 'ts',
+    ],
+    // v5（P5/P6 角色与进阶：本轮起手的入口选择）。三者都在 startRun 时定死、运行中不变，
+    // 但 character/ascension/hardcore 直接决定起手强度与难度，必须进签名防改档
+    5: [
+      'mode', 'phase', 'sessionVer', 'floor',
+      'character', 'ascension', 'hardcore',
       'victory', 'bossKills', 'endless', 'boss',
       'coins', 'relics', 'upgradedPerkIds', 'bannedPerkIds',
       'bonus', 'picks', 'baseScore', 'maxCombo', 'totalMoves', 'totalCleared', 'questsDone',

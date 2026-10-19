@@ -2152,9 +2152,9 @@ function recordSessionClient(socket, session, data) {
 // 汇总各 gameType 的成就判定用统计（结算检查与成就页共用，避免两处各拼一套字段）
 // 消消乐四种玩法成绩互相隔离：标准无尽 highScore/maxCombo、三色爽局 highScore3/maxCombo3、
 // 肉鸽试炼 rogueMaxFloor/rogueHighScore，成就条件与这里一一对应
-// rogueStatsByGame：可选的肉鸽养成 stats（{wins,bossKills}），按 gameKey 传入，
-// games 里不存这份数据（它在独立的 match3 存档文件里）
-function buildGameTypeStats(games, rogueStatsByGame = null) {
+// rogueByGame：可选的肉鸽养成存档（_normalizeRogue 的形状），按 gameKey 传入，
+// games 里不存这份数据（它在独立的 match3 存档文件里）；通关/进阶/角色/硬核统计都从它派生
+function buildGameTypeStats(games, rogueByGame = null) {
   const stats = {
     bestStreak: 0,
     bestMaxStreak: 0,
@@ -2169,6 +2169,9 @@ function buildGameTypeStats(games, rogueStatsByGame = null) {
     gameTypeRogueScore: {},
     gameTypeRogueWins: {},
     gameTypeRogueBossKills: {},
+    gameTypeRogueAscension: {},
+    gameTypeRogueHardcoreWins: {},
+    gameTypeRogueCharWins: {},
     gameTypeGames: {}
   };
   for (const [gameKey, gd] of Object.entries(games || {})) {
@@ -2184,9 +2187,17 @@ function buildGameTypeStats(games, rogueStatsByGame = null) {
     stats.gameTypeRogueFloor[gameKey] = gd.rogueMaxFloor || 0;
     stats.gameTypeRogueScore[gameKey] = gd.rogueHighScore || 0;
     stats.gameTypeGames[gameKey] = gd.totalGames || 0;
-    const rogueStats = rogueStatsByGame?.[gameKey];
-    stats.gameTypeRogueWins[gameKey] = rogueStats?.wins || 0;
-    stats.gameTypeRogueBossKills[gameKey] = rogueStats?.bossKills || 0;
+    const rogue = rogueByGame?.[gameKey];
+    stats.gameTypeRogueWins[gameKey] = rogue?.stats?.wins || 0;
+    stats.gameTypeRogueBossKills[gameKey] = rogue?.stats?.bossKills || 0;
+    // 进阶通关（最高通关过的进阶）/ 硬核通关数 / 各角色通关数（开发方案 4.5 成就口径）
+    stats.gameTypeRogueAscension[gameKey] = rogue?.stats?.bestAscWin || 0;
+    stats.gameTypeRogueHardcoreWins[gameKey] = rogue?.hardcore?.wins || 0;
+    const charWins = {};
+    for (const [charId, cs] of Object.entries(rogue?.charStats || {})) {
+      if (cs && cs.wins > 0) charWins[charId] = cs.wins;
+    }
+    stats.gameTypeRogueCharWins[gameKey] = charWins;
   }
   return stats;
 }
@@ -3137,7 +3148,7 @@ io.on('connection', (socket) => {
       const rogueMeta = await accountManager.getMatch3Rogue(userSession.accountId);
       const gameTypeStats = buildGameTypeStats(
         account?.games,
-        rogueMeta?.stats ? { match3: rogueMeta.stats } : null,
+        rogueMeta ? { match3: rogueMeta } : null,
       );
 
       // 兼容新旧成就格式：统一转为纯ID数组
@@ -3932,6 +3943,14 @@ io.on('connection', (socket) => {
     const rogueBossKills = mode === 'rogue'
       ? Math.max(0, Math.min(3, Math.floor(data?.bossKills || 0)))
       : 0;
+    // 入口选择（开发方案 3.8–3.10）：角色 / 进阶 / 硬核只在 rogue 模式有意义。
+    // 这里只做形状规范化，真正「是否已解锁」的资格校验在 AccountManager.addRogueEssence 里
+    // 据养成存档权威判定（未解锁一律夹回默认 / 0 / false）
+    const rogueCharacter = mode === 'rogue' && typeof data?.character === 'string'
+      ? data.character
+      : null;
+    const rogueAscension = mode === 'rogue' ? Math.max(0, Math.floor(data?.ascension || 0)) : 0;
+    const rogueHardcore = mode === 'rogue' && data?.hardcore === true;
 
     try {
       logger.info('消消乐游戏结束', { accountId, mode, level, floor, score, maxCombo, moves, durationMs });
@@ -4029,7 +4048,10 @@ io.on('connection', (socket) => {
         questsDone,
         win: rogueWin,
         bossKills: rogueBossKills,
-        endless: rogueEndless
+        endless: rogueEndless,
+        character: rogueCharacter,
+        ascension: rogueAscension,
+        hardcore: rogueHardcore
       });
       if (!saved.success) {
         socket.emit('match3_result', { success: false, message: saved.message || '保存失败' });
@@ -4093,10 +4115,10 @@ io.on('connection', (socket) => {
 
           // 聚合各游戏类型的最高分 / 闯关进度 / 消消乐各玩法成绩，供 game_type 类成就使用
           // 肉鸽通关 / Boss 击败数来自独立养成存档（本局结算后的最新值）
-          const rogueStats = mode === 'rogue' ? saved.progress?.rogue?.meta?.stats : null;
+          const rogueMeta = mode === 'rogue' ? saved.progress?.rogue?.meta : null;
           const gameTypeStats = buildGameTypeStats(
             postAccount.games,
-            rogueStats ? { match3: rogueStats } : null,
+            rogueMeta ? { match3: rogueMeta } : null,
           );
 
           const unlockedAchievements = await gameManager.achievementManager.checkAchievements(accountId, {

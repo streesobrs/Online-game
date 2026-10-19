@@ -16,7 +16,9 @@ const MATCH3_LEADERBOARD_TYPES = ['match3-level', 'match3-endless', 'match3-endl
 // 其余 key（排除弃用的 version 与客户端本地签名字段 _ck）归一化时收进 _ext 透传袋，
 // 版本回滚期间不把新版本写的字段抹掉
 const ROGUE_META_KNOWN_KEYS = new Set([
-  'saveVer', 'version', 'essence', 'essenceEarned', 'perks', 'buffs', 'claimed', 'stats'
+  'saveVer', 'version', 'essence', 'essenceEarned', 'perks', 'buffs', 'claimed', 'stats',
+  // P5/P6（开发方案 3.8–3.10）新增：角色战绩 / 已解锁最高进阶 / 硬核独立统计
+  'charStats', 'ascension', 'hardcore'
 ]);
 
 class AccountManager {
@@ -3130,6 +3132,20 @@ class AccountManager {
     const s = src.stats && typeof src.stats === 'object' ? src.stats : {};
     const claimed = src.claimed && typeof src.claimed === 'object' ? src.claimed : {};
 
+    // 角色战绩（开发方案 3.8）：只保留配置里还存在的角色 id，每项裁成非负整数；
+    // 未知角色直接丢弃（不塞进 _ext，避免旧角色定义退役后越堆越多）
+    const charStats = {};
+    const charSrc = src.charStats && typeof src.charStats === 'object' ? src.charStats : {};
+    for (const id of Object.keys(cfg.characters || {})) {
+      const cs = charSrc[id];
+      if (!cs || typeof cs !== 'object') continue;
+      charStats[id] = {
+        runs: num(cs.runs, 0, BIG),
+        bestFloor: num(cs.bestFloor, 0, BIG),
+        wins: num(cs.wins, 0, BIG)
+      };
+    }
+
     // 透传袋：保留已有 _ext，再把当前版本不认识的顶层 key 收进来
     // （version 是已登记弃用字段、_ck 是客户端本地缓存签名，都不进袋）
     const ext = src._ext && typeof src._ext === 'object' ? { ...src._ext } : {};
@@ -3159,8 +3175,23 @@ class AccountManager {
         // 胜利闭环（开发方案 3.3）：通关次数 / 三个 Boss 的累计击败数（纯追加统计，不升 saveVer）
         wins: num(s.wins, 0, BIG),
         bossKills: num(s.bossKills, 0, BIG),
+        // 进阶通关统计（开发方案 3.10）：通关过的**最高进阶**，供进阶类成就与榜单用；夹到配置上限
+        bestAscWin: num(s.bestAscWin, 0, cfg.ascension?.max || 0),
         firstRunAt: num(s.firstRunAt, 0, BIG),
         lastRunAt: num(s.lastRunAt, 0, BIG)
+      },
+      // 角色战绩（开发方案 3.8）：per-角色 出战轮数 / 最深 / 通关数
+      charStats,
+      // 已解锁最高进阶（开发方案 3.10）：夹到 [0, 配置上限]，防改档跳到未开放的阶
+      ascension: {
+        max: num(src.ascension?.max, 0, cfg.ascension?.max || 0)
+      },
+      // 硬核模式独立统计与解锁标记（开发方案 3.9）：unlocked 由「通关 N 次」在结算时点亮
+      hardcore: {
+        unlocked: !!(src.hardcore?.unlocked),
+        runs: num(src.hardcore?.runs, 0, BIG),
+        bestFloor: num(src.hardcore?.bestFloor, 0, BIG),
+        wins: num(src.hardcore?.wins, 0, BIG)
       }
     };
     if (Object.keys(ext).length > 0) out._ext = ext;
@@ -3235,6 +3266,39 @@ class AccountManager {
   }
 
   /**
+   * 进阶精华系数（开发方案 3.10，P6）：1 + per × 阶，封顶。
+   * 与客户端 ascension.js 的 ascensionEssenceMult 同口径，改一边必须同步另一边。
+   * 进阶 0 返回 1，与不打进阶时逐位一致。
+   * @param {number} lv 进阶等级
+   */
+  rogueAscensionMult(lv) {
+    const a = config.match3Rogue.ascension || {};
+    const n = Math.max(0, Math.min(a.max || 0, Math.floor(Number(lv) || 0)));
+    return Math.min(a.essenceMultCap || 1, 1 + (a.essenceMultPerLevel || 0) * n);
+  }
+
+  /**
+   * 某角色是否已解锁（开发方案 3.8，P5）：unlock=null 默认开放；
+   * `{ stat, value }` 看某项 stats 达标；`{ win }` 看通关次数达标。服务端权威。
+   * 与客户端 characters.js 的 characterUnlocked 同口径，改一边必须同步另一边。
+   */
+  _rogueCharacterUnlocked(id, rogue) {
+    const def = config.match3Rogue.characters?.[id];
+    if (!def) return false;
+    const unlock = def.unlock;
+    if (!unlock) return true;
+    const st = rogue?.stats || {};
+    if (Number.isFinite(unlock.win)) return (st.wins || 0) >= unlock.win;
+    if (unlock.stat) return (st[unlock.stat] || 0) >= (unlock.value || 0);
+    return false;
+  }
+
+  /** 硬核模式是否已解锁（开发方案 3.9，P6）：通关 unlockWins 次后开放 */
+  _rogueHardcoreUnlocked(rogue) {
+    return (rogue?.stats?.wins || 0) >= (config.match3Rogue.hardcore?.unlockWins || 0);
+  }
+
+  /**
    * 结算发放精华 + 累计本轮统计（服务端主动发放，客户端不参与计算）
    *
    * 精华只按**到达层数**换算：肉鸽后期得分倍率能堆到几十倍，按分数结算会让
@@ -3246,7 +3310,7 @@ class AccountManager {
    * 胜利闭环（开发方案 3.3）：win=true 额外发固定 winBonus；floor>30 的深渊段
    * 不走平方曲线（基础封在 30 层），只叠加调和衰减增量，最终受 maxEssencePerRun 封顶。
    * @param {string} userId 账号 ID
-   * @param {object} run { floor, cleared, picks, questsDone, win, bossKills, endless }
+   * @param {object} run { floor, cleared, picks, questsDone, win, bossKills, endless, character, ascension, hardcore }
    * @returns {Promise<{rogue: object, gain: number}>} rogue 为写回后的存档，gain 为本轮发放数
    */
   async addRogueEssence(userId, run) {
@@ -3258,8 +3322,24 @@ class AccountManager {
     const bossKills = Math.max(0, Math.min(3, Math.floor(run?.bossKills || 0)));
     const now = Date.now();
     let gain = 0;
+    // 入口选择（开发方案 3.8–3.10）：请求携带的角色 / 进阶 / 硬核先落到锁外，真正的
+    // 「是否已解锁」判定放到锁内（要读当前养成存档）；伪造未解锁的高阶 / 硬核只影响系数，
+    // 会被夹回合法值，不影响层数等既有反刷分口径
+    const reqCharacter = typeof run?.character === 'string' ? run.character : null;
+    const reqAscension = Math.max(0, Math.floor(run?.ascension || 0));
+    const reqHardcore = run?.hardcore === true;
 
     const rogue = await this._patchMatch3Rogue(userId, (r) => {
+      // 角色：未知 id 或未解锁一律回落到默认角色（只记录，不改经济；防伪造角色统计）
+      const charId = reqCharacter && this._rogueCharacterUnlocked(reqCharacter, r)
+        ? reqCharacter
+        : (cfg.defaultCharacter || 'sorcerer');
+      // 进阶：夹到「已解锁最高进阶」与配置上限，防改包声称高阶骗精华系数
+      const ascMax = Math.min(cfg.ascension?.max || 0, r.ascension?.max || 0);
+      const ascension = Math.max(0, Math.min(ascMax, reqAscension));
+      // 硬核：未解锁按非硬核处理（不发更高系数、不计入硬核统计）
+      const hardcore = reqHardcore && this._rogueHardcoreUnlocked(r);
+
       // 基础层数在 30 层封口：深渊段再深也不进平方曲线
       const baseFloor = floor > 30 ? 30 : floor;
       const base = Math.floor((baseFloor * baseFloor) / cfg.essenceDivisor);
@@ -3275,6 +3355,10 @@ class AccountManager {
           for (let k = 1; k <= floor - 30; k += 1) gain += Math.round(abyssBase / k);
         }
       }
+      // 进阶 / 硬核结算系数（开发方案 3.9 / 3.10）：越高阶 / 硬核奖励越高，上限由配置夹住。
+      // 口径与客户端 meta.js 的 essenceForRun 一致（进阶取 rogueAscensionMult，硬核取 cfg.hardcore.essenceMult）
+      gain = Math.floor(gain * this.rogueAscensionMult(ascension)
+        * (hardcore ? (cfg.hardcore?.essenceMult || 1) : 1));
       gain = Math.max(0, Math.min(cfg.maxEssencePerRun, gain));
       r.essence += gain;
       r.essenceEarned += gain;
@@ -3285,8 +3369,31 @@ class AccountManager {
       // 胜利闭环统计：通关次数与累计 Boss 击败数
       if (win) r.stats.wins = (r.stats.wins || 0) + 1;
       r.stats.bossKills = (r.stats.bossKills || 0) + bossKills;
+      // 进阶通关统计（开发方案 3.10）：以**校验后的**进阶为准记录「通关过的最高进阶」
+      // （伪造未解锁的高阶已在上面被夹回，成就与榜单口径同源）
+      if (win) r.stats.bestAscWin = Math.max(r.stats.bestAscWin || 0, ascension);
       r.stats.firstRunAt = r.stats.firstRunAt || now;
       r.stats.lastRunAt = now;
+
+      // 角色战绩（开发方案 3.8）：按（校验后的）角色累计场次 / 最深 / 通关数
+      const cs = r.charStats[charId] || { runs: 0, bestFloor: 0, wins: 0 };
+      cs.runs += 1;
+      cs.bestFloor = Math.max(cs.bestFloor || 0, floor);
+      if (win) cs.wins = (cs.wins || 0) + 1;
+      r.charStats[charId] = cs;
+
+      // 硬核独立统计（开发方案 3.9）：只在硬核轮里累计
+      if (hardcore) {
+        r.hardcore.runs = (r.hardcore.runs || 0) + 1;
+        r.hardcore.bestFloor = Math.max(r.hardcore.bestFloor || 0, floor);
+        if (win) r.hardcore.wins = (r.hardcore.wins || 0) + 1;
+      }
+      // 解锁点亮（服务端权威）：通关 unlockWins 次后开放硬核；
+      // 在本轮选择的进阶「等于当前最高已解锁进阶」时通关，解锁下一阶（与客户端 ascensionUnlocked 同语义）
+      r.hardcore.unlocked = (r.stats.wins || 0) >= (cfg.hardcore?.unlockWins || 0);
+      if (win && ascension >= (r.ascension.max || 0)) {
+        r.ascension.max = Math.min(cfg.ascension?.max || 0, (r.ascension.max || 0) + 1);
+      }
 
       // 本轮选到的祝福计入累计统计。未解锁的不会被抽到，所以只累加存档里已有的条目；
       // 次数按 maxPicksPerRun 截断，避免异常上报把统计顶成大数（统计字段，不参与任何发放）

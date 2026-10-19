@@ -26,6 +26,7 @@ export function createBonus() {
     cascadeBonus: 0,    // 连锁倍率上限加成（实测无效，未进祝福池，见开发方案 5.6）
     specials: { row: 0, bomb: 0, rainbow: 0 }, // 每层开局注入的特殊元素数量
     goalCut: 0,         // 目标分减免（累加）
+    goalMult: 1,        // 目标分系数（乘性）：角色「调色术士」/ 进阶难度在此放大，见 goalOf
     shields: 0,         // 剩余免死次数
     shuffles: 0,        // 每层免费洗牌次数
     floorMult: 0,       // 层数成长：每深 1 层，得分倍率额外增加的比率（线性叠加）
@@ -438,7 +439,8 @@ export function goalOf(floor, bonus) {
     ROGUE.baseGoal
     * ROGUE.goalGrowth ** (floor - 1)
     * (1 + ROGUE.perkGoalWeight * (floor - 1));
-  return Math.round(base * (1 - bonus.goalCut));
+  // goalMult：角色 / 进阶给出的目标系数（乘性，默认 1，与旧版逐位一致）
+  return Math.round(base * (1 - bonus.goalCut) * (bonus.goalMult || 1));
 }
 
 /**

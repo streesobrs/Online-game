@@ -800,6 +800,88 @@ class AchievementManager {
         type: 'game_type',
         condition: { gameType: 'match3', rogueWin: true },
         reward: { exp: 5000, badge: 'match3_rogue_win' }
+      },
+      // 肉鸽长尾成就（开发方案 4.5）：Boss 击败数 / 进阶通关 / 角色通关 / 硬核通关，
+      // 条件字段与 buildGameTypeStats 的统计一一对应，数据来自 rogue 养成存档（服务端权威）
+      {
+        id: 163,
+        name: '初破强敌',
+        description: '在肉鸽试炼中击败第1个Boss',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueBossKills: 1 },
+        reward: { exp: 1000, badge: 'match3_rogue_boss_1' }
+      },
+      {
+        id: 164,
+        name: '再破强敌',
+        description: '在肉鸽试炼中累计击败2个Boss',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueBossKills: 2 },
+        reward: { exp: 2000, badge: 'match3_rogue_boss_2' }
+      },
+      {
+        id: 165,
+        name: '三王全灭',
+        description: '在肉鸽试炼中击败全部3个Boss',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueBossKills: 3 },
+        reward: { exp: 4000, badge: 'match3_rogue_boss_3' }
+      },
+      {
+        id: 166,
+        name: '进阶挑战者',
+        description: '通关肉鸽试炼进阶3',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueAscension: 3 },
+        reward: { exp: 6000, badge: 'match3_rogue_asc_3' }
+      },
+      {
+        id: 167,
+        name: '进阶征服者',
+        description: '通关肉鸽试炼进阶5',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueAscension: 5 },
+        reward: { exp: 10000, badge: 'match3_rogue_asc_5' }
+      },
+      {
+        id: 168,
+        name: '进阶传奇',
+        description: '通关肉鸽试炼最高进阶10',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueAscension: 10 },
+        reward: { exp: 20000, badge: 'match3_rogue_asc_10' }
+      },
+      {
+        id: 169,
+        name: '连锁术士通关',
+        description: '使用连锁术士通关肉鸽试炼',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueCharacter: 'sorcerer' },
+        reward: { exp: 2000, badge: 'match3_rogue_char_sorcerer' }
+      },
+      {
+        id: 170,
+        name: '壁垒守卫通关',
+        description: '使用壁垒守卫通关肉鸽试炼',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueCharacter: 'guardian' },
+        reward: { exp: 2000, badge: 'match3_rogue_char_guardian' }
+      },
+      {
+        id: 171,
+        name: '调色术士通关',
+        description: '使用调色术士通关肉鸽试炼',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueCharacter: 'palette' },
+        reward: { exp: 2000, badge: 'match3_rogue_char_palette' }
+      },
+      {
+        id: 172,
+        name: '硬核通关',
+        description: '在硬核模式（禁用全部局外加成）下通关肉鸽试炼',
+        type: 'game_type',
+        condition: { gameType: 'match3', hardcoreWin: true },
+        reward: { exp: 15000, badge: 'match3_rogue_hardcore' }
       }
     ];
   }
@@ -949,6 +1031,20 @@ class AchievementManager {
         // 肉鸽通关（开发方案 3.3）：本局结算上报 rogueWin，或历史累计已有通关（rogue meta.stats.wins）
         if (achievement.condition.rogueWin !== undefined) {
           return Boolean(stats.rogueWin) || (stats.gameTypeRogueWins?.[achievement.condition.gameType] || 0) >= 1;
+        }
+        // 肉鸽扩展成就（开发方案 4.5）：Boss 击败数 / 通关的最高进阶 / 指定角色通关 / 硬核通关，
+        // 数据全部来自 rogue 养成存档（结算后已回写），口径与 buildGameTypeStats 一一对应
+        if (achievement.condition.rogueBossKills !== undefined) {
+          return (stats.gameTypeRogueBossKills?.[achievement.condition.gameType] || 0) >= achievement.condition.rogueBossKills;
+        }
+        if (achievement.condition.rogueAscension !== undefined) {
+          return (stats.gameTypeRogueAscension?.[achievement.condition.gameType] || 0) >= achievement.condition.rogueAscension;
+        }
+        if (achievement.condition.rogueCharacter !== undefined) {
+          return (stats.gameTypeRogueCharWins?.[achievement.condition.gameType]?.[achievement.condition.rogueCharacter] || 0) >= 1;
+        }
+        if (achievement.condition.hardcoreWin !== undefined) {
+          return (stats.gameTypeRogueHardcoreWins?.[achievement.condition.gameType] || 0) >= 1;
         }
         // 累计局数：不分玩法，读 games.match3.totalGames
         if (achievement.condition.totalGames !== undefined) {
@@ -1114,6 +1210,15 @@ class AchievementManager {
             percent: done ? 100 : 0,
           };
         }
+        // 肉鸽扩展成就的布尔进度（开发方案 4.5）：指定角色通关 / 硬核通关，达到即 1/1
+        if (achievement.condition.rogueCharacter !== undefined) {
+          const done = (stats.gameTypeRogueCharWins?.[achievement.condition.gameType]?.[achievement.condition.rogueCharacter] || 0) >= 1;
+          return { current: done ? 1 : 0, target: 1, percent: done ? 100 : 0 };
+        }
+        if (achievement.condition.hardcoreWin !== undefined) {
+          const done = (stats.gameTypeRogueHardcoreWins?.[achievement.condition.gameType] || 0) >= 1;
+          return { current: done ? 1 : 0, target: 1, percent: done ? 100 : 0 };
+        }
         const gameTypeProgressFields = [
           ['maxLevel', 'gameTypeMaxLevel'],
           ['maxCombo', 'gameTypeMaxCombo'],
@@ -1122,6 +1227,8 @@ class AchievementManager {
           ['maxCombo3', 'gameTypeMaxCombo3'],
           ['rogueMaxFloor', 'gameTypeRogueFloor'],
           ['rogueHighScore', 'gameTypeRogueScore'],
+          ['rogueBossKills', 'gameTypeRogueBossKills'],
+          ['rogueAscension', 'gameTypeRogueAscension'],
           ['totalGames', 'gameTypeGames']
         ];
         for (const [condKey, statsKey] of gameTypeProgressFields) {

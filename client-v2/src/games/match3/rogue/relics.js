@@ -313,6 +313,45 @@ export const RELICS = [
       bonus.shuffles += 1;
     },
   },
+
+  // ===================== 角色专属被动（开发方案 3.8，P5） =====================
+  // 角色被动 = 「自带且不可移除」的遗物：不进掉落池（rollRelic / missingRelics / relicsByRarity
+  // 都会过滤 characterOnly），只能由 characters.js 的 startRelics 在开局注入。
+  {
+    id: 'guardian_ward',
+    icon: '🛡️',
+    name: '壁垒之盾',
+    rarity: 'epic',
+    group: 'survival',
+    max: 1,
+    characterOnly: 'guardian',
+    desc: `角色被动：每层第 1 次步数耗尽必定免死（补 ${ROGUE.shieldMoves} 步，且不消耗免死金牌 / 时光倒流）`,
+    // 只在「本层第一次步尽」时兜底：onGameOver 由 mode-rogue 在失败判定**之前**调用，
+    // 返回 true = 已处理（补步继续本层），调用方就不再扣护盾 / 用时光倒流 / 结算。
+    // 触发计数走 ctx.used（每层开局清空），所以天然是「每层一次」。
+    onGameOver(ctx) {
+      if (usedCount(ctx, this.id) >= 1) return false;
+      if (!addMoves(ctx, ROGUE.shieldMoves)) return false;
+      bumpUsed(ctx, this.id);
+      return true;
+    },
+  },
+  {
+    id: 'recolor_pact',
+    icon: '🧲',
+    name: '重彩契约',
+    rarity: 'epic',
+    group: 'special',
+    max: 1,
+    characterOnly: 'palette',
+    once: true,
+    desc: '角色被动：同色磁石的出现权重倍率 +40%（与「同色磁石」逐层叠乘，越叠越强）',
+    // once：在开局获得时跑一次，直接抬高 bonus.weightMult（floorOptions 每层读它生成权重表）。
+    // 与 magnet 祝福的 `bonus.weightMult *= valueAt(...)` 同源叠乘——「调色术士」自带磁石，所以这条一定有处可叠。
+    grant(bonus) {
+      bonus.weightMult *= 1.4;
+    },
+  },
 ];
 
 /** 商店折扣下限：再多件折扣也不低于 5 折，防「免费商店」把金币闭环打穿 */
@@ -452,7 +491,8 @@ export function rollRelic(rng, owned = [], opts = {}) {
   if (!rng || typeof rng.next !== 'function') return null;
   const have = ownedSet(owned);
   const pool = RELICS.filter(
-    (r) => !have.has(r.id) && (!opts.rarity || r.rarity === opts.rarity),
+    // characterOnly 是角色被动，不进任何随机掉落池（只能由 characters.js 的 startRelics 注入）
+    (r) => !r.characterOnly && !have.has(r.id) && (!opts.rarity || r.rarity === opts.rarity),
   );
   if (pool.length === 0) return null;
   return weightedPick(rng, pool);
@@ -490,16 +530,17 @@ export function relicById(id) {
   return RELICS.find((r) => r.id === id) || null;
 }
 
-/** 尚未拥有的遗物（图鉴的「未发现」列表 / 掉落池）；不修改入参 */
+/** 尚未拥有的遗物（图鉴的「未发现」列表 / 掉落池）；不修改入参；不含角色专属被动 */
 export function missingRelics(owned = []) {
   const have = ownedSet(owned);
-  return RELICS.filter((r) => !have.has(r.id));
+  return RELICS.filter((r) => !r.characterOnly && !have.has(r.id));
 }
 
-/** 图鉴分组：按稀有度归档，固定返回 { common, rare, epic } 三个桶 */
+/** 图鉴分组：按稀有度归档，固定返回 { common, rare, epic } 三个桶；不含角色专属被动 */
 export function relicsByRarity() {
   const out = { common: [], rare: [], epic: [] };
   for (const r of RELICS) {
+    if (r.characterOnly) continue;
     (out[r.rarity] || (out[r.rarity] = [])).push(r);
   }
   return out;
@@ -523,7 +564,8 @@ export function relicsByRarity() {
  *          extraChoices:number, rerolls:number, shieldBonus:number},
  *   onStep: (ctx:object, step:{cascade:number, gained:number}) => void,
  *   onUpdate: (ctx:object, info:object) => void,
- *   onFloorStart: (ctx:object) => void
+ *   onFloorStart: (ctx:object) => void,
+ *   onGameOver: (ctx:object) => boolean
  * }}
  */
 export function buildRelicHooks(ownedIds = []) {
@@ -579,6 +621,21 @@ export function buildRelicHooks(ownedIds = []) {
           safe(() => item.grant(ctx && ctx.bonus, ctx));
         }
       }
+    },
+    /**
+     * 层失败判定**之前**调用（步数耗尽时）：任一遗物返回 true = 已兜住本次失败
+     * （如「壁垒之盾」补步继续本层）。调用方据此跳过扣护盾 / 时光倒流 / 结算。
+     * 只认显式返回 true 的钩子——其余（返回 undefined / 抛错）一律视为未处理。
+     * @returns {boolean}
+     */
+    onGameOver(ctx) {
+      for (const item of items) {
+        if (typeof item.onGameOver !== 'function') continue;
+        let handled = false;
+        const ok = safe(() => { handled = item.onGameOver(ctx) === true; });
+        if (ok && handled) return true;
+      }
+      return false;
     },
   };
 }

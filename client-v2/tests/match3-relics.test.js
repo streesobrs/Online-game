@@ -6,7 +6,7 @@
  *   grant 改 bonus、缺字段静默跳过
  */
 import assert from 'node:assert/strict';
-import { ROGUE_RELIC } from '../src/games/match3/config/config.js';
+import { ROGUE, ROGUE_RELIC } from '../src/games/match3/config/config.js';
 import { createRng } from '../src/games/match3/engine/rng.js';
 import { createBonus } from '../src/games/match3/rogue/perks.js';
 import {
@@ -47,18 +47,23 @@ test('RELICS：id 唯一、字段完整、rarity/group 合法、max 恒为 1', (
     assert.ok(GROUP_IDS.includes(r.group), `${r.id} 分组非法`);
     assert.equal(r.max, 1, `${r.id} 遗物不可叠加`);
     // grant / hook / mods 至少有一种，否则这件遗物没有任何效果
-    assert.ok(r.grant || r.onStep || r.onUpdate || r.mods, `${r.id} 没有任何效果`);
+    assert.ok(
+      r.grant || r.onStep || r.onUpdate || r.onGameOver || r.mods,
+      `${r.id} 没有任何效果`,
+    );
   }
   assert.ok(RELICS.length >= 18, '首发应 ≥18 件');
 });
 
-test('稀有度分布：common 9 / rare 7 / epic 4，图鉴分桶固定', () => {
+test('稀有度分布：common 9 / rare 7 / epic 4（可掉落池），图鉴分桶固定', () => {
   const by = relicsByRarity();
   assert.deepEqual(Object.keys(by), ['common', 'rare', 'epic']);
   assert.equal(by.common.length, 9);
   assert.equal(by.rare.length, 7);
   assert.equal(by.epic.length, 4);
-  assert.equal(by.common.length + by.rare.length + by.epic.length, RELICS.length);
+  // 图鉴分桶 = 可掉落池（去掉角色专属被动，那两件只挂在角色身上，不进任何随机池）
+  const rollable = RELICS.filter((r) => !r.characterOnly).length;
+  assert.equal(by.common.length + by.rare.length + by.epic.length, rollable);
 });
 
 test('四组各 ≥4 件（可拼出 ≥4 种流派）', () => {
@@ -68,14 +73,31 @@ test('四组各 ≥4 件（可拼出 ≥4 种流派）', () => {
   }
 });
 
-test('epic 才是改规则级：都有机制，且至少一件 perFloor / 一件 onStep', () => {
-  const epics = RELICS.filter((r) => r.rarity === 'epic');
+test('epic 才是改规则级：可掉落池里的 epic 都有机制，且至少一件 perFloor / 一件 onStep', () => {
+  const epics = RELICS.filter((r) => r.rarity === 'epic' && !r.characterOnly);
   for (const r of epics) {
     assert.ok(r.grant || r.onStep || r.onUpdate || r.mods, `${r.id} 应有改规则效果`);
   }
   // 「每层开局白送 1 个彩球」类（perFloor）与「连锁阈值下调」类（onStep）各至少一件
   assert.ok(epics.some((r) => r.perFloor), 'epic 应含 perFloor 改规则件');
   assert.ok(epics.some((r) => typeof r.onStep === 'function'), 'epic 应含 onStep 改规则件');
+});
+
+test('角色专属被动（characterOnly）：不进任何随机池，只由 startRelics 注入', () => {
+  const own = RELICS.filter((r) => r.characterOnly).map((r) => r.id);
+  assert.ok(own.length >= 2, '首发至少 2 件角色被动遗物');
+  for (const id of own) {
+    // 单抽绝不能掷到它
+    for (let seed = 0; seed < 50; seed += 1) {
+      const r = rollRelic(createRng(seed), []);
+      assert.ok(!r || r.id !== id, `random 抽到了角色专属：${id}`);
+    }
+    // 缺失池与图鉴也不含它（它不是「可收集」的遗物）
+    assert.ok(!missingRelics([]).some((r) => r.id === id), `${id} 出现在缺失池`);
+    assert.ok(!Object.values(relicsByRarity()).flat().some((r) => r.id === id), `${id} 出现在图鉴`);
+  }
+  // 显式指定 id 时仍能编译出 hook（grantRelic 走的是这条）
+  assert.equal(relicById(own[0]).id, own[0]);
 });
 
 test('协同组合：至少 2 处 desc 点名流派（连锁永动 / 彩球清屏）', () => {
@@ -95,7 +117,8 @@ test('relicById / missingRelics / relicsByRarity 不修改入参', () => {
   const owned = ['coupon', 'haggler'];
   const snapshot = [...owned];
   const missing = missingRelics(owned);
-  assert.equal(missing.length, RELICS.length - 2);
+  // 缺失池只统计可掉落遗物（角色专属被动不进随机池）
+  assert.equal(missing.length, RELICS.filter((r) => !r.characterOnly).length - 2);
   assert.ok(!missing.some((r) => owned.includes(r.id)));
   assert.deepEqual(owned, snapshot, 'missingRelics 不应改入参');
 });
@@ -231,9 +254,21 @@ test('grantOnAcquire：只结算 once 类，perFloor 类不触发', () => {
   assert.equal(ctx.bonus.specials.rainbow, before);
 });
 
+test('onGameOver：壁垒之盾每层首次补步，且每层仅 1 次；缺 board 时安全返回 false', () => {
+  const ctx = { board: fakeBoard(), bonus: createBonus(), used: {} };
+  const hooks = buildRelicHooks(['guardian_ward']);
+  assert.equal(hooks.onGameOver(ctx), true);
+  assert.equal(ctx.board.calls.moves, ROGUE.shieldMoves);
+  assert.equal(ctx.used.guardian_ward, 1);
+  assert.equal(hooks.onGameOver(ctx), false); // 每层一次，再来就不兜底了
+  // 没有 board（层间 / 空 ctx）：不能误判为已处理，交给护盾 / 时光倒流
+  assert.equal(buildRelicHooks(['guardian_ward']).onGameOver({ used: {} }), false);
+  // 没带这件遗物时永远 false
+  assert.equal(buildRelicHooks(['coupon']).onGameOver({ board: fakeBoard(), used: {} }), false);
+});
+
 test('缺字段静默跳过：ctx/step/info 为空对象时不抛错', () => {
   const hooks = buildRelicHooks(RELICS.map((r) => r.id));
-  assert.doesNotThrow(() => hooks.onStep({}, { cascade: 6, gained: 0 }));
   assert.doesNotThrow(() => hooks.onStep({}, {}));
   assert.doesNotThrow(() => hooks.onUpdate({}, { maxCascade: 6, movesLeft: 1, collected: {} }));
   assert.doesNotThrow(() => hooks.onUpdate({}, null));

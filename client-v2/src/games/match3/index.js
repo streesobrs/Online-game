@@ -97,13 +97,15 @@ export function renderMatch3(container = viewRoot()) {
   }
 
   // ---- 娱乐：二级菜单（不设目标的玩法都收在这里）----
-  /** 肉鸽卡片副标题：有未结算的一轮就提示续玩，否则显示历史最佳 */
+  /** 肉鸽卡片副标题：有未结算的一轮就提示续玩，否则显示历史最佳与已解锁进阶 */
   function rogueMeta() {
     const session = loadLocalSession(ROGUE.type);
     if (session) return `未结算的一轮：第 ${session.floor} 层（点击继续）`;
     const best = loadRogueBest();
+    const asc = Math.max(0, Math.floor(getRogueMeta().ascension?.max || 0));
+    const ascText = asc > 0 ? ` · 进阶 ${asc}` : '';
     if (best.maxFloor <= 0) return '限步冲层 · 每层三选一祝福';
-    return `最深 ${best.maxFloor} 层 · 最高分 ${best.highScore}`;
+    return `最深 ${best.maxFloor} 层 · 最高分 ${best.highScore}${ascText}`;
   }
 
   /**
@@ -125,6 +127,11 @@ export function renderMatch3(container = viewRoot()) {
       el('span', { class: 'm3-rogue-status-item' }, `祝福 ${unlocked}/${total}`),
       el('span', { class: 'm3-rogue-status-item' }, `满级 ${maxed}`),
       el('span', { class: 'm3-rogue-status-item' }, `增益 ${buffs}/${META_BUFFS.length}`),
+      // 角色 / 进阶 / 硬核（开发方案 3.8–3.10）：解锁进度一眼可见，引导玩家往长尾目标走
+      el('span', { class: 'm3-rogue-status-item' }, `进阶 ${Math.max(0, Math.floor(meta.ascension?.max || 0))}`),
+      meta.hardcore?.unlocked
+        ? el('span', { class: 'm3-rogue-status-item' }, `硬核通关 ${meta.hardcore.wins || 0}`)
+        : null,
       ready > 0
         ? el('span', { class: 'm3-rogue-status-ready' }, `🏅 ${ready} 项奖励可领`)
         : null,

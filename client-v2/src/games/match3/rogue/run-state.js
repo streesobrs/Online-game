@@ -13,11 +13,14 @@
  * 它们由 mode-rogue 的 teardown() 负责清空，不在这里。
  */
 import { createBonus } from './perks.js';
+import { DEFAULT_CHARACTER } from './characters.js';
 
 /** run 数据容器的全部字段名（mode-rogue.startRun 必须逐项从工厂结果赋值） */
 export const RUN_STATE_KEYS = [
   // 终局标记
   'finished', 'victory',
+  // 入口选择（开发方案 3.8 / 3.10，P5/P6）：角色 / 进阶等级 / 是否硬核，startRun 时定死
+  'characterId', 'ascension', 'hardcore',
   // build
   'bonus', 'picks', 'pickedPerks',
   // 地图状态机（3.1）
@@ -45,6 +48,10 @@ export function createRunState() {
   return {
     finished: false,
     victory: false,
+    // 入口选择的默认值：默认角色 / 进阶 0 / 非硬核（与「不选就等于旧版」逐位一致）
+    characterId: DEFAULT_CHARACTER,
+    ascension: 0,
+    hardcore: false,
     bonus: createBonus(),
     picks: {},
     pickedPerks: [],

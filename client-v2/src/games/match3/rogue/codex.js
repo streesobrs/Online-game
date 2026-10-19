@@ -20,6 +20,7 @@
 import { ROGUE } from '../config/config.js';
 import { META_BUFFS, PERKS, QUEST_REWARDS, descOf, valueAt } from './perks.js';
 import { relicsByRarity } from './relics.js';
+import { CHARACTERS, unlockProgress } from './characters.js';
 import {
   buffFactor, claimableCount, itemLevel, maxLevelOf, milestoneReward, milestoneState,
   nextStep, poolProgress, rarityOf, requiresMet, rogueCfg,
@@ -113,6 +114,7 @@ export function showPerkCodex(picks = null) {
     { id: 'ms', label: '🏅 里程' },
     { id: 'perks', label: '✨ 祝福' },
     { id: 'relics', label: '🎁 遗物' },
+    { id: 'chars', label: '🧩 角色' },
     { id: 'quest', label: '📜 任务' },
   ];
 
@@ -511,6 +513,44 @@ export function showPerkCodex(picks = null) {
       });
   }
 
+  /** 角色图鉴（开发方案 3.8，P5）：只读 + 解锁进度 + 各角色战绩；角色只是玩法入口，不用精华买强度 */
+  function charRow(ch, stats, own) {
+    const prog = unlockProgress(ch, stats);
+    const unlocked = !prog || prog.done;
+    const rec = own && own.runs
+      ? `出战 ${own.runs} 轮 · 最深 ${own.bestFloor || 0} 层 · 通关 ${own.wins || 0}`
+      : null;
+    return el(
+      'div',
+      { class: `m3-codex-item m3-codex-item--char${unlocked ? '' : ' m3-codex-item--locked'}` },
+      el('span', { class: 'm3-codex-icon' }, unlocked ? ch.icon : '🔒'),
+      el(
+        'div',
+        { class: 'm3-codex-main' },
+        el(
+          'div',
+          { class: 'm3-codex-head' },
+          el('span', { class: 'm3-codex-name' }, ch.name),
+          el('span', { class: 'm3-codex-limit' }, ch.style),
+        ),
+        el('div', { class: 'm3-codex-desc' }, ch.desc),
+        el('div', { class: 'm3-codex-meta' }, unlocked ? (rec || '尚未出战') : `🔒 ${prog.label}（${prog.have}/${prog.need}）`),
+      ),
+    );
+  }
+
+  function charSections(meta) {
+    const stats = meta.stats || {};
+    const cs = meta.charStats || {};
+    return [
+      section(
+        '角色 / 职业',
+        '开局前选定身份，决定起手加成与一条专属被动（自带遗物）；解锁靠战绩，不用精华买强度',
+        CHARACTERS.map((ch) => charRow(ch, stats, cs[ch.id])),
+      ),
+    ];
+  }
+
   /** 按稀有度分组（普通 → 稀有 → 史诗），组标题带上该档的等级上限与费用；条目用紧凑行 */
   function raritySections(meta) {
     const cfg = rogueCfg().rarities;
@@ -571,6 +611,9 @@ export function showPerkCodex(picks = null) {
     }
     if (tab === 'relics') {
       return el('div', { class: 'm3-codex-pane' }, ...relicSections());
+    }
+    if (tab === 'chars') {
+      return el('div', { class: 'm3-codex-pane' }, ...charSections(meta));
     }
     if (tab === 'quest') {
       return el(

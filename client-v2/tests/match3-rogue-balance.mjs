@@ -28,8 +28,11 @@ import { allGoalsDone, goalShort } from '../src/games/match3/engine/goals.js';
 import { bossAt, bossHpTarget, bossTerrain } from '../src/games/match3/rogue/boss.js';
 // 3.4 / 3.5 / 3.6：事件 / 遗物 / 商店——标定与产品 import 同一份纯函数，口径不漂
 import { applyChoice, availableChoices, isLeaveChoice, rollEvent } from '../src/games/match3/rogue/events.js';
-import { buildRelicHooks, grantOnAcquire, relicById, rollRelic, rollRelicChoices } from '../src/games/match3/rogue/relics.js';
+import { buildRelicHooks, grantOnAcquire, relicById, rollRelic, rollRelicChoices, RELICS } from '../src/games/match3/rogue/relics.js';
 import { buyItem, priceOf, rollShelf, shelfWithPrices } from '../src/games/match3/rogue/shop.js';
+// 3.8 / 3.10：角色 / 进阶——起手数据与进阶修正的覆盖度检查（P5/P6）
+import { CHARACTERS, DEFAULT_CHARACTER } from '../src/games/match3/rogue/characters.js';
+import { ASCENSIONS, MAX_ASCENSION, ascMods, ascensionEssenceMult } from '../src/games/match3/rogue/ascension.js';
 
 /**
  * 服务端**结算口径**（server/config.js 的 match3Rogue / match3Rewards，手工同步的两项）
@@ -188,6 +191,89 @@ function assertTreeCovered() {
   }
 }
 assertTreeCovered();
+
+/**
+ * 角色 / 职业的数据检查（开发方案 3.8，P5）
+ *
+ * 角色差异全靠数据描述：起手加成 / 起手祝福 / 起手遗物 + 一条自带遗物被动。
+ * 拼错的 id（祝福或遗物不存在）在 mode-rogue 里会被静默跳过（grantPerk 找不到就丢），
+ * 玩家只会觉得「这角色没反应」，很难定位，所以在标定时一次查完：
+ * - id 唯一；默认角色在表里；至少 1 个默认开放角色
+ * - startPerks 必须是 PERKS 里的 id；startRelics 必须是 RELICS 里的 id
+ * - 解锁条件只能落在 stats 已有项（bestFloor / wins 等）或 win，不能凭空写
+ * - 角色专属被动（characterOnly 遗物）必须与 startRelics 一一对应
+ */
+function assertCharactersCovered() {
+  const ids = CHARACTERS.map((c) => c.id);
+  const dup = [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
+  if (dup.length > 0) throw new Error(`角色 id 重复：${dup.join(', ')}`);
+  if (!ids.includes(DEFAULT_CHARACTER)) throw new Error(`默认角色 ${DEFAULT_CHARACTER} 不在角色表里`);
+  if (!CHARACTERS.some((c) => !c.unlock)) throw new Error('至少要有一个默认开放（unlock=null）的角色');
+  const perkIds = new Set(PERKS.map((p) => p.id));
+  const relicIds = new Set(RELICS.map((r) => r.id));
+  const statKeys = new Set(['runs', 'bestFloor', 'totalCleared', 'questsDone', 'wins', 'bossKills']);
+  for (const ch of CHARACTERS) {
+    for (const pid of ch.startPerks || []) {
+      if (!perkIds.has(pid)) throw new Error(`角色 ${ch.id} 的起手祝福 ${pid} 不存在`);
+    }
+    for (const rid of ch.startRelics || []) {
+      if (!relicIds.has(rid)) throw new Error(`角色 ${ch.id} 的起手遗物 ${rid} 不存在`);
+    }
+    const u = ch.unlock;
+    if (u && !Number.isFinite(u.win) && !statKeys.has(u.stat)) {
+      throw new Error(`角色 ${ch.id} 的解锁条件写了未知统计项 ${u.stat}`);
+    }
+  }
+  const used = new Set(CHARACTERS.flatMap((ch) => ch.startRelics || []));
+  for (const r of RELICS.filter((x) => x.characterOnly)) {
+    if (!used.has(r.id)) throw new Error(`角色专属遗物 ${r.id} 没被任何角色携带`);
+  }
+}
+assertCharactersCovered();
+
+/**
+ * 进阶难度的一致性检查（开发方案 3.10，P6）
+ *
+ * 每级一条修正、叠在现有公式上。写错了只会让难度曲线断层（且很难从体感发现），
+ * 所以标定时查：修正条数 = 上限、等级连续 1..MAX、每级只改合法修正项、
+ * 进阶 0 等于无修正基线、越叠越难（目标/血/商店价不减、步数不增）、
+ * 精华系数 0 阶 = 1、逐级不减、顶阶等于配置封顶。
+ */
+function assertAscensionCovered() {
+  if (ASCENSIONS.length !== MAX_ASCENSION) {
+    throw new Error(`进阶修正条数 ${ASCENSIONS.length} 与上限 ${MAX_ASCENSION} 不一致`);
+  }
+  const modKeys = new Set(['goalMult', 'moves', 'eliteBonus', 'eliteMult', 'bossMult', 'shopMult', 'colorFloor']);
+  ASCENSIONS.forEach((e, i) => {
+    if (e.lv !== i + 1) throw new Error(`进阶等级不连续：第 ${i} 条是 lv.${e.lv}`);
+    if (!e.desc) throw new Error(`进阶 Lv.${e.lv} 缺描述`);
+    const bad = Object.keys(e.mod).filter((k) => !modKeys.has(k));
+    if (bad.length > 0) throw new Error(`进阶 Lv.${e.lv} 用了未知修正项 ${bad.join(', ')}`);
+  });
+  const baseline = { goalMult: 1, moves: 0, eliteBonus: 0, eliteMult: 1, bossMult: 1, shopMult: 1, colorFloor: 0 };
+  const base = ascMods(0);
+  for (const [k, v] of Object.entries(baseline)) {
+    if (base[k] !== v) throw new Error(`进阶 0 的 ${k} 应为 ${v}，实际 ${base[k]}`);
+  }
+  let prev = base;
+  for (let lv = 1; lv <= MAX_ASCENSION; lv += 1) {
+    const m = ascMods(lv);
+    if (m.goalMult < prev.goalMult) throw new Error(`进阶 ${lv} 的目标系数比上一阶低`);
+    if (m.bossMult < prev.bossMult) throw new Error(`进阶 ${lv} 的 Boss 血系数比上一阶低`);
+    if (m.shopMult < prev.shopMult) throw new Error(`进阶 ${lv} 的商店价系数比上一阶低`);
+    if (m.moves > prev.moves) throw new Error(`进阶 ${lv} 的步数比上一阶多`);
+    prev = m;
+  }
+  if (ascensionEssenceMult(0) !== 1) throw new Error('进阶 0 的精华系数应为 1');
+  const cap = ROGUE_META.ascension.essenceMultCap;
+  if (Math.abs(ascensionEssenceMult(MAX_ASCENSION) - cap) > 1e-9) {
+    throw new Error(`顶阶精华系数应为 ${cap}，实际 ${ascensionEssenceMult(MAX_ASCENSION)}`);
+  }
+  for (let lv = 1; lv <= MAX_ASCENSION; lv += 1) {
+    if (ascensionEssenceMult(lv) < ascensionEssenceMult(lv - 1)) throw new Error(`进阶 ${lv} 精华系数比上一阶低`);
+  }
+}
+assertAscensionCovered();
 
 /**
  * 打一层

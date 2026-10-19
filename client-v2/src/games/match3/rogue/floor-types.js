@@ -92,11 +92,15 @@ function collectTarget(depth, colors, terrain) {
  * @param {{depth:number,type:string}} node
  * @param {object} bonus - 本轮祝福（影响分数目标曲线）
  * @param {object} rng
- * @param {{colors:number,terrain:object}} ctx - colors 取自 floorOptions（异形盘会降色）
+ * @param {{colors:number,terrain:object,eliteMult?:number,bossMult?:number}} ctx
+ *   - colors 取自 floorOptions（异形盘会降色）
+ *   - eliteMult / bossMult：进阶难度（ascension.js）的额外系数，默认 1（与旧版逐位一致）
  * @returns {Array<{type:string,target?:number,color?:number}>}
  */
 export function floorGoals(node, bonus, rng, ctx) {
   const { colors, terrain } = ctx;
+  const eliteMult = Number.isFinite(ctx.eliteMult) && ctx.eliteMult > 0 ? ctx.eliteMult : 1;
+  const bossMult = Number.isFinite(ctx.bossMult) && ctx.bossMult > 0 ? ctx.bossMult : 1;
   const biome = rogueBiome(node.depth);
   const nodeCfg = ROGUE_NODES[node.type] || ROGUE_NODES.battle;
 
@@ -104,14 +108,15 @@ export function floorGoals(node, bonus, rng, ctx) {
   // 不再配条件目标——固定机关盘本身就是第二个压力源
   if (node.type === NODE.BOSS) {
     const def = bossAt(node.depth);
-    if (def) return [{ type: 'score', target: bossHpTarget(def, bonus) }];
+    if (def) return [{ type: 'score', target: bossHpTarget(def, bonus, bossMult) }];
   }
 
-  // 分数目标：旧曲线 × 节点系数 × 异形盘折算
+  // 分数目标：旧曲线 × 节点系数 × 异形盘折算 × 进阶精英系数（仅精英层）
   const shapeScale = terrain.mask ? terrain.playableRatio * ROGUE_SHAPE.scoreComp : 1;
+  const ascScale = node.type === NODE.ELITE ? eliteMult : 1;
   const scoreTarget = Math.max(
     1,
-    Math.round(goalOf(node.depth, bonus) * nodeCfg.goalMult * shapeScale),
+    Math.round(goalOf(node.depth, bonus) * nodeCfg.goalMult * shapeScale * ascScale),
   );
 
   const canClear = terrain.blockers.length > 0;

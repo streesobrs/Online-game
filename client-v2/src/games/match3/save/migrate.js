@@ -14,6 +14,7 @@
  */
 import { ROGUE_META, SESSION_SCHEMA_VER, SIGNED_FIELDS } from '../config/config.js';
 import { synthLinearMap } from '../rogue/mapgen.js';
+import { DEFAULT_CHARACTER } from '../rogue/characters.js';
 
 /** 当前局外存档版本（权威随服务端下发；未下发时用客户端镜像） */
 export const CURRENT_META_VER = ROGUE_META.saveVer;
@@ -170,6 +171,24 @@ export const SESSION_MIGRATIONS = [
       if (!Array.isArray(out.relics)) out.relics = [];
       if (!Array.isArray(out.upgradedPerkIds)) out.upgradedPerkIds = [];
       if (!Array.isArray(out.bannedPerkIds)) out.bannedPerkIds = [];
+      return out;
+    },
+  },
+  /**
+   * v4 → v5（开发方案 3.8–3.10 角色 / 进阶 / 硬核入口选择）：追加三个本轮强度字段。
+   * 老档一律按「默认角色、无进阶、非硬核」补默认，**不覆盖档上已有值**：
+   * character=DEFAULT_CHARACTER、ascension=0、hardcore=false。
+   * 三字段都会进本轮签名白名单，缺了会验签失败，故必须在此补齐。
+   * 纯数据补齐、幂等，不重建地图、不重掷 runRng。
+   */
+  {
+    from: 4,
+    to: 5,
+    up(saved) {
+      const out = { ...saved, sessionVer: 5 };
+      if (out.character === undefined) out.character = DEFAULT_CHARACTER;
+      if (out.ascension === undefined) out.ascension = 0;
+      if (out.hardcore === undefined) out.hardcore = false;
       return out;
     },
   },

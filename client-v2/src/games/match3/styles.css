@@ -2517,3 +2517,233 @@ div.m3-relic-card:hover {
   font-weight: 600;
   color: var(--theme-status-color, #4a5568);
 }
+
+/* ===== 肉鸽：入口选择屏（角色 / 进阶 / 硬核，开发方案 3.8–3.10）=====
+ * 进模式前的一屏：三组选择卡 + 底部「开始试炼」。未解锁置灰并显示进度。
+ */
+.m3-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 12px 0;
+}
+
+.m3-setup-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.m3-setup-group-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--theme-title-color, #2c3e50);
+}
+
+.m3-setup-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.m3-setup-card {
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 12px;
+  background: var(--theme-panel-bg, #fff);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.m3-setup-card:hover:not(:disabled) {
+  border-color: var(--theme-primary, #007bff);
+}
+
+.m3-setup-card--on {
+  border-color: var(--theme-primary, #007bff);
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.m3-setup-card--locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.m3-setup-card-icon {
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.m3-setup-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.m3-setup-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.m3-setup-card-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--theme-title-color, #2c3e50);
+}
+
+.m3-setup-card-style {
+  font-size: 11px;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-setup-card-desc {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-setup-card-kit {
+  font-size: 11px;
+  color: var(--theme-accent, #27ae60);
+}
+
+.m3-setup-card-lock {
+  font-size: 11px;
+  color: #e67e22;
+}
+
+.m3-setup-asc-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.m3-setup-asc {
+  position: relative;
+  min-width: 40px;
+  padding: 6px 10px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 8px;
+  background: var(--theme-panel-bg, #fff);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.m3-setup-asc--on {
+  border-color: var(--theme-primary, #007bff);
+  background: rgba(0, 123, 255, 0.12);
+  font-weight: 700;
+}
+
+.m3-setup-asc--locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.m3-setup-asc-tip {
+  margin-left: 2px;
+  font-size: 11px;
+}
+
+.m3-setup-asc-note {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-setup-asc-hint {
+  font-size: 11px;
+  color: #e67e22;
+}
+
+.m3-setup-hard {
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 12px;
+  background: var(--theme-panel-bg, #fff);
+  text-align: left;
+  cursor: pointer;
+}
+
+.m3-setup-hard--on {
+  border-color: #e74c3c;
+  background: rgba(231, 76, 60, 0.10);
+}
+
+.m3-setup-hard--locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.m3-setup-hard-icon {
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.m3-setup-hard-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.m3-setup-hard-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--theme-title-color, #2c3e50);
+}
+
+.m3-setup-hard-desc {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-setup-hard-lock {
+  font-size: 11px;
+  color: #e67e22;
+}
+
+/* ===== 肉鸽：死亡墓志铭（开发方案 3.9 / 3.10）=====
+ * 结算页里与 build 并列的一块「战报」：身份 + 难度 + 路线 + 死因。
+ */
+.m3-epitaph {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 12px;
+  margin: 4px 0;
+  border-left: 3px solid var(--theme-border-color, #95a5a6);
+  border-radius: 0 8px 8px 0;
+  background: rgba(0, 0, 0, 0.04);
+  text-align: left;
+}
+
+.m3-epitaph-tags {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--theme-title-color, #2c3e50);
+}
+
+.m3-epitaph-route {
+  font-size: 12px;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-epitaph-cause {
+  font-size: 12px;
+  color: #e74c3c;
+}
+
+@media (max-width: 640px) {
+  .m3-setup-cards {
+    grid-template-columns: 1fr;
+  }
+}

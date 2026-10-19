@@ -88,11 +88,11 @@ function v1SessionFixture(floor = 7, phase = 'floor') {
 
 section('版本与迁移表');
 
-test('当前版本：meta 与客户端镜像一致、session 常量为 4；迁移步首尾相接', () => {
+test('当前版本：meta 与客户端镜像一致、session 常量为 5；迁移步首尾相接', () => {
   assert.equal(CURRENT_META_VER, ROGUE_META.saveVer);
   assert.equal(CURRENT_SESSION_VER, SESSION_SCHEMA_VER);
   assert.equal(CURRENT_META_VER, 2);
-  assert.equal(CURRENT_SESSION_VER, 4);
+  assert.equal(CURRENT_SESSION_VER, 5);
   assert.equal(META_MIGRATIONS[0].from, 1);
   assert.equal(META_MIGRATIONS[0].to, 2);
   assert.equal(SESSION_MIGRATIONS[0].from, 1);
@@ -101,6 +101,9 @@ test('当前版本：meta 与客户端镜像一致、session 常量为 4；迁�
   assert.equal(SESSION_MIGRATIONS[1].to, 3);
   assert.equal(SESSION_MIGRATIONS[2].from, 3);
   assert.equal(SESSION_MIGRATIONS[2].to, 4);
+  // v4 → v5：角色 / 进阶 / 硬核入口选择
+  assert.equal(SESSION_MIGRATIONS[3].from, 4);
+  assert.equal(SESSION_MIGRATIONS[3].to, 5);
   // 链式相接：每一步的 to 必须等于下一步的 from，版本号不留空档
   for (let i = 1; i < SESSION_MIGRATIONS.length; i += 1) {
     assert.equal(SESSION_MIGRATIONS[i].from, SESSION_MIGRATIONS[i - 1].to);
@@ -243,10 +246,10 @@ test('空输入：空存档形态带当前 saveVer，且每次返回独立对象
 
 section('session 迁移');
 
-test('v1 session：迁移到 v4，按 floor 合成线性图（当前层 open、前后状态正确），并补齐胜利闭环与局内经济字段', () => {
+test('v1 session：迁移到 v5，按 floor 合成线性图（当前层 open、前后状态正确），并补齐胜利闭环、局内经济与入口选择字段', () => {
   const result = migrateSession(v1SessionFixture(7));
   assert.equal(result.future, false);
-  assert.equal(result.data.sessionVer, 4);
+  assert.equal(result.data.sessionVer, 5);
   assert.equal(result.data.mapSeed, null);
   assert.equal(result.data.mapParams, null);
   assert.equal(result.data.nodeId, 'l7');
@@ -271,21 +274,25 @@ test('v1 session：迁移到 v4，按 floor 合成线性图（当前层 open、�
   assert.deepEqual(result.data.relics, []);
   assert.deepEqual(result.data.upgradedPerkIds, []);
   assert.deepEqual(result.data.bannedPerkIds, []);
+  // v5 追加字段的默认值（角色 / 进阶 / 硬核）
+  assert.equal(result.data.character, 'sorcerer');
+  assert.equal(result.data.ascension, 0);
+  assert.equal(result.data.hardcore, false);
 });
 
-test('v2 → v4：四字段缺省补齐；已有值一律不覆盖，重封签名通过', () => {
+test('v2 → v5：四字段缺省补齐；已有值一律不覆盖，重封签名通过', () => {
   // 先手工造一份已签名的 v2（走 1→2 的 up 得到地图字段）
   const v2 = { ...SESSION_MIGRATIONS[0].up(v1SessionFixture(20)), sig: undefined };
   assert.equal(v2.sessionVer, 2);
   const { data, ver, future } = migrateSession(v2);
-  assert.equal(ver, 4);
+  assert.equal(ver, 5);
   assert.equal(future, false);
-  assert.equal(data.sessionVer, 4);
+  assert.equal(data.sessionVer, 5);
   assert.equal(data.victory, false);
   assert.equal(data.bossKills, 0);
   assert.equal(data.endless, false);
   assert.equal(data.boss, null);
-  // 2→4 步只补不改：带上胜利进度的 v2 档，值原样保留
+  // 2→5 步只补不改：带上胜利进度的 v2 档，值原样保留
   const midBoss = {
     ...v2,
     victory: true,
@@ -298,30 +305,49 @@ test('v2 → v4：四字段缺省补齐；已有值一律不覆盖，重封签�
   assert.equal(kept.victory, true);
   assert.equal(kept.bossKills, 2);
   assert.deepEqual(kept.boss, { id: 'frost_reverent', target: 800, fired: ['frost_reverent:p0'] });
-  // 迁移后重封：按 v4 白名单验签 ok
+  // 迁移后重封：按 v5 白名单验签 ok
   const resealed = sealSession(kept);
-  assert.equal(resealed.sessionVer, 4);
+  assert.equal(resealed.sessionVer, 5);
   assert.equal(checkSignature(resealed, SIGNED_FIELDS.session, 'sig'), 'ok');
 });
 
-test('v3 → v4：局内经济四字段缺省补齐；已有值一律不覆盖', () => {
-  // 从 v1 走到 v3（前两步 up 全跑），再手工挂上「已在事件 / 商店里动过经济」的 v3 档
+test('v3 → v5：局内经济四字段缺省补齐；已有值一律不覆盖', () => {
+  // 从 v1 走到当前版本（前几步 up 全跑），再手工挂上「已在事件 / 商店里动过经济」的 v3 档
   const v3 = { ...migrateSession({ ...v1SessionFixture(12), sessionVer: 3, coins: 45, relics: ['golden_vein'], upgradedPerkIds: ['supply'], bannedPerkIds: ['focus'] }).data };
-  assert.equal(v3.sessionVer, 4, 'migrateSession 会一路补到当前版本');
+  assert.equal(v3.sessionVer, 5, 'migrateSession 会一路补到当前版本');
   // 只补空：老档缺 key 时补默认，绝不覆盖已有值
   const legacyV3 = { ...SESSION_MIGRATIONS[1].up(v1SessionFixture(12)), sessionVer: 3 };
   delete legacyV3.sig;
   const out = migrateSession(legacyV3).data;
-  assert.equal(out.sessionVer, 4);
+  assert.equal(out.sessionVer, 5);
   assert.equal(out.coins, 0);
   assert.deepEqual(out.relics, []);
   assert.deepEqual(out.upgradedPerkIds, []);
   assert.deepEqual(out.bannedPerkIds, []);
-  // 幂等：对已是 v4 的档再跑一次，逐字段不变
+  // 幂等：对已是 v5 的档再跑一次，逐字段不变
   assert.deepEqual(migrateSession(out).data, out);
 });
 
-test('v4 签名：篡改 victory / bossKills / endless / boss / coins / relics 任一即 bad', () => {
+test('v4 → v5：入口选择三字段缺省补齐；已有值一律不覆盖，幂等', () => {
+  // v4 档：没有 character / ascension / hardcore
+  const v4 = { ...SESSION_MIGRATIONS[2].up(SESSION_MIGRATIONS[1].up(SESSION_MIGRATIONS[0].up(v1SessionFixture(18)))), sessionVer: 4 };
+  delete v4.sig;
+  const out = migrateSession(v4).data;
+  assert.equal(out.sessionVer, 5);
+  assert.equal(out.character, 'sorcerer');
+  assert.equal(out.ascension, 0);
+  assert.equal(out.hardcore, false);
+  // 只补不改：v4 档若已带入口选择（旧客户端灰度写回），原值保留
+  const withChoice = { ...v4, character: 'palette', ascension: 7, hardcore: true };
+  const kept = migrateSession(withChoice).data;
+  assert.equal(kept.character, 'palette');
+  assert.equal(kept.ascension, 7);
+  assert.equal(kept.hardcore, true);
+  // 幂等
+  assert.deepEqual(migrateSession(kept).data, kept);
+});
+
+test('v5 签名：篡改 victory / bossKills / endless / boss / coins / relics / 入口选择任一即 bad', () => {
   const sealed = sealSession({
     ...v1SessionFixture(30),
     victory: true, bossKills: 3, endless: false, boss: { id: 'core_titan', target: 900, fired: [] },
@@ -338,6 +364,10 @@ test('v4 签名：篡改 victory / bossKills / endless / boss / coins / relics �
   assert.equal(checkSignature({ ...sealed, relics: [] }, SIGNED_FIELDS.session, 'sig'), 'bad');
   assert.equal(checkSignature({ ...sealed, upgradedPerkIds: [] }, SIGNED_FIELDS.session, 'sig'), 'bad');
   assert.equal(checkSignature({ ...sealed, bannedPerkIds: [] }, SIGNED_FIELDS.session, 'sig'), 'bad');
+  // 入口选择（角色 / 进阶 / 硬核）同样改本轮强度，必须进签名
+  assert.equal(checkSignature({ ...sealed, character: 'guardian' }, SIGNED_FIELDS.session, 'sig'), 'bad');
+  assert.equal(checkSignature({ ...sealed, ascension: 10 }, SIGNED_FIELDS.session, 'sig'), 'bad');
+  assert.equal(checkSignature({ ...sealed, hardcore: true }, SIGNED_FIELDS.session, 'sig'), 'bad');
   // 老版本验签不受影响：v3 白名单不含新字段，补上 v4 字段不改变 v3 签名
   const v3Base = { ...v1SessionFixture(8), sessionVer: 3 };
   const withV4 = {

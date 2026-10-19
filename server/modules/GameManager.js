@@ -1438,7 +1438,12 @@ class GameManager {
           questsDone,
           win: data.win === true,
           bossKills: Math.max(0, Math.min(3, Math.floor(data.bossKills || 0))),
-          endless: data.endless === true
+          endless: data.endless === true,
+          // 入口选择（开发方案 3.8–3.10）：角色 / 进阶 / 硬核一并落到养成结算，
+          // 由 AccountManager 据存档权威校验并回写角色战绩 / 进阶解锁 / 硬核统计
+          character: typeof data.character === 'string' ? data.character : null,
+          ascension: Math.max(0, Math.floor(data.ascension || 0)),
+          hardcore: data.hardcore === true
         });
         rogueGain = { gain: rogueRes.gain, meta: rogueRes.rogue };
       }

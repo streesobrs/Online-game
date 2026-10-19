@@ -22,17 +22,19 @@ export function bossAt(depth) {
  * Boss 血量 = 本层目标分曲线 × Boss 系数（与精英的 goalMult 同一思路，单独列表便于逐个调）
  * @param {object} def - ROGUE_BOSSES 里的定义
  * @param {object} bonus - 本轮加成（goalCut 等会压低目标分，对 Boss 同样生效）
+ * @param {number} [mult] - 额外系数（进阶难度 asc.bossMult；默认 1，与旧版逐位一致）
  */
-export function bossHpTarget(def, bonus) {
-  return Math.max(1, Math.round(goalOf(def.depth, bonus) * def.hpMult));
+export function bossHpTarget(def, bonus, mult = 1) {
+  const m = Number.isFinite(mult) && mult > 0 ? mult : 1;
+  return Math.max(1, Math.round(goalOf(def.depth, bonus) * def.hpMult * m));
 }
 
 /**
  * 生成 Boss 层运行时状态（mode-rogue 持有，进层时建、续玩时从存档恢复）
  * @returns {{id:string,target:number,fired:string[]}}
  */
-export function createBossState(def, bonus) {
-  return { id: def.id, target: bossHpTarget(def, bonus), fired: [] };
+export function createBossState(def, bonus, mult = 1) {
+  return { id: def.id, target: bossHpTarget(def, bonus, mult), fired: [] };
 }
 
 function blocker(r, c, kind) {

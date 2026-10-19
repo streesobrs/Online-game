@@ -29,6 +29,9 @@ function makeDirty() {
   const s = createRunState();
   s.finished = true;
   s.victory = true;
+  s.characterId = 'palette';
+  s.ascension = 10;
+  s.hardcore = true;
   s.bonus.scoreMult = 9.9;
   s.bonus.specials.rainbow = 5;
   s.picks = { magnet: 4, storm: 2 };
@@ -98,13 +101,17 @@ test('脏 fixture（打完整轮）后新容器逐项回到初始值', () => {
   assert.equal(fresh.boss, null);
   assert.equal(fresh.endless, false);
   assert.equal(fresh.finished, false);
+  // 入口选择也回到默认（默认角色 / 进阶 0 / 非硬核）
+  assert.equal(fresh.characterId, 'sorcerer');
+  assert.equal(fresh.ascension, 0);
+  assert.equal(fresh.hardcore, false);
   assert.deepEqual(fresh.picks, {});
   assert.notEqual(fresh.map, staleMap);
 });
 
 test('静态守卫：mode-rogue.startRun 对每个 run 字段都从工厂结果赋值', () => {
   const source = readFileSync(join(here, '..', 'src', 'games', 'match3', 'modes', 'mode-rogue.js'), 'utf8');
-  const start = source.indexOf('function startRun()');
+  const start = source.indexOf('function startRun(');
   const end = source.indexOf('\n  }', start);
   assert.ok(start > 0 && end > start, '找不到 startRun 函数体');
   const body = source.slice(start, end);

@@ -34,6 +34,10 @@ import {
   buildRelicHooks, grantOnAcquire, RELICS, relicById, relicRollExtras, rollRelic, rollRelicChoices,
 } from '../rogue/relics.js';
 import { applyChoice, availableChoices, rollEvent } from '../rogue/events.js';
+// 角色 / 进阶 / 硬核（开发方案 3.8–3.10，P5/P6）：起手选项与难度修正，纯逻辑
+import { CHARACTERS, DEFAULT_CHARACTER, characterById, unlockProgress, unlockedCharacters } from '../rogue/characters.js';
+import { ascMods, applyAscension, ascensionLabel } from '../rogue/ascension.js';
+import { renderRogueSetup } from '../ui/rogue-setup.js';
 import { buyItem, priceOf, refreshShelf, removePerk, rollShelf, shelfWithPrices } from '../rogue/shop.js';
 import {
   estimateExp, finishedSession, getRogueMeta, loadLocalSession, onProgress, onResult, onRogueMeta,
@@ -217,6 +221,14 @@ export function renderRogue(container, { onExit }) {
   let boss = null;         // 当前 Boss 层运行时状态（boss.js），非 Boss 层 / 层间为 null
   let endless = false;     // 是否已在通关后进入无尽深渊（31+ 层）
   let victory = false;     // 已击败最终 Boss（无论是否继续深渊，结算均按通关）
+  // 本轮结束的原因（3.9 墓志铭语义）：dead=真的战死（步数耗尽/深渊力竭）/ evacuate=深渊里主动撤离 /
+  // claim=通关后点「领取结束」。只有 dead 才配叫「死因」，主动结束一律是「结局」
+  let endReason = 'dead';
+  // ---- 入口选择（开发方案 3.8–3.10，P5/P6）----
+  let characterId = DEFAULT_CHARACTER; // 本轮角色 id（起手加成与被动遗物的来源）
+  let ascension = 0;                   // 本轮进阶等级（0 = 标准难度）
+  let hardcore = false;                // 本轮是否硬核（禁 meta 加成 + 更高精华系数）
+  let asc = ascMods(0);                // 进阶修正的合并结果（变了就重算，调用点直接读）
   // ---- 局内经济与遗物（开发方案 3.4 / 3.5 / 3.6）----
   let coins = 0;                 // 局内金币：本轮有效，终局清零、不上报服务端
   let relics = [];               // 本轮持有的遗物 id（每件最多 1 个）
@@ -293,12 +305,13 @@ export function renderRogue(container, { onExit }) {
   /**
    * 立即授予一张祝福（事件 / 商店买祝福的唯一出口）：进 picks、当场生效、进本轮三选池
    * @param {object} opts - { id }（指定）或 { rarity } / { minRarity }（从已解锁且未叠满的池里随机）
+   * @param {boolean} [opts.force] - 绕过局外解锁白名单（角色起手祝福自带，与「是否解锁过」无关）
    * @returns {object|null} 该祝福定义；无可授时返回 null
    */
   function grantPerk(opts = {}) {
-    const allowed = unlockedSet(getRogueMeta());
+    const allowed = opts.force ? null : unlockedSet(getRogueMeta());
     const rank = { common: 0, rare: 1, epic: 2 };
-    const eligible = (perk) => allowed.has(perk.id)
+    const eligible = (perk) => (!allowed || allowed.has(perk.id))
       && !bannedPerkIds.includes(perk.id)
       && (picks[perk.id] || 0) < perk.max
       && (!opts.rarity || perk.rarity === opts.rarity)
@@ -482,6 +495,11 @@ export function renderRogue(container, { onExit }) {
       victory,
       bossKills,
       endless,
+      // ---- 入口选择（开发方案 3.8–3.10，session v5）----
+      // 三者直接决定本轮难度与起手强度，必须进签名（config.SIGNED_FIELDS.session[5]）
+      character: characterId,
+      ascension,
+      hardcore,
       // Boss 层运行时（血条目标与已触发阶段）；非 Boss 层为 null
       boss: boss ? { id: boss.id, target: boss.target, fired: [...boss.fired] } : null,
       // ---- 局内经济与遗物（开发方案 3.4 / 3.5 / 3.6，session v4）----
@@ -554,7 +572,31 @@ export function renderRogue(container, { onExit }) {
   }
 
   // ---- 开新一轮 ----
-  function startRun() {
+  /**
+   * 角色起步加成写进本轮 bonus（3.8）：字段语义与 perks.js 的 createBonus 对齐
+   * - moves / colorCut / shields / shuffles：累加
+   * - scoreMult / goalMult：累乘
+   * - colorFloor：取更大值（下调档数不能突破颜色下限）
+   * 在 applyMetaBuffs 之后调用，于是「角色差异」叠在「长期养成」之上
+   */
+  function applyCharacterBonus(sb) {
+    if (!sb || typeof sb !== 'object') return;
+    if (Number.isFinite(sb.moves)) bonus.moves += sb.moves;
+    if (Number.isFinite(sb.colorCut)) bonus.colorCut += sb.colorCut;
+    if (Number.isFinite(sb.shields)) bonus.shields += sb.shields;
+    if (Number.isFinite(sb.shuffles)) bonus.shuffles += sb.shuffles;
+    if (Number.isFinite(sb.scoreMult)) bonus.scoreMult *= sb.scoreMult;
+    if (Number.isFinite(sb.goalMult)) bonus.goalMult = (bonus.goalMult || 1) * sb.goalMult;
+    if (Number.isFinite(sb.colorFloor)) bonus.colorFloor = Math.max(bonus.colorFloor || 0, sb.colorFloor);
+  }
+
+  /**
+   * 开新一轮
+   * @param {{characterId?:string, ascension?:number, hardcore?:boolean}} [setup]
+   *   入口选择（开发方案 3.8–3.10）：角色 / 进阶 / 硬核。缺省即「默认角色 + 进阶 0 + 非硬核」，
+   *   与旧版逐位一致；「再来一轮」沿用同一 setup（由闭包 variables 记住，见 resetSetup）
+   */
+  function startRun(setup = {}) {
     teardown();
     // run 容器统一从纯工厂复位（4.7.3：唯一构造点，禁止继承上轮任何 run 字段；
     // 静态守卫见 tests/match3-run-state.test.js，新增字段必须两边都登记）
@@ -590,6 +632,15 @@ export function renderRogue(container, { onExit }) {
     bossKills = f.bossKills;
     boss = f.boss;
     endless = f.endless;
+    // ---- 入口选择（3.8–3.10）：先落工厂默认值，再被 setup 覆盖，最后算 asc ----
+    characterId = f.characterId;
+    ascension = f.ascension;
+    hardcore = f.hardcore;
+    // setup 由入口选择屏传来（角色 / 进阶 / 硬核）；缺省时沿用工厂默认（默认角色 / 进阶 0 / 非硬核）
+    if (setup.characterId) characterId = characterById(setup.characterId).id;
+    if (Number.isFinite(setup.ascension)) ascension = Math.max(0, Math.floor(setup.ascension));
+    if (typeof setup.hardcore === 'boolean') hardcore = setup.hardcore;
+    asc = ascMods(ascension);
     // ---- 局内瞬态（不进 run 容器）：startRun 是唯一构造点，这里也必须逐项归零 ----
     // 否则「上一轮逛到一半的商店货架 / 没花掉的下一层步数 / 没用的重随券」会漏进新一轮
     relicUsed = {};          // 遗物每层触发计数
@@ -604,17 +655,37 @@ export function renderRogue(container, { onExit }) {
     // relics 已复位为空，遗物 hook 必须跟着重建，否则会带着上一轮编译出的 hook 跑
     refreshRelicHooks();
     // 共鸣树里「局内生效」的节点加成在这里一次性灌进来（跨轮常驻，一轮中间不会变）：
-    // 起始补给 / 开箱彩球 / 常驻护盾 / 常驻洗牌走 apply，先手规划只改第 1 层的步数倍率
-    applyMetaBuffs(bonus, getRogueMeta());
-    rewindsLeft = mechanicOn(getRogueMeta(), 'rewind') ? mechanicCfg().rewind.retriesPerRun : 0;
+    // 起始补给 / 开箱彩球 / 常驻护盾 / 常驻洗牌走 apply，先手规划只改第 1 层的步数倍率。
+    // 硬核模式禁一切 meta 加成（3.10）：跳过 applyMetaBuffs 与时光倒流，只保留角色与进阶的修正
+    if (!hardcore) {
+      applyMetaBuffs(bonus, getRogueMeta());
+      rewindsLeft = mechanicOn(getRogueMeta(), 'rewind') ? mechanicCfg().rewind.retriesPerRun : 0;
+    } else {
+      rewindsLeft = 0;
+    }
+    // 进阶修正（3.10）：只影响难度的部分写进 bonus（moves / goalMult / colorFloor），
+    // eliteBonus / eliteMult / bossMult / shopMult 由 asc 对象在各自调用点使用
+    applyAscension(bonus, asc);
+    // 角色起手注入（3.8）：先起步加成，再送起手祝福（走 grantPerk 同一入口），最后自带遗物（复用 3.5）
+    const charDef = characterById(characterId);
+    applyCharacterBonus(charDef.startBonus);
     gainEl = null;
     elapsedMs = 0;
     startedAt = Date.now();
     runRng = createRng(Date.now() % 2147483647);
+    // 起手祝福要进 picks 与三选池，且**不受局外解锁限制**（角色身份自带，force 绕过白名单）
+    for (const id of charDef.startPerks || []) grantPerk({ id, force: true });
+    // 起手遗物：唯一出口 grantRelic，characterOnly 遗物不进任何随机池（relics.js 已过滤）
+    for (const id of charDef.startRelics || []) grantRelic({ id });
     // 地图在一切消耗随机序列的操作之前生成，保证「同 seed + 同参数 = 同一张图」。
     // P2-P4 上线后放行全部节点类型（事件 / 商店 / 宝藏 / 篝火，见 mapgen 的 ALL_ENABLED）；
-    // 从没通过第 1 层的账号走新手保护（不出精英），打过一层后恢复正常配额
-    map = generateMap(runRng, { newPlayer: loadRogueBest().maxFloor < 1, enabled: ALL_ENABLED });
+    // 从没通过第 1 层的账号走新手保护（不出精英），打过一层后恢复正常配额；
+    // 进阶的 eliteBonus 由 asc 驱动（mapgen 内部会夹上限）
+    map = generateMap(runRng, {
+      newPlayer: loadRogueBest().maxFloor < 1,
+      enabled: ALL_ENABLED,
+      eliteBonus: asc.eliteBonus,
+    });
     nodeId = map.start[0];
     terrain = null;
     goals = [];
@@ -645,6 +716,11 @@ export function renderRogue(container, { onExit }) {
     victory = !!session.victory;
     bossKills = Math.max(0, Math.min(3, Math.floor(session.bossKills || 0)));
     endless = !!session.endless;
+    // 入口选择（session v5）：旧档（v4 及以前）没有这三个字段，落回默认值（默认角色 / 进阶 0 / 非硬核）
+    characterId = characterById(session.character || DEFAULT_CHARACTER).id;
+    ascension = Math.max(0, Math.floor(session.ascension || 0));
+    hardcore = !!session.hardcore;
+    asc = ascMods(ascension);
     boss = null;
     baseScore = session.baseScore || 0;
     maxCombo = session.maxCombo || 0;
@@ -1076,9 +1152,9 @@ export function renderRogue(container, { onExit }) {
     renderShop();
   }
 
-  /** 遗物对商店价格的修正（折扣 / 涨价，已夹到 5 折下限） */
+  /** 遗物对商店价格的修正（折扣 / 涨价，已夹到 5 折下限）+ 进阶修正（3.10：高进阶涨价） */
   function shopMods() {
-    return { shopDiscount: relicHooks.mods.shopDiscount };
+    return { shopDiscount: relicHooks.mods.shopDiscount * (asc.shopMult || 1) };
   }
 
   function renderShop() {
@@ -1269,7 +1345,13 @@ export function renderRogue(container, { onExit }) {
       // 新进入节点：地形与目标都由 runRng 当场掷出（同 seed 可复现）
       terrain = terrainFor(node, runRng);
       const probe = floorOptions(bonus, floor, terrain);
-      goals = floorGoals(node, bonus, runRng, { colors: probe.colors, terrain });
+      goals = floorGoals(node, bonus, runRng, {
+        colors: probe.colors,
+        terrain,
+        // 进阶修正（3.10）：精英层分数目标额外系数 / Boss 血量额外系数，默认 1（与旧版逐位一致）
+        eliteMult: asc.eliteMult,
+        bossMult: asc.bossMult,
+      });
     }
     const opts = floorOptions(bonus, floor, terrain);
     if (carryMoves > 0) opts.moves += carryMoves; // 商店买来的「下一层 +N 步」并入本层起手步数
@@ -1289,7 +1371,7 @@ export function renderRogue(container, { onExit }) {
           fired: Array.isArray(restore.boss.fired) ? [...restore.boss.fired] : [],
         };
       } else {
-        boss = createBossState(bossDef, bonus);
+        boss = createBossState(bossDef, bonus, asc.bossMult);
       }
     } else {
       boss = null;
@@ -1392,7 +1474,7 @@ export function renderRogue(container, { onExit }) {
 
     // 无尽深渊里随时可以「见好就收」：撤离按通关结算（奖励在最终 Boss 倒下时已锁定）
     const retreatBtn = endless
-      ? el('button', { class: 'm3-btn m3-btn--ghost', onClick: () => finishRun() }, '🌀 撤离深渊（结算）')
+      ? el('button', { class: 'm3-btn m3-btn--ghost', onClick: () => finishRun('evacuate') }, '🌀 撤离深渊（结算）')
       : null;
 
     const actions = el(
@@ -1651,6 +1733,12 @@ export function renderRogue(container, { onExit }) {
 
     function onGameOver(info) {
       if (finished || floorCleared || rewinding || allGoalsDone(goals, info)) return;
+      // 角色被动 / 遗物的「步尽兜底」钩子（3.5 / 3.8）：壁垒守卫的「壁垒之盾」每层首次步尽必定免死，
+      // 且**优先于**免死金牌与时光倒流（返回 true = 已补步继续本层，不扣护盾 / 不用回溯）
+      if (relicHooks.onGameOver(relicCtx(board))) {
+        paintStats();
+        return;
+      }
       if (bonus.shields > 0) {
         bonus.shields -= 1;
         toast.info(`🛡 免死金牌生效，补 ${ROGUE.shieldMoves} 步`);
@@ -1993,9 +2081,38 @@ export function renderRogue(container, { onExit }) {
   }
 
   // ---- 通关：胜利结算页（开发方案 3.3）----
+  /**
+   * 死亡墓志铭（开发方案 3.9 / 3.10）：把「这一轮是谁、什么难度、走了什么路、怎么结束的」压成一块，
+   * 与 build（祝福条）并列，作为结算页的战报。
+   *
+   * 「死因」只有真的战死（步数耗尽 / 深渊力竭）才成立；通关后主动结束（深渊撤离 / 点击领取）
+   * 是玩家主动收手，标签一律作「结局」，不能写成死因——否则手动退出会显得像被打死（3.9 语义修正）
+   */
+  function renderEpitaph() {
+    const charDef = characterById(characterId);
+    const tags = [
+      `${charDef.icon}${charDef.name}`,
+      ascensionLabel(ascension),
+      hardcore ? '🔥 硬核' : null,
+    ].filter(Boolean).join(' · ');
+    const elites = map ? map.nodes.filter((n) => n.state === 'done' && n.type === NODE.ELITE).length : 0;
+    const died = endReason === 'dead';
+    const cause = endReason === 'evacuate'
+      ? `主动撤离无尽深渊 · 第 ${floor} 层`
+      : endReason === 'claim'
+        ? `击败最终 Boss · 第 ${floor} 层`
+        : (endless ? `深渊力竭 · 第 ${floor} 层` : `步数耗尽 · 第 ${floor} 层`);
+    return el(
+      'div',
+      { class: 'm3-result-line m3-epitaph' },
+      el('div', { class: 'm3-epitaph-tags' }, `🪦 ${tags}`),
+      el('div', { class: 'm3-epitaph-route' }, `路线：⚔️ 精英 ${elites} 个 · 👑 Boss ${bossKills}/3 · 区域 ${rogueBiome(floor).name}`),
+      el('div', { class: 'm3-epitaph-cause' }, `${died ? '死因' : '结局'}：${cause}`),
+    );
+  }
+
   /** 路线概览：已完成节点里精英 / Boss 的计数 + 本轮遗物件数 */
   function routeSummary() {
-    if (!map) return '';
     let elite = 0;
     let boss = 0;
     for (const n of map.nodes) {
@@ -2042,7 +2159,7 @@ export function renderRogue(container, { onExit }) {
       el(
         'div',
         { class: 'm3-actions' },
-        el('button', { class: 'm3-btn', onClick: () => finishRun() }, '✦ 领取奖励，结束本轮'),
+        el('button', { class: 'm3-btn', onClick: () => finishRun('claim') }, '✦ 领取奖励，结束本轮'),
         el('button', { class: 'm3-btn m3-btn--abyss', onClick: () => enterEndless() }, '🌀 继续深入无尽深渊'),
         el('button', { class: 'm3-btn m3-btn--ghost', onClick: () => onExit() }, '返回选择'),
       ),
@@ -2063,9 +2180,10 @@ export function renderRogue(container, { onExit }) {
   }
 
   // ---- 本轮结束 ----
-  function finishRun() {
+  function finishRun(reason = 'dead') {
     if (finished) return;
     finished = true;
+    endReason = reason;
     // 到这里的路径：步数耗尽（board 还在，胜利与否看 victory）/ 胜利页点「领取结束」/
     // 深渊中战死或主动撤离（board 视情况而定）。通关标记在最终 Boss 倒下时已置位
     const info = board ? board.getState() : null;
@@ -2107,6 +2225,10 @@ export function renderRogue(container, { onExit }) {
       // 但「记录全」能支撑以后基于它做的功能（如常用 build 统计）
       picks,
       questsDone,
+      // 入口选择（开发方案 3.8–3.10）：角色 / 进阶 / 硬核，服务端据它做角色战绩、进阶解锁与硬核独立统计
+      character: characterId,
+      ascension,
+      hardcore,
     });
 
     const before = loadRogueBest();
@@ -2118,11 +2240,12 @@ export function renderRogue(container, { onExit }) {
     else if (score > before.highScore) toast.success('新的最高总分！');
 
     // 本轮精华：先按同一公式就地算一个（离线也能看到收益），服务端回执到达后改成权威值。
-    // 通关含固定 winBonus；深渊层基础部分封在 30 层 + 衰减增量（与服务端同公式）
+    // 通关含固定 winBonus；深渊层基础部分封在 30 层 + 衰减增量（与服务端同公式）；
+    // 进阶 / 硬核系数与服务端同口径（3.10：越高进阶 / 硬核，精华越高，上限见 config）
     gainEl = el(
       'div',
       { class: 'm3-result-line m3-result-essence' },
-      essenceLine(essenceForRun(floor, getRogueMeta(), { win: won })),
+      essenceLine(essenceForRun(floor, getRogueMeta(), { win: won, ascension, hardcore })),
     );
 
     container.replaceChildren(
@@ -2133,9 +2256,13 @@ export function renderRogue(container, { onExit }) {
         el(
           'p',
           { class: 'm3-sub' },
-          won
-            ? (endless ? `从无尽深渊撤离，抵达第 ${floor} 层` : `击败最终 Boss，抵达第 ${floor} 层`)
-            : (endless ? `倒在无尽深渊第 ${floor} 层（通关奖励仍可领取）` : `步数耗尽，止步第 ${floor} 层`),
+          // 结束语按**结束原因**分派：主动撤离 / 击败 Boss 后领取 都是通关后的主动收尾，
+          // 只有真的战死才写「倒下 / 步数耗尽」，避免手动退出被描述成被打死
+          endReason === 'evacuate'
+            ? `主动撤离无尽深渊，抵达第 ${floor} 层`
+            : endReason === 'claim'
+              ? `击败最终 Boss，抵达第 ${floor} 层`
+              : (endless ? `倒在无尽深渊第 ${floor} 层（通关奖励仍可领取）` : `步数耗尽，止步第 ${floor} 层`),
         ),
       ),
       el(
@@ -2147,6 +2274,8 @@ export function renderRogue(container, { onExit }) {
         won ? el('div', { class: 'm3-result-line' }, `👑 Boss 击败 ${bossKills}/3`) : null,
         el('div', { class: 'm3-result-line' }, `祝福 ${pickedPerks.length} 张 · 💎 遗物 ${relics.length} 件`),
         el('div', { class: 'm3-result-line' }, `🪙 局内金币 ${coins}（终局清零，不上报、不兑换精华）`),
+        // 墓志铭（3.9 / 3.10）：身份 + 难度 + 路线缩略 + 结束原因，让「这一轮怎么走的」一眼可读
+        renderEpitaph(),
         renderPerkStrip(),
         gainEl,
         el(
@@ -2159,7 +2288,8 @@ export function renderRogue(container, { onExit }) {
       el(
         'div',
         { class: 'm3-actions' },
-        el('button', { class: 'm3-btn', onClick: () => startRun() }, '再来一轮'),
+        // 「再来一轮」沿用当前身份与难度（3.8–3.10）：想换角色 / 调进阶就用下面的「返回选择」重进
+        el('button', { class: 'm3-btn', onClick: () => startRun({ characterId, ascension, hardcore }) }, '再来一轮'),
         // 结算是最想花精华的时点：直接给一个去解锁 / 升级的入口
         el('button', { class: 'm3-btn', onClick: () => showPerkCodex() }, '📖 图鉴与养成'),
         // 通关时盘面已随地图流程销毁，没有可展示的积分明细
@@ -2183,8 +2313,52 @@ export function renderRogue(container, { onExit }) {
   // 有未结算的一轮就直接接着打：刷新、换设备回来都落在同一个入口上
   // （云端那份由 mergeRemoteProgress 在收到服务端进度时并进本地，菜单上的续玩提示同源）
   const saved = loadLocalSession(ROGUE.type);
-  if (saved) resumeRun(saved);
-  else startRun();
+  if (saved) {
+    resumeRun(saved);
+  } else {
+    // 无存档：先出「角色 / 进阶 / 硬核」选择屏（3.8–3.10），选好再 startRun
+    showSetup();
+  }
+
+  /**
+   * 入口选择屏：角色（3.8）/ 进阶（3.10）/ 硬核（3.9）
+   *
+   * 角色与进阶的解锁都以 meta（服务端权威）为准：
+   * - 角色：unlockedCharacters(meta.stats) 决定哪些可选，未解锁置灰并显示进度
+   * - 进阶：meta.ascension.max 决定可选范围 0..max；进阶 N 需先在 N-1（或更低）通关才解锁 N+1
+   * - 硬核：meta.hardcore.unlocked（通关 1 次）才可勾选
+   * 「开始试炼」回调里再复核一次解锁资格，防止本地改档绕过（服务端结算时还会二次校验）
+   */
+  function showSetup() {
+    const meta = getRogueMeta();
+    const stats = meta.stats || {};
+    // 本地记住上次的选择，二次进入时作为默认值（未解锁的会自动落回默认角色 / 进阶 0）
+    renderRogueSetup(container, {
+      characters: CHARACTERS,
+      unlocked: unlockedCharacters(stats),
+      unlockOf: (char) => unlockProgress(char, stats),
+      maxAscension: Math.max(0, Math.floor(meta.ascension?.max || 0)),
+      ascensionLabel,
+      hardcoreUnlocked: !!meta.hardcore?.unlocked,
+      hardcoreWins: meta.hardcore?.wins || 0,
+      defaultCharacter: characterId,
+      defaultAscension: ascension,
+      defaultHardcore: hardcore,
+      onExit,
+      onStart: (setup) => {
+        // 复核：角色必须已解锁；进阶必须在 [0, max] 内；硬核必须已解锁。任一不合就落回安全默认
+        const chosenChar = unlockedCharacters(stats).includes(setup.characterId)
+          ? setup.characterId
+          : DEFAULT_CHARACTER;
+        const maxAsc = Math.max(0, Math.floor(meta.ascension?.max || 0));
+        const chosenAsc = Number.isInteger(setup.ascension) && setup.ascension >= 0 && setup.ascension <= maxAsc
+          ? setup.ascension
+          : 0;
+        const chosenHard = !!setup.hardcore && !!meta.hardcore?.unlocked;
+        startRun({ characterId: chosenChar, ascension: chosenAsc, hardcore: chosenHard });
+      },
+    });
+  }
 
   // 拉取服务端最佳成绩（合并后本地记录才是准的）；奖励配置到达后补显预计经验
   const offProgress = onProgress(() => refreshExp?.());
