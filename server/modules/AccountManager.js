@@ -8,6 +8,10 @@ const sessionToken = require('../utils/sessionToken');
 const fs = require('fs');
 const path = require('path');
 
+// 每账号邮箱保留的最大邮件数（超出时丢弃最早的，连同其中未领取的奖励）。
+// 邮件存在 dataStore 的独立文件里，这个上限直接决定单文件体积，调大前先估一下磁盘量
+const MAIL_LIMIT = 500;
+
 // 排行榜里消消乐的榜单键：各玩法得分尺度不可比（见 GameManager.saveMatch3Record 的分开存档），
 // 因此不设「消消乐总榜」，按玩法各排各的，每个榜只取本玩法的字段
 const MATCH3_LEADERBOARD_TYPES = ['match3-level', 'match3-endless', 'match3-endless3', 'match3-rogue'];
@@ -1893,6 +1897,58 @@ class AccountManager {
       logger.error('添加经验值失败', { id, error: err.message });
       return { success: false, message: '添加失败' };
     }
+  }
+
+  /**
+   * 往内存里的 account 记账发星钻，并写一条星钻流水（返回到账后的余额）
+   *
+   * 只改内存，由调用方随 _saveAccount 一起落盘：不能改用 addCurrency —— 它会自己读库并写库，
+   * 紧接着的 _saveAccount 又会把内存里的值写回去，两边的写会打架。
+   * 用于「邮件奖励」这两条自己手写经验、绕过 addExp 的路径（见 _applyLevelUpRewards）。
+   */
+  async _creditCoinsInMemory(userId, account, amount, source, reason) {
+    if (!(amount > 0)) return account.currency?.starCoins || 0;
+    if (!account.currency) account.currency = { starCoins: 0 };
+    account.currency.starCoins = (account.currency.starCoins || 0) + amount;
+
+    try {
+      const transactionRecords = await this.getTransactionRecords(userId);
+      transactionRecords.transactions.push({
+        id: Date.now().toString(36) + Math.random().toString(36).substr(2, config.security.randomIdSuffixLength),
+        type: 'earn',
+        amount,
+        balance: account.currency.starCoins,
+        source,
+        reason,
+        timestamp: Date.now()
+      });
+      await dataStore.writeOne('currencyTransactions', userId, transactionRecords);
+    } catch (recErr) {
+      logger.warn('记录星钻流水失败', { userId, source, error: recErr.message });
+    }
+    return account.currency.starCoins;
+  }
+
+  /**
+   * 升级奖励：每升 1 级发 levelUpCoinReward 星钻（与 addExp 同口径）
+   *
+   * 邮件奖励（单封 / 一键领取）是自己手写经验与等级、绕过了 addExp 的，历史上漏了这一步，
+   * 导致「一键领取邮件」涨了等级却拿不到升级奖励。
+   * 等级里程碑（checkLevelRewards）不在这里，由调用方在 _saveAccount 之后单独调用：
+   * 它按库里的最新等级判断，必须等新等级先落盘。
+   */
+  async _applyLevelUpRewards(userId, account, oldLevel, newLevel) {
+    if (!(newLevel > oldLevel)) return 0;
+    const amount = (newLevel - oldLevel) * config.exp.levelUpCoinReward;
+    if (amount <= 0) return 0;
+
+    await this._creditCoinsInMemory(userId, account, amount, 'level_up', `从${oldLevel}级升到${newLevel}级奖励`);
+
+    if (this.operationLogger) {
+      const username = account?.account?.nickname || account?.account?.username || '';
+      this.operationLogger.getLevelUp(userId, username, oldLevel, newLevel, { source: 'mail_reward' });
+    }
+    return amount;
   }
 
   // 修改密码
@@ -4995,9 +5051,10 @@ class AccountManager {
       if (!mailStore.mails) mailStore.mails = [];
       mailStore.mails.unshift(mail);
 
-      // 限制邮件数量，最多保留100封
-      if (mailStore.mails.length > 100) {
-        mailStore.mails = mailStore.mails.slice(0, 100);
+      // 限制邮件数量，最多保留 500 封
+      // （每账号的邮件存在 dataStore 的独立文件里，上限直接决定单文件体积，调大前先估一下磁盘）
+      if (mailStore.mails.length > MAIL_LIMIT) {
+        mailStore.mails = mailStore.mails.slice(0, MAIL_LIMIT);
       }
 
       await this._saveMailStore(userId, mailStore);
@@ -5205,6 +5262,15 @@ class AccountManager {
         } catch (recErr) {
           logger.warn('记录邮件经验奖励失败', { userId, error: recErr.message });
         }
+
+        // 邮件经验也按「经验兑换星钻」折算（与 addExp / 经验道具同口径，旧版漏了）
+        const expCoinReward = Math.max(1, Math.floor(mail.exp / config.exp.expToCoinRatio));
+        await this._creditCoinsInMemory(userId, account, expCoinReward, 'exp_reward', `获得${mail.exp}经验值奖励`);
+        rewards.currencyReward = expCoinReward;
+
+        // 邮件经验同样会升级，所以升级奖励也要发（旧版漏了，见 _applyLevelUpRewards）
+        const levelUpCurrency = await this._applyLevelUpRewards(userId, account, oldLevel, newLevel);
+        if (levelUpCurrency > 0) rewards.levelUpCurrency = levelUpCurrency;
       }
 
       // 标记邮件为已领取（使用独立邮件存储）
@@ -5215,6 +5281,8 @@ class AccountManager {
 
       await this._saveMailStore(userId, mailStore);
       await this._saveAccount(userId, account);
+      // 等级里程碑奖励也要走一遍：checkLevelRewards 按库里的等级判断，必须在 _saveAccount 之后调
+      await this.checkLevelRewards(userId);
       logger.info('领取邮件奖励', { userId, mailId, rewards });
 
       if (this.operationLogger) {
@@ -5405,10 +5473,21 @@ class AccountManager {
         } catch (recErr) {
           logger.warn('记录批量邮件经验奖励失败', { userId, error: recErr.message });
         }
+
+        // 邮件经验也按「经验兑换星钻」折算（与 addExp / 经验道具同口径，旧版漏了）
+        const expCoinReward = Math.max(1, Math.floor(expToAdd / config.exp.expToCoinRatio));
+        await this._creditCoinsInMemory(userId, account, expCoinReward, 'exp_reward', `获得${expToAdd}经验值奖励`);
+        totalRewards.currencyReward = expCoinReward;
+
+        // 批量领邮件升级同样要发升级奖励（旧版漏了，见 _applyLevelUpRewards）
+        const levelUpCurrency = await this._applyLevelUpRewards(userId, account, oldLevel, newLevel);
+        if (levelUpCurrency > 0) totalRewards.levelUpCurrency = levelUpCurrency;
       }
 
       await this._saveMailStore(userId, mailStore);
       await this._saveAccount(userId, account);
+      // 等级里程碑奖励也要走一遍：checkLevelRewards 按库里的等级判断，必须在 _saveAccount 之后调
+      await this.checkLevelRewards(userId);
       logger.info('批量领取邮件', { userId, claimedCount, totalRewards });
 
       if (this.operationLogger) {

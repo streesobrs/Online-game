@@ -426,6 +426,7 @@ module.exports = {
     perks: {
       supply: 'common', minimal: 'common', arsenal: 'common', bomber: 'common',
       scout: 'common', shield: 'common', shuffle: 'common', collector: 'common',
+      taskcolor: 'common',
       focus: 'rare', rainbow: 'rare', deepsteps: 'rare',
       magnet: 'epic', abyss: 'epic', storm: 'epic', barrage: 'epic', bloodpact: 'epic'
     },

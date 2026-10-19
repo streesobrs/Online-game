@@ -15,7 +15,8 @@ import {
   ROGUE, ROGUE_BOSSES, ROGUE_BOSS_ORDER, ROGUE_GOLD, ROGUE_META, ROGUE_RELIC, SCORE, SPECIAL,
 } from '../src/games/match3/config/config.js';
 import {
-  META_BUFFS, PERKS, QUEST_REWARDS, createBonus, floorOptions, goalOf, questFor, rollPerks, valueAt,
+  META_BUFFS, PERKS, QUEST_REWARDS, createBonus, floorOptions, goalOf, questFor, rollPerks,
+  taskColorsOf, valueAt,
 } from '../src/games/match3/rogue/perks.js';
 // 局外养成（共鸣树）的推导也直接 import：等级上限、机制节点生效判定、本轮起手的加成注入
 // 都只有一份实现，标定口径跟产品完全一致
@@ -469,6 +470,7 @@ const CHOICE_VALUE = {
   rainbow: 0.25,
   scout: 0.2,
   collector: 0.15,
+  taskcolor: 0.18,
   shield: 0.05,
   shuffle: 0.03,
   storm: 0.37,
@@ -811,17 +813,19 @@ function simulateRun(cfg, runSeed) {
     const goals = useTerrain
       ? floorGoals(node, bonus, rng, { colors: probe.colors, terrain })
       : [{ type: 'score', target: goalOf(floor, bonus) }]; // 对照基线：旧版满盘 + 单一分数目标
-    const opts = floorOptions(bonus, floor, terrain);
+    // 局内任务：与产品同源（同一 runRng 掷颜色与奖励，见 perks.js 的 questFor）
+    const quest = cfg.quest === false ? null : questFor(floor, bonus, rng);
+    const questCfg = quest ? { color: quest.color, need: quest.need, rewardId: quest.reward.id } : null;
+    if (questCfg) quests += 1;
+    // 开局参数在目标与任务之后才定：「定向调配」的颜色权重来自这两者（taskColorsOf），
+    // 顺序与 mountFloor 一致，runRng 的消耗顺序也与产品逐位一致
+    const opts = floorOptions(bonus, floor, terrain, taskColorsOf(goals, quest));
     // 商店买来的「下一层 +N 步」只吃这一层（mode-rogue.nextFloorMoves 同义）
     const extraMoves = pendingMoves;
     pendingMoves = 0;
     const floorMoves = opts.moves + extraMoves;
     if (terrain?.mask) shapedFloors += 1;
     if ((terrain?.blockers || []).length > 0) blockerFloors += 1;
-    // 局内任务：与产品同源（同一 runRng 掷颜色与奖励，见 perks.js 的 questFor）
-    const quest = cfg.quest === false ? null : questFor(floor, bonus, rng);
-    const questCfg = quest ? { color: quest.color, need: quest.need, rewardId: quest.reward.id } : null;
-    if (questCfg) quests += 1;
 
     // 每层 3 次采样取中位，降低单次随机噪声对「能打到几层」的干扰；
     // 每样本一份独立的遗物触发计数（一个样本 = 一次独立尝试）。

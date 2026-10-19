@@ -13,6 +13,7 @@
 import { COLOR_NAMES, ROGUE, ROGUE_BOSSES, ROGUE_GOLD, ROGUE_RELIC, STORAGE_KEYS } from '../config/config.js';
 import {
   PERKS, QUEST_REWARDS, createBonus, descOf, floorOptions, goalOf, questFor, questNeedFor, rollPerks,
+  taskColorsOf,
 } from '../rogue/perks.js';
 import { essenceForRun, applyMetaBuffs, mechanicCfg, mechanicOn, perkLevel, unlockedSet } from '../rogue/meta.js';
 import { createMatch3Board } from '../ui/board.js';
@@ -155,6 +156,10 @@ function bonusStats(bonus, floor, rewinds = 0) {
   if (bonus.weightMult > 1) {
     const name = bonus.weightColor > 0 ? `${COLOR_NAMES[bonus.weightColor]}色` : '随机一色';
     rows.push({ key: 'magnet', label: '同色磁石', value: `${name} ×${bonus.weightMult.toFixed(2)}` });
+  }
+  // 定向调配：颜色每层按任务重算，面板只能给出倍率；具体是哪一色看侧栏的目标 / 任务条
+  if (bonus.taskColorMult > 1) {
+    rows.push({ key: 'taskcolor', label: '定向调配', value: `任务色 ×${bonus.taskColorMult.toFixed(2)}` });
   }
   // 「时光倒流」是机制节点给的一次性重打机会，攒着不用就浪费了——摆出来让玩家看得见
   if (rewinds > 0) rows.push({ key: 'rewind', label: '时光倒流', value: `×${rewinds}` });
@@ -1362,11 +1367,14 @@ export function renderRogue(container, { onExit }) {
         bossMult: asc.bossMult,
       });
     }
-    const opts = floorOptions(bonus, floor, terrain);
-    if (carryMoves > 0) opts.moves += carryMoves; // 商店买来的「下一层 +N 步」并入本层起手步数
-    shufflesLeft = restore ? (restore.shufflesLeft || 0) : bonus.shuffles;
     // 续玩时不重掷任务：重掷会白吃一次随机序列，进度也对不上存档
     quest = restore ? restoreQuest(restore.quest) : questFor(floor, bonus, runRng);
+    // 「定向调配」：本层开局参数要在任务（条件目标 + 局内任务）都定下来之后才算，
+    // 因为它的颜色权重来自这两者（taskColorsOf），必须与 payload 同时落定。
+    // 顺序仍是 地形 → 目标 → 任务 → 开局参数，runRng 的消耗顺序与旧版逐位一致
+    const opts = floorOptions(bonus, floor, terrain, taskColorsOf(goals, quest));
+    if (carryMoves > 0) opts.moves += carryMoves; // 商店买来的「下一层 +N 步」并入本层起手步数
+    shufflesLeft = restore ? (restore.shufflesLeft || 0) : bonus.shuffles;
 
     // ---- Boss 运行时（开发方案 3.3）----
     // 新进入：状态与 goals[0].target 同源（bossHpTarget）；续玩：以存档里的血量 / 阶段为准；

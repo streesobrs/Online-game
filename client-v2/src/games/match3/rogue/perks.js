@@ -34,6 +34,7 @@ export function createBonus() {
     moveGrowth: 0,      // 层数成长：每 movesPerFloorStep 层多发步数的倍率加成
     weightColor: 0,     // 「同色磁石」选定的颜色（0 = 未选），见 floorOptions 的 colorWeights
     weightMult: 1,      // 该颜色的出现权重倍率（每叠一层 ×ROGUE.magnetMult）
+    taskColorMult: 1,   // 「定向调配」：本层「要求收集的颜色」的出现权重倍率（累乘，见 taskColorsOf）
     firstFloorMult: 1,  // 「先手规划」机制：第 1 层起手步数的额外倍率（未解锁 = 1，不等于没生效）
   };
 }
@@ -207,6 +208,22 @@ export const PERKS = [
       // scales.base 就是 ROGUE.magnetMult，所以 lv1 与旧版逐位一致，升级只是把这个权重推得更高
       bonus.weightMult *= valueAt(this, lvOf(ctx));
     },
+  },
+  {
+    id: 'taskcolor',
+    icon: '🧪',
+    name: '定向调配',
+    rarity: 'common',
+    scales: { kind: 'mult', base: 1.5, per: 0.12 },
+    desc(lv) {
+      return `本层要求收集的颜色出现概率 ×${valueAt(this, lv)}（条件目标的收集色 + 局内任务色）`;
+    },
+    max: 3,
+    growth: true,
+    // 与「同色磁石」的区别：磁石在选中时随机锁死一种颜色、整轮固定；
+    // 这张不锁色，而是**每层开局**按当层任务反推该推哪一色（见 taskColorsOf），
+    // 所以任务换色它自动跟着换，不需要玩家做选择。apply 只累倍率，颜色在 floorOptions 里现算
+    apply(bonus, ctx) { bonus.taskColorMult *= valueAt(this, lvOf(ctx)); },
   },
   {
     id: 'abyss',
@@ -457,6 +474,58 @@ export function goalOf(floor, bonus) {
 }
 
 /**
+ * 本层的「任务色」：这一层要求玩家**收集**的颜色（去重）
+ *
+ * 两个来源：
+ * - 条件目标（floor-types.js 生成，`type: 'collect'` 的目标自带 color）
+ * - 局内任务（questFor 生成，自带 color）
+ *
+ * 「定向调配」祝福据此把该颜色的出现概率实时抬高——任务换色它自动跟着换，
+ * 所以颜色在这里现算，而不是在选中祝福时锁死（那是「同色磁石」的做法）。
+ * @param {Array<object>} goals - 本层硬目标
+ * @param {object|null} quest - 本层局内任务
+ * @returns {number[]} 颜色下标数组（无任务时为空数组）
+ */
+export function taskColorsOf(goals, quest) {
+  const set = new Set();
+  for (const goal of goals || []) {
+    if (goal && goal.type === 'collect' && goal.color > 0) set.add(goal.color);
+  }
+  if (quest && quest.color > 0) set.add(quest.color);
+  return [...set];
+}
+
+/**
+ * 本层各颜色的出现权重（棋盘开局填充与后续补充都用它，见 cascade.js 的 pickColor）
+ *
+ * 两条来源可以叠加（例如磁石锁了红、任务要绿，则红绿各自加权）：
+ * - 「同色磁石」：选中时锁定的一色 ×weightMult
+ * - 「定向调配」：任务色 ×taskColorMult（同一色同时命中两条就相乘）
+ *
+ * 两条都没生效时返回 null = 等概率。这个「null 与旧版逐位一致」是硬约束：
+ * 非肉鸽模式与历史关卡的复现性都依赖它。
+ * @param {object} bonus - 本轮加成
+ * @param {number} colors - 本层元素种类数
+ * @param {number[]} [taskColors] - 本层任务色（taskColorsOf 的结果）
+ * @returns {number[]|null}
+ */
+export function colorWeightsFor(bonus, colors, taskColors = []) {
+  const magnet = bonus.weightColor > 0 && bonus.weightMult > 1 && bonus.weightColor <= colors
+    ? bonus.weightColor
+    : 0;
+  const taskSet = new Set((taskColors || []).filter((c) => c > 0 && c <= colors));
+  const taskMult = bonus.taskColorMult > 1 ? bonus.taskColorMult : 1;
+  if (magnet === 0 && taskSet.size === 0) return null;
+  return Array.from({ length: colors }, (_, k) => {
+    const color = k + 1;
+    let weight = 1;
+    if (color === magnet) weight *= bonus.weightMult;
+    if (taskSet.has(color)) weight *= taskMult;
+    return weight;
+  });
+}
+
+/**
  * 本层开局参数：直接喂给 board 的 payload
  *
  * 两条**层数成长轴**（见开发方案 5.6 的「层数成长来源」）：
@@ -468,8 +537,10 @@ export function goalOf(floor, bonus) {
  * @param {number} [floor] - 层号（层数成长来源）
  * @param {object} [terrain] - 本层地形（floor-types.js 的 terrainFor 结果，开发方案 3.2）：
  *   带 mask 时切到 9×9 异形盘并降色、透传 blockers；不传 = 旧版 8×8 满盘（标定脚本兼容）
+ * @param {number[]} [taskColors] - 本层任务色（taskColorsOf 的结果，「定向调配」用）；
+ *   不传 = 不启用，行为与旧版逐位一致
  */
-export function floorOptions(bonus, floor = 1, terrain = null) {
+export function floorOptions(bonus, floor = 1, terrain = null, taskColors = []) {
   const specials = [];
   if (bonus.specials.row) specials.push({ kind: SPECIAL.ROW, count: bonus.specials.row });
   if (bonus.specials.bomb) specials.push({ kind: SPECIAL.BOMB, count: bonus.specials.bomb });
@@ -479,12 +550,9 @@ export function floorOptions(bonus, floor = 1, terrain = null) {
   const baseColors = Math.max(bonus.colorFloor ?? ROGUE.minColors, ROGUE.colors - bonus.colorCut);
   // 异形盘（挖洞 / 分仓）行列不贯通，6 色会频繁无解，强制降一档（见 levels.js 标定注释）
   const colors = terrain?.mask ? Math.min(baseColors, ROGUE_SHAPE.maxColors) : baseColors;
-  // 颜色权重：只有「同色磁石」会给出非均匀权重；其余情况保持 null（等概率），
-  // 与旧版逐位一致——这一点在引擎侧同样是硬约束（见 cascade.js 的 pickColor）
-  const colorWeights =
-    bonus.weightColor > 0 && bonus.weightMult > 1 && bonus.weightColor <= colors
-      ? Array.from({ length: colors }, (_, k) => (k === bonus.weightColor - 1 ? bonus.weightMult : 1))
-      : null;
+  // 颜色权重：非均匀权重只由「同色磁石」（锁定一色）与「定向调配」（本层任务色）给出；
+  // 其余情况保持 null（等概率），与旧版逐位一致——这一点在引擎侧同样是硬约束（见 cascade.js 的 pickColor）
+  const colorWeights = colorWeightsFor(bonus, colors, taskColors);
 
   const baseMoves = ROGUE.movesPerFloor
     + bonus.moves
