@@ -12,7 +12,7 @@
  * 纯 DOM + CSS，不引框架；只负责渲染与把选择回传，不持有 run 状态（推进在 mode-rogue 里）。
  */
 import { el } from '../../../utils/dom.js';
-import { ASCENSIONS, MAX_ASCENSION } from '../rogue/ascension.js';
+import { ASCENSIONS, MAX_ASCENSION, ascMods } from '../rogue/ascension.js';
 
 /**
  * 渲染入口选择屏
@@ -22,6 +22,8 @@ import { ASCENSIONS, MAX_ASCENSION } from '../rogue/ascension.js';
  * @param {string[]} opts.unlocked - 已解锁角色 id 列表
  * @param {(char:object)=>({label:string,have:number,need:number,done:boolean}|null)} opts.unlockOf
  *   未解锁角色的进度（已解锁角色返回 null）
+ * @param {(char:object)=>({level:number,runs:number,next:(number|null)})} [opts.masteryOf]
+ *   某角色的熟练度（按出战轮数分级，纯展示）
  * @param {number} opts.maxAscension - 最高可选进阶等级（含）
  * @param {(lv:number)=>string} opts.ascensionLabel
  * @param {boolean} opts.hardcoreUnlocked
@@ -37,6 +39,7 @@ export function renderRogueSetup(container, opts) {
         characters = [],
         unlocked = [],
         unlockOf = () => null,
+        masteryOf = () => null,
         maxAscension = 0,
         ascensionLabel = (lv) => (lv > 0 ? `进阶 ${lv}` : '标准难度'),
         hardcoreUnlocked = false,
@@ -60,12 +63,14 @@ export function renderRogueSetup(container, opts) {
         const owned = unlocked.includes(char.id);
         const on = sel.characterId === char.id;
         const prog = owned ? null : unlockOf(char);
-        const kit = [
-            char.startBonus?.moves ? `+${char.startBonus.moves} 步` : null,
-            char.startBonus?.colorCut ? `${6 - char.startBonus.colorCut} 色起手` : null,
-            char.startBonus?.scoreMult ? `得分 ×${char.startBonus.scoreMult}` : null,
-            char.startBonus?.goalMult ? `目标 ×${char.startBonus.goalMult}` : null,
-        ].filter(Boolean);
+        const accent = char.accent || '#94a3b8';
+        // 熟练度（纯展示：按该角色累计出战轮数分级，不接任何强度；压成一行次要信息，钉在卡底对齐）
+        const mast = owned ? masteryOf(char) : null;
+        const mastText = mast
+            ? (mast.next === null
+                ? `熟练满级 · 出战 ${mast.runs} 轮`
+                : `熟练 Lv.${mast.level} · 出战 ${mast.runs}/${mast.next} 轮`)
+            : null;
         return el(
             'button',
             {
@@ -78,7 +83,11 @@ export function renderRogueSetup(container, opts) {
                     paint();
                 },
             },
-            el('span', { class: 'm3-setup-card-icon' }, owned ? char.icon : '🔒'),
+            el('span', {
+                class: 'm3-setup-card-icon',
+                // 角色专属配色（起手身份的辨识色；emoji 用中性底色，锁定时不染色）
+                style: owned ? { background: `${accent}1f`, color: accent } : null,
+            }, owned ? char.icon : '🔒'),
             el(
                 'span',
                 { class: 'm3-setup-card-main' },
@@ -89,7 +98,7 @@ export function renderRogueSetup(container, opts) {
                     el('span', { class: 'm3-setup-card-style' }, char.style),
                 ),
                 el('span', { class: 'm3-setup-card-desc' }, char.desc),
-                kit.length > 0 ? el('span', { class: 'm3-setup-card-kit' }, `起手：${kit.join(' · ')}`) : null,
+                mastText ? el('span', { class: 'm3-setup-card-mastery' }, `⭐ ${mastText}`) : null,
                 prog && !prog.done
                     ? el(
                         'span',
@@ -101,7 +110,7 @@ export function renderRogueSetup(container, opts) {
         );
     }
 
-    /** 进阶等级：一排按钮 0..maxAscension；超出的档位不渲染，另给一句「下一阶怎么解锁」 */
+    /** 进阶等级：按钮 0..maxAscension + 选中等级的累计修正摘要 + 全部等级的逐级说明 */
     function ascRow() {
         const btns = [];
         for (let lv = 0; lv <= maxAscension; lv += 1) {
@@ -131,12 +140,42 @@ export function renderRogueSetup(container, opts) {
                 el('span', { class: 'm3-setup-asc-tip' }, `${nextLv}`),
             ));
         }
-        const mods = sel.ascension > 0
-            ? ASCENSIONS.slice(0, sel.ascension).map((e) => `Lv.${e.lv} ${e.desc}`)
-            : ['无额外修正（与标准难度逐位一致）'];
+        const n = sel.ascension;
+        const asc = ascMods(n);
+        // 选中等级的「累计修正」摘要：把所有已叠加的修正项折算成人话，回答「选它到底改了啥」
+        const summary = n === 0
+            ? ['无额外修正（与标准难度逐位一致）']
+            : [
+                asc.goalMult > 1.0001 ? `所有目标分 +${Math.round((asc.goalMult - 1) * 100)}%` : null,
+                asc.moves < 0 ? `每层起手 −${Math.abs(asc.moves)} 步` : null,
+                asc.eliteBonus > 0 ? `每区域精英 +${asc.eliteBonus}` : null,
+                asc.eliteMult > 1.0001 ? `精英目标分 +${Math.round((asc.eliteMult - 1) * 100)}%` : null,
+                asc.bossMult > 1.0001 ? `Boss 血量 +${Math.round((asc.bossMult - 1) * 100)}%` : null,
+                asc.shopMult > 1.0001 ? `商店价格 +${Math.round((asc.shopMult - 1) * 100)}%` : null,
+                asc.colorFloor > 0 ? `元素种类下限 ${asc.colorFloor} 色` : null,
+            ].filter(Boolean);
+        // 全部等级的逐级说明：当前已叠加的高亮，未解锁的打锁标——一眼看清整条进阶曲线
+        const ladder = ASCENSIONS.map((e) => {
+            const locked = e.lv > maxAscension;
+            const active = e.lv <= n;
+            return el(
+                'div',
+                { class: `m3-setup-asc-item${active ? ' m3-setup-asc-item--on' : ''}${locked ? ' m3-setup-asc-item--locked' : ''}` },
+                el('span', { class: 'm3-setup-asc-item-lv' }, `Lv.${e.lv}`),
+                el('span', { class: 'm3-setup-asc-item-desc' }, e.desc),
+                locked ? el('span', { class: 'm3-setup-asc-item-lock' }, '🔒') : null,
+            );
+        });
         return [
             el('div', { class: 'm3-setup-asc-row' }, ...btns),
-            el('div', { class: 'm3-setup-asc-note' }, `当前：${ascensionLabel(sel.ascension)}`, el('br'), ...mods.map((m) => el('div', {}, m))),
+            el(
+                'div',
+                { class: 'm3-setup-asc-note' },
+                `当前：${ascensionLabel(n)}`,
+                el('div', { class: 'm3-setup-asc-summary' }, summary.join(' · ')),
+            ),
+            el('div', { class: 'm3-setup-asc-ladder-title' }, '各级修正（当前已叠加的高亮）'),
+            el('div', { class: 'm3-setup-asc-ladder' }, ...ladder),
             nextLv <= MAX_ASCENSION
                 ? el('div', { class: 'm3-setup-asc-hint' }, `🔒 进阶 ${nextLv}：在进阶 ${maxAscension} 通关后解锁`)
                 : el('div', { class: 'm3-setup-asc-hint' }, '🔒 已解锁全部进阶，愿试炼不止'),

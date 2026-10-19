@@ -42,7 +42,8 @@ const wait = (ms) => new Promise((done) => setTimeout(done, ms));
  *   可选表现与规则字段：colorScaling（按颜色数缩放得分，仅无尽模式）、
  *   scoreMult（额外得分倍率，肉鸽模式的自选祝福用）、cascadeMax（连锁倍率上限，默认 SCORE.cascadeMax）、
  *   specials（开局注入的特殊元素，形如 [{ kind, count }]，肉鸽模式的「军火库」类祝福用）、
- *   colorWeights（各颜色的出现权重数组，缺省等概率，肉鸽模式的「同色磁石」祝福用）
+ *   colorWeights（各颜色的出现权重数组，缺省等概率，肉鸽模式的「同色磁石」祝福用）、
+ *   engine（遗物编译出的引擎修正对象，如 { bombRadius, rainbowExtraColors }，见 special.js 文件头；缺省不动引擎）
  * @param {number} [options.seed] - 覆盖默认种子（默认取 payload.id，保证同一关可复现）
  * @param {Object} [options.snapshot] - 局内续存快照（无尽模式刷新后续玩）
  * @param {Function} [options.onUpdate] - 每次状态变化回调 (info)
@@ -264,6 +265,8 @@ export function createMatch3Board(container, options = {}) {
   const cascadeMax = Number.isFinite(payload.cascadeMax) ? payload.cascadeMax : SCORE.cascadeMax;
   // 各颜色的出现权重（肉鸽的「同色磁石」祝福），缺省等概率
   const weights = payload.colorWeights || null;
+  // 遗物编译出的引擎修正（肉鸽「遗物二期」：炸弹半径 / 彩球额外清色），缺省 null = 与旧行为一致
+  const engine = payload.engine && typeof payload.engine === 'object' ? payload.engine : null;
   const currentColorMult = () => (colorScaling ? colorScoreMultiplier(state.colors) : 1) * scoreMult;
 
   // ---- 动画 ----
@@ -358,7 +361,7 @@ export function createMatch3Board(container, options = {}) {
 
     const result =
       rainbowIndex == null
-        ? resolve(grid, { rng, colors: state.colors, focus: b, colorMult: currentColorMult(), cascadeMax, weights })
+        ? resolve(grid, { rng, colors: state.colors, focus: b, colorMult: currentColorMult(), cascadeMax, weights, engine })
         : resolveRainbowSwap(grid, {
           rng,
           colors: state.colors,
@@ -367,6 +370,7 @@ export function createMatch3Board(container, options = {}) {
           colorMult: currentColorMult(),
           cascadeMax,
           weights,
+          engine,
         });
 
     state.score += result.gained;

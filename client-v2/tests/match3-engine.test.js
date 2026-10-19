@@ -27,7 +27,7 @@ import {
 } from '../src/games/match3/engine/grid.js';
 import { countBlockers, damageBlockers, placeBlockers } from '../src/games/match3/engine/blockers.js';
 import { findMatches, findRuns, hasMatch } from '../src/games/match3/engine/match.js';
-import { effectCells, expandSpecials } from '../src/games/match3/engine/special.js';
+import { effectCells, expandSpecials, pickExtraColors, rainbowSwapTargets } from '../src/games/match3/engine/special.js';
 import { findValidMove, isResolvable, shuffleRegion } from '../src/games/match3/engine/deadlock.js';
 import {
   applyGravity,
@@ -327,6 +327,59 @@ test('炸弹爆炸不波及彩球：3×3 内的彩球不被引爆', () => {
 
   const { cleared } = expandSpecials(grid, [12]);
   assert.equal(cleared.has(13), false);
+});
+
+test('引擎修正 bombRadius：半径受 opts 覆盖，非法值回退默认（1 → 3×3 / 2 → 5×5）', () => {
+  const grid = makeGrid(BASE);
+  setAt(grid, 12, { color: 3, special: 'bomb' });
+  assert.equal(effectCells(grid, 12).length, 9);                 // 默认半径 1
+  assert.equal(effectCells(grid, 12, { bombRadius: 2 }).length, 25); // 半径 2 覆盖全盘
+
+  // 角落炸弹：半径 2 被边界裁成 3×3
+  const corner = makeGrid(BASE);
+  setAt(corner, 0, { color: 2, special: 'bomb' });
+  assert.equal(effectCells(corner, 0, { bombRadius: 2 }).length, 9);
+
+  // 缺省 / 非法值（0、NaN）逐位回退默认半径，不会炸成空集
+  assert.equal(effectCells(grid, 12, { bombRadius: 0 }).length, 9);
+  assert.equal(effectCells(grid, 12, { bombRadius: NaN }).length, 9);
+
+  // expandSpecials 透传 opts：半径 2 一举覆盖全盘
+  const cascade = makeGrid(BASE);
+  setAt(cascade, 12, { color: 3, special: 'bomb' });
+  assert.equal(expandSpecials(cascade, [12], { bombRadius: 2 }).cleared.size, 25);
+});
+
+test('引擎修正 rainbowExtraColors：彩球额外清「场上另一主色」（双色棱镜）', () => {
+  const grid = makeGrid(BASE); // 色 2 有 13 个、色 3 有 12 个
+  setAt(grid, 0, { color: null, special: 'rainbow' }); // 命中后色 2 剩 12
+
+  // 默认：只清目标色 3（12 个）+ 彩球自身 = 13
+  assert.equal(rainbowSwapTargets(grid, 0, 1).length, 13);
+  // +1 额外色：再清场上另一主色 2，合计覆盖全盘 25 格
+  const dual = rainbowSwapTargets(grid, 0, 1, { rainbowExtraColors: 1 });
+  assert.equal(dual.length, 25);
+  assert.equal(new Set(dual).size, dual.length); // 去重，同格不重复计入
+
+  // resolveRainbowSwap 透传 engine：首连锁直接清空全盘
+  const fresh = makeGrid(BASE);
+  setAt(fresh, 0, { color: null, special: 'rainbow' });
+  const result = resolveRainbowSwap(fresh, {
+    rng: createRng(7),
+    colors: 6,
+    rainbowIndex: 0,
+    targetIndex: 1,
+    engine: { rainbowExtraColors: 1 },
+  });
+  assert.equal(result.steps[0].cleared.length, 25);
+});
+
+test('pickExtraColors：按出现次数降序取色、排除指定色、同次数按下标升序', () => {
+  const grid = makeGrid(BASE); // 色 2：13 个，色 3：12 个
+  assert.deepEqual(pickExtraColors(grid, 3, 1), [2]);   // 排除 3 → 取最多的 2
+  assert.deepEqual(pickExtraColors(grid, 2, 1), [3]);
+  assert.deepEqual(pickExtraColors(grid, 99, 2), [2, 3]); // 全色按次数降序
+  assert.deepEqual(pickExtraColors(grid, 99, 0), []);     // n=0 返回空
 });
 
 // ========== 连锁与计分 ==========

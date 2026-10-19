@@ -882,6 +882,104 @@ class AchievementManager {
         type: 'game_type',
         condition: { gameType: 'match3', hardcoreWin: true },
         reward: { exp: 15000, badge: 'match3_rogue_hardcore' }
+      },
+      // 角色扩展（开发方案 3.8 扩展）：4 个新角色的通关徽章 + 7 个角色的「出战 15 轮」熟练徽章 + 全角色通关
+      // 数据来自 rogue 养成存档的 charStats（服务端权威），口径与 buildGameTypeStats 的 CharWins / CharRuns 一一对应
+      {
+        id: 173,
+        name: '赏金猎人通关',
+        description: '使用赏金猎人通关肉鸽试炼',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueCharacter: 'bounty' },
+        reward: { exp: 2000, badge: 'match3_rogue_char_bounty' }
+      },
+      {
+        id: 174,
+        name: '爆破专家通关',
+        description: '使用爆破专家通关肉鸽试炼',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueCharacter: 'bomber' },
+        reward: { exp: 2000, badge: 'match3_rogue_char_bomber' }
+      },
+      {
+        id: 175,
+        name: '幸运儿通关',
+        description: '使用幸运儿通关肉鸽试炼',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueCharacter: 'gambler' },
+        reward: { exp: 2000, badge: 'match3_rogue_char_gambler' }
+      },
+      {
+        id: 176,
+        name: '棱镜师通关',
+        description: '使用棱镜师通关肉鸽试炼',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueCharacter: 'prism' },
+        reward: { exp: 2000, badge: 'match3_rogue_char_prism' }
+      },
+      {
+        id: 177,
+        name: '连锁术士·宗师',
+        description: '使用连锁术士累计出战15轮',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueCharacterRuns: 15, rogueCharacterId: 'sorcerer' },
+        reward: { exp: 3000, badge: 'match3_rogue_master_sorcerer' }
+      },
+      {
+        id: 178,
+        name: '壁垒守卫·宗师',
+        description: '使用壁垒守卫累计出战15轮',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueCharacterRuns: 15, rogueCharacterId: 'guardian' },
+        reward: { exp: 3000, badge: 'match3_rogue_master_guardian' }
+      },
+      {
+        id: 179,
+        name: '调色术士·宗师',
+        description: '使用调色术士累计出战15轮',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueCharacterRuns: 15, rogueCharacterId: 'palette' },
+        reward: { exp: 3000, badge: 'match3_rogue_master_palette' }
+      },
+      {
+        id: 180,
+        name: '赏金猎人·宗师',
+        description: '使用赏金猎人累计出战15轮',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueCharacterRuns: 15, rogueCharacterId: 'bounty' },
+        reward: { exp: 3000, badge: 'match3_rogue_master_bounty' }
+      },
+      {
+        id: 181,
+        name: '爆破专家·宗师',
+        description: '使用爆破专家累计出战15轮',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueCharacterRuns: 15, rogueCharacterId: 'bomber' },
+        reward: { exp: 3000, badge: 'match3_rogue_master_bomber' }
+      },
+      {
+        id: 182,
+        name: '幸运儿·宗师',
+        description: '使用幸运儿累计出战15轮',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueCharacterRuns: 15, rogueCharacterId: 'gambler' },
+        reward: { exp: 3000, badge: 'match3_rogue_master_gambler' }
+      },
+      {
+        id: 183,
+        name: '棱镜师·宗师',
+        description: '使用棱镜师累计出战15轮',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueCharacterRuns: 15, rogueCharacterId: 'prism' },
+        reward: { exp: 3000, badge: 'match3_rogue_master_prism' }
+      },
+      {
+        id: 184,
+        name: '群英荟萃',
+        description: '用全部7个角色各通关一次肉鸽试炼',
+        type: 'game_type',
+        condition: { gameType: 'match3', rogueAllChars: 7 },
+        reward: { exp: 8000, badge: 'match3_rogue_all_chars' }
       }
     ];
   }
@@ -1042,6 +1140,16 @@ class AchievementManager {
         }
         if (achievement.condition.rogueCharacter !== undefined) {
           return (stats.gameTypeRogueCharWins?.[achievement.condition.gameType]?.[achievement.condition.rogueCharacter] || 0) >= 1;
+        }
+        // 角色熟练度（开发方案 3.8 扩展）：按该角色累计出战轮数达标；全角色通关 = 各角色 wins≥1 的数量达标
+        if (achievement.condition.rogueCharacterRuns !== undefined) {
+          const runs = stats.gameTypeRogueCharRuns?.[achievement.condition.gameType]?.[achievement.condition.rogueCharacterId] || 0;
+          return runs >= achievement.condition.rogueCharacterRuns;
+        }
+        if (achievement.condition.rogueAllChars !== undefined) {
+          const charWins = stats.gameTypeRogueCharWins?.[achievement.condition.gameType] || {};
+          const cleared = Object.values(charWins).filter((n) => n >= 1).length;
+          return cleared >= achievement.condition.rogueAllChars;
         }
         if (achievement.condition.hardcoreWin !== undefined) {
           return (stats.gameTypeRogueHardcoreWins?.[achievement.condition.gameType] || 0) >= 1;
@@ -1214,6 +1322,18 @@ class AchievementManager {
         if (achievement.condition.rogueCharacter !== undefined) {
           const done = (stats.gameTypeRogueCharWins?.[achievement.condition.gameType]?.[achievement.condition.rogueCharacter] || 0) >= 1;
           return { current: done ? 1 : 0, target: 1, percent: done ? 100 : 0 };
+        }
+        // 角色熟练度（开发方案 3.8 扩展）：出战轮数进度 / 全角色通关数量进度
+        if (achievement.condition.rogueCharacterRuns !== undefined) {
+          const target = achievement.condition.rogueCharacterRuns;
+          const current = stats.gameTypeRogueCharRuns?.[achievement.condition.gameType]?.[achievement.condition.rogueCharacterId] || 0;
+          return { current, target, percent: Math.min(100, Math.round((current / target) * 100)) };
+        }
+        if (achievement.condition.rogueAllChars !== undefined) {
+          const target = achievement.condition.rogueAllChars;
+          const charWins = stats.gameTypeRogueCharWins?.[achievement.condition.gameType] || {};
+          const current = Object.values(charWins).filter((n) => n >= 1).length;
+          return { current, target, percent: Math.min(100, Math.round((current / target) * 100)) };
         }
         if (achievement.condition.hardcoreWin !== undefined) {
           const done = (stats.gameTypeRogueHardcoreWins?.[achievement.condition.gameType] || 0) >= 1;

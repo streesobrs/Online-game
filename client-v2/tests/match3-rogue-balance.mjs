@@ -31,7 +31,7 @@ import { applyChoice, availableChoices, isLeaveChoice, rollEvent } from '../src/
 import { buildRelicHooks, grantOnAcquire, relicById, rollRelic, rollRelicChoices, RELICS } from '../src/games/match3/rogue/relics.js';
 import { buyItem, priceOf, rollShelf, shelfWithPrices } from '../src/games/match3/rogue/shop.js';
 // 3.8 / 3.10：角色 / 进阶——起手数据与进阶修正的覆盖度检查（P5/P6）
-import { CHARACTERS, DEFAULT_CHARACTER } from '../src/games/match3/rogue/characters.js';
+import { CHARACTERS, DEFAULT_CHARACTER, MASTERY_TIERS, characterMastery } from '../src/games/match3/rogue/characters.js';
 import { ASCENSIONS, MAX_ASCENSION, ascMods, ascensionEssenceMult } from '../src/games/match3/rogue/ascension.js';
 
 /**
@@ -228,6 +228,16 @@ function assertCharactersCovered() {
   for (const r of RELICS.filter((x) => x.characterOnly)) {
     if (!used.has(r.id)) throw new Error(`角色专属遗物 ${r.id} 没被任何角色携带`);
   }
+  // 熟练度阶梯（3.8 扩展）：门槛为升序正整数，且 characterMastery 的满级档与门槛表一致
+  for (let i = 0; i < MASTERY_TIERS.length; i += 1) {
+    if (!Number.isInteger(MASTERY_TIERS[i]) || MASTERY_TIERS[i] <= 0) {
+      throw new Error(`熟练度门槛非法：${MASTERY_TIERS[i]}`);
+    }
+    if (i > 0 && MASTERY_TIERS[i] <= MASTERY_TIERS[i - 1]) throw new Error('熟练度门槛必须递增');
+  }
+  if (characterMastery({ runs: MASTERY_TIERS[MASTERY_TIERS.length - 1] }).level !== MASTERY_TIERS.length) {
+    throw new Error('熟练度满级档与门槛表不一致');
+  }
 }
 assertCharactersCovered();
 
@@ -291,7 +301,7 @@ assertAscensionCovered();
 function playFloor({
   colors, moves, scoreMult, cascadeMax, specials, seed, colorWeights = null, quest = null,
   rows = ROGUE.rows, cols = ROGUE.cols, mask = null, blockers = null, goals = null,
-  hooks = null, relicUsed = null, floor = 0, bonus = null,
+  hooks = null, relicUsed = null, floor = 0, bonus = null, engine = null,
 }) {
   const rng = createRng(seed);
   const grid = createInitialBoard({ rows, cols, mask, blockers, colors, seed, weights: colorWeights }).grid;
@@ -341,7 +351,7 @@ function playFloor({
     const list = allValidMoves(grid);
     if (list.length === 0) {
       if (hasMatch(grid)) {
-        const res = resolve(grid, { rng, colors, colorMult: ctx.scoreMult, cascadeMax, weights: colorWeights });
+        const res = resolve(grid, { rng, colors, colorMult: ctx.scoreMult, cascadeMax, weights: colorWeights, engine });
         score += res.gained;
         clearedTiles += tilesOf(res.colors);
         blockersCleared += res.blockersCleared || 0;
@@ -358,10 +368,10 @@ function playFloor({
     swapCells(grid, a, b);
     const rainbowIndex = [a, b].find((i) => grid.cells[i]?.special === SPECIAL.RAINBOW);
     const result = rainbowIndex == null
-      ? resolve(grid, { rng, colors, focus: b, colorMult: ctx.scoreMult, cascadeMax, weights: colorWeights })
+      ? resolve(grid, { rng, colors, focus: b, colorMult: ctx.scoreMult, cascadeMax, weights: colorWeights, engine })
       : resolveRainbowSwap(grid, {
         rng, colors, rainbowIndex, targetIndex: rainbowIndex === a ? b : a, colorMult: ctx.scoreMult, cascadeMax,
-        weights: colorWeights,
+        weights: colorWeights, engine,
       });
     score += result.gained;
     clearedTiles += tilesOf(result.colors);
@@ -458,6 +468,7 @@ const CHOICE_VALUE = {
   bomber: 0.15,
   rainbow: 0.25,
   scout: 0.2,
+  collector: 0.15,
   shield: 0.05,
   shuffle: 0.03,
   storm: 0.37,
@@ -825,6 +836,7 @@ function simulateRun(cfg, runSeed) {
         ...opts, moves: finalMoves, goals, quest: questCfg,
         seed: runSeed + floor * 977 + k * 31 + seedShift,
         hooks: relicsOn ? hooks : null, relicUsed: {}, floor, bonus,
+        engine: relicsOn ? hooks.engine : null,
       }));
       if (plays.filter((p) => p.goalsAllDone === true).length >= 2) break;
       if (bonus.shields > 0) {

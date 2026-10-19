@@ -1,6 +1,6 @@
 /**
  * 遗物纯函数断言（开发方案 3.5，P3）
- * - 数据表：20 件、四组各 ≥4、稀有度分布、epic 才是改规则、协同描述点名
+ * - 数据表：31 件、四组各 ≥4、稀有度分布、epic 才是改规则、协同描述点名
  * - 掉落：同 seed 复现、排除已拥有、池空返回 null、三选一不重复且不足时短路
  * - hook 分发：mods 聚合（含 shopDiscount 下限夹取）、onStep 每层上限、onFloorStart 只跑 perFloor、
  *   grant 改 bonus、缺字段静默跳过
@@ -46,21 +46,21 @@ test('RELICS：id 唯一、字段完整、rarity/group 合法、max 恒为 1', (
     assert.ok(['common', 'rare', 'epic'].includes(r.rarity), `${r.id} 稀有度非法`);
     assert.ok(GROUP_IDS.includes(r.group), `${r.id} 分组非法`);
     assert.equal(r.max, 1, `${r.id} 遗物不可叠加`);
-    // grant / hook / mods 至少有一种，否则这件遗物没有任何效果
+    // grant / hook / engine 修正 / mods 至少有一种，否则这件遗物没有任何效果
     assert.ok(
-      r.grant || r.onStep || r.onUpdate || r.onGameOver || r.mods,
+      r.grant || r.onStep || r.onUpdate || r.onGameOver || r.mods || r.engine,
       `${r.id} 没有任何效果`,
     );
   }
   assert.ok(RELICS.length >= 18, '首发应 ≥18 件');
 });
 
-test('稀有度分布：common 9 / rare 7 / epic 4（可掉落池），图鉴分桶固定', () => {
+test('稀有度分布：common 9 / rare 10 / epic 6（可掉落池），图鉴分桶固定', () => {
   const by = relicsByRarity();
   assert.deepEqual(Object.keys(by), ['common', 'rare', 'epic']);
   assert.equal(by.common.length, 9);
-  assert.equal(by.rare.length, 7);
-  assert.equal(by.epic.length, 4);
+  assert.equal(by.rare.length, 10);
+  assert.equal(by.epic.length, 6);
   // 图鉴分桶 = 可掉落池（去掉角色专属被动，那两件只挂在角色身上，不进任何随机池）
   const rollable = RELICS.filter((r) => !r.characterOnly).length;
   assert.equal(by.common.length + by.rare.length + by.epic.length, rollable);
@@ -76,7 +76,7 @@ test('四组各 ≥4 件（可拼出 ≥4 种流派）', () => {
 test('epic 才是改规则级：可掉落池里的 epic 都有机制，且至少一件 perFloor / 一件 onStep', () => {
   const epics = RELICS.filter((r) => r.rarity === 'epic' && !r.characterOnly);
   for (const r of epics) {
-    assert.ok(r.grant || r.onStep || r.onUpdate || r.mods, `${r.id} 应有改规则效果`);
+    assert.ok(r.grant || r.onStep || r.onUpdate || r.mods || r.engine, `${r.id} 应有改规则效果`);
   }
   // 「每层开局白送 1 个彩球」类（perFloor）与「连锁阈值下调」类（onStep）各至少一件
   assert.ok(epics.some((r) => r.perFloor), 'epic 应含 perFloor 改规则件');
@@ -85,7 +85,7 @@ test('epic 才是改规则级：可掉落池里的 epic 都有机制，且至少
 
 test('角色专属被动（characterOnly）：不进任何随机池，只由 startRelics 注入', () => {
   const own = RELICS.filter((r) => r.characterOnly).map((r) => r.id);
-  assert.ok(own.length >= 2, '首发至少 2 件角色被动遗物');
+  assert.ok(own.length >= 6, '角色被动遗物应 ≥6 件（守护/调色 + 扩展 4 个）');
   for (const id of own) {
     // 单抽绝不能掷到它
     for (let seed = 0; seed < 50; seed += 1) {
@@ -190,6 +190,18 @@ test('buildRelicHooks：mods 聚合（乘性相乘、加性相加）', () => {
   const extra = buildRelicHooks(['wide_choice', 'reroll_token']).mods;
   assert.equal(extra.extraChoices, 1);
   assert.equal(extra.rerolls, 1);
+});
+
+test('buildRelicHooks：engine 修正聚合（引擎档遗物 → hooks.engine，空池为 {}）', () => {
+  assert.deepEqual(buildRelicHooks([]).engine, {});
+  assert.deepEqual(buildRelicHooks(['wide_blast']).engine, { bombRadius: 2 });
+  assert.deepEqual(buildRelicHooks(['twin_rainbow']).engine, { rainbowExtraColors: 1 });
+  // 两件引擎档同时持有：字段各自独立聚合
+  assert.deepEqual(buildRelicHooks(['wide_blast', 'twin_rainbow']).engine, {
+    bombRadius: 2, rainbowExtraColors: 1,
+  });
+  // 零引擎档遗物不污染 engine（不带 engine 字段的遗物不入聚合）
+  assert.deepEqual(buildRelicHooks(['coupon', 'infinite_chain']).engine, {});
 });
 
 test('buildRelicHooks：shopDiscount 下限夹到 0.5（优惠券 ×0.8 × 砍价 0.6 = 0.48 → 0.5）', () => {

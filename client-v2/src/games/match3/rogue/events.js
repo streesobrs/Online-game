@@ -78,7 +78,7 @@ export function isLeaveChoice(choice) {
 }
 
 /**
- * 事件表（本批 14 条，文档目标 20–30 条，后续按同构数据热更式追加）
+ * 事件表（本批 18 条，文档目标 20–30 条，后续按同构数据热更式追加）
  *
  * 字段：
  * - `id`       唯一标识
@@ -462,6 +462,114 @@ export const EVENTS = [
         },
       },
       { text: '离开', apply: () => '你假装没看见那些名字，加快脚步。' },
+    ],
+  },
+
+  // ---- 热更批次（P7 内容扩充，minDepth 3–14，同构追加）----
+  {
+    id: 'wandering_monk',
+    icon: '🧘',
+    weight: 9,
+    minDepth: 3,
+    maxDepth: 16,
+    text: '一位云游僧人坐在路碑旁，面前摆着空钵与一卷残经。',
+    choices: [
+      {
+        text: '布施 25 金币（换一张随机祝福）',
+        when: (s) => s.coins >= 25,
+        apply(ctx) {
+          ctx.addCoins(-25);
+          const perk = ctx.grantPerk({ rarity: 'common' });
+          return perk ? '僧人合掌一礼，往你手心按了一张牌。' : '僧人收下金币，只回了你一句「随缘」。';
+        },
+      },
+      {
+        text: '听他讲一段经（+1 护盾）',
+        apply(ctx) { ctx.addShield(1); return '残经里的话很旧，你听着，脚下稳了些。'; },
+      },
+      { text: '离开', apply: () => '你怕耽误脚程，冲僧人点点头就走了。' },
+    ],
+  },
+  {
+    id: 'sunken_forge',
+    icon: '⚒️',
+    weight: 8,
+    minDepth: 6,
+    text: '半沉在泥里的熔炉还留着余温，风箱一鼓，火星四溅。',
+    choices: [
+      {
+        text: '花 30 金币重铸一件随机遗物',
+        when: (s) => s.coins >= 30,
+        apply(ctx) {
+          ctx.addCoins(-30);
+          const id = ctx.grantRelic('random');
+          return id ? `炉火里浮出一件东西：${id}。` : '炉膛只剩冷灰，什么也没铸出来。';
+        },
+      },
+      {
+        text: '把护符投进炉里（献 1 次护盾，下一层 +4 步；无护盾则 −2 步）',
+        apply(ctx) {
+          if (loseShield(ctx, 1) === 0) loseMoves(ctx, 2);
+          else ctx.addMoves(4);
+          return '护符化进炉火，回冲的风推着你向前。';
+        },
+      },
+      { text: '离开', apply: () => '你没敢碰那炉还未熄的火，绕了开去。' },
+    ],
+  },
+  {
+    id: 'pillar_of_dawn',
+    icon: '🌅',
+    weight: 7,
+    minDepth: 10,
+    text: '一根石柱上刻着日出，柱顶缝隙里漏下细碎的光。',
+    choices: [
+      {
+        text: '伸手接光（随机：+1 护盾 或 −3 步）',
+        apply(ctx) {
+          if (ctx.rng.next() < 0.5) {
+            ctx.addShield(1);
+            return '光落在掌心，你觉得自己像被护住了。';
+          }
+          loseMoves(ctx, 3);
+          return '光从指缝里溜走，你愣了好一会儿。';
+        },
+      },
+      {
+        text: '花 20 金币拓下日出（下一层 +2 步）',
+        when: (s) => s.coins >= 20,
+        apply(ctx) { ctx.addCoins(-20); ctx.addMoves(2); return '拓片揣进怀里，像多揣了一点天光。'; },
+      },
+      { text: '离开', apply: () => '你用袖子挡了下光，继续赶路。' },
+    ],
+  },
+  {
+    id: 'obsidian_gate',
+    icon: '🚪',
+    weight: 6,
+    minDepth: 14,
+    text: '一扇黑曜石门立在没有墙的地方，门缝里透出暖光。',
+    choices: [
+      {
+        text: '推开门（随机：稀有遗物 或 下一层 −4 步）',
+        apply(ctx) {
+          if (ctx.rng.next() < 0.5) {
+            const id = ctx.grantRelic({ rarity: 'rare' });
+            return id ? `门后案上摆着一件稀罕物：${id}。` : '门后空无一物，只有风穿过。';
+          }
+          loseMoves(ctx, 4);
+          return '门后是条死路，你折返时又绕了好几圈。';
+        },
+      },
+      {
+        text: '以血为引（献 2 次护盾换一张稀有祝福；护盾不足则 −3 步）',
+        apply(ctx) {
+          if (loseShield(ctx, 2) === 0 && loseShield(ctx, 1) === 0) loseMoves(ctx, 3);
+          ctx.grantPerk({ minRarity: 'rare' });
+          return '黑曜石吸走了你的护佑，门里传来一声应允。';
+        },
+      },
+      { text: '离开', apply: () => '你摸了摸门框上的凉意，退开了。' },
     ],
   },
 ];

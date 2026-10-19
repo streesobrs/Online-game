@@ -10,7 +10,7 @@
 import { ENDLESS3, ENDLESS, ROGUE } from './config/config.js';
 import { renderEndless, renderEndless3, loadBest, loadSession } from './modes/mode-endless.js';
 import { renderRogue, loadRogueBest } from './modes/mode-rogue.js';
-import { showPerkCodex } from './rogue/codex.js';
+import { renderCodexPage } from './rogue/codex.js';
 import { claimableCount, buffLevel, poolProgress } from './rogue/meta.js';
 import { META_BUFFS } from './rogue/perks.js';
 import { renderLevelMode, loadProgress, clearedCount, totalStars } from './modes/mode-level.js';
@@ -171,7 +171,8 @@ export function renderMatch3(container = viewRoot()) {
         'div',
         { class: 'm3-actions' },
         // 进对局之前也能先看看肉鸽池子里有哪些祝福，并顺手把攒下的精华花掉
-        el('button', { class: 'm3-btn m3-btn--ghost', onClick: () => showPerkCodex() }, '📖 图鉴与养成'),
+        // （局外走整页，不再用模态框盖住菜单）
+        el('button', { class: 'm3-btn m3-btn--ghost', onClick: () => renderCodexView() }, '📖 图鉴与养成'),
         el('button', { class: 'm3-btn m3-btn--ghost', onClick: () => renderMenu() }, '返回选择'),
       ),
     );
@@ -195,6 +196,12 @@ export function renderMatch3(container = viewRoot()) {
   function renderRogueView() {
     disposeMode();
     modeCleanup = renderRogue(wrap, { onExit: renderFunView });
+  }
+
+  // 图鉴整页：局外不用模态框（会盖住菜单、把小屏挤成滚动小窗），返回时回到娱乐菜单
+  function renderCodexView() {
+    disposeMode();
+    modeCleanup = renderCodexPage(wrap, { onExit: renderFunView });
   }
 
   // 进度以服务端为准：进入消消乐先拉一次，菜单上的「已通关 N 关」与最佳分才不会显示成空

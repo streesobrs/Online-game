@@ -2,7 +2,7 @@
  * 肉鸽角色 / 职业（开发方案 3.8，P5）
  *
  * 解决「每轮起手完全相同」的问题：给 run 一个「入口身份」。
- * 首发 3 个角色，差异全部是**数据 + 复用既有系统**，不新增引擎：
+ * 首发 3 个 + 扩展 4 个（共 7 个），差异全部是**数据 + 复用既有系统**，不新增引擎：
  * 1. `startBonus`：起步加成（步数 / 颜色数 / 得分倍率 / 目标系数），
  *    在 `applyMetaBuffs` **之后**注入——角色是「起点差异」，meta 是「长期养成」，两者叠加
  * 2. `startPerks`：开局就送的祝福 id（走 mode-rogue 的 `grantPerk` 同一入口，进三选池与 picks）
@@ -21,6 +21,7 @@ export const CHARACTERS = [
     icon: '🔥',
     name: '连锁术士',
     style: '连锁滚雪球',
+    accent: '#ef4444',
     unlock: null,
     // 起手与默认一致（6 色 10 步）
     startBonus: {},
@@ -34,6 +35,7 @@ export const CHARACTERS = [
     icon: '🛡️',
     name: '壁垒守卫',
     style: '稳健生存',
+    accent: '#3b82f6',
     // 资格解锁：不花精华，靠战绩
     unlock: { stat: 'bestFloor', value: 15, label: '最深抵达第 15 层' },
     // 起手 12 步（基准 10 + 2）、得分倍率 ×0.9（用慢一点换更稳）
@@ -48,6 +50,7 @@ export const CHARACTERS = [
     icon: '🧲',
     name: '调色术士',
     style: '色彩操控',
+    accent: '#a855f7',
     // 资格解锁：通关 1 次
     unlock: { win: 1, label: '通关 1 次' },
     // 5 色起手（colorCut 1）、目标分 +10%（goalMult 1.1）
@@ -56,6 +59,64 @@ export const CHARACTERS = [
     // 被动遗物：每个区域可重锁一次磁石颜色
     startRelics: ['recolor_pact'],
     desc: '5 色起手、目标分 +10%，自带「同色磁石」；每个区域可重锁一次磁石颜色。',
+  },
+  // ---- 扩展 4 个（覆盖连锁 / 生存 / 颜色之外的流派）----
+  {
+    id: 'bounty',
+    icon: '💰',
+    name: '赏金猎人',
+    style: '经济滚钱',
+    accent: '#f59e0b',
+    // 资格解锁：不花精华，靠战绩
+    unlock: { stat: 'bestFloor', value: 8, label: '最深抵达第 8 层' },
+    // 起手目标分 +5%（用略高的目标换经济优势）
+    startBonus: { goalMult: 1.05 },
+    startPerks: ['supply'],
+    // 被动遗物：金币获取 ×1.35、商店价格 ×0.85（只捡也敢买的金币流）
+    startRelics: ['bounty_pact'],
+    desc: '起手目标分 +5%，自带遗物「💰赏金契约」：金币获取 ×1.35、商店价格 ×0.85。',
+  },
+  {
+    id: 'bomber',
+    icon: '💥',
+    name: '爆破专家',
+    style: '炸弹拆迁',
+    accent: '#f97316',
+    // 击败 1 个 Boss 解锁
+    unlock: { stat: 'bossKills', value: 1, label: '击败 1 个 Boss' },
+    startBonus: {},
+    startPerks: ['bomber'],
+    // 被动遗物：每层开局至少 1 个炸弹（幂等不叠加）
+    startRelics: ['bomb_primer'],
+    desc: '自带「💣爆破专家」祝福与遗物「💥爆破引信」：每层开局多 1 个炸弹，靠拆迁滚雪球。',
+  },
+  {
+    id: 'gambler',
+    icon: '🎲',
+    name: '幸运儿',
+    style: '重随搏一把',
+    accent: '#10b981',
+    // 累计出战 5 轮解锁（反复游玩即解锁）
+    unlock: { stat: 'runs', value: 5, label: '累计出战 5 轮' },
+    startBonus: {},
+    startPerks: ['scout'],
+    // 被动遗物：每次三选一额外 1 次重随（与「重随代币」同源聚合）
+    startRelics: ['loaded_dice'],
+    desc: '自带「🧭侦察报告」与遗物「🎲灌铅骰子」：每次三选一额外 1 次重随，靠重新掷骰翻盘。',
+  },
+  {
+    id: 'prism',
+    icon: '🌀',
+    name: '棱镜师',
+    style: '彩球清屏',
+    accent: '#06b6d4',
+    // 完成 5 个局内任务解锁
+    unlock: { stat: 'questsDone', value: 5, label: '完成 5 个局内任务' },
+    startBonus: {},
+    startPerks: ['rainbow'],
+    // 被动遗物（引擎档）：彩球交换时同时清两色
+    startRelics: ['prism_pact'],
+    desc: '自带「🌈彩球礼物」与遗物「🌀棱镜契约」：彩球交换时同时清两色，走彩球清屏流。',
   },
 ];
 
@@ -108,4 +169,31 @@ export function unlockProgress(char, stats = {}) {
     need,
     done: have >= need,
   };
+}
+
+/**
+ * 熟练度阶梯（纯展示，开发方案 3.8 扩展）
+ *
+ * 解决「同一角色重复出战没有回报」：按该角色累计出战轮数分级，
+ * 等级只驱动**展示与荣誉徽章门槛**，**不接任何局内强度**（角色强度大头仍在 build）。
+ * 门槛数组升序，`level` = 达到的门槛数；与服务端成就「出战 15 轮」共用最高档 15。
+ */
+export const MASTERY_TIERS = [3, 8, 15];
+
+/**
+ * 某角色的熟练度（按出战轮数分级）
+ * @param {object} cs - meta.charStats[charId]（{ runs, bestFloor, wins }）
+ * @returns {{ level:number, runs:number, next:(number|null), progress:number, done:boolean }}
+ *   next 为下一档所需轮数（已满级为 null），progress 为 0..1 的进度
+ */
+export function characterMastery(cs) {
+  const runs = Math.max(0, Math.floor(cs?.runs || 0));
+  let level = 0;
+  for (const at of MASTERY_TIERS) if (runs >= at) level += 1;
+  const prevAt = level > 0 ? MASTERY_TIERS[level - 1] : 0;
+  const next = level < MASTERY_TIERS.length ? MASTERY_TIERS[level] : null;
+  const progress = next === null
+    ? 1
+    : Math.max(0, Math.min(1, (runs - prevAt) / (next - prevAt)));
+  return { level, runs, next, progress, done: next === null };
 }

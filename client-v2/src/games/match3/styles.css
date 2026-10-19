@@ -460,6 +460,14 @@
   font-weight: 700;
 }
 
+/* 「（原 900）」：减免类祝福（侦察报告 / 采集协议）生效时并列的原值，弱化显示与折后值区分 */
+.m3-cut-note {
+  margin-left: 4px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted, #94a3b8);
+}
+
 /* ===== 局内任务（肉鸽专属，见 perks.js 的 questFor） ===== */
 .m3-quest {
   border-color: #f0b429;
@@ -660,6 +668,74 @@
    不会隔着 body 的 padding 露出滑过的内容（移动端同步，见底部媒体查询） */
 .modal-overlay--codex .modal__body {
   padding-top: 0;
+}
+
+/* ===== 图鉴整页外壳（局外：娱乐菜单 / 结算页 / 站点路由 #/codex） =====
+ * 局内（对局中查池子）仍走上面的模态框；局外没有「盘面」可回，改成整页——
+ * 顶部「← 返回 + 标题」，内容包进卡片，吸顶分页栏的底色跟着卡片走。
+ * 面板内容本身（.m3-codex*）与模态框完全共用，这里只补外框。 */
+.m3-codex-page {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 4px 0 24px;
+}
+
+.m3-codex-page-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.m3-codex-back {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 8px;
+  background: var(--theme-panel-bg, #fff);
+  font-size: 13px;
+  color: var(--theme-status-color, #4a5568);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.m3-codex-back:hover {
+  border-color: var(--theme-btn-primary-bg, #007bff);
+  color: var(--theme-btn-primary-bg, #007bff);
+}
+
+.m3-codex-page-title {
+  margin: 0;
+  font-size: 20px;
+  color: var(--theme-title-color, #2c3e50);
+}
+
+/* 内容卡片：与模态框同一套底色，吸顶分页栏才有东西可贴 */
+.m3-codex-page-body {
+  padding: 0 14px 16px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 12px;
+  background: var(--theme-panel-bg, #fff);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.05);
+}
+
+/* 面板自带的顶部内边距是给模态框补 body padding 的，整页里由卡片内边距承担 */
+.m3-codex-page-body .m3-codex {
+  padding-top: 0;
+}
+
+.m3-codex-page-body .m3-codex-tabs {
+  background: var(--theme-panel-bg, #fff);
+}
+
+@media (max-width: 480px) {
+  .m3-codex-page-body {
+    padding: 0 10px 14px;
+    border-radius: 10px;
+  }
 }
 
 .m3-codex {
@@ -2542,7 +2618,7 @@ div.m3-relic-card:hover {
 
 .m3-setup-cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 10px;
 }
 
@@ -2564,7 +2640,7 @@ div.m3-relic-card:hover {
 
 .m3-setup-card--on {
   border-color: var(--theme-primary, #007bff);
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.2), 0 4px 14px rgba(0, 123, 255, 0.12);
 }
 
 .m3-setup-card--locked {
@@ -2573,14 +2649,24 @@ div.m3-relic-card:hover {
 }
 
 .m3-setup-card-icon {
-  font-size: 24px;
-  line-height: 1.1;
+  flex: 0 0 38px;
+  align-self: flex-start;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  line-height: 1;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .m3-setup-card-main {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -2600,6 +2686,9 @@ div.m3-relic-card:hover {
 .m3-setup-card-style {
   font-size: 11px;
   color: var(--theme-status-color, #4a5568);
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .m3-setup-card-desc {
@@ -2608,12 +2697,16 @@ div.m3-relic-card:hover {
   color: var(--theme-status-color, #4a5568);
 }
 
-.m3-setup-card-kit {
+.m3-setup-card-mastery {
+  margin-top: auto;
+  padding-top: 6px;
   font-size: 11px;
-  color: var(--theme-accent, #27ae60);
+  color: #d4a017;
 }
 
 .m3-setup-card-lock {
+  margin-top: auto;
+  padding-top: 6px;
   font-size: 11px;
   color: #e67e22;
 }
@@ -2660,6 +2753,62 @@ div.m3-relic-card:hover {
 .m3-setup-asc-hint {
   font-size: 11px;
   color: #e67e22;
+}
+
+.m3-setup-asc-summary {
+  margin-top: 2px;
+  font-weight: 600;
+  color: var(--theme-accent, #27ae60);
+}
+
+.m3-setup-asc-ladder-title {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-setup-asc-ladder {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 4px 12px;
+}
+
+.m3-setup-asc-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-setup-asc-item--on {
+  color: var(--theme-title-color, #2c3e50);
+  font-weight: 600;
+}
+
+.m3-setup-asc-item--locked {
+  opacity: 0.5;
+}
+
+.m3-setup-asc-item-lv {
+  flex: 0 0 auto;
+  font-weight: 700;
+  color: var(--theme-primary, #007bff);
+}
+
+.m3-setup-asc-item--on .m3-setup-asc-item-lv {
+  color: inherit;
+}
+
+.m3-setup-asc-item-desc {
+  flex: 1;
+  min-width: 0;
+}
+
+.m3-setup-asc-item-lock {
+  flex: 0 0 auto;
+  font-size: 11px;
 }
 
 .m3-setup-hard {
@@ -2740,10 +2889,4 @@ div.m3-relic-card:hover {
 .m3-epitaph-cause {
   font-size: 12px;
   color: #e74c3c;
-}
-
-@media (max-width: 640px) {
-  .m3-setup-cards {
-    grid-template-columns: 1fr;
-  }
 }

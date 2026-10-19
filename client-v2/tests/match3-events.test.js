@@ -82,8 +82,8 @@ function probeRng(seed) {
 
 // ---------------------------------------------------------------- 数据完整性
 
-test('事件表：id 唯一、条数在 12–14', () => {
-  assert.ok(EVENTS.length >= 12 && EVENTS.length <= 14, `事件条数 ${EVENTS.length}`);
+test('事件表：id 唯一、条数在 12–24', () => {
+  assert.ok(EVENTS.length >= 12 && EVENTS.length <= 24, `事件条数 ${EVENTS.length}`);
   const ids = new Set(EVENTS.map((e) => e.id));
   assert.equal(ids.size, EVENTS.length, 'id 必须唯一');
 });

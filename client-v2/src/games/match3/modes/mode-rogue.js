@@ -12,13 +12,13 @@
  */
 import { COLOR_NAMES, ROGUE, ROGUE_BOSSES, ROGUE_GOLD, ROGUE_RELIC, STORAGE_KEYS } from '../config/config.js';
 import {
-  PERKS, QUEST_REWARDS, createBonus, descOf, floorOptions, goalOf, questFor, rollPerks,
+  PERKS, QUEST_REWARDS, createBonus, descOf, floorOptions, goalOf, questFor, questNeedFor, rollPerks,
 } from '../rogue/perks.js';
 import { essenceForRun, applyMetaBuffs, mechanicCfg, mechanicOn, perkLevel, unlockedSet } from '../rogue/meta.js';
 import { createMatch3Board } from '../ui/board.js';
 import { createRng } from '../engine/rng.js';
 import { showScoreDetails } from '../ui/scoreDetails.js';
-import { showPerkCodex } from '../rogue/codex.js';
+import { renderCodexPage, showPerkCodex } from '../rogue/codex.js';
 import {
   ALL_ENABLED, advanceTo, completeNode, generateMap, hasOpenNode, MAP_DEPTH, NODE, NODE_META,
   synthLinearMap,
@@ -26,7 +26,7 @@ import {
 import { renderMapScreen } from '../ui/map-view.js';
 import { floorGoals, rogueBiome, terrainFor } from '../rogue/floor-types.js';
 import { MASKS } from '../config/levels.js';
-import { allGoalsDone, goalProgress, goalShort } from '../engine/goals.js';
+import { allGoalsDone, goalBaseNote, goalProgress, goalShort } from '../engine/goals.js';
 import { createRunState } from '../rogue/run-state.js';
 import { bossAt, createBossState, crossedPhases } from '../rogue/boss.js';
 // 局内经济与遗物（开发方案 3.4 / 3.5 / 3.6）：三个模块都是纯逻辑，这里只负责接线与渲染
@@ -35,7 +35,7 @@ import {
 } from '../rogue/relics.js';
 import { applyChoice, availableChoices, rollEvent } from '../rogue/events.js';
 // 角色 / 进阶 / 硬核（开发方案 3.8–3.10，P5/P6）：起手选项与难度修正，纯逻辑
-import { CHARACTERS, DEFAULT_CHARACTER, characterById, unlockProgress, unlockedCharacters } from '../rogue/characters.js';
+import { CHARACTERS, DEFAULT_CHARACTER, characterById, characterMastery, unlockProgress, unlockedCharacters } from '../rogue/characters.js';
 import { ascMods, applyAscension, ascensionLabel } from '../rogue/ascension.js';
 import { renderRogueSetup } from '../ui/rogue-setup.js';
 import { buyItem, priceOf, refreshShelf, removePerk, rollShelf, shelfWithPrices } from '../rogue/shop.js';
@@ -132,8 +132,16 @@ function bonusStats(bonus, floor, rewinds = 0) {
     { key: 'colors', label: '元素种类', value: `${opts.colors} 色` },
     { key: 'mult', label: '得分倍率', value: `×${opts.scoreMult.toFixed(2)}` },
   ];
+  // 「侦察报告」类减免：并列摆出未减免的原值，玩家才看得出削了多少
   if (bonus.goalCut > 0) {
-    rows.push({ key: 'goalCut', label: '目标分', value: `−${Math.round(bonus.goalCut * 100)}%` });
+    const target = goalOf(floor, bonus);
+    const base = goalOf(floor, { ...bonus, goalCut: 0 });
+    rows.push({ key: 'goalCut', label: '目标分', value: `${target}（原 ${base}）` });
+  }
+  // 「采集协议」：与目标分减免并列，展示时同样夹到上限，避免面板数字比实际生效的还大
+  if (bonus.collectCut > 0) {
+    const { need, base } = questNeedFor(floor, bonus.collectCut);
+    rows.push({ key: 'collectCut', label: '收集目标', value: `×${need}（原 ×${base}）` });
   }
   const specials = [];
   if (bonus.specials.row > 0) specials.push(`🧨${bonus.specials.row}`);
@@ -545,6 +553,7 @@ export function renderRogue(container, { onExit }) {
         ? {
           color: quest.color,
           need: quest.need,
+          base: quest.base,          // 减免前的原需求（无减免时为 undefined，JSON 会自动丢掉）
           rewardId: quest.reward.id,
           progress: quest.progress,
           done: quest.done,
@@ -1448,7 +1457,13 @@ export function renderRogue(container, { onExit }) {
       questEl.replaceChildren(
         el('span', { class: 'm3-quest-title' }, '📜 收集'),
         el('i', { class: `m3-swatch m3-c${quest.color}` }),
-        el('span', {}, `${COLOR_NAMES[quest.color]}色 ×${quest.need}`),
+        el(
+          'span',
+          {},
+          `${COLOR_NAMES[quest.color]}色 ×${quest.need}`,
+          // 「采集协议」削过之后，把原来的需求一并摆出来（续玩存档缺 base 时不显示）
+          quest.base > quest.need ? el('span', { class: 'm3-cut-note' }, `（原 ×${quest.base}）`) : null,
+        ),
         el('span', { class: 'm3-quest-progress' }, `${quest.progress}/${quest.need}`),
         el('span', { class: 'm3-quest-reward' }, `→ ${reward.icon}${reward.name}`),
       );
@@ -1680,7 +1695,13 @@ export function renderRogue(container, { onExit }) {
           return el(
             'div',
             { class: `m3-goal${done ? ' m3-goal--done' : ''}` },
-            el('span', { class: 'm3-goal-text' }, goalShort(item)),
+            el(
+              'span',
+              { class: 'm3-goal-text' },
+              goalShort(item),
+              // 减免类祝福生效时并列原值：「得分 252（原 900）」
+              goalBaseNote(item) ? el('span', { class: 'm3-cut-note' }, goalBaseNote(item)) : null,
+            ),
             el('span', { class: 'm3-rogue-goal-num' }, `${Math.min(current, target)}/${target}`),
           );
         }),
@@ -1779,7 +1800,8 @@ export function renderRogue(container, { onExit }) {
       if (relics.length > 0) relicHooks.onStep(relicCtx(board), step);
     }
     board = createMatch3Board(host, {
-      payload: { ...opts, id: null },
+      // engine：遗物编译出的引擎修正（开发方案 3.5 二期，P7），透传给 cascade / special 的效果范围计算
+      payload: { ...opts, id: null, engine: relicHooks.engine },
       seed: savedBoard && Number.isFinite(savedBoard.seed) ? savedBoard.seed : Date.now() % 2147483647,
       snapshot: savedBoard,
       onUpdate,
@@ -2290,8 +2312,8 @@ export function renderRogue(container, { onExit }) {
         { class: 'm3-actions' },
         // 「再来一轮」沿用当前身份与难度（3.8–3.10）：想换角色 / 调进阶就用下面的「返回选择」重进
         el('button', { class: 'm3-btn', onClick: () => startRun({ characterId, ascension, hardcore }) }, '再来一轮'),
-        // 结算是最想花精华的时点：直接给一个去解锁 / 升级的入口
-        el('button', { class: 'm3-btn', onClick: () => showPerkCodex() }, '📖 图鉴与养成'),
+        // 结算是最想花精华的时点：直接给一个去解锁 / 升级的入口（局外走整页，返回回到结算屏）
+        el('button', { class: 'm3-btn', onClick: () => openCodexPage() }, '📖 图鉴与养成'),
         // 通关时盘面已随地图流程销毁，没有可展示的积分明细
         info
           ? el(
@@ -2303,6 +2325,22 @@ export function renderRogue(container, { onExit }) {
         el('button', { class: 'm3-btn m3-btn--ghost', onClick: () => onExit() }, '返回选择'),
       ),
     );
+  }
+
+  /**
+   * 结算页打开图鉴：走整页（局外不用模态框）
+   *
+   * 结算屏那一大坨节点（含服务端回执会改写的精华行 gainEl）先整体摘下存起来，
+   * 返回时原样挂回去——不用把 finishRun 里的渲染抽成可重入函数。
+   */
+  function openCodexPage() {
+    const saved = Array.from(container.childNodes);
+    const cleanup = renderCodexPage(container, {
+      onExit: () => {
+        cleanup();
+        container.replaceChildren(...saved);
+      },
+    });
   }
 
   /** 结算页的精华行文案 */
@@ -2337,6 +2375,7 @@ export function renderRogue(container, { onExit }) {
       characters: CHARACTERS,
       unlocked: unlockedCharacters(stats),
       unlockOf: (char) => unlockProgress(char, stats),
+      masteryOf: (char) => characterMastery((meta.charStats || {})[char.id]),
       maxAscension: Math.max(0, Math.floor(meta.ascension?.max || 0)),
       ascensionLabel,
       hardcoreUnlocked: !!meta.hardcore?.unlocked,

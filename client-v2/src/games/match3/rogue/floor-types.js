@@ -79,12 +79,14 @@ export function terrainFor(node, rng) {
 }
 
 /** collect 目标数：复用局内任务的需求曲线；异形盘按可玩格比例折算 */
-function collectTarget(depth, colors, terrain) {
+function collectTarget(depth, colors, terrain, bonus) {
   const base = ROGUE.quest.baseNeed * ROGUE.quest.needGrowth ** (depth - 1);
   // 颜色越少，单色可收集量越多；6 色基线为 1，其余按 6/colors 放大
   const colorScale = ROGUE.colors / colors;
   const shapeScale = terrain.mask ? terrain.playableRatio : 1;
-  return Math.max(3, Math.round(base * colorScale * shapeScale));
+  // 与局内任务同源：共享「采集协议」等给出的收集减免（见 perks.js 的 collectCut）
+  const cut = Math.min(ROGUE.quest.cutCap, Math.max(0, (bonus && bonus.collectCut) || 0));
+  return Math.max(3, Math.round(base * colorScale * shapeScale * (1 - cut)));
 }
 
 /**
@@ -108,7 +110,12 @@ export function floorGoals(node, bonus, rng, ctx) {
   // 不再配条件目标——固定机关盘本身就是第二个压力源
   if (node.type === NODE.BOSS) {
     const def = bossAt(node.depth);
-    if (def) return [{ type: 'score', target: bossHpTarget(def, bonus, bossMult) }];
+    if (def) {
+      const target = bossHpTarget(def, bonus, bossMult);
+      // Boss 血量同样吃目标分减免，侧栏一并给出减免前的原血量
+      const base = bonus.goalCut > 0 ? bossHpTarget(def, { ...bonus, goalCut: 0 }, bossMult) : target;
+      return [base !== target ? { type: 'score', target, base } : { type: 'score', target }];
+    }
   }
 
   // 分数目标：旧曲线 × 节点系数 × 异形盘折算 × 进阶精英系数（仅精英层）
@@ -118,6 +125,10 @@ export function floorGoals(node, bonus, rng, ctx) {
     1,
     Math.round(goalOf(node.depth, bonus) * nodeCfg.goalMult * shapeScale * ascScale),
   );
+  // 「原值」= 不计目标分减免前的值，只在侧栏用来展示「折后（原 X）」，不参与判定
+  const scoreBase = bonus.goalCut > 0
+    ? Math.max(1, Math.round(goalOf(node.depth, { ...bonus, goalCut: 0 }) * nodeCfg.goalMult * shapeScale * ascScale))
+    : scoreTarget;
 
   const canClear = terrain.blockers.length > 0;
   const makeGoal = (kind) => {
@@ -128,9 +139,17 @@ export function floorGoals(node, bonus, rng, ctx) {
       };
     }
     if (kind === 'collect') {
-      return { type: 'collect', color: 1 + rng.int(colors), target: collectTarget(node.depth, colors, terrain) };
+      const target = collectTarget(node.depth, colors, terrain, bonus);
+      // 传 null 的 bonus 即「不减免」：拿到祝福未生效时的原值；两者相等时就不带 base
+      const base = collectTarget(node.depth, colors, terrain, null);
+      return {
+        type: 'collect',
+        color: 1 + rng.int(colors),
+        target,
+        ...(base !== target ? { base } : {}),
+      };
     }
-    return { type: 'score', target: scoreTarget };
+    return { type: 'score', target: scoreTarget, ...(scoreBase !== scoreTarget ? { base: scoreBase } : {}) };
   };
 
   if (nodeCfg.goals >= 2) {

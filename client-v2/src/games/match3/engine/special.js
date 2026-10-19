@@ -10,6 +10,12 @@
  *
  * 形态效果：row 整行 / col 整列 / bomb 半径内的方形区域（默认 3×3）/ rainbow 同色全部
  * 彩球组合：+ 普通方块 → 清除全场同色；+ 条状 / 炸弹 → 该效果复制给全部同色棋子并逐颗触发
+ *
+ * 引擎 hook（开发方案 3.5「遗物二期」，P7）：effectCells / expandSpecials / rainbowSwapTargets
+ * 均可选接收一个 `opts`（遗物编译出的引擎修正，见 relics.js 的 buildRelicHooks.engine）：
+ * - `opts.bombRadius`：覆盖 SPECIAL_RULES.bombRadius（肉鸽遗物「爆炸半径 +1」）；
+ * - `opts.rainbowExtraColors`：彩球交换额外清除的颜色个数（肉鸽遗物「双色棱镜」）。
+ * 不传时逐位等同旧行为——引擎只读参数，不含任何遗物逻辑。
  */
 import { SPECIAL, SPECIAL_RULES, SHAPE } from '../config/config.js';
 import { colOf, getAt, index, isPlayable, rowOf } from './grid.js';
@@ -41,8 +47,13 @@ export function pickRainbowColor(grid) {
   return best;
 }
 
-/** 单个特殊元素的效果范围（不含连锁） */
-export function effectCells(grid, cellIndex) {
+/**
+ * 单个特殊元素的效果范围（不含连锁）
+ * @param {object} grid
+ * @param {number} cellIndex
+ * @param {object} [opts] - 引擎修正：`opts.bombRadius` 覆盖炸弹半径（默认 SPECIAL_RULES.bombRadius）
+ */
+export function effectCells(grid, cellIndex, opts = {}) {
   const cell = getAt(grid, cellIndex);
   if (!cell || !cell.special) return [];
 
@@ -70,7 +81,9 @@ export function effectCells(grid, cellIndex) {
   }
 
   if (cell.special === SPECIAL.BOMB) {
-    const rad = SPECIAL_RULES.bombRadius;
+    const rad = Number.isFinite(opts.bombRadius) && opts.bombRadius > 0
+      ? Math.floor(opts.bombRadius)
+      : SPECIAL_RULES.bombRadius;
     for (let rr = r - rad; rr <= r + rad; rr += 1) {
       for (let cc = c - rad; cc <= c + rad; cc += 1) {
         if (isPlayable(grid, rr, cc)) push(index(grid, rr, cc));
@@ -96,9 +109,10 @@ export function effectCells(grid, cellIndex) {
  * 彩球 + 普通方块 / 彩球交换：清除目标颜色的全部方块
  * 彩球 + 彩球是唯一例外（清空全盘，场上其他彩球除外），开发方案 1.3 的"不做两两组合"针对的是条状 / 炸弹
  * 目标是条状 / 炸弹时另走 rainbowCopyTargets（效果复制给同色），不走这里
+ * @param {object} [opts] - 引擎修正：`opts.rainbowExtraColors` 额外清除的颜色个数（遗物「双色棱镜」）
  * @returns {number[]} 去重后的待清除格子
  */
-export function rainbowSwapTargets(grid, rainbowIndex, targetIndex) {
+export function rainbowSwapTargets(grid, rainbowIndex, targetIndex, opts = {}) {
   const target = getAt(grid, targetIndex);
   const out = new Set([rainbowIndex, targetIndex]);
   if (!target) return [...out];
@@ -112,11 +126,37 @@ export function rainbowSwapTargets(grid, rainbowIndex, targetIndex) {
 
   const color = target.color;
   if (color == null) return [...out];
+  const clearColor = (want) => {
+    for (const i of grid.cellIndex) {
+      const cell = getAt(grid, i);
+      if (cell && cell.color === want) out.add(i);
+    }
+  };
+  clearColor(color);
+  // 双色棱镜：再清「场上另一主色」（按出现次数降序取，确定性、可复现）
+  const extra = Math.max(0, Math.floor(opts.rainbowExtraColors || 0));
+  for (const c of pickExtraColors(grid, color, extra)) clearColor(c);
+  return [...out];
+}
+
+/**
+ * 场上出现次数最多的若干颜色（排除 excludeColor），用于「双色棱镜」额外清色
+ * 同次数按颜色下标升序，保证同 seed 同盘面结果一致
+ * @returns {number[]} 至多 n 个颜色（场上颜色不足时返回更少）
+ */
+export function pickExtraColors(grid, excludeColor, n) {
+  const count = Math.max(0, Math.floor(n || 0));
+  if (count === 0) return [];
+  const counts = new Map();
   for (const i of grid.cellIndex) {
     const cell = getAt(grid, i);
-    if (cell && cell.color === color) out.add(i);
+    if (!cell || cell.color == null || cell.color === excludeColor) continue;
+    counts.set(cell.color, (counts.get(cell.color) || 0) + 1);
   }
-  return [...out];
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0] - b[0])
+    .slice(0, count)
+    .map(([c]) => c);
 }
 
 /**
@@ -143,9 +183,10 @@ export function rainbowCopyTargets(grid, targetIndex) {
  * 把初始消除集合展开为「含特殊元素级联」的完整消除集合
  * @param {object} grid 棋盘
  * @param {number[]} seeds 本轮因连线而被消除的格子
+ * @param {object} [opts] - 引擎修正（见文件头），透传给 effectCells（如 `bombRadius`）
  * @returns {{ cleared: Set<number>, triggered: Array<{index:number, special:string, cells:number[]}> }}
  */
-export function expandSpecials(grid, seeds) {
+export function expandSpecials(grid, seeds, opts = {}) {
   const cleared = new Set();
   const fired = new Set();
   const triggered = [];
@@ -162,7 +203,7 @@ export function expandSpecials(grid, seeds) {
     if (!cell || !cell.special || fired.has(i)) continue;
 
     fired.add(i);
-    const effect = effectCells(grid, i);
+    const effect = effectCells(grid, i, opts);
     triggered.push({ index: i, special: cell.special, cells: effect.slice() });
 
     for (const j of effect) {

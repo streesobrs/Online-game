@@ -2172,6 +2172,7 @@ function buildGameTypeStats(games, rogueByGame = null) {
     gameTypeRogueAscension: {},
     gameTypeRogueHardcoreWins: {},
     gameTypeRogueCharWins: {},
+    gameTypeRogueCharRuns: {},
     gameTypeGames: {}
   };
   for (const [gameKey, gd] of Object.entries(games || {})) {
@@ -2194,10 +2195,14 @@ function buildGameTypeStats(games, rogueByGame = null) {
     stats.gameTypeRogueAscension[gameKey] = rogue?.stats?.bestAscWin || 0;
     stats.gameTypeRogueHardcoreWins[gameKey] = rogue?.hardcore?.wins || 0;
     const charWins = {};
+    const charRuns = {};
     for (const [charId, cs] of Object.entries(rogue?.charStats || {})) {
       if (cs && cs.wins > 0) charWins[charId] = cs.wins;
+      if (cs && cs.runs > 0) charRuns[charId] = cs.runs;
     }
     stats.gameTypeRogueCharWins[gameKey] = charWins;
+    // 各角色累计出战轮数（开发方案 3.8 扩展）：供「出战 N 轮」类角色成就取数
+    stats.gameTypeRogueCharRuns[gameKey] = charRuns;
   }
   return stats;
 }
@@ -3971,13 +3976,22 @@ io.on('connection', (socket) => {
         : mode === 'rogue'
           ? (rewards.rogueMaxScorePerMove || rewards.maxScorePerMove)
           : rewards.maxScorePerMove;
+      // 深渊（31+）段放宽：肉鸽层数成长祝福线性放大得分倍率，本层目标分又按客户端
+      // ROGUE.goalGrowth^(层数-1) 指数上涨，玩家为达标必然打出同量级的分，固定上限会误杀正常长局
+      // （实测第 48 层均步得分 2892 万）。这里按同一条曲线逐层放大上限，1~30 层强度不变
+      const rogueAbyssFrom = Math.max(0, ...Object.values(config.match3Rogue.bosses).map((b) => Math.floor(b.depth || 0)));
+      const rogueFloor = Math.max(0, Math.floor(floor || 0));
+      const abyssGrowth = mode === 'rogue' && rogueFloor > rogueAbyssFrom
+        ? Math.pow(rewards.rogueAbyssCapGrowth || 1, rogueFloor - rogueAbyssFrom)
+        : 1;
+      const perMoveCapForRun = perMoveCap * abyssGrowth;
       const account = await gameManager.accountManager.getAccount(accountId);
       const currentMaxLevel = account?.games?.match3?.maxLevel || 0;
       const violations = [];
       if (safeMoves <= 0) {
         violations.push('no_moves');
       } else {
-        if (safeScore > safeMoves * perMoveCap) violations.push('score_per_move');
+        if (safeScore > safeMoves * perMoveCapForRun) violations.push('score_per_move');
         if (safeDuration < safeMoves * rewards.minMsPerMove) violations.push('duration_per_move');
       }
       if (mode === 'level' && (!Number.isFinite(level) || level < 1 || level > currentMaxLevel + 1)) {
@@ -3985,7 +3999,6 @@ io.on('connection', (socket) => {
       }
       // 肉鸽：层数只由到达层数换算成精华与经验（不按分），所以必须挡住「层数报个大数」。
       // 每层至少要花掉 1 步，层数不可能超过总步数——这条比单步得分上限更直接
-      const rogueFloor = Math.max(0, Math.floor(floor || 0));
       if (mode === 'rogue' && rogueFloor > safeMoves) {
         violations.push('floor_per_move');
       }

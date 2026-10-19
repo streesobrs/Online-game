@@ -15,12 +15,13 @@
  * 所有改动都要经服务端：`upgradeRoguePerk` / `claimRogueMilestone` 只发 id 出去，
  * 扣费与校验都在服务端做，回执带回最新存档 → sync.js 广播 → 这里重画。
  *
- * 外框复用 components/modal（与「积分详情」同一套），所以这里只负责产出内容节点。
+ * 外框分两种：局内（对局中查池子）用 components/modal 的模态框；局外（娱乐菜单 / 结算页 /
+ * 站点路由 #/codex）用整页——同一份内容，codexPanel 只产出内容节点与生命周期，外壳各自套。
  */
 import { ROGUE } from '../config/config.js';
 import { META_BUFFS, PERKS, QUEST_REWARDS, descOf, valueAt } from './perks.js';
 import { relicsByRarity } from './relics.js';
-import { CHARACTERS, unlockProgress } from './characters.js';
+import { CHARACTERS, characterMastery, unlockProgress } from './characters.js';
 import {
   buffFactor, claimableCount, itemLevel, maxLevelOf, milestoneReward, milestoneState,
   nextStep, poolProgress, rarityOf, requiresMet, rogueCfg,
@@ -84,17 +85,19 @@ function section(title, hint, items, listClass = '') {
 }
 
 /**
- * 打开祝福图鉴 / 养成面板
+ * 图鉴面板的**内容 + 生命周期**（不含外壳）
  *
- * 三个入口共用：娱乐菜单（进对局前就能看与解锁）、对局左栏与三选一模态框（对局中查池子）。
- * 对局中打开时带 picks，能看到本轮已经拿到几张。
+ * 局内（对局中查池子）与局外（娱乐菜单 / 结算页 / 站点路由）共用这一份内容，
+ * 外壳分别见 showPerkCodex（模态框）与 renderCodexPage（整页）。
  *
  * 面板里发起的解锁 / 升级 / 领奖都由服务端处理，回执回来后 `onRogueMeta` 触发重画，
  * 所以这里的按钮**只负责发起**，不自己改本地数据。
  *
  * @param {Record<string, number>} [picks] - 本轮已选祝福 { 祝福id: 次数 }；不在对局中则不传
+ * @returns {{ host: HTMLElement, stop: Function }} host 为面板根节点；stop 退订
+ *          （外壳移除后必须调用，否则下次服务端下发会写进已移除的节点）
  */
-export function showPerkCodex(picks = null) {
+export function codexPanel(picks = null) {
   const host = el('div', { class: 'm3-codex' });
   let closed = false;
   let off = null;
@@ -520,6 +523,11 @@ export function showPerkCodex(picks = null) {
     const rec = own && own.runs
       ? `出战 ${own.runs} 轮 · 最深 ${own.bestFloor || 0} 层 · 通关 ${own.wins || 0}`
       : null;
+    // 熟练度（纯展示：按该角色累计出战轮数分级，不接强度；对应成就徽章门槛 15 轮）
+    const mast = characterMastery(own);
+    const mastText = mast.next === null
+      ? `熟练 Lv.${mast.level}（满级）`
+      : `熟练 Lv.${mast.level}（出战 ${mast.runs}/${mast.next} 轮）`;
     return el(
       'div',
       { class: `m3-codex-item m3-codex-item--char${unlocked ? '' : ' m3-codex-item--locked'}` },
@@ -534,7 +542,7 @@ export function showPerkCodex(picks = null) {
           el('span', { class: 'm3-codex-limit' }, ch.style),
         ),
         el('div', { class: 'm3-codex-desc' }, ch.desc),
-        el('div', { class: 'm3-codex-meta' }, unlocked ? (rec || '尚未出战') : `🔒 ${prog.label}（${prog.have}/${prog.need}）`),
+        el('div', { class: 'm3-codex-meta' }, unlocked ? `${rec ? `${rec} · ` : '尚未出战 · '}⭐ ${mastText}` : `🔒 ${prog.label}（${prog.have}/${prog.need}）`),
       ),
     );
   }
@@ -573,12 +581,15 @@ export function showPerkCodex(picks = null) {
     }).filter(Boolean);
   }
 
-  /** 切换分页：重画并把弹窗滚动条归位（否则新页会停在上一页滚到的位置） */
+  /** 切换分页：重画并把滚动位归零（否则新页会停在上一页滚到的位置）；
+      模态外壳滚 .modal__body，整页外壳直接滚窗口 */
   function switchTab(id) {
     if (tab === id) return;
     tab = id;
     paint();
-    host.closest('.modal__body')?.scrollTo({ top: 0 });
+    const scroller = host.closest('.modal__body');
+    if (scroller) scroller.scrollTo({ top: 0 });
+    else window.scrollTo({ top: 0 });
   }
 
   /** 分页按钮条：有可领里程碑时在「里程」上挂红点角标 */
@@ -670,6 +681,19 @@ export function showPerkCodex(picks = null) {
     if (!closed) paint();
   });
 
+  return { host, stop };
+}
+
+/**
+ * 打开图鉴（**局内**入口：对局左栏 / 三选一模态框）
+ *
+ * 对局中用模态框更合适：不打断盘面，关掉就回到同一局面（此时盘面已 lock）。
+ * 带 picks 时能看到本轮已经拿到几张。
+ *
+ * @param {Record<string, number>} [picks] - 本轮已选祝福 { 祝福id: 次数 }
+ */
+export function showPerkCodex(picks = null) {
+  const { host, stop } = codexPanel(picks);
   const overlay = modal.show({
     title: '📖 图鉴与养成',
     showCancel: false,
@@ -681,4 +705,39 @@ export function showPerkCodex(picks = null) {
 
   // 图鉴条目比普通弹窗宽（每行都要塞下效果与按钮），借宿主节点放宽 max-width
   overlay?.classList.add('modal-overlay--codex');
+}
+
+/**
+ * 渲染图鉴**整页**（局外入口：娱乐菜单 / 结算页 / 站点路由 #/codex）
+ *
+ * 与模态框的区别：局外没有「盘面」可回，用整页才不会把图鉴挤成滚动小窗。
+ * 顶部是「← 返回 + 标题」，内容包进卡片（吸顶分页栏才有底色可贴）。
+ *
+ * @param {HTMLElement} container - 挂载容器（会被整页替换）
+ * @param {Object} [options]
+ * @param {Record<string, number>} [options.picks] - 本轮已选祝福；局外一般不传
+ * @param {string} [options.title='📖 图鉴与养成'] - 页面标题
+ * @param {Function} [options.onExit] - 点「返回」的回调（由调用方决定回到哪一屏）
+ * @returns {Function} cleanup：退订 + 摘除页面（调用方在切走前调用）
+ */
+export function renderCodexPage(container, { picks = null, title = '📖 图鉴与养成', onExit } = {}) {
+  const panel = codexPanel(picks);
+  const page = el(
+    'div',
+    { class: 'm3-codex-page' },
+    el(
+      'div',
+      { class: 'm3-codex-page-head' },
+      onExit
+        ? el('button', { class: 'm3-codex-back', type: 'button', onClick: () => onExit() }, '← 返回')
+        : null,
+      el('h2', { class: 'm3-codex-page-title' }, title),
+    ),
+    el('div', { class: 'm3-codex-page-body' }, panel.host),
+  );
+  container.replaceChildren(page);
+  return () => {
+    panel.stop();
+    page.remove();
+  };
 }

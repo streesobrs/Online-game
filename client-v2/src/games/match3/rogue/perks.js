@@ -26,6 +26,7 @@ export function createBonus() {
     cascadeBonus: 0,    // 连锁倍率上限加成（实测无效，未进祝福池，见开发方案 5.6）
     specials: { row: 0, bomb: 0, rainbow: 0 }, // 每层开局注入的特殊元素数量
     goalCut: 0,         // 目标分减免（累加）
+    collectCut: 0,      // 局内「收集」目标数减免（累加，比例）：局内任务与条件目标共用
     goalMult: 1,        // 目标分系数（乘性）：角色「调色术士」/ 进阶难度在此放大，见 goalOf
     shields: 0,         // 剩余免死次数
     shuffles: 0,        // 每层免费洗牌次数
@@ -171,6 +172,18 @@ export const PERKS = [
     max: 4,
     growth: true,
     apply(bonus, ctx) { bonus.goalCut += valueAt(this, lvOf(ctx)); },
+  },
+  {
+    id: 'collector',
+    icon: '🧺',
+    name: '采集协议',
+    rarity: 'common',
+    // 与「侦察报告」互补：那张削目标分，这张削「收集某色 N 个」的数量（局内任务 + 条件目标）
+    scales: { kind: 'mult', base: 0.2, per: 0.12 },
+    desc(lv) { return `本局「收集」目标数 −${pct(valueAt(this, lv))}%（局内任务与条件目标）`; },
+    max: 4,
+    growth: true,
+    apply(bonus, ctx) { bonus.collectCut += valueAt(this, lvOf(ctx)); },
   },
   {
     id: 'magnet',
@@ -610,6 +623,22 @@ export const QUEST_REWARDS = [
 ];
 
 /**
+ * 某层「收集」目标数：需求曲线 × 减免，并夹下限
+ *
+ * questFor 与局内加成面板（mode-rogue 的 bonusStats）共用，保证「面板上显示的数」
+ * 与「真正掷出来的数」同口径，不会一个显示 25、另一个掷出 26。
+ * @param {number} floor - 层号
+ * @param {number} [cut] - 减免比例（内部按 ROGUE.quest.cutCap 夹顶）
+ * @returns {{ need:number, base:number }} need = 折后（已夹下限）；base = 未减免的原值
+ */
+export function questNeedFor(floor, cut = 0) {
+  const cfg = ROGUE.quest;
+  const base = Math.round(cfg.baseNeed * cfg.needGrowth ** (floor - 1));
+  const c = Math.min(cfg.cutCap, Math.max(0, cut || 0));
+  return { need: Math.max(cfg.minNeed, Math.round(base * (1 - c))), base };
+}
+
+/**
  * 本层局内任务：随机指定一种颜色 + 需要收集的个数 + 达成奖励
  *
  * 不设失败惩罚——它的作用是给层内制造一个额外决策焦点（要不要为了它换一种消法），
@@ -624,9 +653,12 @@ export function questFor(floor, bonus, rng) {
   const cfg = ROGUE.quest;
   if (floor < cfg.fromFloor) return null;
   const colors = Math.max(bonus.colorFloor ?? ROGUE.minColors, ROGUE.colors - bonus.colorCut);
+  // 「采集协议」等按比例压需求；原值与折后值都留在任务对象里，侧栏「×25（原 ×42）」要把两边都摆出来
+  const { need, base } = questNeedFor(floor, bonus.collectCut);
   return {
     color: 1 + rng.int(colors),
-    need: Math.round(cfg.baseNeed * cfg.needGrowth ** (floor - 1)),
+    need,
+    ...(need !== base ? { base } : {}),
     reward: QUEST_REWARDS[rng.int(QUEST_REWARDS.length)],
     progress: 0,
     done: false,

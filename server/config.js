@@ -375,6 +375,12 @@ module.exports = {
     // 标定脚本（tests/match3-rogue-balance.mjs）实测「全满级」档 16 次 run 的整轮均步得分最高 4,628,416，
     // 故取 18000000（约 3.9 倍余量）——对正常玩家等同不设限，只兜底拦住明显伪造的上报
     // （改 perks.js 的祝福池、config.js 的 goalGrowth / magnetMult，或放开 minColors 后需重新标定此项）
+    rogueAbyssCapGrowth: 1.33,                      // 深渊（31 层起）单步上限的每层放大系数
+    // 上面这条固定上限只标定到「通关段」（1~30 层）。深渊段（31+）不适用固定上限：
+    // 层数成长祝福线性放大得分倍率，本层目标分本身又按客户端 ROGUE.goalGrowth^(层数-1) 指数上涨，
+    // 玩家为达标必然打出同量级的分（实测第 48 层整轮均步得分 2892 万，是固定上限的 1.6 倍，
+    // 正常长局会被 score_per_move 误杀）。故深渊段把上限按同一条曲线放大，
+    // 取值与客户端 ROGUE.goalGrowth 手工同步；改一边必须同步改另一边
     minMsPerMove: 300                               // 单步最短合理耗时毫秒（反刷分：durationMs ≥ moves × 本值）
   },
 
@@ -419,7 +425,7 @@ module.exports = {
     // 新增祝福必须两边同时登记（客户端 perks.js 的 rarity 字段 + 这里）
     perks: {
       supply: 'common', minimal: 'common', arsenal: 'common', bomber: 'common',
-      scout: 'common', shield: 'common', shuffle: 'common',
+      scout: 'common', shield: 'common', shuffle: 'common', collector: 'common',
       focus: 'rare', rainbow: 'rare', deepsteps: 'rare',
       magnet: 'epic', abyss: 'epic', storm: 'epic', barrage: 'epic', bloodpact: 'epic'
     },
@@ -456,7 +462,12 @@ module.exports = {
     characters: {
       sorcerer: { unlock: null, startPerks: ['focus'], startRelics: ['infinite_chain'] },
       guardian: { unlock: { stat: 'bestFloor', value: 15 }, startPerks: [], startRelics: ['guardian_ward'] },
-      palette: { unlock: { win: 1 }, startPerks: ['magnet'], startRelics: ['recolor_pact'] }
+      palette: { unlock: { win: 1 }, startPerks: ['magnet'], startRelics: ['recolor_pact'] },
+      // 扩展 4 个角色（与客户端 characters.js 手工镜像）
+      bounty: { unlock: { stat: 'bestFloor', value: 8 }, startPerks: ['supply'], startRelics: ['bounty_pact'] },
+      bomber: { unlock: { stat: 'bossKills', value: 1 }, startPerks: ['bomber'], startRelics: ['bomb_primer'] },
+      gambler: { unlock: { stat: 'runs', value: 5 }, startPerks: ['scout'], startRelics: ['loaded_dice'] },
+      prism: { unlock: { stat: 'questsDone', value: 5 }, startPerks: ['rainbow'], startRelics: ['prism_pact'] }
     },
     defaultCharacter: 'sorcerer',
     // 进阶难度（开发方案 3.10，P6）：与客户端 config.js 的 ROGUE_META.ascension 手工镜像。

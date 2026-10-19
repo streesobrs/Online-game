@@ -193,11 +193,12 @@ export function mergeBreakdown(a, b) {
  *   focus 为玩家刚交换的格子；cascadeStart 用于接在已有的连锁之后（彩球交换先算一次）；
  *   colorMult 为按颜色数给的得分倍率（仅无尽模式传，见 config.js 的 COLOR_SCORE_MULTIPLIER），默认 1；
  *   cascadeMax 为连锁倍率上限，默认 SCORE.cascadeMax（肉鸽模式的祝福可抬高它）；
- *   weights 为补充新方块时的颜色权重，缺省等概率（见 pickColor）
+ *   weights 为补充新方块时的颜色权重，缺省等概率（见 pickColor）；
+ *   engine 为遗物编译出的引擎修正（开发方案 3.5 二期，见 special.js 文件头），如 `{ bombRadius }`
  * @returns {{steps:Array, gained:number, maxCascade:number, resolvable:boolean,
  *            colors:Object, blockersCleared:number, breakdown:Object}}
  */
-export function resolve(grid, { rng, colors, focus = null, cascadeStart = 1, colorMult = 1, cascadeMax = SCORE.cascadeMax, weights = null }) {
+export function resolve(grid, { rng, colors, focus = null, cascadeStart = 1, colorMult = 1, cascadeMax = SCORE.cascadeMax, weights = null, engine = null }) {
   const steps = [];
   let cascade = cascadeStart - 1;
   let gained = 0;
@@ -215,7 +216,7 @@ export function resolve(grid, { rng, colors, focus = null, cascadeStart = 1, col
     for (const group of groups) {
       for (const i of group.cells) seeds.push(i);
     }
-    const { cleared, triggered } = expandSpecials(grid, seeds);
+    const { cleared, triggered } = expandSpecials(grid, seeds, engine || undefined);
     const blockerDamage = damageBlockers(grid, cleared);
 
     // 命中集合里既可能有糖果格，也可能有障碍格：障碍只受击、不参与消除
@@ -296,12 +297,13 @@ export function resolve(grid, { rng, colors, focus = null, cascadeStart = 1, col
  * - 目标是条状 / 炸弹：把该特殊效果复制给全部同色棋子，再逐颗触发
  * - 目标是普通方块 / 彩球：清除全场同色；被波及到的特殊元素（含同色条状 / 炸弹）立即触发
  * @param {{rng:object, colors:number, rainbowIndex:number, targetIndex:number,
- *          colorMult?:number, cascadeMax?:number, weights?:Array<number>}} options
- *   weights 为后续补充新方块的颜色权重，缺省等概率（见 pickColor）
+ *          colorMult?:number, cascadeMax?:number, weights?:Array<number>, engine?:object}} options
+ *   weights 为后续补充新方块的颜色权重，缺省等概率（见 pickColor）；
+ *   engine 为遗物编译出的引擎修正（如 `{ rainbowExtraColors, bombRadius }`，见 special.js 文件头）
  * @returns {{steps:Array, gained:number, maxCascade:number, resolvable:boolean,
  *            colors:Object, blockersCleared:number, breakdown:Object}}
  */
-export function resolveRainbowSwap(grid, { rng, colors, rainbowIndex, targetIndex, colorMult = 1, cascadeMax = SCORE.cascadeMax, weights = null }) {
+export function resolveRainbowSwap(grid, { rng, colors, rainbowIndex, targetIndex, colorMult = 1, cascadeMax = SCORE.cascadeMax, weights = null, engine = null }) {
   const copy = rainbowCopyTargets(grid, targetIndex);
   const cleared = new Set([rainbowIndex]);
   const triggered = [];
@@ -317,14 +319,14 @@ export function resolveRainbowSwap(grid, { rng, colors, rainbowIndex, targetInde
       const cell = getAt(grid, i);
       if (cell.special !== copy.shape) cell.special = copy.shape;
     }
-    const expanded = expandSpecials(grid, copy.cells);
+    const expanded = expandSpecials(grid, copy.cells, engine || undefined);
     expanded.cleared.forEach((i) => cleared.add(i));
     triggered.push({ index: rainbowIndex, special: SPECIAL.RAINBOW, cells: copy.cells.slice() });
     triggered.push(...expanded.triggered);
   } else {
     // 普通方块 / 彩球：清除全场同色，被波及的特殊元素一并触发
-    const targets = rainbowSwapTargets(grid, rainbowIndex, targetIndex);
-    const expanded = expandSpecials(grid, targets.filter((i) => i !== rainbowIndex));
+    const targets = rainbowSwapTargets(grid, rainbowIndex, targetIndex, engine || undefined);
+    const expanded = expandSpecials(grid, targets.filter((i) => i !== rainbowIndex), engine || undefined);
     expanded.cleared.forEach((i) => cleared.add(i));
     triggered.push({ index: rainbowIndex, special: SPECIAL.RAINBOW, cells: [...cleared] });
     triggered.push(...expanded.triggered);
@@ -377,7 +379,7 @@ export function resolveRainbowSwap(grid, { rng, colors, rainbowIndex, targetInde
     added,
   };
 
-  const rest = resolve(grid, { rng, colors, cascadeStart: 2, colorMult, cascadeMax, weights });
+  const rest = resolve(grid, { rng, colors, cascadeStart: 2, colorMult, cascadeMax, weights, engine });
   return {
     steps: [first, ...rest.steps],
     gained: gained + rest.gained,

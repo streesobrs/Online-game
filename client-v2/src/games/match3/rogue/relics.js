@@ -7,14 +7,18 @@
  *   **不进三选一池**，只从宝藏 / Boss / 事件 / 商店获得（来源见 config.ROGUE_RELIC）。
  * 两者最终都汇总到同一个 bonus + board 上，所以遗物不需要另造一套数值尺度。
  *
- * 零引擎改动：本文件**只用既有钩子**，不新增任何引擎回调——
- * - `grant(bonus, ctx)`：改 bonus。`once:true` 在获得时跑一次；`perFloor:true` 每层开局重放
- *   （perFloor 的 grant 必须**幂等**：重复调用不能叠数值，见每股注释）；
- * - `onStep(ctx, step)`：每次走子后（step = { cascade, gained }），走 board.addMoves / setScoreMult / addSpecials；
- * - `onUpdate(ctx, info)`：每次盘面更新（info = { score, maxCascade, collected, movesLeft, cleared }）；
- * - `mods`：静态修正（商店折扣 / 金币倍率 / 三选一选项数…），由 buildRelicHooks 聚合。
- * 需要改「棋盘生成 / 特殊元素命中」的遗物（如彩球同时清两色、爆炸半径 +1）属于文档里的**第二期**
- * （引擎 hook 档），不在本文件——本文件只收「零引擎档」，覆盖文档里约七成的有趣遗物。
+ * 两类遗物：
+ * - **零引擎档**（多数）：只用既有钩子，不新增任何引擎回调——
+ *   - `grant(bonus, ctx)`：改 bonus。`once:true` 在获得时跑一次；`perFloor:true` 每层开局重放
+ *     （perFloor 的 grant 必须**幂等**：重复调用不能叠数值，见每股注释）；
+ *   - `onStep(ctx, step)`：每次走子后（step = { cascade, gained }），走 board.addMoves / setScoreMult / addSpecials；
+ *   - `onUpdate(ctx, info)`：每次盘面更新（info = { score, maxCascade, collected, movesLeft, cleared }）；
+ *   - `mods`：静态修正（商店折扣 / 金币倍率 / 三选一选项数…），由 buildRelicHooks 聚合。
+ * - **引擎档**（开发方案 3.5「二期」，P7）：改「棋盘生成 / 特殊元素命中」规则，靠 `engine` 字段声明
+ *   （`{ bombRadius?, rainbowExtraColors? }`），由 buildRelicHooks 聚合成 `hooks.engine`，
+ *   再经 board payload 透传给 cascade / special 的效果范围计算（见 special.js 文件头）。
+ *   引擎只读这些参数、不含任何遗物逻辑；这类遗物在标定脚本里同样可直接模拟。
+ *   例：彩球同时清两色（`rainbowExtraColors`）、爆炸半径 +1（`bombRadius`）。
  *
  * 纯数据 + 纯逻辑，不碰 DOM、不用 Math.random：需要随机一律走传入的 rng，
  * 同 seed 必出同结果（与 perks.js / boss.js / rng.js 同一条约定），便于标定与续存复现。
@@ -28,7 +32,7 @@
 import { ROGUE, ROGUE_GOLD, ROGUE_RELIC, SPECIAL } from '../config/config.js';
 
 /**
- * 遗物池（开发方案 3.5，首发 20 件）
+ * 遗物池（开发方案 3.5，P3 首发 20 件 + P7 引擎档 / 热更 5 件 + 角色被动 6 件 = 31 件）
  *
  * 按四组流派组织（`group`），每组至少 4 件，可拼出文档要求的「≥4 种流派」：
  * - `chain`    连锁流：把长连锁变成步数 / 倍率 / 特殊元素的循环；
@@ -121,6 +125,20 @@ export const RELICS = [
       bonus.goalCut -= 0.08;
     },
   },
+  {
+    id: 'chain_nova',
+    icon: '🌟',
+    name: '连锁新星',
+    rarity: 'rare',
+    group: 'chain',
+    max: 1,
+    desc: '连锁达到 6 时立即造 1 个条状（每层最多 2 次）。连锁新星 + 无尽锁链 = 长连锁滚雪球',
+    onStep(ctx, step) {
+      if (!step || step.cascade < 6) return;
+      if (usedCount(ctx, this.id) >= 2) return;
+      if (addSpecial(ctx, SPECIAL.ROW, 1)) bumpUsed(ctx, this.id);
+    },
+  },
 
   // ===================== 特殊元素流：条状 / 炸弹 / 彩球的产出 =====================
   {
@@ -194,6 +212,30 @@ export const RELICS = [
     },
   },
 
+  // ---- 引擎档：改「特殊元素命中规则」（P7 二期，见文件头；engine 字段由 buildRelicHooks 聚合）----
+  {
+    id: 'twin_rainbow',
+    icon: '🌈',
+    name: '双色棱镜',
+    rarity: 'epic',
+    group: 'special',
+    max: 1,
+    // 引擎修正：彩球交换时额外清「场上另一主色」。同 seed 同盘面取到的第二色一致（见 pickExtraColors）
+    engine: { rainbowExtraColors: 1 },
+    desc: '改规则（引擎）：彩球交换时同时清两色（目标色 + 场上另一主色）。双色棱镜 + 棱镜种子 = 彩球清屏流',
+  },
+  {
+    id: 'wide_blast',
+    icon: '💥',
+    name: '广域爆破',
+    rarity: 'epic',
+    group: 'special',
+    max: 1,
+    // 引擎修正：炸弹半径 3×3 → 5×5（覆盖 SPECIAL_RULES.bombRadius）
+    engine: { bombRadius: 2 },
+    desc: '改规则（引擎）：所有炸弹爆炸半径 +1（3×3 → 5×5），一颗炸弹能撕开更大一片',
+  },
+
   // ===================== 经济流：商店折扣 / 金币 / 三选一资源 =====================
   {
     id: 'coupon',
@@ -256,6 +298,17 @@ export const RELICS = [
     desc: '每次三选一额外 1 次重随',
     mods: { rerolls: 1 },
   },
+  {
+    id: 'toll_booth',
+    icon: '🛣️',
+    name: '收费站',
+    rarity: 'rare',
+    group: 'economy',
+    max: 1,
+    desc: '每层过关时，剩余步数折算金币 ×1.5（鼓励省着走、把步数换成钱）',
+    // moveRefundMult 只被「剩余步数折算金币」用到（mode-rogue），聚合时被夹在 [1, 3]
+    mods: { moveRefundMult: 1.5 },
+  },
 
   // ===================== 生存流：护盾 / 层数成长 / 翻盘窗口 =====================
   {
@@ -313,6 +366,20 @@ export const RELICS = [
       bonus.shuffles += 1;
     },
   },
+  {
+    id: 'second_wind',
+    icon: '💨',
+    name: '再振作',
+    rarity: 'rare',
+    group: 'survival',
+    max: 1,
+    desc: '本层剩余步数 ≤2 时返还 2 步（每层 1 次，给卡死的层一次续命）',
+    onUpdate(ctx, info) {
+      if (!info || !(info.movesLeft > 0) || info.movesLeft > 2) return;
+      if (usedCount(ctx, this.id) >= 1) return;
+      if (addMoves(ctx, 2)) bumpUsed(ctx, this.id);
+    },
+  },
 
   // ===================== 角色专属被动（开发方案 3.8，P5） =====================
   // 角色被动 = 「自带且不可移除」的遗物：不进掉落池（rollRelic / missingRelics / relicsByRarity
@@ -351,6 +418,57 @@ export const RELICS = [
     grant(bonus) {
       bonus.weightMult *= 1.4;
     },
+  },
+  {
+    id: 'bounty_pact',
+    icon: '💰',
+    name: '赏金契约',
+    rarity: 'epic',
+    group: 'economy',
+    max: 1,
+    characterOnly: 'bounty',
+    // 经济流机制：金币进项更高、商店更便宜（mods 由 buildRelicHooks 聚合，与优惠券 / 砍价高手同源）
+    mods: { goldMult: 1.35, shopDiscount: 0.85 },
+    desc: '角色被动：金币获取 ×1.35、商店价格 ×0.85（金币只在本轮有效，终局清零、不上报）',
+  },
+  {
+    id: 'bomb_primer',
+    icon: '💥',
+    name: '爆破引信',
+    rarity: 'epic',
+    group: 'special',
+    max: 1,
+    characterOnly: 'bomber',
+    // once：开局获得时跑一次，bonus 常驻 → 之后每层开局都多 1 个炸弹（与 special_feast 同语义）
+    once: true,
+    desc: '角色被动：每层开局多 1 个炸弹（与军火库 / 火力覆盖叠加）',
+    grant(bonus) {
+      bonus.specials.bomb += 1;
+    },
+  },
+  {
+    id: 'loaded_dice',
+    icon: '🎲',
+    name: '灌铅骰子',
+    rarity: 'epic',
+    group: 'economy',
+    max: 1,
+    characterOnly: 'gambler',
+    // 资源流机制：每次三选一额外 1 次重随（与遗物「重随代币」同源聚合）
+    mods: { rerolls: 1 },
+    desc: '角色被动：每次三选一额外 1 次重随（与「重随代币」叠加）',
+  },
+  {
+    id: 'prism_pact',
+    icon: '🌀',
+    name: '棱镜契约',
+    rarity: 'epic',
+    group: 'special',
+    max: 1,
+    characterOnly: 'prism',
+    // 引擎档：彩球交换时额外清「场上另一主色」（同 seed 同盘面取到的第二色一致，见 pickExtraColors）
+    engine: { rainbowExtraColors: 1 },
+    desc: '角色被动（引擎）：彩球交换时同时清两色（目标色 + 场上另一主色）',
   },
 ];
 
@@ -562,6 +680,7 @@ export function relicsByRarity() {
  * @returns {{
  *   mods: {shopDiscount:number, moveRefundMult:number, goldMult:number,
  *          extraChoices:number, rerolls:number, shieldBonus:number},
+ *   engine: {bombRadius?:number, rainbowExtraColors?:number},
  *   onStep: (ctx:object, step:{cascade:number, gained:number}) => void,
  *   onUpdate: (ctx:object, info:object) => void,
  *   onFloorStart: (ctx:object) => void,
@@ -597,8 +716,22 @@ export function buildRelicHooks(ownedIds = []) {
   mods.moveRefundMult = clamp(mods.moveRefundMult, 1, MOVE_REFUND_MULT_MAX);
   mods.goldMult = clamp(mods.goldMult, 1, GOLD_MULT_MAX);
 
+  // ---- 引擎修正聚合（P7 二期，见文件头）----
+  // 遗物不可叠加（max:1），多条同字段时取较大值（等价于相加，但对数据写重更宽容）
+  // 空对象时不传进 board（board 只在 `engine && typeof === 'object'` 时透传，空对象也无效果）
+  const engine = {};
+  for (const item of items) {
+    const e = item.engine;
+    if (!e) continue;
+    if (Number.isFinite(e.bombRadius)) engine.bombRadius = Math.max(engine.bombRadius || 0, e.bombRadius);
+    if (Number.isFinite(e.rainbowExtraColors)) {
+      engine.rainbowExtraColors = Math.max(engine.rainbowExtraColors || 0, e.rainbowExtraColors);
+    }
+  }
+
   return {
     mods,
+    engine,
     /** 每次走子后：遍历持有遗物各自的 onStep（step = { cascade, gained }） */
     onStep(ctx, step) {
       for (const item of items) {

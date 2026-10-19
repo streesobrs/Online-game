@@ -25,6 +25,17 @@ export function goalShort(goal) {
 }
 
 /**
+ * 目标的「原值」提示：减免类祝福（侦察报告 / 采集协议）把目标压低后，
+ * 侧栏把未减免的原值一并摆出来，玩家才看得出这张祝福削了多少。
+ * @param {object} goal - 目标；带上 `base`（减免前的值）时才有提示
+ * @returns {string|null} 形如「（原 900）」；无减免 / 原值等于现值时返回 null
+ */
+export function goalBaseNote(goal) {
+  if (!Number.isFinite(goal && goal.base) || goal.base === goal.target) return null;
+  return goal.type === 'collect' ? `（原 ×${goal.base}）` : `（原 ${goal.base}）`;
+}
+
+/**
  * 单个目标的当前进度
  * @returns {{goal:object, current:number, done:boolean}}
  */
