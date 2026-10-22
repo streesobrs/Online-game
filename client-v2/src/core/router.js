@@ -7,11 +7,11 @@
  * 均重定向到统一「游戏大厅」，通过 store 传递初始状态。
  */
 import { NAV_ITEMS, ROUTE_ALIASES } from '../data/navItems.js';
+import { getStartPage } from './prefs.js';
 import { store } from './store.js';
 import { eventBus } from './eventBus.js';
 
 const ROUTES = new Map();
-const DEFAULT_ROUTE = 'games';
 
 /**
  * 路由守卫（由 main.js 注册）。
@@ -49,6 +49,10 @@ export function go(id) {
         return;
       }
       id = 'profile';
+    } else if (alias.settingsTab) {
+      // 已迁移到设置页的模块：直接落到对应分类
+      store.set('settings.initTab', alias.settingsTab);
+      id = 'settings';
     } else {
       if (alias.mode) store.set('games.initMode', alias.mode);
       else store.set('games.initMode', null);
@@ -74,7 +78,8 @@ export function go(id) {
 /** 处理 hash 变化 */
 function handleHashChange() {
   const hash = window.location.hash.slice(2);
-  let id = hash || DEFAULT_ROUTE;
+  // 没有 hash（直接打开站点）时走设置页里选的「启动页」
+  let id = hash || getStartPage();
 
   // 路由别名处理：旧路由重定向到统一入口
   const alias = ROUTE_ALIASES[id];
@@ -84,6 +89,13 @@ function handleHashChange() {
       store.set('profile.initTab', alias.tab);
       id = 'profile';
       window.location.hash = '#/profile';
+      return;
+    }
+    if (alias.settingsTab) {
+      // 已迁移到设置页 → 对应分类
+      store.set('settings.initTab', alias.settingsTab);
+      id = 'settings';
+      window.location.hash = '#/settings';
       return;
     }
     if (alias.mode) store.set('games.initMode', alias.mode);

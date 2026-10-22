@@ -19,14 +19,11 @@ import { toast } from '../../components/toast.js';
 import { modal } from '../../components/modal.js';
 import { store } from '../../core/store.js';
 import { eventBus } from '../../core/eventBus.js';
-import { SHORTCUT_DEFS, SHORTCUT_SCOPES, scopeName } from '../../data/shortcutDefs.js';
-import {
-  getBinding, isCustomized, setBinding, resetBinding, resetAll, formatCombo, comboFromEvent,
-} from '../../core/shortcuts.js';
 import * as auth from '../../core/auth.js';
 import { requestReplay, showReplay } from '../replay/index.js';
 import { resetOnboarding, resetAllTours, startOnboarding, startMailTour, startAssetsTour, startShopTour } from '../../components/onboarding.js';
-import { buildNavPrefsPanel } from '../../components/navPrefs.js';
+import { buildPrivacyRows, mergePrivacy } from '../../components/privacyPanel.js';
+import { go } from '../../core/router.js';
 
 /** 游戏类型展示元数据 */
 const GAME_META = {
@@ -36,17 +33,13 @@ const GAME_META = {
   snake: { name: '贪吃蛇', icon: '🐍' },
 };
 
-/** 等级里程碑奖励（对齐服务端 config.levelRewards.milestones） */
-const LEVEL_REWARD_MILESTONES = [
-  { level: 5, desc: '获得100💎 + 🧪经验药水×3 + ↩️悔棋卡×1' },
-  { level: 10, desc: '获得250💎 + 🧪经验药水×5 + ✨双倍经验卡×2 + 💡提示卡×3 + 💎7天月卡' },
-  { level: 15, desc: '获得500💎 + 🧪经验药水×10 + ✨双倍经验卡×3 + ↩️悔棋卡×3' },
-  { level: 20, desc: '获得800💎 + 限定徽章 + 🧪经验药水×10 + ✨双倍经验卡×5 + 💡提示卡×5 + 🍀幸运符×1 + 💎30天月卡' },
-  { level: 25, desc: '获得1200💎 + 称号"棋坛精英" + 🌟三倍经验卡×2 + ↩️悔棋卡×5 + 💡提示卡×5' },
-  { level: 30, desc: '获得1800💎 + 限定徽章 + 🌟三倍经验卡×3 + 🧪经验药水×20 + 🍀幸运符×3 + 💎30天月卡' },
-  { level: 40, desc: '获得3000💎 + 称号"传奇大师" + 🌟三倍经验卡×5 + 🧪经验药水×30 + 🚀等级直升券×1 + 💎30天月卡' },
-  { level: 50, desc: '获得5000💎 + 限定徽章 + 称号"至尊棋圣" + 🌟三倍经验卡×10 + 🧪经验药水×50 + 🚀等级直升券×3 + 🍀幸运符×5 + 💎30天月卡' },
-];
+/**
+ * 等级里程碑奖励：档位表由服务端下发（config.levelRewards.milestones → getLevelRewards），
+ * 客户端不再自己抄一份奖励文案，避免两边漂掉。字段见 getAvailableLevelRewards 返回的 `all`：
+ * { level, description, claimed, available }
+ * 大小等级按等级末位判断（末位 0/5 为大等级，即所有档位都是大等级），客户端不额外拿 tier 字段，
+ * 只按 level % 5 自己算。
+ */
 
 /** 当前用户 ID（与 v1 一致） */
 function currentUserId() {
@@ -163,17 +156,6 @@ function openBioModal(currentBio) {
  * 隐私设置弹窗（每次打开从 API 拉最新值，不依赖模块缓存）
  */
 async function openPrivacyModal() {
-  const PRIVACY_OPTIONS = [
-    { key: 'bio', label: '个性签名', default: true, hint: '别人查看你的主页时能看到你的签名' },
-    { key: 'stats', label: '战绩统计', default: true, hint: '对局数、胜/负、胜率、连胜' },
-    { key: 'achievements', label: '徽章 / 成就', default: true, hint: '已解锁的徽章和成就进度' },
-    { key: 'createdAt', label: '注册时间', default: true, hint: '显示你的账号注册时间' },
-    { key: 'isAdmin', label: '管理员身份', default: true, hint: '是否显示你是管理员' },
-    { key: 'loginCount', label: '登录次数', default: false, hint: '显示你总共登录过多少次' },
-    { key: 'lastLogin', label: '最后登录时间', default: false, hint: '显示你最近一次登录的时间' },
-    { key: 'lastSeen', label: '最后在线时间', default: false, hint: '显示你最近一次上线的时间' },
-  ];
-
   const body = el('div', { class: 'privacy-panel' },
     el('div', { class: 'text-muted', style: 'padding:20px;text-align:center;' }, '⏳ 加载中...'));
   modal.show({
@@ -197,46 +179,14 @@ async function openPrivacyModal() {
     profilePrivacy = serverPrivacy; // 同步模块缓存
   } catch (err) { /* 忽略，继续用默认值 */ }
 
-  PRIVACY_OPTIONS.forEach(opt => {
-    toggles[opt.key] = serverPrivacy && serverPrivacy[opt.key] !== undefined
-      ? !!serverPrivacy[opt.key]
-      : opt.default;
-  });
-
-  const rows = PRIVACY_OPTIONS.map(opt => {
-    const labelEl = el('div', { class: 'privacy-row-label' }, [
-      el('span', { class: 'privacy-row-name' }, opt.label),
-      el('span', { class: 'privacy-row-hint' }, opt.hint),
-    ]);
-    // checked attribute 只能是 true/false（el() 会跳过 false，不设 attribute）
-    // 不能用 '' 空字符串 — HTML checkbox 的空 checked 是 truthy！
-    const switchEl = el('label', { class: 'privacy-switch' }, [
-      el('input', { type: 'checkbox', checked: !!toggles[opt.key] }),
-      el('span', { class: 'privacy-slider' }),
-    ]);
-    const checkbox = switchEl.querySelector('input[type=checkbox]');
-    checkbox.addEventListener('change', (e) => { toggles[opt.key] = e.target.checked; });
-    return el('div', { class: 'privacy-row' }, [labelEl, switchEl]);
-  });
+  toggles = mergePrivacy(serverPrivacy);
 
   body.innerHTML = '';
   body.append(
     el('div', { class: 'privacy-tip' },
       '开启后，其他用户查看你的主页/资料卡时就能看到对应信息；关闭则只显示给你自己。'),
-    el('div', { class: 'privacy-rows' }, rows),
+    el('div', { class: 'privacy-rows' }, buildPrivacyRows(toggles)),
   );
-}
-
-/**
- * 界面设置弹窗：导航栏 / 账号入口两个开关，与新手引导共用同一份偏好，拨动即时生效
- */
-function openUiSettingsModal() {
-  modal.show({
-    title: '🧩 界面设置',
-    content: buildNavPrefsPanel(),
-    confirmText: '完成',
-    showCancel: false,
-  });
 }
 
 /**
@@ -245,7 +195,7 @@ function openUiSettingsModal() {
  * @returns {Function} cleanup 函数
  */
 export function renderProfile(container) {
-  const PROFILE_TAB_KEYS = ['info', 'avatar', 'history', 'mail', 'assets', 'rewards', 'achievements', 'shop', 'themes', 'shortcuts', 'calendar'];
+  const PROFILE_TAB_KEYS = ['info', 'avatar', 'history', 'mail', 'assets', 'rewards', 'achievements', 'shop', 'themes', 'calendar'];
   const INIT_TAB = store.get('profile.initTab');
   let activeTab = PROFILE_TAB_KEYS.includes(INIT_TAB) ? INIT_TAB : 'info';
   store.set('profile.initTab', null); // 初始 Tab 已消费，避免下次进入仍停留在上次 Tab
@@ -356,7 +306,7 @@ export function renderProfile(container) {
         el('button', { class: 'profile-aside-btn', onClick: () => switchTab('achievements') }, '🏆 我的成就'),
         el('button', { class: 'profile-aside-btn', onClick: () => switchTab('shop') }, '🛒 我的商城'),
         el('button', { class: 'profile-aside-btn', onClick: () => switchTab('themes') }, '🎨 主题设置'),
-        el('button', { class: 'profile-aside-btn', onClick: openUiSettingsModal }, '🧩 界面设置'),
+        el('button', { class: 'profile-aside-btn', onClick: () => go('settings') }, '⚙️ 设置'),
         el('button', {
           class: 'profile-aside-btn',
           onClick: () => {
@@ -384,33 +334,36 @@ export function renderProfile(container) {
   function renderTabs() {
     tabsEl.innerHTML = '';
     const unreadMail = mails ? mails.filter((m) => !m.read || (!m.claimed && mailHasRewards(m))).length : 0;
+    // 大等级里程碑奖励改成手动领取后，Tab 上得有提示，否则玩家容易忘了领
+    const claimableRewards = (profileData?.levelRewards?.available || []).length;
     const tabs = [
       { key: 'info', label: '📄 资料概览' },
       { key: 'avatar', label: '🖼 头像装扮' },
       { key: 'history', label: '📜 对战历史' },
       { key: 'mail', label: `📬 邮箱${unreadMail > 0 ? ` (${unreadMail})` : ''}` },
       { key: 'assets', label: '💰 资产明细' },
-      { key: 'rewards', label: '🎁 等级奖励' },
+      { key: 'rewards', label: '🎁 等级奖励', dot: claimableRewards > 0 },
       { key: 'achievements', label: '🏆 我的成就' },
       { key: 'shop', label: '🛒 商城' },
       { key: 'themes', label: '🎨 主题' },
-      { key: 'shortcuts', label: '⌨ 快捷键' },
       { key: 'calendar', label: '📅 倍率日历' },
     ];
     tabs.forEach((t) => {
       const btn = el('button', {
         class: 'profile-tab' + (t.key === activeTab ? ' active' : ''),
         onClick: () => switchTab(t.key),
-      }, t.label);
+      }, [
+        t.label,
+        t.dot ? el('span', { class: 'profile-tab-dot', title: `${claimableRewards} 项等级奖励待领取` }) : null,
+      ]);
       tabsEl.appendChild(btn);
     });
   }
 
   // ---- 内容分发 ----
   async function renderContent() {
-    // 切换前先清理上一个嵌入视图的监听/订阅（成就/商城/主题）与改键采集状态
+    // 切换前先清理上一个嵌入视图的监听/订阅（成就/商城/主题）
     if (embeddedCleanup) { embeddedCleanup(); embeddedCleanup = null; }
-    stopKeyCapture();
     contentEl.innerHTML = '';
     const needsProfile = activeTab === 'info' || activeTab === 'avatar' || activeTab === 'assets' || activeTab === 'rewards';
     if (!profileData && needsProfile) {
@@ -426,7 +379,6 @@ export function renderProfile(container) {
     else if (activeTab === 'achievements') await renderEmbedded('../achievements/index.js', 'renderAchievements');
     else if (activeTab === 'shop') await renderEmbedded('../shop/index.js', 'renderShop');
     else if (activeTab === 'themes') await renderEmbedded('../themes/index.js', 'renderThemePanel');
-    else if (activeTab === 'shortcuts') contentEl.append(renderShortcutsTab());
     else if (activeTab === 'calendar') await renderCalendarTab(contentEl);
 
     // 场景引导：首次进入邮件/资产/商城 Tab 时触发（内部带完成标记，不重复打扰）
@@ -458,126 +410,6 @@ export function renderProfile(container) {
       contentEl.innerHTML = '';
       contentEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:40px;' }, '模块加载失败'));
     }
-  }
-
-  // ---- 快捷键 Tab ----
-  let capturingId = null;     // 正在采集新键的绑定 id
-  let captureHandler = null;  // 采集期的 document keydown（捕获阶段，抢在全局快捷键监听之前）
-
-  /** 结束采集：移除拦截监听 */
-  function stopKeyCapture() {
-    if (captureHandler) {
-      document.removeEventListener('keydown', captureHandler, true);
-      captureHandler = null;
-    }
-    capturingId = null;
-  }
-
-  /** 进入采集状态：按下新键即写入，Esc 取消 */
-  function startKeyCapture(def, refresh) {
-    stopKeyCapture();
-    captureHandler = (e) => {
-      // 捕获阶段拦下按键，避免改键时误触发全局快捷键
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.key === 'Escape') { stopKeyCapture(); refresh(); return; }
-
-      const combo = comboFromEvent(e);
-      if (!combo) return; // 只按了修饰键：继续等主键
-
-      const res = setBinding(def.id, combo);
-      if (!res.ok) { toast.error(res.message); return; }
-
-      stopKeyCapture();
-      refresh();
-      toast.success(`「${def.name}」已改为 ${formatCombo(getBinding(def.id))}`);
-      if (res.crossScope) {
-        toast.info(`该键在「${scopeName(res.crossScope.scope)}」中也被「${res.crossScope.name}」使用，两者互不影响`);
-      }
-    };
-    document.addEventListener('keydown', captureHandler, true);
-    capturingId = def.id;
-    refresh();
-  }
-
-  function renderShortcutRow(def, refresh) {
-    const customized = isCustomized(def.id);
-    const capturing = capturingId === def.id;
-
-    const kbd = el('kbd', { class: 'profile-shortcut-key' + (capturing ? ' capturing' : '') },
-      capturing ? '按下新键…' : formatCombo(getBinding(def.id)));
-
-    const actionBtn = el('button', {
-      class: 'profile-shortcut-btn',
-      type: 'button',
-      onClick: () => {
-        if (capturing) { stopKeyCapture(); refresh(); return; }
-        startKeyCapture(def, refresh);
-      },
-    }, capturing ? '取消' : '改键');
-
-    const resetBtn = el('button', {
-      class: 'profile-shortcut-btn profile-shortcut-btn--ghost',
-      type: 'button',
-      disabled: !customized,
-      onClick: () => {
-        stopKeyCapture();
-        if (resetBinding(def.id)) toast.info(`「${def.name}」已恢复默认键位`);
-        refresh();
-      },
-    }, '重置');
-
-    return el('div', { class: 'profile-shortcut-row' + (capturing ? ' capturing' : '') }, [
-      el('span', { class: 'profile-shortcut-icon' }, def.icon),
-      el('span', { class: 'profile-shortcut-name' }, def.name),
-      customized ? el('span', { class: 'profile-shortcut-status' }, '已自定义') : null,
-      el('span', { class: 'profile-shortcut-spacer' }),
-      kbd,
-      actionBtn,
-      resetBtn,
-    ]);
-  }
-
-  function renderShortcutsTab() {
-    const scopeListEl = el('div', { class: 'profile-shortcut-scopes' });
-    const resetAllBtn = el('button', {
-      class: 'profile-shortcut-btn profile-shortcut-btn--ghost',
-      type: 'button',
-      onClick: () => {
-        stopKeyCapture();
-        if (resetAll()) toast.info('已全部恢复默认键位');
-        refresh();
-      },
-    }, '全部恢复默认');
-
-    const refresh = () => {
-      scopeListEl.innerHTML = '';
-      SHORTCUT_SCOPES.forEach((scope) => {
-        const defs = SHORTCUT_DEFS.filter((d) => d.scope === scope.id);
-        if (!defs.length) return;
-        scopeListEl.append(el('div', { class: 'profile-shortcut-scope' }, [
-          el('div', { class: 'profile-shortcut-scope-head' }, [
-            el('span', { class: 'profile-shortcut-scope-name' }, scope.name),
-            el('span', { class: 'profile-shortcut-scope-desc' }, scope.desc),
-          ]),
-          el('div', { class: 'profile-shortcut-list' }, defs.map((d) => renderShortcutRow(d, refresh))),
-        ]));
-      });
-      resetAllBtn.disabled = !SHORTCUT_DEFS.some((d) => isCustomized(d.id));
-    };
-    refresh();
-
-    return el('div', { class: 'panel profile-card' }, [
-      el('div', { class: 'profile-shortcut-head' }, [
-        el('div', { class: 'profile-section-title' }, '⌨️ 快捷键'),
-        resetAllBtn,
-      ]),
-      el('p', { class: 'profile-shortcut-tip' },
-        '点「改键」后按下新键即可，支持 Ctrl / Alt / Shift 组合键（如 Ctrl+K）。同一分类内键位不可重复；不同分类之间允许同键，各自生效。'),
-      scopeListEl,
-      el('p', { class: 'text-muted', style: 'margin-top:12px;font-size:12px;' },
-        '在输入框内按键不会触发；改键时按 Esc 取消。'),
-    ]);
   }
 
   /**
@@ -1098,28 +930,48 @@ export function renderProfile(container) {
   // ============ 等级奖励 Tab ============
   function renderLevelRewardsTab() {
     const rw = profileData.levelRewards || {};
-    const claimed = rw.claimedLevels || [];
+    const milestones = rw.all || [];
+    const claimedSet = new Set(rw.claimedLevels || []);
     const availableSet = new Set((rw.available || []).map((r) => r.level));
     const curLevel = calcLevelExp(profileData.profile?.exp, expMap).level;
+    const perLevelCoins = rw.perLevelCoins || 0;
+    const byLevel = new Map(milestones.map((r) => [r.level, r]));
+    const maxLevel = milestones.length > 0 ? milestones[milestones.length - 1].level : 50;
     const anyAvailable = availableSet.size > 0;
 
-    const progressSteps = [];
-    LEVEL_REWARD_MILESTONES.forEach((r, i) => {
-      if (i > 0) progressSteps.push(el('div', { class: 'profile-reward-line' + (claimed.includes(r.level) ? ' claimed' : '') }));
-      const isClaimed = claimed.includes(r.level);
-      const isAvail = availableSet.has(r.level);
-      const isPast = curLevel >= r.level;
-      let cls = 'profile-reward-dot';
-      if (isClaimed) cls += ' claimed';
-      else if (isAvail) cls += ' available';
-      else if (isPast) cls += ' active';
-      const tip = isClaimed ? '✓' : (isAvail ? '!' : r.level);
-      progressSteps.push(el('div', { class: cls, title: `Lv.${r.level}: ${r.desc}` }, tip));
-    });
+    // 等级地图：1~50 逐级一格，每行 10 级（天然就是 1-4、5、6-9、10 这种分组）。
+    // - 末位 0/5（5 的倍数）= 大等级：金色格子，有里程碑奖励，未领时可点（见 config.levelRewards）
+    // - 其余 = 小等级：每级固定 +perLevelCoins 星钻，升级即自动到账，到级后转绿
+    const ladder = [];
+    for (let lv = 1; lv <= maxLevel; lv += 1) {
+      const ms = byLevel.get(lv);
+      const isMajor = lv % 5 === 0;
+      const isClaimed = !!ms?.claimed || claimedSet.has(lv);
+      const isAvail = !!ms?.available || availableSet.has(lv);
+      let cls = 'profile-reward-node ' + (isMajor ? 'major' : 'minor');
+      let tip;
+      let face = String(lv);
+      if (isMajor) {
+        if (isClaimed) { cls += ' claimed'; face = '✓'; tip = `✓ Lv.${lv} 大等级：已领取`; }
+        else if (isAvail) { cls += ' available'; tip = `Lv.${lv} 大等级：${ms?.description || ''}（点击领取）`; }
+        else { cls += ' locked'; tip = `Lv.${lv} 大等级：${ms?.description || ''}`; }
+      } else if (curLevel >= lv) {
+        cls += ' reached';
+        tip = `Lv.${lv} 小等级：+${perLevelCoins}💎（已自动到账）`;
+      } else {
+        cls += ' locked';
+        tip = `Lv.${lv} 小等级：+${perLevelCoins}💎`;
+      }
+      ladder.push(el('div', {
+        class: cls,
+        title: tip,
+        onClick: isAvail ? () => claimLevelRewards() : undefined,
+      }, face));
+    }
 
-    const rows = LEVEL_REWARD_MILESTONES.map((r) => {
-      const isClaimed = claimed.includes(r.level);
-      const isAvail = availableSet.has(r.level);
+    const rows = milestones.map((r) => {
+      const isClaimed = !!r.claimed || claimedSet.has(r.level);
+      const isAvail = !!r.available || availableSet.has(r.level);
       const isFuture = curLevel < r.level;
       let badge;
       if (isClaimed) badge = el('span', { class: 'profile-reward-badge claimed' }, '✓ 已领取');
@@ -1129,8 +981,11 @@ export function renderProfile(container) {
         class: 'profile-reward-row' + (isClaimed ? ' claimed' : isAvail ? ' available' : isFuture ? ' future' : ''),
         onClick: isAvail ? () => claimLevelRewards() : undefined,
       }, [
-        el('div', { class: 'profile-reward-lv' }, `Lv.${r.level}`),
-        el('div', { class: 'profile-reward-desc' }, r.desc),
+        el('div', { class: 'profile-reward-lv' }, [
+          `Lv.${r.level}`,
+          el('span', { class: 'profile-reward-lv-tag' }, '大等级'),
+        ]),
+        el('div', { class: 'profile-reward-desc' }, r.description || ''),
         badge,
       ]);
     });
@@ -1141,7 +996,10 @@ export function renderProfile(container) {
           '🎁 等级奖励',
           anyAvailable ? el('button', { class: 'profile-reward-claim-all', onClick: () => claimLevelRewards() }, '领取全部') : null,
         ]),
-        el('div', { class: 'profile-reward-progress' }, progressSteps),
+        el('div', { class: 'profile-reward-legend' },
+          `每级 +${perLevelCoins}💎 自动到账（小等级，到级变绿）· 末位 0 / 5 为「大等级」，点金色格子领下方奖励`),
+        el('div', { class: 'profile-reward-ladder' }, ladder),
+        el('div', { class: 'profile-reward-subtitle' }, '大等级额外奖励（5 / 10 / 15 … 50 级各一档）'),
         el('div', { class: 'profile-reward-list' }, rows),
       ]),
     ]);
@@ -1752,7 +1610,7 @@ export function renderProfile(container) {
   container.append(el('div', { class: 'profile-page' }, [asideEl, mainEl]));
   loadAll();
 
-  // 已迁移模块的快捷键/旧路由入口：已在个人资料页时直接切 Tab（见 router.go）
+  // 已迁移模块的旧路由入口：已在个人资料页时直接切 Tab（见 router.go）
   const offOpenTab = eventBus.on('profile:openTab', (tab) => switchTab(tab));
 
   // 资料更新成功（如个性签名）：刷新个人资料数据并重渲染

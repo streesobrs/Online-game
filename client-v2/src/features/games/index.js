@@ -14,7 +14,7 @@
  * │          │                                          │
  * └──────────┴──────────────────────────────────────────┘
  *
- * 快捷键：1-4 切换游戏，T 联机/A AI，Enter 开始匹配（键位可在个人资料自定义，
+ * 快捷键：1-4 切换游戏，T 联机/A AI，Enter 开始匹配（键位可在设置页自定义，
  * 见 core/shortcuts.js；本视图通过 registerScopeHandler 注册作用域处理函数）
  */
 import { el } from '../../utils/dom.js';
@@ -511,7 +511,7 @@ export function renderGames(container) {
     emit('get_current_game');
   }
 
-  // ---- 页面内快捷键（走统一分发，键位由个人资料「快捷键」决定）----
+  // ---- 页面内快捷键（走统一分发，键位由设置页「⌨ 快捷键」决定）----
   function runLobbyShortcut(op) {
     if (!op) return;
     const gamesList = state.mode === 'ai' ? AI_GAMES : GAMES;

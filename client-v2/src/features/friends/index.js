@@ -11,6 +11,7 @@ import { toast } from '../../components/toast.js';
 import { avatarNode } from '../../utils/avatar.js';
 import { showUserCard } from '../../components/userCard.js';
 import { getOnlineUsers, subscribeOnlineUsers, sendChallenge } from '../online-players/index.js';
+import { getUiPrefs } from '../../core/prefs.js';
 import { go } from '../../core/router.js';
 
 // ===== 模块级状态（常驻，跨视图保留）=====
@@ -98,7 +99,10 @@ export async function removeFriend(friendId) {
 
 // ===== 实时通知（模块加载即生效，聊天页静态引入保证启动即监听）=====
 eventBus.on('friend:request', (data) => {
-  toast.info(`${data.fromNickname || '有人'} 向你发送了好友申请`);
+  // 「好友申请弹窗提示」可在设置页关闭（红点仍会亮）
+  if (getUiPrefs().friendToast) {
+    toast.info(`${data.fromNickname || '有人'} 向你发送了好友申请`);
+  }
   loadFriends();
 });
 

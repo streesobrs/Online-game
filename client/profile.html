@@ -579,6 +579,18 @@
       margin-bottom: 12px;
     }
 
+    /* 有可领取的等级奖励时，标题旁的红点提示（大等级奖励改成手动领取后加） */
+    .reward-title-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      margin-left: 6px;
+      border-radius: 50%;
+      background: #e53e3e;
+      vertical-align: middle;
+      animation: pulse-glow 1.2s ease infinite;
+    }
+
     .reward-dot {
       width: 28px;
       height: 28px;
@@ -1679,7 +1691,7 @@
           <!-- 等级奖励 -->
           <div class="card">
             <div class="card-title">
-              <span>🎁 等级奖励</span>
+              <span>🎁 等级奖励<span class="reward-title-dot" id="rewardTitleDot" style="display:none"></span></span>
               <button class="claim-all-btn" id="claimAllBtn" onclick="claimAllRewards()"
                 style="display:none">领取全部</button>
             </div>
@@ -2775,16 +2787,9 @@
       const listEl = document.getElementById('rewardList');
       const claimBtn = document.getElementById('claimAllBtn');
 
-      const all = [
-        { level: 5, desc: '100💎 + 🏆棋坛新秀 + 🧪经验药水×3 + ↩️悔棋卡×1' },
-        { level: 10, desc: '250💎 + 🏆对弈达人 + 🧪经验药水×5 + ✨双倍经验卡×2 + 💡提示卡×3 + 💎7天月卡' },
-        { level: 15, desc: '500💎 + 🏆棋艺高手 + 🧪经验药水×10 + ✨双倍经验卡×3 + ↩️悔棋卡×3' },
-        { level: 20, desc: '800💎 + 🏅限定徽章 + 🧪经验药水×10 + ✨双倍经验卡×5 + 💡提示卡×5 + 🍀幸运符×1 + 💎30天月卡' },
-        { level: 25, desc: '1200💎 + 🏆棋坛精英 + 🌟三倍经验卡×2 + ↩️悔棋卡×5 + 💡提示卡×5' },
-        { level: 30, desc: '1800💎 + 🏅限定徽章 + 🌟三倍经验卡×3 + 🧪经验药水×20 + 🍀幸运符×3 + 💎30天月卡' },
-        { level: 40, desc: '3000💎 + 🏆传奇大师 + 🌟三倍经验卡×5 + 🧪经验药水×30 + 🚀等级直升券×1 + 💎30天月卡' },
-        { level: 50, desc: '5000💎 + 🏅限定徽章 + 🏆至尊棋圣 + 🌟三倍经验卡×10 + 🧪经验药水×50 + 🚀等级直升券×3 + 🍀幸运符×5 + 💎30天月卡' }
-      ];
+      // 档位表由服务端下发（getAvailableLevelRewards 返回的 all），客户端不再自己抄一份奖励文案，
+      // 否则服务端改档位/数值后这里会显示成过期内容
+      const all = (rw && rw.all ? rw.all : []).map(r => ({ level: r.level, desc: r.description || '' }));
 
       const claimed = rw?.claimedLevels || [];
       const available = (rw?.available || []).map(r => r.level);
@@ -2826,7 +2831,7 @@
         else if (isAvail) badge = '<span class="reward-badge grab-badge">点击领取</span>';
         else if (isFuture) badge = '<span class="reward-badge locked-badge">Lv.' + r.level + '解锁</span>';
 
-        listHtml += `<div class="${cls}" onclick="${isAvail ? `claimLevelReward(${r.level})` : ''}">
+        listHtml += `<div class="${cls} major" onclick="${isAvail ? `claimLevelReward(${r.level})` : ''}">
           <div class="reward-lv">Lv.${r.level}</div>
           <div class="reward-desc">${r.desc}</div>
           ${badge}
@@ -2834,6 +2839,8 @@
       }
       listEl.innerHTML = listHtml || '<div class="empty">暂无等级奖励</div>';
       claimBtn.style.display = hasAvailable ? 'inline-block' : 'none';
+      const dotEl = document.getElementById('rewardTitleDot');
+      if (dotEl) dotEl.style.display = hasAvailable ? 'inline-block' : 'none';
     }
 
     function renderAchievements(ach) {

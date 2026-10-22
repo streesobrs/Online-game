@@ -4,7 +4,7 @@
  * - topbar：是否显示顶部传统导航栏（默认开）
  * - account：账号入口形态 —— 'drawer' 全局抽屉（默认） | 'float' 悬浮头像
  *
- * 新手引导与「个人资料 → 界面设置」共用同一份偏好，改动即时生效。
+ * 新手引导与「设置」页（#/settings）共用同一份偏好，改动即时生效。
  */
 import { switchLayout, renderAccountBar, renderNavDrawer } from './registry.js';
 

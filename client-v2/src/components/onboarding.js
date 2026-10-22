@@ -18,7 +18,7 @@ import { buildNavPrefsPanel } from './navPrefs.js';
 
 const DONE_KEY = 'v2_onboarding_done';
 
-/* ===== 主引导步骤（首次登录 → 大厅/好友/排行榜/资料/快捷键） ===== */
+/* ===== 主引导步骤（首次登录 → 大厅/好友/排行榜/资料） ===== */
 const MAIN_STEPS = [
   {
     view: 'games',
@@ -45,7 +45,7 @@ const MAIN_STEPS = [
     view: 'games',
     icon: '🧩',
     title: '界面自定义',
-    text: '两个开关随你组合，拨动即时生效；以后可在「个人资料 → 界面设置」里随时改。',
+    text: '两个开关随你组合，拨动即时生效；以后可在导航栏「设置」页里随时改。',
     extra: (refresh) => buildNavPrefsPanel(refresh),
   },
   {
@@ -83,25 +83,9 @@ const MAIN_STEPS = [
     selector: '.profile-page',
     icon: '📄',
     title: '个人资料',
-    text: '这是你的个人主页：左侧是账号信息（头像 / 昵称 / 等级 / 经验 / 资产）；右侧 Tab 可查看资料概览、头像装扮、对战历史、邮箱、资产明细、等级奖励、成就、商城、主题。点右上角「资料」按钮也能进来。',
-  },
-  {
-    view: 'profile',
-    selector: '.profile-shortcut-list',
-    before: openShortcutsTab,
-    icon: '⌨️',
-    title: '快捷键',
-    text: '这里整理了全部快捷键，并且键位可以自己改：点某一行右侧的「改键」再按下新键即可（支持 Ctrl / Alt / Shift 组合键），点「重置」恢复默认。熟记后操作更顺手！',
+    text: '这是你的个人主页：左侧是账号信息（头像 / 昵称 / 等级 / 经验 / 资产）；右侧 Tab 可查看资料概览、头像装扮、对战历史、邮箱、资产明细、等级奖励、成就、商城、主题。点右上角「资料」按钮也能进来。快捷键自定义已挪到「设置 → ⌨ 快捷键」。',
   },
 ];
-
-/** 跳转个人资料后切换到「快捷键」Tab（before 钩子） */
-function openShortcutsTab() {
-  const tabs = document.querySelectorAll('.profile-tab');
-  for (const t of tabs) {
-    if (t.textContent.includes('快捷键')) { t.click(); break; }
-  }
-}
 
 /* ===== 场景引导步骤 ===== */
 

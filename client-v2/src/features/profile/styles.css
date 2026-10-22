@@ -215,6 +215,18 @@
   color: #fff;
 }
 
+/* Tab 上的「有奖励可领」红点（大等级奖励改成手动领取后加，提醒玩家别忘了领） */
+.profile-tab-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: #e53e3e;
+  vertical-align: middle;
+  animation: reward-dot-pulse 1.2s ease infinite;
+}
+
 /* Tab 内容切换淡入 */
 @keyframes profile-content-fade {
   from {
@@ -697,14 +709,10 @@
   color: var(--text-secondary, #4a5568);
 }
 
+/* 外观统一由全局 select 规则绘制，这里只做紧凑尺寸 */
 .profile-filter-select {
-  border: 1px solid var(--theme-chat-input-border, var(--border-color, #e2e8f0));
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 13px;
-  background: var(--surface, #fff);
-  color: var(--text, #2d3748);
-  outline: none;
+  padding: 5px 24px 5px 9px;
+  font-size: 12px;
 }
 
 /* option 在部分浏览器（Firefox、旧 Safari）不继承 select 的 color */
@@ -774,7 +782,7 @@
   transform: scale(0.96);
 }
 
-/* ===== 快捷键 Tab ===== */
+/* ===== 快捷键编辑器（设置页） ===== */
 .profile-shortcut-head {
   display: flex;
   align-items: center;
@@ -1724,9 +1732,100 @@
 
 .profile-reward-lv {
   flex-shrink: 0;
-  min-width: 44px;
+  min-width: 104px;
   font-weight: 700;
   color: var(--accent-indigo, #6366f1);
+}
+
+/* 「大等级」小标签：列表里每一档都是大等级，光写「Lv.5 大」看不懂 */
+.profile-reward-lv-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border: 1px solid #f6e05e;
+  border-radius: 4px;
+  background: #fef3c7;
+  color: #b7791f;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.5;
+  vertical-align: middle;
+}
+
+.profile-reward-subtitle {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #718096);
+}
+
+/* 等级地图：1~50 逐级一格，每行 10 级（天然就是 1-4、5、6-9、10 这种分组）。
+   末位 0 / 5 是「大等级」（里程碑奖励，金色、可点领），其余是「小等级」（每级 +N💎 自动到账） */
+.profile-reward-legend {
+  margin-bottom: 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-muted, #718096);
+}
+
+.profile-reward-ladder {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 8px 6px;
+  margin-bottom: 20px;
+}
+
+.profile-reward-node {
+  justify-self: center;
+  width: 100%;
+  max-width: 52px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  border-radius: 8px;
+  background: var(--surface-alt, #f7fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  color: #a0aec0;
+  cursor: default;
+  user-select: none;
+  transition: transform 0.12s;
+}
+
+/* 小等级：到级后转绿 */
+.profile-reward-node.minor.reached {
+  background: #f0fff4;
+  border-color: #9ae6b4;
+  color: #38a169;
+}
+
+/* 大等级：描金 */
+.profile-reward-node.major {
+  border-color: #d69e2e;
+  background: #fffaf0;
+  color: #b7791f;
+  box-shadow: inset 0 0 0 1px rgba(214, 158, 46, 0.25);
+}
+
+.profile-reward-node.major.available {
+  background: linear-gradient(135deg, #f6ad55, #ed8936);
+  border-color: #dd6b20;
+  color: #fff;
+  cursor: pointer;
+  animation: reward-dot-pulse 1.2s ease infinite;
+}
+
+.profile-reward-node.major.available:hover {
+  transform: scale(1.08);
+}
+
+.profile-reward-node.major.claimed {
+  background: linear-gradient(135deg, #68d391, #48bb78);
+  border-color: #38a169;
+  color: #fff;
 }
 
 .profile-reward-desc {

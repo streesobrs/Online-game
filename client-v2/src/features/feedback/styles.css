@@ -49,7 +49,6 @@
   margin-bottom: 10px;
 }
 
-.fb-select,
 .fb-input {
   padding: 9px 12px;
   border: 2px solid var(--theme-border-color, #e9ecef);
@@ -60,6 +59,7 @@
   color: var(--theme-status-color, #495057);
 }
 
+/* 下拉框外观统一由全局 select 规则绘制，这里只约束宽度 */
 .fb-select {
   width: 130px;
   flex-shrink: 0;
@@ -84,7 +84,6 @@
   color: var(--theme-status-color, #495057);
 }
 
-.fb-select:focus,
 .fb-input:focus,
 .fb-textarea:focus {
   outline: none;

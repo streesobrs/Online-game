@@ -19,6 +19,7 @@ import * as shortcutManager from './core/shortcuts.js';
 import { NAV_ITEMS, GAMES, FEATURES, findItem } from './data/navItems.js';
 import * as themes from './features/themes/index.js';
 import { applyNavMode, getNavPrefs, setNavPrefs } from './layouts/mode.js';
+import { applyUiPrefs } from './core/prefs.js';
 import { viewRoot } from './utils/dom.js';
 import * as login from './features/auth/login.js';
 import { renderLoginPage } from './features/auth/login-page.js';
@@ -55,6 +56,9 @@ auth.initAuth();
 // 2. 初始化主题（应用 v1/v2 共享的 selectedTheme）
 themes.initThemes();
 
+// 2.0 应用界面偏好（减少动效等，需在首屏渲染前落到 body 上）
+applyUiPrefs();
+
 // 2.1 注册全局系统事件监听（维护横幅/版本检查/管理消息/警告，补齐 v1 行为）
 initSystemEvents();
 
@@ -80,7 +84,8 @@ registerRoute('games', () => renderGames(viewRoot()));
 registerRoute('chat', () => renderChat(viewRoot()));
 
 // 其余视图按需懒加载
-// 已迁移模块（成就/商城/主题/快捷键）不再注册独立路由，旧路由经 ROUTE_ALIASES 重定向到个人资料页对应 Tab
+// 已迁移模块（成就/商城/主题）不再注册独立路由，旧路由经 ROUTE_ALIASES 重定向到个人资料页对应 Tab
+// 快捷键已迁到设置页，旧路由 #/shortcuts 重定向到设置页的「快捷键」分类
 registerRoute('friends', lazyView('./features/friends/index.js', 'renderFriends'));
 registerRoute('match3', lazyView('./games/match3/index.js', 'renderMatch3'));
 // 肉鸽图鉴 / 养成：站点级整页入口（大厅 / 任意页面都能开），复用消消乐同一条整页外壳
@@ -89,6 +94,8 @@ registerRoute('leaderboard', lazyView('./features/leaderboard/index.js', 'render
 registerRoute('spectate', lazyView('./features/spectate/index.js', 'renderSpectate'));
 registerRoute('feedback', lazyView('./features/feedback/index.js', 'renderFeedback'));
 registerRoute('profile', lazyView('./features/profile/index.js', 'renderProfile'));
+registerRoute('settings', lazyView('./features/settings/index.js', 'renderSettings'));
+registerRoute('admin', lazyView('./features/admin/index.js', 'renderAdmin'));
 registerRoute('player', lazyView('./features/player/index.js', 'renderPlayerProfile'));
 registerRoute('login', () => renderLoginPage(viewRoot()));
 

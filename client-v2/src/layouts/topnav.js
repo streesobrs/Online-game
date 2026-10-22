@@ -265,6 +265,13 @@ export function renderAccountBar(container) {
   return () => { unsubscribe(); stopInteractions(); bar.remove(); };
 }
 
+/** 当前登录账号是否为管理员（账号数据在 store.user.account.account 上） */
+function isAdminAccount() {
+  const user = store.get('user');
+  const inner = user?.account?.account || user?.account || null;
+  return !!inner?.isAdmin;
+}
+
 /**
  * 渲染顶部导航布局
  * @param {HTMLElement} container - 挂载容器
@@ -275,17 +282,32 @@ export function renderTopNav(container) {
   // 使用 FEATURES 中的第一个导航项 'games' 作为入口
   const gamesNav = { id: 'games', name: '游戏', icon: '🎮', shortcut: 'G' };
 
+  // 后台入口：默认隐藏，登录账号是管理员时才出现
+  const adminBtn = el('a', {
+    class: 'nav-btn nav-btn--admin hidden',
+    href: '#/admin',
+    title: '后台管理（仅管理员可见）',
+  }, [
+    el('span', { class: 'nav-btn__icon' }, '🛠️'),
+    el('span', { class: 'nav-btn__name' }, '后台'),
+  ]);
+
   container.append(
     el('div', { class: 'nav-group nav-group--games' }, navButton(gamesNav)),
     el('div', { class: 'nav-divider' }),
-    // 已迁移进个人资料页的模块（成就/商城/主题/快捷键）不再出现在导航栏
+    // 已迁移进个人资料页 / 设置页的模块（成就/商城/主题/快捷键）不再出现在导航栏
     el('div', { class: 'nav-group nav-group--features' }, FEATURES.filter((i) => !i.inProfile).map(navButton)),
+    el('div', { class: 'nav-group nav-group--admin' }, adminBtn),
     el('div', { class: 'nav-divider' }),
     el('a', { class: 'nav-btn nav-btn--legacy', href: '/', title: '切换回旧版客户端' }, [
       el('span', { class: 'nav-btn__icon' }, '🕰️'),
       el('span', { class: 'nav-btn__name' }, '旧版'),
     ])
   );
+
+  const syncAdminBtn = () => adminBtn.classList.toggle('hidden', !isAdminAccount());
+  syncAdminBtn();
+  const unsubscribeAdmin = store.subscribe('user', syncAdminBtn);
 
   const buttons = Array.from(container.querySelectorAll('[data-nav]'));
 
@@ -305,6 +327,7 @@ export function renderTopNav(container) {
   return () => {
     unsubscribe();
     unsubscribeBadge();
+    unsubscribeAdmin();
     container.innerHTML = '';
   };
 }

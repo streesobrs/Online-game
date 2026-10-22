@@ -1847,7 +1847,7 @@ class AccountManager {
           this.operationLogger.getLevelUp(id, username, oldLevel, level, { source });
         }
       }
-      await this.checkLevelRewards(id);
+      // 等级奖励不自动发放：升级只解锁，玩家自己到资料页「等级奖励」里领（见 checkLevelRewards）
 
       // 记录经验值变化操作日志
       if (this.operationLogger && finalExp > 0) {
@@ -1933,9 +1933,8 @@ class AccountManager {
    * 升级奖励：每升 1 级发 levelUpCoinReward 星钻（与 addExp 同口径）
    *
    * 邮件奖励（单封 / 一键领取）是自己手写经验与等级、绕过了 addExp 的，历史上漏了这一步，
-   * 导致「一键领取邮件」涨了等级却拿不到升级奖励。
-   * 等级里程碑（checkLevelRewards）不在这里，由调用方在 _saveAccount 之后单独调用：
-   * 它按库里的最新等级判断，必须等新等级先落盘。
+   * 导致「一键领取邮件」涨了等级却拿不到升级奖励。升级奖励与等级奖励（里程碑）是两回事：
+   * 这张是每级固定的 50 星钻、自动到账；等级奖励要玩家自己到资料页「等级奖励」里领。
    */
   async _applyLevelUpRewards(userId, account, oldLevel, newLevel) {
     if (!(newLevel > oldLevel)) return 0;
@@ -2458,11 +2457,11 @@ class AccountManager {
     const milestones = config.levelRewards.milestones;
     const result = [];
 
+    // 称号与徽章只挂在部分大等级上（纯展示，服务端暂未落库）
     const levelTitles = {
-      5: '棋坛新秀',
       10: '对弈达人',
-      15: '棋艺高手',
-      25: '棋坛精英',
+      20: '棋坛高手',
+      30: '棋坛精英',
       40: '传奇大师',
       50: '至尊棋圣'
     };
@@ -2771,7 +2770,16 @@ class AccountManager {
         available,
         future,
         claimedLevels: claimedRewards,
-        totalClaimed: claimedRewards.length
+        totalClaimed: claimedRewards.length,
+        // 完整档位表（含已领取的），供资料页一次画出全部里程碑：客户端不再自己维护一份奖励文案
+        all: levelRewards.map(r => ({
+          ...r,
+          claimed: claimedRewards.includes(r.level),
+          available: currentLevel >= r.level && !claimedRewards.includes(r.level)
+        })),
+        // 「小等级」（非 5 的倍数）每级固定发多少星钻：客户端画等级阶梯时标在小节点上
+        perLevelCoins: config.exp.levelUpCoinReward,
+        currentLevel
       };
     } catch (err) {
       logger.error('获取等级奖励列表失败', { accountId, error: err.message });
@@ -2881,9 +2889,8 @@ class AccountManager {
             type: 'earn', amount: total, balance: account.currency.starCoins,
             source: 'compensation', reason, timestamp: Date.now()
           });
+          // 等级奖励不自动发放：老玩家达到过的档位留在资料页「等级奖励」里等玩家自己领
           await dataStore.writeOne('currencyTransactions', accountId, records);
-
-          await this.checkLevelRewards(accountId);
 
           stats.compensated++;
           stats.totalCoins += total;
@@ -2983,6 +2990,178 @@ class AccountManager {
     } catch (err) {
       logger.error('保存邮件存储失败', { userId, error: err.message });
       return false;
+    }
+  }
+
+  // ========== 邮件有效期 / 领取条件 / 定时发送 ==========
+
+  /** 规范化邮件领取条件 */
+  _normalizeMailConditions(raw) {
+    const c = raw && typeof raw === 'object' ? raw : {};
+    const minGames = {};
+    if (c.minGames && typeof c.minGames === 'object') {
+      for (const [type, count] of Object.entries(c.minGames)) {
+        const n = Math.max(0, parseInt(count, 10) || 0);
+        if (n > 0) minGames[type] = n;
+      }
+    }
+    return {
+      minLevel: Math.max(0, parseInt(c.minLevel, 10) || 0),
+      minTotalGames: Math.max(0, parseInt(c.minTotalGames, 10) || 0),
+      minGames,
+      achievements: Array.isArray(c.achievements)
+        ? c.achievements
+          .map(id => String(id).trim())
+          .filter(id => id.length > 0)
+          .slice(0, 50)
+        : []
+    };
+  }
+
+  /** 邮件当前是否处于可领取时间区间 */
+  _isMailInTimeWindow(mail, now = Date.now()) {
+    if (mail.status && mail.status !== 'sent') return false;
+    if (mail.revoked) return false;
+    const validFrom = Number(mail.validFrom) || 0;
+    const validUntil = Number(mail.validUntil) || 0;
+    if (validFrom && now < validFrom) return false;
+    if (validUntil && now > validUntil) return false;
+    return true;
+  }
+
+  /** 检查账号是否满足邮件领取条件 */
+  _checkMailConditions(account, conditions) {
+    const c = this._normalizeMailConditions(conditions);
+    const inner = account?.account || account || {};
+    const level = Number(inner.profile?.level) || 1;
+    const games = account?.games || {};
+    const stats = account?.stats || {};
+    const achievements = this._normalizeAchievements(account?.achievements || []);
+    const missing = [];
+
+    if (c.minLevel > 0 && level < c.minLevel) missing.push(`等级达到 Lv.${c.minLevel}`);
+    if (c.minTotalGames > 0) {
+      let totalGames = Number(stats.totalGames) || 0;
+      if (!totalGames) {
+        totalGames = Object.values(games).reduce((sum, g) => sum + (Number(g?.totalGames) || 0), 0);
+      }
+      if (totalGames < c.minTotalGames) missing.push(`累计对局 ${c.minTotalGames} 局`);
+    }
+
+    const gameNames = { gobang: '五子棋', go: '围棋', 'chinese-chess': '象棋', snake: '贪吃蛇', match3: '消消乐' };
+    for (const [type, need] of Object.entries(c.minGames)) {
+      const played = Number(games[type]?.totalGames) || 0;
+      if (played < need) missing.push(`${gameNames[type] || type} ${need} 局`);
+    }
+    if (c.achievements.length > 0) {
+      const owned = new Set(achievements.map(String));
+      const lacking = c.achievements.filter(id => !owned.has(String(id)));
+      if (lacking.length > 0) missing.push(`解锁 ${lacking.length} 项指定成就`);
+    }
+
+    return { ok: missing.length === 0, missing, conditions: c };
+  }
+
+  /** 读取待发送的定时邮件任务 */
+  async _getScheduledMailJobs() {
+    const jobs = await dataStore.read('mailScheduled');
+    return Array.isArray(jobs) ? jobs : [];
+  }
+
+  /** 加入定时发送队列 */
+  async scheduleMailJob({ target, mailData, scheduledAt, createdBy }) {
+    const jobs = await this._getScheduledMailJobs();
+    const job = {
+      id: Date.now().toString(36) + Math.random().toString(36).substr(2, 6),
+      target,
+      mailData,
+      scheduledAt: Number(scheduledAt) || 0,
+      createdBy: createdBy || '',
+      status: 'pending',
+      createdAt: Date.now()
+    };
+    jobs.push(job);
+    await dataStore.write('mailScheduled', jobs.slice(-500));
+    logger.info('邮件已加入定时发送队列', { jobId: job.id, target, scheduledAt: job.scheduledAt });
+    return { success: true, job };
+  }
+
+  /** 取消定时发送任务 */
+  async cancelScheduledMailJob(jobId) {
+    const jobs = await this._getScheduledMailJobs();
+    const index = jobs.findIndex(job => job.id === jobId && job.status === 'pending');
+    if (index < 0) return { success: false, message: '定时任务不存在或已完成' };
+    jobs.splice(index, 1);
+    await dataStore.write('mailScheduled', jobs);
+    return { success: true, message: '定时任务已取消' };
+  }
+
+  /** 执行到期的定时邮件任务 */
+  async runDueScheduledMails() {
+    const jobs = await this._getScheduledMailJobs();
+    if (!jobs.length) return { executed: 0 };
+    const now = Date.now();
+    let executed = 0;
+    let changed = false;
+
+    for (const job of jobs) {
+      if (job.status !== 'pending' || job.scheduledAt > now) continue;
+      changed = true;
+      try {
+        const mailData = { ...(job.mailData || {}), scheduledAt: job.scheduledAt, deliverTime: job.scheduledAt };
+        if (job.target?.type === 'user' && job.target.userId) {
+          await this.sendMail(job.target.userId, mailData);
+        } else if (job.target?.type === 'users' && Array.isArray(job.target.userIds)) {
+          await this.sendMailToUsers(job.target.userIds, mailData);
+        } else if (job.target?.type === 'all') {
+          await this.sendMailToAll(mailData);
+        }
+        job.status = 'sent';
+        job.executedAt = now;
+        executed += 1;
+      } catch (err) {
+        job.status = 'failed';
+        job.error = err.message;
+        job.executedAt = now;
+        logger.error('定时邮件发送失败', { jobId: job.id, error: err.message });
+      }
+    }
+
+    if (changed) await dataStore.write('mailScheduled', jobs.slice(-500));
+    if (executed > 0) logger.info('定时邮件任务执行完成', { executed });
+    return { executed };
+  }
+
+  /** 启动定时邮件调度（每 5 秒检查一次，保证定时邮件准时投递） */
+  startMailScheduler() {
+    if (this._mailSchedulerTimer) return;
+    this._mailSchedulerTimer = setInterval(() => {
+      this.runDueScheduledMails().catch(err => logger.error('定时邮件调度失败', { error: err.message }));
+    }, 5000);
+    this.runDueScheduledMails().catch(err => logger.error('定时邮件调度失败', { error: err.message }));
+    logger.info('定时邮件调度已启动');
+  }
+
+  /** 管理员撤回未领取的邮件 */
+  async revokeMail(userId, mailId) {
+    try {
+      const mailStore = await this._getMailStore(userId);
+      const mail = (mailStore.mails || []).find(m => m.id === mailId);
+      if (!mail) return { success: false, message: '邮件不存在' };
+      if (mail.claimed) return { success: false, message: '邮件已被领取，无法撤回' };
+
+      mail.revoked = true;
+      mail.revokedAt = Date.now();
+      await this._saveMailStore(userId, mailStore);
+
+      if (this.io) {
+        try { this.io.to(userId).emit('mail_removed', { mailId, reason: 'revoked' }); } catch (_) { /* ignore */ }
+      }
+      logger.info('管理员撤回邮件', { userId, mailId });
+      return { success: true, message: '邮件已撤回' };
+    } catch (err) {
+      logger.error('撤回邮件失败', { userId, mailId, error: err.message });
+      return { success: false, message: '撤回失败' };
     }
   }
 
@@ -4084,7 +4263,7 @@ class AccountManager {
         const levelUpCurrency = (newLevel - oldLevel) * config.exp.levelUpCoinReward;
         await this.addCurrency(userId, levelUpCurrency, `从${oldLevel}级升到${newLevel}级奖励`, 'level_up');
       }
-      await this.checkLevelRewards(userId);
+      // 等级奖励不自动发放：升级只解锁，玩家自己到资料页「等级奖励」里领（见 checkLevelRewards）
 
       try {
         const expRecords = await this.getExpRecords(userId);
@@ -5032,6 +5211,17 @@ class AccountManager {
         processedVip = { ...processedVip, name: vipName, icon: '💎' };
       }
 
+      const now = Date.now();
+      // 生效时间起点：定时邮件以「计划投递时刻」为基准（调度轮询可能有几秒误差，
+      // 用计划时刻可保证后台显示的送达时间与有效期起点一致）；
+      // 生效时间早于送达时间时按送达时间算，避免邮件带着一个「过去」的开始时间。
+      const baseTime = Number(mailData.deliverTime) || now;
+      const validFrom = Math.max(Number(mailData.validFrom) || 0, baseTime);
+      const durationMinutes = Math.max(0, parseInt(mailData.durationMinutes, 10) || 0);
+      const validUntil = durationMinutes > 0
+        ? validFrom + durationMinutes * 60 * 1000
+        : (Number(mailData.validUntil) || 0);
+
       const mail = {
         id: Date.now().toString(36) + Math.random().toString(36).substr(2, 6),
         title: mailData.title || '系统邮件',
@@ -5039,12 +5229,24 @@ class AccountManager {
         items: processedItems,
         cosmetics: processedCosmetics,
         vip: processedVip,
+        slots: Math.max(0, parseInt(mailData.slots, 10) || 0),
         starCoins: mailData.starCoins || 0,
         exp: mailData.exp || 0,
         from: mailData.from || '系统',
+        // 生效时间区间：validUntil 为 0 表示长期有效
+        validFrom,
+        validUntil,
+        durationMinutes,
+        // 领取条件：等级 / 总对局 / 各游戏对局数 / 指定成就
+        conditions: this._normalizeMailConditions(mailData.conditions),
+        // 定时发送：实际发送时间（用于后台展示）
+        scheduledAt: Number(mailData.scheduledAt) || 0,
+        status: 'sent',
+        revoked: false,
+        revokedAt: 0,
         claimed: false,
         read: false,
-        createdAt: Date.now()
+        createdAt: now
       };
 
       const mailStore = await this._getMailStore(userId);
@@ -5103,15 +5305,29 @@ class AccountManager {
     }
   }
 
-  /**
-   * 获取用户邮件列表
-   */
-  async getMails(userId) {
+  /** 邮件是否包含可领取奖励 */
+  _mailHasReward(mail) {
+    return !!(
+      (mail.items && mail.items.length > 0)
+      || (mail.cosmetics && mail.cosmetics.length > 0)
+      || mail.vip
+      || mail.slots > 0
+      || mail.starCoins > 0
+      || mail.exp > 0
+    );
+  }
+
+  async getMails(userId, options = {}) {
     try {
       const mailStore = await this._getMailStore(userId);
-      const mails = mailStore.mails || [];
+      const now = Date.now();
+      const allMails = mailStore.mails || [];
+      // 玩家端只返回当前生效区间内的邮件；后台可 includeInactive 查看全部
+      const mails = options.includeInactive
+        ? allMails
+        : allMails.filter(m => this._isMailInTimeWindow(m, now));
       const unreadCount = mails.filter(m => !m.read).length;
-      const unclaimedCount = mails.filter(m => !m.claimed && ((m.items && m.items.length > 0) || (m.cosmetics && m.cosmetics.length > 0) || m.vip || m.starCoins > 0 || m.exp > 0)).length;
+      const unclaimedCount = mails.filter(m => !m.claimed && this._mailHasReward(m) && this._isMailInTimeWindow(m, now)).length;
       return { success: true, mails, unreadCount, unclaimedCount };
     } catch (err) {
       logger.error('获取邮件失败', { userId, error: err.message });
@@ -5141,6 +5357,25 @@ class AccountManager {
       const mail = mailStore.mails[mailIndex];
       if (mail.claimed) {
         return { success: false, message: '该邮件已领取' };
+      }
+      if (mail.status && mail.status !== 'sent') {
+        return { success: false, message: '邮件尚未发送' };
+      }
+      if (mail.revoked) {
+        return { success: false, message: '邮件已被撤回' };
+      }
+
+      const claimNow = Date.now();
+      if (mail.validFrom && claimNow < mail.validFrom) {
+        return { success: false, message: '邮件尚未生效' };
+      }
+      if (mail.validUntil && claimNow > mail.validUntil) {
+        return { success: false, message: '邮件已过期' };
+      }
+
+      const conditionCheck = this._checkMailConditions(account, mail.conditions);
+      if (!conditionCheck.ok) {
+        return { success: false, message: `未满足领取条件：${conditionCheck.missing.join('、')}` };
       }
 
       const rewards = { items: [], cosmetics: [], vip: null, starCoins: 0, exp: 0, slots: 0 };
@@ -5281,8 +5516,6 @@ class AccountManager {
 
       await this._saveMailStore(userId, mailStore);
       await this._saveAccount(userId, account);
-      // 等级里程碑奖励也要走一遍：checkLevelRewards 按库里的等级判断，必须在 _saveAccount 之后调
-      await this.checkLevelRewards(userId);
       logger.info('领取邮件奖励', { userId, mailId, rewards });
 
       if (this.operationLogger) {
@@ -5326,12 +5559,16 @@ class AccountManager {
       let claimedCount = 0;
       let starCoinsToAdd = 0;
       let expToAdd = 0;
+      let slotsToAdd = 0;
 
       for (let i = 0; i < mailStore.mails.length; i++) {
         const mail = mailStore.mails[i];
         if (mail.claimed) continue;
+        // 未生效 / 已过期 / 已撤回 / 条件不满足的邮件不参与一键领取
+        if (!this._isMailInTimeWindow(mail)) continue;
+        if (!this._checkMailConditions(account, mail.conditions).ok) continue;
 
-        const hasReward = (mail.items && mail.items.length > 0) || (mail.cosmetics && mail.cosmetics.length > 0) || mail.vip || mail.starCoins > 0 || mail.exp > 0;
+        const hasReward = this._mailHasReward(mail);
         if (!hasReward) {
           mailStore.mails[i].read = true;
           continue;
@@ -5366,6 +5603,10 @@ class AccountManager {
           expToAdd += mail.exp;
         }
 
+        if (mail.slots && mail.slots > 0) {
+          slotsToAdd += mail.slots;
+        }
+
         mailStore.mails[i].claimed = true;
         mailStore.mails[i].read = true;
         mailStore.mails[i].claimedAt = Date.now();
@@ -5387,19 +5628,29 @@ class AccountManager {
       if (cosmeticSet.size > 0) {
         if (!account.cosmetics) {
           account.cosmetics = {
-            owned: { frames: [], skins: [], backgrounds: [], titles: [] },
-            equipped: { frame: null, skin: null, background: null, title: null }
+            owned: { frames: [], avatars: [], customAvatars: [], skins: [], backgrounds: [], titles: [] },
+            equipped: { frame: null, avatar: null, avatarCustom: null, skin: null, background: null, title: null }
           };
         }
-        const categoryMap = { frame: 'frames', skin: 'skins', background: 'backgrounds', title: 'titles' };
+        const categoryMap = { frame: 'frames', avatar: 'avatars', skin: 'skins', background: 'backgrounds', title: 'titles' };
         for (const key of cosmeticSet) {
           const [category, id] = key.split(':');
           const ownedKey = categoryMap[category];
-          if (ownedKey && !account.cosmetics.owned[ownedKey].includes(id)) {
-            account.cosmetics.owned[ownedKey].push(id);
-            totalRewards.cosmetics.push({ category, id });
+          if (ownedKey) {
+            if (!account.cosmetics.owned[ownedKey]) account.cosmetics.owned[ownedKey] = [];
+            if (!account.cosmetics.owned[ownedKey].includes(id)) {
+              account.cosmetics.owned[ownedKey].push(id);
+              totalRewards.cosmetics.push({ category, id });
+            }
           }
         }
+      }
+
+      // 应用头像槽位奖励
+      if (slotsToAdd > 0) {
+        if (!account.cosmetics) account.cosmetics = { slots: 0 };
+        account.cosmetics.slots = (account.cosmetics.slots || 0) + slotsToAdd;
+        totalRewards.slots = slotsToAdd;
       }
 
       // 应用会员奖励
@@ -5486,8 +5737,6 @@ class AccountManager {
 
       await this._saveMailStore(userId, mailStore);
       await this._saveAccount(userId, account);
-      // 等级里程碑奖励也要走一遍：checkLevelRewards 按库里的等级判断，必须在 _saveAccount 之后调
-      await this.checkLevelRewards(userId);
       logger.info('批量领取邮件', { userId, claimedCount, totalRewards });
 
       if (this.operationLogger) {

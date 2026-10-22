@@ -5,7 +5,7 @@
  * - global → 路由跳转（go(view)）
  * - 其它作用域（如 games）→ 交给该作用域注册的处理函数（视图挂载时注册，卸载时注销）
  *
- * 键位可由用户在「个人资料 → 快捷键」自定义，见 core/shortcuts.js。
+ * 键位可由用户在「设置 → ⌨ 快捷键」自定义，见 core/shortcuts.js。
  * 输入框（input/textarea/select/contentEditable）内不触发。
  */
 import { go } from '../core/router.js';

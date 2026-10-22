@@ -124,6 +124,24 @@
       box-shadow: 0 10px 25px rgba(59, 130, 246, 0.4);
     }
 
+    .login-back-btn {
+      width: 100%;
+      margin-top: 12px;
+      padding: 10px;
+      background: transparent;
+      border: 1px solid #475569;
+      border-radius: 10px;
+      color: #94a3b8;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .login-back-btn:hover {
+      color: #e2e8f0;
+      border-color: #64748b;
+    }
+
     /* 主布局 */
     .admin-layout {
       display: flex;
@@ -2756,6 +2774,7 @@
       <input type="password" id="admin-password" class="login-input" placeholder="请输入密码"
         onkeypress="if(event.key==='Enter')login()">
       <button class="login-btn" onclick="login()">登录系统</button>
+      <button class="login-back-btn" onclick="backToClient()">← 返回客户端</button>
       <div style="text-align: center; margin-top: 16px; font-size: 12px; color: #64748b;">
         <span id="server-version">加载版本中...</span>
       </div>
@@ -2868,6 +2887,7 @@
           <h1 id="page-title" class="page-title">数据概览</h1>
         </div>
         <div class="top-actions">
+          <button class="icon-btn" onclick="backToClient()" title="返回客户端">↩</button>
           <button class="icon-btn" onclick="refreshAllData()" title="刷新数据">🔄</button>
           <button class="icon-btn" onclick="showBroadcastModal()" title="广播消息">📢</button>
           <button class="icon-btn" onclick="logout()" title="退出登录">🚪</button>
@@ -3784,15 +3804,34 @@
                   <input type="text" id="mail-title" class="form-input" placeholder="如：系统补偿、活动奖励等">
                 </div>
                 <div>
+                  <label class="form-label">发送人</label>
+                  <select id="mail-from" class="form-input" onchange="syncMailFromCustom()">
+                    <option value="管理员">管理员</option>
+                    <option value="系统">系统</option>
+                    <option value="__custom__">自定义…</option>
+                  </select>
+                  <input type="text" id="mail-from-custom" class="form-input" maxlength="20"
+                    placeholder="输入自定义发送人（留空按「管理员」发送）" style="display:none;margin-top:6px;">
+                </div>
+                <div>
                   <label class="form-label">邮件内容</label>
                   <textarea id="mail-content" class="form-input" rows="3" placeholder="邮件详细内容..."></textarea>
                 </div>
               </div>
 
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+                <select id="mail-template-select" class="form-input" style="flex:1;min-width:200px;">
+                  <option value="">选择邮件模板…</option>
+                </select>
+                <button class="btn" onclick="applyMailTemplate()">套用模板</button>
+                <button class="btn" onclick="saveMailTemplate()">保存为模板</button>
+                <button class="btn" onclick="deleteMailTemplate()">删除模板</button>
+              </div>
+
               <div
                 style="background:#0f172a;padding:12px;border-radius:8px;border:1px solid #334155;margin-bottom:12px;">
                 <div style="font-size:13px;color:#94a3b8;margin-bottom:8px;">📦 奖励内容（可留空）</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
                   <div>
                     <label class="form-label" style="font-size:12px;">💎 星钻</label>
                     <input type="number" id="mail-starcoins" class="form-input" value="0" min="0" placeholder="星钻数量">
@@ -3800,6 +3839,10 @@
                   <div>
                     <label class="form-label" style="font-size:12px;">⭐ 经验值</label>
                     <input type="number" id="mail-exp" class="form-input" value="0" min="0" placeholder="经验值数量">
+                  </div>
+                  <div>
+                    <label class="form-label" style="font-size:12px;">🖼️ 头像槽位</label>
+                    <input type="number" id="mail-slots" class="form-input" value="0" min="0" placeholder="槽位数量">
                   </div>
                 </div>
 
@@ -3871,10 +3914,91 @@
                 </div>
               </div>
 
+              <div
+                style="background:#0f172a;padding:12px;border-radius:8px;border:1px solid #334155;margin-bottom:12px;">
+                <div style="font-size:13px;color:#94a3b8;margin-bottom:8px;">⏱️ 有效期与定时发送</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+                  <div>
+                    <label class="form-label" style="font-size:12px;">生效时间（留空=随邮件送达）</label>
+                    <input type="datetime-local" id="mail-valid-from" class="form-input">
+                  </div>
+                  <div>
+                    <label class="form-label" style="font-size:12px;">持续时长（小时，0=长期）</label>
+                    <input type="number" id="mail-duration" class="form-input" value="0" min="0" step="0.5">
+                  </div>
+                  <div>
+                    <label class="form-label" style="font-size:12px;">定时发送（留空=立即）</label>
+                    <input type="datetime-local" id="mail-scheduled-at" class="form-input">
+                  </div>
+                </div>
+                <div id="mail-timing-hint"
+                  style="font-size:12px;color:#94a3b8;background:#111c30;border:1px solid #1e293b;border-radius:6px;padding:6px 8px;">
+                </div>
+
+                <div style="font-size:13px;color:#94a3b8;margin-bottom:8px;">🎯 领取条件（留空表示无门槛）</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                  <div>
+                    <label class="form-label" style="font-size:12px;">最低等级</label>
+                    <input type="number" id="mail-min-level" class="form-input" value="0" min="0">
+                  </div>
+                  <div>
+                    <label class="form-label" style="font-size:12px;">最低总对局数</label>
+                    <input type="number" id="mail-min-total-games" class="form-input" value="0" min="0">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:10px;">
+                  <div>
+                    <label class="form-label" style="font-size:12px;">五子棋局数</label>
+                    <input type="number" id="mail-min-gobang" class="form-input" value="0" min="0">
+                  </div>
+                  <div>
+                    <label class="form-label" style="font-size:12px;">围棋局数</label>
+                    <input type="number" id="mail-min-go" class="form-input" value="0" min="0">
+                  </div>
+                  <div>
+                    <label class="form-label" style="font-size:12px;">象棋局数</label>
+                    <input type="number" id="mail-min-chinese-chess" class="form-input" value="0" min="0">
+                  </div>
+                  <div>
+                    <label class="form-label" style="font-size:12px;">贪吃蛇局数</label>
+                    <input type="number" id="mail-min-snake" class="form-input" value="0" min="0">
+                  </div>
+                  <div>
+                    <label class="form-label" style="font-size:12px;">消消乐局数</label>
+                    <input type="number" id="mail-min-match3" class="form-input" value="0" min="0">
+                  </div>
+                </div>
+                <div>
+                  <label class="form-label" style="font-size:12px;">需要解锁的成就（可多选，Ctrl / Shift 点击）</label>
+                  <select id="mail-achievements" class="form-input" multiple size="6" style="min-height:110px;">
+                    <option value="">加载中…</option>
+                  </select>
+                </div>
+              </div>
+
               <div style="display:flex;gap:10px;">
                 <button class="btn btn-primary" onclick="sendMailToUser()">📨 发送给指定用户</button>
                 <button class="btn btn-warning" onclick="sendMailToAllUsers()">📢 发送给所有用户</button>
               </div>
+            </div>
+          </div>
+
+          <!-- 邮件管理 -->
+          <div class="data-card">
+            <div class="card-header">
+              <span class="card-title">🗂️ 邮件管理（撤回 / 删除 / 定时队列）</span>
+            </div>
+            <div style="padding:16px;">
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+                <input type="text" id="mail-manage-user-id" class="form-input" style="flex:1;min-width:200px;"
+                  placeholder="输入用户ID查询其全部邮件">
+                <button class="btn btn-primary" onclick="queryUserMails()">查询邮件</button>
+                <button class="btn" onclick="loadScheduledMails()">刷新定时队列</button>
+              </div>
+              <div id="mail-manage-list" style="display:flex;flex-direction:column;gap:8px;min-height:40px;"></div>
+              <div style="margin-top:16px;font-size:13px;color:#94a3b8;">⏰ 待发送的定时邮件</div>
+              <div id="mail-scheduled-list"
+                style="display:flex;flex-direction:column;gap:8px;margin-top:8px;min-height:40px;"></div>
             </div>
           </div>
 
@@ -4307,6 +4431,19 @@
           } else {
             showToast(data.message || '操作失败', 'error');
           }
+
+          if (data.action === 'send_mail' || data.action === 'send_mail_all') {
+            if (data.scheduled) loadScheduledMails();
+          }
+          if (['revoke_mail', 'delete_mail'].includes(data.action) && mailManageUserId) {
+            socket.emit('get_user_mails', { id: mailManageUserId });
+          }
+          if (['save_mail_template', 'delete_mail_template'].includes(data.action)) {
+            socket.emit('get_mail_templates');
+          }
+          if (data.action === 'cancel_scheduled_mail') {
+            loadScheduledMails();
+          }
         });
 
         // 账号列表更新事件
@@ -4400,6 +4537,52 @@
         socket.on('admin_users_select_list', (data) => {
           if (data.success && pendingUserListId) {
             renderUserList(data.users, pendingUserListId);
+          }
+        });
+
+        // 邮件模板
+        socket.on('admin_mail_templates', (data) => {
+          mailTemplates = (data && data.templates) || [];
+          renderMailTemplateOptions();
+        });
+
+        // 用户邮件列表（后台管理）
+        socket.on('admin_user_mails', (data) => {
+          if (data && data.userId) mailManageUserId = data.userId;
+          mailManageList = (data && data.mails) || [];
+          renderMailManageList();
+        });
+
+        // 定时邮件队列
+        socket.on('admin_scheduled_mails', (data) => {
+          mailScheduledJobs = (data && data.jobs) || [];
+          renderMailScheduledList();
+        });
+
+        // 成就列表（邮件领取条件用）
+        socket.on('achievements_list', (data) => {
+          const categories = (data && data.categories) || [];
+          const options = [];
+          categories.forEach((category) => {
+            (category.achievements || []).forEach((ach) => {
+              options.push({ id: String(ach.id), name: ach.name, description: ach.description || '' });
+            });
+          });
+          mailAchievements = options;
+          const select = document.getElementById('mail-achievements');
+          if (select) {
+            select.innerHTML = '';
+            if (!options.length) {
+              select.innerHTML = '<option value="">暂无成就</option>';
+              return;
+            }
+            options.forEach((ach) => {
+              const opt = document.createElement('option');
+              opt.value = ach.id;
+              opt.textContent = `${ach.name}（#${ach.id}）`;
+              opt.title = ach.description;
+              select.appendChild(opt);
+            });
           }
         });
 
@@ -4609,6 +4792,13 @@
       if (view === 'exp-records') loadExpRecords();
       if (view === 'coin-records') loadCoinRecords();
       if (view === 'mail-records') loadMailRecords();
+      if (view === 'mail') {
+        loadItemList();
+        socket.emit('get_mail_templates');
+        socket.emit('get_scheduled_mails');
+        socket.emit('get_achievements_list');
+        refreshMailTimingHint();
+      }
 
       // 移动端切换页面后关闭侧边栏
       if (window.innerWidth <= 768) {
@@ -5240,6 +5430,31 @@
       // 清除存储的 token
       localStorage.removeItem('adminToken');
       location.reload();
+    }
+
+    /**
+     * 回到进入后台前所在的页面
+     * 优先级：?from= 指定的站内路径 → 同源 referrer → 新版客户端首页
+     */
+    function backToClient() {
+      const from = new URLSearchParams(location.search).get('from');
+      // 只接受站内相对路径，避免被构造成跳去外站
+      if (from && from.startsWith('/') && !from.startsWith('//')) {
+        location.href = from;
+        return;
+      }
+      try {
+        if (document.referrer) {
+          const ref = new URL(document.referrer);
+          if (ref.origin === location.origin) {
+            location.href = ref.href;
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('解析来源页失败', err);
+      }
+      location.href = '/beta';
     }
 
     // 加载服务器版本号
@@ -6318,10 +6533,11 @@
         vip,
         starCoins,
         exp,
-        from: '管理员'
+        from: getMailFrom(),
+        ...collectMailExtras()
       };
       socket.emit('send_mail_to_user', mailData);
-      showToast('邮件发送请求已提交', 'success');
+      showToast(resolveMailDeliverAt(mailData) > Date.now() + 5000 ? '定时邮件已提交' : '邮件发送请求已提交', 'success');
     }
 
     function sendMailToAllUsers() {
@@ -6335,7 +6551,12 @@
       const vip = getSelectedMailVip();
 
       if (!title) return showToast('请输入邮件标题', 'error');
-      if (!confirm('确定要给所有用户发送这封邮件吗？此操作可能需要较长时间。')) return;
+      const extras = collectMailExtras();
+      const deliverAt = resolveMailDeliverAt(extras);
+      const isTimed = deliverAt > Date.now() + 5000;
+      if (!confirm(isTimed
+        ? `确定要在 ${new Date(deliverAt).toLocaleString('zh-CN', { hour12: false })} 给所有用户发送这封邮件吗？`
+        : '确定要给所有用户发送这封邮件吗？此操作可能需要较长时间。')) return;
 
       const mailData = {
         title,
@@ -6345,10 +6566,11 @@
         vip,
         starCoins,
         exp,
-        from: '管理员'
+        from: getMailFrom(),
+        ...extras
       };
       socket.emit('send_mail_all', mailData);
-      showToast('全站邮件发送请求已提交', 'success');
+      showToast(isTimed ? '全站定时邮件已提交' : '全站邮件发送请求已提交', 'success');
     }
 
     function grantStarCoins() {
@@ -8508,6 +8730,333 @@
     let mailSelectedVip = null;
     let grantSelectedItems = new Map();
     let mailActiveTab = 'items';
+    let mailTemplates = [];
+    let mailManageUserId = '';
+    let mailManageList = [];
+    let mailScheduledJobs = [];
+    let mailAchievements = [];
+
+    /** 收集邮件表单中的有效期 / 条件 / 定时字段 */
+    function collectMailExtras() {
+      const byId = (id) => document.getElementById(id);
+      const num = (id) => Math.max(0, parseInt(byId(id)?.value, 10) || 0);
+      const toTs = (id) => {
+        const v = byId(id)?.value;
+        return v ? new Date(v).getTime() : 0;
+      };
+
+      const minGames = {};
+      ['gobang', 'go', 'chinese-chess', 'snake', 'match3'].forEach((type) => {
+        const n = num(`mail-min-${type}`);
+        if (n > 0) minGames[type] = n;
+      });
+
+      const conditions = {};
+      const minLevel = num('mail-min-level');
+      const minTotalGames = num('mail-min-total-games');
+      if (minLevel) conditions.minLevel = minLevel;
+      if (minTotalGames) conditions.minTotalGames = minTotalGames;
+      if (Object.keys(minGames).length) conditions.minGames = minGames;
+
+      const achSelect = byId('mail-achievements');
+      const achievements = achSelect
+        ? Array.from(achSelect.selectedOptions).map(o => o.value).filter(Boolean)
+        : [];
+      if (achievements.length) conditions.achievements = achievements;
+
+      const durationHours = Math.max(0, parseFloat(byId('mail-duration')?.value) || 0);
+
+      return {
+        slots: num('mail-slots'),
+        validFrom: toTs('mail-valid-from'),
+        durationMinutes: Math.round(durationHours * 60),
+        conditions: Object.keys(conditions).length ? conditions : null,
+        scheduledAt: toTs('mail-scheduled-at')
+      };
+    }
+
+    /** 把邮件数据回填到表单（模板套用 / 反向保存） */
+    function fillMailForm(mailData) {
+      const byId = (id) => document.getElementById(id);
+      const m = mailData || {};
+      const c = m.conditions || {};
+      const set = (id, value) => { const node = byId(id); if (node) node.value = value; };
+
+      set('mail-title', m.title || '');
+      set('mail-content', m.content || '');
+      // 发送人：预设值直接选中，其余落到「自定义…」并填入输入框
+      const fromValue = (m.from || '管理员').toString();
+      const fromSelect = byId('mail-from');
+      const isPreset = !!fromSelect && Array.from(fromSelect.options).some(opt => opt.value === fromValue);
+      if (fromSelect) fromSelect.value = isPreset ? fromValue : '__custom__';
+      set('mail-from-custom', isPreset ? '' : fromValue);
+      syncMailFromCustom({ silent: true });
+      set('mail-starcoins', m.starCoins || 0);
+      set('mail-exp', m.exp || 0);
+      set('mail-slots', m.slots || 0);
+      set('mail-duration', m.durationMinutes ? Math.round((m.durationMinutes / 60) * 10) / 10 : 0);
+      set('mail-min-level', c.minLevel || 0);
+      set('mail-min-total-games', c.minTotalGames || 0);
+      ['gobang', 'go', 'chinese-chess', 'snake', 'match3'].forEach((type) => {
+        set(`mail-min-${type}`, (c.minGames && c.minGames[type]) || 0);
+      });
+
+      const achSelect = byId('mail-achievements');
+      if (achSelect) {
+        const wanted = new Set((c.achievements || []).map(String));
+        Array.from(achSelect.options).forEach(opt => { opt.selected = wanted.has(opt.value); });
+      }
+
+      // 物品 / 礼包
+      mailSelectedItems.clear();
+      mailSelectedPacks.clear();
+      (m.items || []).forEach((item) => {
+        const found = mailItemList.find(x => x.id === item.id) || mailPackList.find(x => x.id === item.id);
+        if (!found) return;
+        const entry = { ...found, count: item.count || 1 };
+        if (mailPackList.some(x => x.id === item.id)) mailSelectedPacks.set(item.id, entry);
+        else mailSelectedItems.set(item.id, entry);
+      });
+      updateMailItemsGrid();
+      updateMailPacksGrid();
+
+      // 外观
+      mailSelectedCosmetics.clear();
+      (m.cosmetics || []).forEach(co => mailSelectedCosmetics.add(`${co.category}:${co.id}`));
+      updateMailCosmeticsSelected();
+
+      // 会员
+      mailSelectedVip = null;
+      if (m.vip && m.vip.days) {
+        const found = mailVipList.find(v => v.days === m.vip.days);
+        mailSelectedVip = found || { days: m.vip.days, expBonus: m.vip.expBonus || 2 };
+      }
+      renderMailVip(mailVipList);
+    }
+
+    /** 选择「自定义…」时显示自定义发送人输入框（opts.silent 时不抢焦点） */
+    function syncMailFromCustom(opts) {
+      const select = document.getElementById('mail-from');
+      const custom = document.getElementById('mail-from-custom');
+      if (!select || !custom) return;
+      const isCustom = select.value === '__custom__';
+      custom.style.display = isCustom ? '' : 'none';
+      if (isCustom && !opts?.silent) custom.focus();
+    }
+
+    /** 邮件发送人：下拉预设，选「自定义…」时取输入框，留空回退为「管理员」 */
+    function getMailFrom() {
+      const select = document.getElementById('mail-from');
+      const value = (select?.value || '').trim();
+      if (value && value !== '__custom__') return value;
+      return (document.getElementById('mail-from-custom')?.value || '').trim() || '管理员';
+    }
+
+    /** 从表单收集完整邮件数据（模板保存用） */
+    function collectMailFormData() {
+      return {
+        title: document.getElementById('mail-title')?.value.trim() || '',
+        content: document.getElementById('mail-content')?.value.trim() || '',
+        items: getSelectedMailItems(),
+        cosmetics: getSelectedMailCosmetics(),
+        vip: getSelectedMailVip(),
+        starCoins: parseInt(document.getElementById('mail-starcoins')?.value, 10) || 0,
+        exp: parseInt(document.getElementById('mail-exp')?.value, 10) || 0,
+        from: getMailFrom(),
+        ...collectMailExtras()
+      };
+    }
+
+    function renderMailTemplateOptions() {
+      const select = document.getElementById('mail-template-select');
+      if (!select) return;
+      const current = select.value;
+      select.innerHTML = '<option value="">选择邮件模板…</option>';
+      mailTemplates.forEach((t) => {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.name;
+        select.appendChild(opt);
+      });
+      select.value = current;
+    }
+
+    function applyMailTemplate() {
+      const select = document.getElementById('mail-template-select');
+      const tpl = mailTemplates.find(t => t.id === select?.value);
+      if (!tpl) return showToast('请选择模板', 'error');
+      fillMailForm(tpl.mailData || {});
+      refreshMailTimingHint();
+      showToast('模板已套用', 'success');
+    }
+
+    function saveMailTemplate() {
+      if (!socket) return showToast('未连接到服务器', 'error');
+      const name = prompt('模板名称：');
+      if (!name || !name.trim()) return;
+      socket.emit('save_mail_template', { name: name.trim(), mailData: collectMailFormData() });
+    }
+
+    function deleteMailTemplate() {
+      const select = document.getElementById('mail-template-select');
+      const tpl = mailTemplates.find(t => t.id === select?.value);
+      if (!tpl) return showToast('请选择模板', 'error');
+      if (!confirm(`确定删除模板「${tpl.name}」吗？`)) return;
+      socket.emit('delete_mail_template', { id: tpl.id });
+    }
+
+    const MAIL_STATE_TEXT = {
+      active: '可领取', claimed: '已领取', pending: '未生效',
+      expired: '已过期', revoked: '已撤回', unsent: '未发送'
+    };
+
+    function mailValidityText(mail, startOverride) {
+      const from = Math.max(Number(mail?.validFrom) || 0, Number(startOverride) || 0);
+      const until = Number(mail?.validUntil) || 0;
+      const fmt = (ts) => ts ? new Date(ts).toLocaleString('zh-CN', { hour12: false }) : '—';
+      if (!until) return `${from ? fmt(from) : '立即'} 起长期有效`;
+      return `${fmt(from)} 至 ${fmt(until)}`;
+    }
+
+    /** 邮件实际送达时间：取「定时发送」与「生效时间」中较晚者 */
+    function resolveMailDeliverAt(extras) {
+      return Math.max(Number(extras?.scheduledAt) || 0, Number(extras?.validFrom) || 0);
+    }
+
+    /** 刷新「送达时间 / 有效期」提示，避免定时与生效时间填串 */
+    function refreshMailTimingHint() {
+      const hint = document.getElementById('mail-timing-hint');
+      if (!hint) return;
+      const extras = collectMailExtras();
+      const deliverAt = resolveMailDeliverAt(extras);
+      const fmt = (ts) => new Date(ts).toLocaleString('zh-CN', { hour12: false });
+      const deferred = deliverAt > Date.now() + 5000;
+      let text;
+      if (!deferred) {
+        text = '立即送达，送达后玩家即可领取';
+      } else {
+        const delayed = (Number(extras.validFrom) || 0) > (Number(extras.scheduledAt) || 0);
+        text = `将于 ${fmt(deliverAt)} 送达${delayed ? '（生效时间晚于发送时间，投递顺延至生效时间）' : ''}`;
+      }
+      if (extras.durationMinutes > 0) {
+        text += `；有效期至 ${fmt((deferred ? deliverAt : Date.now()) + extras.durationMinutes * 60 * 1000)}`;
+      } else {
+        text += '；长期有效';
+      }
+      hint.textContent = text;
+    }
+
+    ['mail-valid-from', 'mail-duration', 'mail-scheduled-at'].forEach((id) => {
+      const node = document.getElementById(id);
+      if (!node) return;
+      node.addEventListener('input', refreshMailTimingHint);
+      node.addEventListener('change', refreshMailTimingHint);
+    });
+
+    function mailConditionsText(conditions) {
+      const c = conditions || {};
+      const gameNames = { gobang: '五子棋', go: '围棋', 'chinese-chess': '象棋', snake: '贪吃蛇', match3: '消消乐' };
+      const parts = [];
+      if (c.minLevel) parts.push(`等级≥${c.minLevel}`);
+      if (c.minTotalGames) parts.push(`总对局≥${c.minTotalGames}`);
+      Object.entries(c.minGames || {}).forEach(([type, n]) => parts.push(`${gameNames[type] || type}≥${n}局`));
+      if (Array.isArray(c.achievements) && c.achievements.length) parts.push(`需解锁${c.achievements.length}项成就`);
+      return parts.length ? parts.join('，') : '无';
+    }
+
+    function renderMailManageList() {
+      const list = document.getElementById('mail-manage-list');
+      if (!list) return;
+      list.innerHTML = '';
+      if (!mailManageUserId) {
+        list.innerHTML = '<div style="color:#64748b;font-size:12px;">输入用户ID后点击「查询邮件」查看该用户全部邮件</div>';
+        return;
+      }
+      if (!mailManageList.length) {
+        list.innerHTML = '<div style="color:#64748b;font-size:12px;">该用户没有邮件</div>';
+        return;
+      }
+      mailManageList.forEach((mail) => {
+        const canRevoke = !mail.claimed && !mail.revoked;
+        const row = document.createElement('div');
+        row.style.cssText = 'background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;';
+        row.innerHTML = `
+          <div style="flex:1;min-width:220px;">
+            <div style="font-size:13px;font-weight:600;color:#e2e8f0;">
+              <span style="background:#334155;border-radius:4px;padding:1px 6px;font-size:11px;margin-right:6px;">${MAIL_STATE_TEXT[mail.state] || '未知'}</span>
+              ${escapeHtml(mail.title || '无标题')}
+            </div>
+            <div style="font-size:12px;color:#94a3b8;margin-top:4px;line-height:1.6;">
+              送达时间：${escapeHtml(new Date(mail.scheduledAt || mail.createdAt || Date.now()).toLocaleString('zh-CN', { hour12: false }))}<br>
+              有效期：${escapeHtml(mailValidityText(mail, mail.scheduledAt || mail.createdAt))}<br>
+              领取条件：${escapeHtml(mailConditionsText(mail.conditions))}
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;">
+            ${canRevoke ? `<button class="btn" data-act="revoke">撤回</button>` : ''}
+            <button class="btn" data-act="delete" style="background:#dc2626;">删除</button>
+          </div>
+        `;
+        const revokeBtn = row.querySelector('[data-act="revoke"]');
+        if (revokeBtn) revokeBtn.onclick = () => {
+          if (!confirm(`确定撤回「${mail.title || '无标题'}」吗？`)) return;
+          socket.emit('revoke_mail', { userId: mailManageUserId, mailId: mail.id });
+        };
+        row.querySelector('[data-act="delete"]').onclick = () => {
+          if (!confirm(`确定删除「${mail.title || '无标题'}」吗？`)) return;
+          socket.emit('delete_mail', { userId: mailManageUserId, mailId: mail.id });
+        };
+        list.appendChild(row);
+      });
+    }
+
+    function renderMailScheduledList() {
+      const list = document.getElementById('mail-scheduled-list');
+      if (!list) return;
+      list.innerHTML = '';
+      if (!mailScheduledJobs.length) {
+        list.innerHTML = '<div style="color:#64748b;font-size:12px;">当前没有待发送的定时邮件</div>';
+        return;
+      }
+      mailScheduledJobs.forEach((job) => {
+        const target = job.target?.type === 'all'
+          ? '全服'
+          : job.target?.type === 'users'
+            ? `${(job.target.userIds || []).length} 个账号`
+            : (job.target?.userId || '未知');
+        const row = document.createElement('div');
+        row.style.cssText = 'background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;';
+        row.innerHTML = `
+          <div style="flex:1;min-width:220px;">
+            <div style="font-size:13px;font-weight:600;color:#e2e8f0;">⏰ ${escapeHtml(job.mailData?.title || '无标题')}</div>
+            <div style="font-size:12px;color:#94a3b8;margin-top:4px;line-height:1.6;">
+              发送时间：${escapeHtml(new Date(job.scheduledAt).toLocaleString('zh-CN', { hour12: false }))}<br>
+              收件人：${escapeHtml(target)}<br>
+              有效期：${escapeHtml(mailValidityText(job.mailData || {}, job.scheduledAt))}
+            </div>
+          </div>
+          <div><button class="btn" data-act="cancel" style="background:#dc2626;">取消</button></div>
+        `;
+        row.querySelector('[data-act="cancel"]').onclick = () => {
+          if (!confirm(`确定取消「${job.mailData?.title || '无标题'}」的定时发送吗？`)) return;
+          socket.emit('cancel_scheduled_mail', { jobId: job.id });
+        };
+        list.appendChild(row);
+      });
+    }
+
+    function queryUserMails() {
+      if (!socket) return showToast('未连接到服务器', 'error');
+      const userId = document.getElementById('mail-manage-user-id')?.value.trim();
+      if (!userId) return showToast('请输入用户ID', 'error');
+      mailManageUserId = userId;
+      socket.emit('get_user_mails', { id: userId });
+    }
+
+    function loadScheduledMails() {
+      if (!socket) return showToast('未连接到服务器', 'error');
+      socket.emit('get_scheduled_mails');
+    }
 
     function loadItemList() {
       debugLog('loadItemList 被调用, socket:', socket, 'connected:', socket?.connected);

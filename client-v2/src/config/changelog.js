@@ -3,10 +3,19 @@
  *
  * 生成命令：npm run changelog
  * 数据源：git 提交记录（遵循 .trae/rules/git-commit-message.md 提交规范）
- * 生成时间：2026-10-19T15:40:45.131Z
+ * 生成时间：2026-10-22T08:27:38.899Z
  */
 
 export const CHANGELOG = [
+  {
+    "tag": "Build 796",
+    "name": "新增肉鸽试炼「定向调配」祝福及邮件奖励星钻发放",
+    "type": "feat",
+    "scope": "全端",
+    "hash": "34e0177",
+    "publishedAt": "2026-10-19T23:41:02+08:00",
+    "body": "### 后端改动\n- 新增「定向调配」祝福的实现逻辑与权重计算\n- 新增邮件领取时的经验转星钻及升级奖励发放\n- 调整邮件存储上限从100封改为500封\n- 新增taskColorsOf与colorWeightsFor工具函数\n\n### 前端改动\n- 新增「定向调配」祝福的显示与面板展示\n- 适配肉鸽模式的开局参数计算逻辑\n- 新增taskcolor的权重配置与测试用例"
+  },
   {
     "tag": "Build 795",
     "name": "肉鸽试炼扩展4个新角色并新增熟练度系统",

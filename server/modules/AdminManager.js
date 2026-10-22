@@ -2166,6 +2166,54 @@ class AdminManager {
     return this.adminSockets.size;
   }
 
+  // 从后台 payload 中提取邮件数据（有效期 / 条件 / 附件）
+  _buildMailData(data = {}) {
+    const {
+      title,
+      content,
+      items = [],
+      cosmetics = [],
+      vip = null,
+      slots = 0,
+      starCoins = 0,
+      exp = 0,
+      from = '管理员',
+      validFrom = 0,
+      validUntil = 0,
+      durationMinutes = 0,
+      conditions = null
+    } = data;
+    return {
+      title,
+      content,
+      items,
+      cosmetics,
+      vip,
+      slots: Math.max(0, parseInt(slots, 10) || 0),
+      starCoins: Math.max(0, parseInt(starCoins, 10) || 0),
+      exp: Math.max(0, parseInt(exp, 10) || 0),
+      from: (typeof from === 'string' && from.trim()) ? from.trim().slice(0, 20) : '管理员',
+      validFrom: Number(validFrom) || 0,
+      validUntil: Number(validUntil) || 0,
+      durationMinutes: Math.max(0, parseInt(durationMinutes, 10) || 0),
+      conditions: conditions || null
+    };
+  }
+
+  // 是否需要走定时队列（预留 5 秒容错，避免把「立即发送」误判成定时）
+  _isScheduledSend(scheduledAt) {
+    const at = Number(scheduledAt) || 0;
+    return at > Date.now() + 5000;
+  }
+
+  // 邮件实际投递时间：取「定时发送时间」与「生效时间」中较晚的一个
+  // （生效时间晚于发送时间时顺延投递，避免出现「已送达但玩家看不见」的邮件）
+  _resolveDeliveryTime(mailData, scheduledAt) {
+    const at = Number(scheduledAt) || 0;
+    const from = Number(mailData?.validFrom) || 0;
+    return Math.max(at, from);
+  }
+
   // 给指定用户发送邮件（带物品/星钻/经验奖励）
   async sendMailToUser(socket, data) {
     const adminInfo = this.adminSockets.get(socket.id);
@@ -2179,7 +2227,7 @@ class AdminManager {
       return;
     }
 
-    const { userId, title, content, items = [], cosmetics = [], vip = null, starCoins = 0, exp = 0, from = '管理员' } = data;
+    const { userId, scheduledAt = 0 } = data || {};
     if (!userId) {
       socket.emit('admin_action_result', {
         action: 'send_mail',
@@ -2189,9 +2237,30 @@ class AdminManager {
       return;
     }
 
-    const mailData = { title, content, items, cosmetics, vip, starCoins, exp, from };
+    const mailData = this._buildMailData(data);
+    const deliverAt = this._resolveDeliveryTime(mailData, scheduledAt);
+
+    // 定时发送：先进队列，由调度器到点投递
+    if (this._isScheduledSend(deliverAt)) {
+      const jobResult = await this.accountManager.scheduleMailJob({
+        target: { type: 'user', userId },
+        mailData,
+        scheduledAt: deliverAt,
+        createdBy: adminInfo?.username || ''
+      });
+      logger.info('管理员安排定时邮件', { adminSocket: socket.id, userId, deliverAt });
+      socket.emit('admin_action_result', {
+        action: 'send_mail',
+        success: jobResult.success,
+        scheduled: true,
+        job: jobResult.job,
+        message: jobResult.success ? '邮件已安排定时发送' : '定时邮件创建失败'
+      });
+      return;
+    }
+
     const result = await this.accountManager.sendMail(userId, mailData);
-    logger.info('管理员发送邮件', { adminSocket: socket.id, userId, title });
+    logger.info('管理员发送邮件', { adminSocket: socket.id, userId, title: mailData.title });
 
     // 记录操作日志
     if (this.operationLogger && adminInfo && result.success) {
@@ -2200,15 +2269,19 @@ class AdminManager {
         adminInfo.username || '管理员',
         'mail_send',
         userId,
-        title,
+        mailData.title,
         {
           mailId: result.mail?.id || '',
-          title,
-          items: items.length,
-          cosmetics: cosmetics.length,
-          vipDays: vip?.days || 0,
-          starCoins,
-          exp
+          title: mailData.title,
+          items: mailData.items.length,
+          cosmetics: mailData.cosmetics.length,
+          slots: mailData.slots,
+          vipDays: mailData.vip?.days || 0,
+          starCoins: mailData.starCoins,
+          exp: mailData.exp,
+          validFrom: mailData.validFrom,
+          validUntil: mailData.validUntil,
+          conditions: mailData.conditions
         }
       );
     }
@@ -2241,7 +2314,7 @@ class AdminManager {
       return;
     }
 
-    const { userIds, title, content, items = [], starCoins = 0, exp = 0, from = '管理员' } = data;
+    const { userIds, scheduledAt = 0 } = data || {};
     if (!Array.isArray(userIds) || userIds.length === 0) {
       socket.emit('admin_action_result', {
         action: 'send_mail_batch',
@@ -2251,9 +2324,29 @@ class AdminManager {
       return;
     }
 
-    const mailData = { title, content, items, starCoins, exp, from };
+    const mailData = this._buildMailData(data);
+    const deliverAt = this._resolveDeliveryTime(mailData, scheduledAt);
+
+    if (this._isScheduledSend(deliverAt)) {
+      const jobResult = await this.accountManager.scheduleMailJob({
+        target: { type: 'users', userIds },
+        mailData,
+        scheduledAt: deliverAt,
+        createdBy: adminInfo?.username || ''
+      });
+      logger.info('管理员安排批量定时邮件', { adminSocket: socket.id, userCount: userIds.length, deliverAt });
+      socket.emit('admin_action_result', {
+        action: 'send_mail_batch',
+        success: jobResult.success,
+        scheduled: true,
+        job: jobResult.job,
+        message: jobResult.success ? '邮件已安排定时发送' : '定时邮件创建失败'
+      });
+      return;
+    }
+
     const result = await this.accountManager.sendMailToUsers(userIds, mailData);
-    logger.info('管理员批量发送邮件', { adminSocket: socket.id, userCount: userIds.length, title });
+    logger.info('管理员批量发送邮件', { adminSocket: socket.id, userCount: userIds.length, title: mailData.title });
 
     // 记录操作日志
     if (this.operationLogger && adminInfo && result.success) {
@@ -2262,14 +2355,16 @@ class AdminManager {
         adminInfo.username || '管理员',
         'mail_batch',
         '',
-        title,
+        mailData.title,
         {
-          title,
+          title: mailData.title,
           userCount: userIds.length,
           sentCount: result.sentCount || 0,
-          items: items.length,
-          starCoins,
-          exp
+          items: mailData.items.length,
+          cosmetics: mailData.cosmetics.length,
+          slots: mailData.slots,
+          starCoins: mailData.starCoins,
+          exp: mailData.exp
         }
       );
     }
@@ -2284,7 +2379,7 @@ class AdminManager {
         const userSocket = this.userManager.getSocketByAccountId(uid);
         if (userSocket) {
           const updatedAccount = await this.accountManager.getAccount(uid);
-          userSocket.emit('mail_received', { title, content, from });
+          userSocket.emit('mail_received', { title: mailData.title, content: mailData.content, from: mailData.from });
           userSocket.emit('account_updated', { account: updatedAccount });
         }
       }
@@ -2304,10 +2399,30 @@ class AdminManager {
       return;
     }
 
-    const { title, content, items = [], cosmetics = [], vip = null, starCoins = 0, exp = 0, from = '管理员' } = data;
-    const mailData = { title, content, items, cosmetics, vip, starCoins, exp, from };
+    const { scheduledAt = 0 } = data || {};
+    const mailData = this._buildMailData(data);
+    const deliverAt = this._resolveDeliveryTime(mailData, scheduledAt);
+
+    if (this._isScheduledSend(deliverAt)) {
+      const jobResult = await this.accountManager.scheduleMailJob({
+        target: { type: 'all' },
+        mailData,
+        scheduledAt: deliverAt,
+        createdBy: adminInfo?.username || ''
+      });
+      logger.info('管理员安排全站定时邮件', { adminSocket: socket.id, deliverAt });
+      socket.emit('admin_action_result', {
+        action: 'send_mail_all',
+        success: jobResult.success,
+        scheduled: true,
+        job: jobResult.job,
+        message: jobResult.success ? '邮件已安排定时发送' : '定时邮件创建失败'
+      });
+      return;
+    }
+
     const result = await this.accountManager.sendMailToAll(mailData);
-    logger.info('管理员发送全站邮件', { adminSocket: socket.id, title, sentCount: result.sentCount });
+    logger.info('管理员发送全站邮件', { adminSocket: socket.id, title: mailData.title, sentCount: result.sentCount });
 
     // 记录操作日志
     if (this.operationLogger && adminInfo && result.success) {
@@ -2316,14 +2431,18 @@ class AdminManager {
         adminInfo.username || '管理员',
         'mail_all',
         '',
-        title,
+        mailData.title,
         {
-          title,
+          title: mailData.title,
           sentCount: result.sentCount || 0,
-          items: items.length,
-          cosmetics: cosmetics.length,
-          starCoins,
-          exp
+          items: mailData.items.length,
+          cosmetics: mailData.cosmetics.length,
+          slots: mailData.slots,
+          starCoins: mailData.starCoins,
+          exp: mailData.exp,
+          validFrom: mailData.validFrom,
+          validUntil: mailData.validUntil,
+          conditions: mailData.conditions
         }
       );
     }
@@ -2338,7 +2457,7 @@ class AdminManager {
       for (const userSession of onlineUsers) {
         if (userSession && userSession.socket) {
           const updatedAccount = await this.accountManager.getAccount(userSession.accountId);
-          userSession.socket.emit('mail_received', { title, content, from });
+          userSession.socket.emit('mail_received', { title: mailData.title, content: mailData.content, from: mailData.from });
           userSession.socket.emit('account_updated', { account: updatedAccount });
         }
       }
@@ -2473,7 +2592,7 @@ class AdminManager {
     }
   }
 
-  // 获取用户邮件列表（管理员查看）
+  // 获取用户邮件列表（管理员查看，含已失效/已撤回/未生效的邮件）
   async getUserMails(socket, id) {
     if (!this.accountManager) {
       socket.emit('admin_action_result', {
@@ -2484,11 +2603,176 @@ class AdminManager {
       return;
     }
 
-    const result = await this.accountManager.getMails(id);
+    const result = await this.accountManager.getMails(id, { includeInactive: true });
+    const now = Date.now();
+    const mails = (result.mails || []).map(mail => {
+      let state = 'active';
+      if (mail.status && mail.status !== 'sent') state = 'unsent';
+      else if (mail.revoked) state = 'revoked';
+      else if (mail.claimed) state = 'claimed';
+      else if (mail.validFrom && now < mail.validFrom) state = 'pending';
+      else if (mail.validUntil && now > mail.validUntil) state = 'expired';
+      return { ...mail, state };
+    });
+
     socket.emit('admin_user_mails', {
       userId: id,
-      ...result
+      ...result,
+      mails
     });
+  }
+
+  // 撤回单封邮件（已领取的不能撤回）
+  async revokeMail(socket, userId, mailId) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'revoke_mail',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+    const result = await this.accountManager.revokeMail(userId, mailId);
+    logger.info('管理员撤回邮件', { adminSocket: socket.id, userId, mailId, success: result.success });
+    socket.emit('admin_action_result', { action: 'revoke_mail', ...result });
+  }
+
+  // 删除单封邮件（仅删除记录）
+  async deleteMail(socket, userId, mailId) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'delete_mail',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+    const account = await this.accountManager.getAccount(userId);
+    const result = account
+      ? await this.accountManager.deleteMail(userId, mailId)
+      : { success: false, message: '账号不存在' };
+    logger.info('管理员删除邮件', { adminSocket: socket.id, userId, mailId, success: result.success });
+    socket.emit('admin_action_result', { action: 'delete_mail', ...result });
+  }
+
+  // ===== 邮件模板 =====
+
+  async getMailTemplates(socket) {
+    const templates = await dataStore.read('mailTemplates');
+    socket.emit('admin_mail_templates', {
+      success: true,
+      templates: Array.isArray(templates) ? templates : []
+    });
+  }
+
+  async saveMailTemplate(socket, data = {}) {
+    const name = String(data.name || '').trim();
+    if (!name) {
+      socket.emit('admin_action_result', {
+        action: 'save_mail_template',
+        success: false,
+        message: '模板名称不能为空'
+      });
+      return;
+    }
+    const adminInfo = this.adminSockets.get(socket.id);
+    const templates = await dataStore.read('mailTemplates');
+    const list = Array.isArray(templates) ? templates : [];
+    const now = Date.now();
+    const mailData = this._buildMailData(data.mailData || {});
+
+    let template = null;
+    if (data.id) template = list.find(t => t.id === data.id);
+    if (template) {
+      template.name = name;
+      template.mailData = mailData;
+      template.updatedAt = now;
+      template.updatedBy = adminInfo?.username || '';
+    } else {
+      template = {
+        id: now.toString(36) + Math.random().toString(36).substr(2, 5),
+        name,
+        mailData,
+        createdBy: adminInfo?.username || '',
+        createdAt: now,
+        updatedAt: now
+      };
+      list.push(template);
+    }
+
+    await dataStore.write('mailTemplates', list.slice(-200));
+    logger.info('保存邮件模板', { adminSocket: socket.id, templateId: template.id, name });
+
+    socket.emit('admin_action_result', {
+      action: 'save_mail_template',
+      success: true,
+      message: '模板已保存',
+      template
+    });
+    this._broadcastMailTemplates(list);
+  }
+
+  async deleteMailTemplate(socket, id) {
+    const templates = await dataStore.read('mailTemplates');
+    const list = Array.isArray(templates) ? templates : [];
+    const next = list.filter(t => t.id !== id);
+    if (next.length === list.length) {
+      socket.emit('admin_action_result', {
+        action: 'delete_mail_template',
+        success: false,
+        message: '模板不存在'
+      });
+      return;
+    }
+    await dataStore.write('mailTemplates', next);
+    logger.info('删除邮件模板', { adminSocket: socket.id, templateId: id });
+    socket.emit('admin_action_result', {
+      action: 'delete_mail_template',
+      success: true,
+      message: '模板已删除'
+    });
+    this._broadcastMailTemplates(next);
+  }
+
+  _broadcastMailTemplates(templates) {
+    if (!this.io || typeof this.io.of !== 'function') return;
+    const payload = {
+      success: true,
+      templates: Array.isArray(templates) ? templates : []
+    };
+    // 只推送给已登录的管理员连接
+    const ns = this.io.of('/admin');
+    for (const socketId of this.adminSockets.keys()) {
+      ns.to(socketId).emit('admin_mail_templates', payload);
+    }
+  }
+
+  // ===== 定时邮件队列 =====
+
+  async getScheduledMails(socket) {
+    if (!this.accountManager) {
+      socket.emit('admin_scheduled_mails', { success: false, jobs: [] });
+      return;
+    }
+    const jobs = await this.accountManager._getScheduledMailJobs();
+    const pending = (Array.isArray(jobs) ? jobs : [])
+      .filter(job => job.status === 'pending')
+      .sort((a, b) => a.scheduledAt - b.scheduledAt);
+    socket.emit('admin_scheduled_mails', { success: true, jobs: pending });
+  }
+
+  async cancelScheduledMail(socket, jobId) {
+    if (!this.accountManager) {
+      socket.emit('admin_action_result', {
+        action: 'cancel_scheduled_mail',
+        success: false,
+        message: '账号管理器不可用'
+      });
+      return;
+    }
+    const result = await this.accountManager.cancelScheduledMailJob(jobId);
+    logger.info('取消定时邮件', { adminSocket: socket.id, jobId, success: result.success });
+    socket.emit('admin_action_result', { action: 'cancel_scheduled_mail', ...result });
   }
 
   // 获取物品列表

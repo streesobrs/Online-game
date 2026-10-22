@@ -1,0 +1,273 @@
+/* ========== 设置页（#/settings） ========== */
+
+.settings-page {
+  width: 100%;
+  max-width: 940px;
+  margin: 0 auto;
+  padding: 16px 0 32px;
+}
+
+/* 左分类导航 + 右内容：设置项再多也只换面板，不会把页面拉长 */
+.settings-layout {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.settings-nav {
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--theme-text-color, #2d3748);
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+}
+
+.settings-nav-item:hover {
+  background: var(--surface-alt, #f7fafc);
+}
+
+.settings-nav-item.active {
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--theme-primary, #6366f1);
+  font-weight: 600;
+}
+
+.settings-nav-icon {
+  width: 18px;
+  text-align: center;
+}
+
+/* 右列内容 */
+.settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.settings-hint {
+  margin: -4px 0 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--theme-tip-text-color, #718096);
+}
+
+/* ---- 单选卡片（启动页） ---- */
+.settings-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.settings-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 10px;
+  background: var(--theme-panel-bg, #fff);
+  color: var(--theme-text-color, #2d3748);
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.settings-choice:hover {
+  border-color: var(--theme-primary, #6366f1);
+}
+
+.settings-choice.active {
+  border-color: var(--theme-primary, #6366f1);
+  background: rgba(99, 102, 241, 0.08);
+  font-weight: 600;
+}
+
+.settings-choice-icon {
+  font-size: 16px;
+}
+
+.settings-choice-name {
+  flex: 1;
+  text-align: left;
+}
+
+.settings-choice-check {
+  color: var(--theme-primary, #6366f1);
+  font-weight: 700;
+}
+
+/* ---- 跳转入口 ---- */
+.settings-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 10px;
+  background: var(--theme-panel-bg, #fff);
+  color: var(--theme-text-color, #2d3748);
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.settings-link:hover {
+  border-color: var(--theme-primary, #6366f1);
+  background: var(--surface-alt, #f7fafc);
+}
+
+.settings-link-icon {
+  width: 20px;
+  text-align: center;
+}
+
+.settings-link-label {
+  flex: 1;
+  text-align: left;
+}
+
+.settings-link-arrow {
+  color: #a0aec0;
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* 退出登录等危险操作 */
+.settings-link.danger {
+  color: #e53e3e;
+  border-color: rgba(229, 62, 62, 0.35);
+}
+
+.settings-link.danger:hover {
+  background: rgba(229, 62, 62, 0.06);
+  border-color: #e53e3e;
+}
+
+/* ---- 动画：总开关 + 速率（全局，body 上的 --anim-speed 由 prefs.js 写入） ---- */
+/* 关闭：过渡与循环动画全部停掉 */
+body.anim-off *,
+body.anim-off *::before,
+body.anim-off *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* 非 1x 时按速率缩放：过渡按 0.2s 基准，装饰性循环动画按 0.4s 基准 */
+body.anim-custom *,
+body.anim-custom *::before,
+body.anim-custom *::after {
+  transition-duration: calc(0.2s / var(--anim-speed, 1)) !important;
+  animation-duration: calc(0.4s / var(--anim-speed, 1)) !important;
+}
+
+/* ---- 界面密度：紧凑 ---- */
+body.density-compact .panel {
+  padding: 12px 14px;
+}
+
+body.density-compact .panel-title {
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+}
+
+body.density-compact .settings-content {
+  gap: 10px;
+}
+
+/* ---- 隐私分区保存按钮 ---- */
+.settings-privacy .privacy-rows {
+  max-height: none;
+}
+
+.settings-save {
+  margin-top: 12px;
+  padding: 8px 18px;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.settings-save:hover {
+  filter: brightness(1.06);
+}
+
+/* ---- 其它界面偏好落到 body 上的开关 ---- */
+/* 悬浮聊天坞：按钮与展开面板都直接挂在 body 上 */
+body.hide-float-dock .float-dock-btn,
+body.hide-float-dock .float-dock-panel {
+  display: none !important;
+}
+
+/* 好友申请红点（顶部导航 / 全局抽屉共用） */
+body.hide-friend-badge .nav-btn__badge,
+body.hide-friend-badge .nav-drawer-item__badge {
+  display: none !important;
+}
+
+/* 棋盘最后一步标记（五子棋 / 围棋 / 象棋） */
+body.hide-last-move .gobang-cell.last-move::before,
+body.hide-last-move .go-cell.last-move::before,
+body.hide-last-move .chess-intersection.last-move::before {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .settings-page {
+    padding: 12px 0 24px;
+  }
+
+  /* 窄屏：分类导航变成顶部横向可滚动的标签条 */
+  .settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .settings-nav {
+    position: static;
+    flex-direction: row;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .settings-nav-item {
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    border-color: var(--theme-border-color, #e2e8f0);
+    background: var(--theme-panel-bg, #fff);
+    white-space: nowrap;
+  }
+
+  .settings-choices {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

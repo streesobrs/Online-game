@@ -26,7 +26,9 @@ class DataStore {
       'globalChats': 'chats',
       'gameChats': 'chats',
       'systemStats': 'system',
-      'feedbacks': 'feedbacks'
+      'feedbacks': 'feedbacks',
+      'mailScheduled': 'mail',
+      'mailTemplates': 'mail'
     };
     this.init();
   }

@@ -254,6 +254,22 @@ a.nav-btn.nav-btn--legacy:hover {
     opacity: 1;
 }
 
+/* 后台管理入口：仅管理员可见，用虚线与旧版入口区分 */
+a.nav-btn.nav-btn--admin {
+    text-decoration: none;
+    color: var(--theme-nav-btn-color);
+    background: var(--theme-nav-btn-bg);
+    border: 1px solid var(--theme-border-color, #cbd5e0);
+}
+
+a.nav-btn.nav-btn--admin:hover {
+    background: var(--theme-nav-btn-bg-hover);
+}
+
+a.nav-btn.nav-btn--admin.hidden {
+    display: none;
+}
+
 .nav-btn__icon {
     font-size: 14px;
     line-height: 1;
@@ -535,7 +551,7 @@ body.nav-account-drawer #account-root {
     display: none;
 }
 
-/* 开关组（新手引导气泡 + 界面设置弹窗共用） */
+/* 开关组（新手引导气泡 + 设置页共用） */
 .nav-prefs {
     display: flex;
     flex-direction: column;
@@ -572,6 +588,45 @@ body.nav-account-drawer #account-root {
     font-size: 12px;
     line-height: 1.5;
     color: var(--text-secondary, #718096);
+}
+
+/* 统一原生下拉框外观（设置页等处的 select 共用） */
+select {
+    padding: 6px 26px 6px 10px;
+    border: 1px solid var(--theme-border-color, #cbd5e0);
+    border-radius: 8px;
+    background-color: var(--theme-panel-bg, #fff);
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23718096' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+    color: var(--text-primary, #2d3748);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+select:hover {
+    border-color: var(--theme-primary, #6366f1);
+}
+
+select:focus {
+    outline: none;
+    border-color: var(--theme-primary, #6366f1);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+/* 多选一的下拉行（动画速率 / 提示条位置等） */
+.nav-pref-row--select {
+    cursor: default;
+}
+
+.nav-pref-select {
+    flex-shrink: 0;
+    min-width: 132px;
+    max-width: 190px;
 }
 
 .nav-pref-switch {

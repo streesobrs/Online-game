@@ -569,18 +569,23 @@ module.exports = {
     hintCardGrants: 5                               // 每张提示卡增加的提示次数
   },
 
-  // ========== 等级里程碑奖励配置 ==========
-  // 每5级一个奖励里程碑，玩家达到等级后可在资料页领取
+  // ========== 等级奖励（里程碑）==========
+  // 等级分两种（按末位判断）：末位是 0 或 5（也就是 5 的倍数）= 大等级，其余（1-4、6-9）= 小等级。
+  // - 小等级：每级固定发 levelUpCoinReward 星钻，自动到账（见 addExp / _applyLevelUpRewards）
+  // - 大等级：5/10/15/…/50 共 10 档，额外给下面这份里程碑奖励，**不自动发放**，
+  //   玩家在资料页「等级奖励」里手动领取（见 AccountManager.checkLevelRewards）
   levelRewards: {
     milestones: {
-      5: { starCoins: 100, expPotions: 3, undoCards: 1 },
-      10: { starCoins: 250, expPotions: 5, doubleExpCards: 2, hintCards: 3, vipDays: 7, vipMultiplier: 2.0 },
-      15: { starCoins: 500, expPotions: 10, doubleExpCards: 3, undoCards: 3 },
-      20: { starCoins: 800, expPotions: 10, doubleExpCards: 5, hintCards: 5, luckyCharms: 1, vipDays: 30, vipMultiplier: 2.0 },
-      25: { starCoins: 1200, tripleExpCards: 2, undoCards: 5, hintCards: 5 },
-      30: { starCoins: 1800, tripleExpCards: 3, expPotions: 20, luckyCharms: 3, vipDays: 30, vipMultiplier: 2.0 },
-      40: { starCoins: 3000, tripleExpCards: 5, expPotions: 30, levelUpTickets: 1, vipDays: 30, vipMultiplier: 2.0 },
-      50: { starCoins: 5000, tripleExpCards: 10, expPotions: 50, levelUpTickets: 3, luckyCharms: 5, vipDays: 30, vipMultiplier: 2.0 }
+      5: { starCoins: 120, expPotions: 3, hintCards: 2 },
+      10: { starCoins: 300, expPotions: 5, doubleExpCards: 2, hintCards: 3, vipDays: 7, vipMultiplier: 2.0 },
+      15: { starCoins: 450, expPotions: 8, doubleExpCards: 2, undoCards: 3 },
+      20: { starCoins: 900, expPotions: 15, tripleExpCards: 2, luckyCharms: 1, vipDays: 30, vipMultiplier: 2.0 },
+      25: { starCoins: 900, expPotions: 12, doubleExpCards: 4, hintCards: 5, undoCards: 4 },
+      30: { starCoins: 2000, expPotions: 25, tripleExpCards: 4, luckyCharms: 3, vipDays: 30, vipMultiplier: 2.0 },
+      35: { starCoins: 1500, expPotions: 20, tripleExpCards: 2, undoCards: 6 },
+      40: { starCoins: 3600, expPotions: 40, tripleExpCards: 6, luckyCharms: 4, levelUpTickets: 1, vipDays: 30, vipMultiplier: 2.0 },
+      45: { starCoins: 2400, expPotions: 30, tripleExpCards: 3, luckyCharms: 2 },
+      50: { starCoins: 6000, expPotions: 60, tripleExpCards: 12, luckyCharms: 6, levelUpTickets: 3, vipDays: 30, vipMultiplier: 2.0 }
     }
   },
 

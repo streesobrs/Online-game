@@ -1822,8 +1822,12 @@ app.get('/api/profile/:accountId', async (req, res) => {
           available: levelRewards.available || [],
           future: levelRewards.future || [],
           claimedLevels: levelRewards.claimedLevels || [],
-          totalClaimed: levelRewards.totalClaimed || 0
-        } : { available: [], future: [], claimedLevels: [], totalClaimed: 0 },
+          totalClaimed: levelRewards.totalClaimed || 0,
+          // 完整档位表（含已领取的与未解锁的）：客户端整页画里程碑都靠它，不再自己抄一份奖励文案
+          all: levelRewards.all || [],
+          // 「小等级」每级固定发的星钻（大等级另有里程碑奖励），客户端画等级阶梯要用
+          perLevelCoins: levelRewards.perLevelCoins || 0
+        } : { available: [], future: [], claimedLevels: [], totalClaimed: 0, all: [], perLevelCoins: 0 },
         achievements: achievementsOut,
         stats: statsOut,
         games,
@@ -4959,6 +4963,40 @@ adminNamespace.on('connection', (socket) => {
     adminManager.getItemsList(socket);
   });
 
+  // 撤回邮件（已领取不可撤回）
+  socket.on('revoke_mail', (data = {}) => {
+    const { userId, mailId } = data;
+    adminManager.revokeMail(socket, userId, mailId);
+  });
+
+  // 删除邮件记录
+  socket.on('delete_mail', (data = {}) => {
+    const { userId, mailId } = data;
+    adminManager.deleteMail(socket, userId, mailId);
+  });
+
+  // 邮件模板：读取 / 保存 / 删除
+  socket.on('get_mail_templates', () => {
+    adminManager.getMailTemplates(socket);
+  });
+
+  socket.on('save_mail_template', (data = {}) => {
+    adminManager.saveMailTemplate(socket, data);
+  });
+
+  socket.on('delete_mail_template', (data = {}) => {
+    adminManager.deleteMailTemplate(socket, data.id);
+  });
+
+  // 定时邮件队列：读取 / 取消
+  socket.on('get_scheduled_mails', () => {
+    adminManager.getScheduledMails(socket);
+  });
+
+  socket.on('cancel_scheduled_mail', (data = {}) => {
+    adminManager.cancelScheduledMail(socket, data.jobId);
+  });
+
   // 获取成就列表（管理员用，返回所有成就定义供添加成就模态框使用）
   socket.on('get_achievements_list', () => {
     if (!adminManager.checkAdminAuth(socket)) {
@@ -5174,6 +5212,7 @@ adminNamespace.on('connection', (socket) => {
     'mute_user', 'unmute_user', 'delete_account',
     'modify_user_exp', 'grant_starcoins', 'grant_exp', 'grant_items',
     'send_mail_to_user', 'send_mail_batch', 'send_mail_all',
+    'revoke_mail', 'delete_mail', 'save_mail_template', 'delete_mail_template', 'cancel_scheduled_mail',
     'add_user_achievement', 'remove_user_achievement', 'reset_user_achievements',
     'cleanup_data',
     'update_backup_db', 'update_restore_backup', 'update_apply_update',
@@ -5205,6 +5244,11 @@ adminNamespace.on('connection', (socket) => {
 });
 
 // ========== 定时任务 ==========
+
+// 定时邮件调度（每 30 秒检查是否有到期的定时邮件）
+if (accountManager && typeof accountManager.startMailScheduler === 'function') {
+  accountManager.startMailScheduler();
+}
 
 // 检查不活跃用户（每5分钟）
 setInterval(() => {
