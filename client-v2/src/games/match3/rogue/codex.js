@@ -12,7 +12,7 @@
  * 遗物只做「看」（不靠精华购买，也不进三选一池），见下方 relicSections。
  *
  * 数值推导全在 meta.js（等级上限、费用、里程碑判定、余额），本文件只管渲染与发起请求。
- * 所有改动都要经服务端：`upgradeRoguePerk` / `claimRogueMilestone` 只发 id 出去，
+ * 所有改动都要经服务端：`upgradeRoguePerk` / `claimRogueMilestone` / `claimAllRogueMilestones` 只发 id 出去，
  * 扣费与校验都在服务端做，回执带回最新存档 → sync.js 广播 → 这里重画。
  *
  * 外框分两种：局内（对局中查池子）用 components/modal 的模态框；局外（娱乐菜单 / 结算页 /
@@ -23,10 +23,12 @@ import { META_BUFFS, PERKS, QUEST_REWARDS, descOf, valueAt } from './perks.js';
 import { relicsByRarity } from './relics.js';
 import { CHARACTERS, characterMastery, unlockProgress } from './characters.js';
 import {
-  buffFactor, claimableCount, itemLevel, maxLevelOf, milestoneReward, milestoneState,
-  nextStep, poolProgress, rarityOf, requiresMet, rogueCfg,
+  buffFactor, claimableCount, collectionSummary, itemLevel, maxLevelOf, milestoneReward, milestoneState,
+  nextStep, rarityOf, requiresMet, rogueCfg,
 } from './meta.js';
-import { claimRogueMilestone, getRogueMeta, onRogueMeta, upgradeRoguePerk } from '../save/sync.js';
+import {
+  claimAllRogueMilestones, claimRogueMilestone, getRogueMeta, onRogueMeta, upgradeRoguePerk,
+} from '../save/sync.js';
 import { el } from '../../../utils/dom.js';
 import { modal } from '../../../components/modal.js';
 import { toast } from '../../../components/toast.js';
@@ -50,24 +52,24 @@ function prevName(entry) {
 }
 
 /**
- * 一条图鉴记录（任务奖励用；祝福的记录带等级与按钮，见 perkRow）
- * @param {object} entry - 任务奖励（icon、name、desc 必填）
- * @param {string|null} limit - 上限说明
+ * 一条只读图鉴卡（遗物 / 任务共用）：固定规格的方卡，标题常驻、描述区可滚动
+ * @param {object} entry - 任务奖励 / 遗物（icon、name、desc 必填）
+ * @param {string|null} limit - 右上角小标签（遗物流派 / 上限说明）
  */
 function item(entry, limit) {
   return el(
     'div',
-    { class: 'm3-codex-item' },
-    el('span', { class: 'm3-codex-icon' }, entry.icon),
+    { class: 'm3-codex-tile' },
     el(
       'div',
-      { class: 'm3-codex-main' },
-      el(
-        'div',
-        { class: 'm3-codex-head' },
-        el('span', { class: 'm3-codex-name' }, entry.name),
-        limit ? el('span', { class: 'm3-codex-limit' }, limit) : null,
-      ),
+      { class: 'm3-codex-tile-head' },
+      el('span', { class: 'm3-codex-icon' }, entry.icon),
+      el('span', { class: 'm3-codex-tile-name' }, entry.name),
+      limit ? el('span', { class: 'm3-codex-limit' }, limit) : null,
+    ),
+    el(
+      'div',
+      { class: 'm3-codex-tile-body' },
       el('div', { class: 'm3-codex-desc' }, entry.desc),
     ),
   );
@@ -81,6 +83,24 @@ function section(title, hint, items, listClass = '') {
     el('div', { class: 'm3-codex-sec-title' }, title),
     hint ? el('p', { class: 'm3-codex-sub' }, hint) : null,
     el('div', { class: `m3-codex-list${listClass}` }, ...items),
+  );
+}
+
+/**
+ * 分页标题：统一「标题 + 一句说明 + 右侧主操作」的层级
+ * 六个分页都用它开头，切换时视线落点一致；主操作（如一键领取）固定在右上角，不用往下找。
+ */
+function paneHead(title, hint, action = null) {
+  return el(
+    'div',
+    { class: 'm3-codex-pane-head' },
+    el(
+      'div',
+      { class: 'm3-codex-pane-text' },
+      el('h3', { class: 'm3-codex-pane-title' }, title),
+      hint ? el('p', { class: 'm3-codex-pane-hint' }, hint) : null,
+    ),
+    action ? el('div', { class: 'm3-codex-pane-action' }, action) : null,
   );
 }
 
@@ -101,38 +121,50 @@ export function codexPanel(picks = null) {
   const host = el('div', { class: 'm3-codex' });
   let closed = false;
   let off = null;
-  /** 共鸣树里当前选中的节点（详情卡跟着它走） */
-  let selectedId = null;
   /**
-   * 当前分页：内容太多（共鸣树 / 20 条里程碑 / 15 张祝福 / 20 件遗物 / 任务奖励），
-   * 全铺在一个滚动流里要翻很久，按「养成 / 领奖 / 图鉴」拆成五页。
+   * 当前分页：内容太多（共鸣树 / 27 条里程碑 / 15 张祝福 / 20 件遗物 / 任务奖励），
+   * 全铺在一个滚动流里要翻很久，按「养成 / 领奖 / 图鉴」拆成六页。
    * 对局中打开（带 picks）多半是想查三选一池，默认落在祝福页。
    */
   let tab = picks ? 'perks' : 'tree';
-  /** 祝福紧凑行的展开集合：服务端推送重绘后仍保持各自的展开状态 */
-  const expanded = new Set();
+  /** 祝福列表筛选：全部 / 可购买 / 已解锁 / 未解锁（只影响展示，不影响抽取） */
+  let perkFilter = 'all';
 
   const TABS = [
-    { id: 'tree', label: '🌳 养成' },
-    { id: 'ms', label: '🏅 里程' },
-    { id: 'perks', label: '✨ 祝福' },
-    { id: 'relics', label: '🎁 遗物' },
-    { id: 'chars', label: '🧩 角色' },
-    { id: 'quest', label: '📜 任务' },
+    { id: 'tree', icon: '🌳', label: '养成' },
+    { id: 'ms', icon: '🏅', label: '里程' },
+    { id: 'perks', icon: '✨', label: '祝福' },
+    { id: 'relics', icon: '🎁', label: '遗物' },
+    { id: 'chars', icon: '🧩', label: '角色' },
+    { id: 'quest', icon: '📜', label: '任务' },
   ];
 
   /** 里程碑分组（按 kind 归类，定义顺序即组内顺序；组配置只影响展示，服务端不看） */
   const MS_GROUPS = [
     { title: '🎴 祝福收集', kinds: ['unlocked', 'maxed', 'all'] },
     { title: '🌳 共鸣树', kinds: ['buffs'] },
-    { title: '🏔 历练挑战', kinds: ['runs', 'floor', 'quests', 'wins', 'boss'] },
+    { title: '🧩 角色与熟练度', kinds: ['chars', 'mastery'] },
+    { title: '🌀 进阶挑战', kinds: ['ascension'] },
+    { title: '🏔 历练挑战', kinds: ['runs', 'floor', 'quests', 'wins', 'boss', 'picks'] },
   ];
 
-  /** 默认选中：优先挑一个「前置已满足、还没满级」的节点（玩家下一步多半就想买它） */
-  function defaultSelection(meta) {
-    const buyable = META_BUFFS.find((b) => requiresMet(meta, b) && itemLevel(meta, b) < maxLevelOf(b));
-    return (buyable || META_BUFFS[0]).id;
-  }
+  /** 祝福筛选按钮 */
+  const PERK_FILTERS = [
+    { id: 'all', label: '全部' },
+    { id: 'buyable', label: '可购买' },
+    { id: 'owned', label: '已解锁' },
+    { id: 'locked', label: '未解锁' },
+  ];
+
+  /** 角色熟练度称号（纯荣誉展示，不接强度；与 characters.js 的 MASTERY_TIERS 档位对齐） */
+  const MASTERY_TITLE = ['见习', '新秀', '老手', '大师'];
+
+  /** 三条流派的列头文案（只影响展示；节点归属以 perks.js 的 tree.col 为准） */
+  const TREE_PATHS = [
+    { name: '经济', hint: '放大每轮结算' },
+    { name: '开局', hint: '起手更顺' },
+    { name: '保命', hint: '兜住翻车' },
+  ];
 
   /** 关掉面板时退订：否则下次服务端下发还会往已移除的节点上写 */
   function stop() {
@@ -206,7 +238,11 @@ export function codexPanel(picks = null) {
     return !step
       ? el('span', { class: 'm3-codex-buy m3-codex-buy--max' }, isMechanic ? '已解锁' : '已满级')
       : !ready
-        ? el('span', { class: 'm3-codex-buy m3-codex-buy--max' }, `需先解锁 ${prevName(entry)}`)
+        ? el(
+          'span',
+          { class: 'm3-codex-buy m3-codex-buy--max', title: `需先解锁 ${prevName(entry)}` },
+          '前置未解锁',
+        )
         : el(
           'button',
           {
@@ -220,84 +256,31 @@ export function codexPanel(picks = null) {
   }
 
   /**
-   * 完整大卡：图标 + 名字 / 稀有度 / 等级条 + 当前与下一级效果 + 解锁或升级按钮
-   * 只用于共鸣树下方「当前选中节点」的详情；祝福列表用紧凑行 perkCompact
+   * 祝福卡：固定规格的方卡，标题行常驻、效果区可滚动、操作固定在底部
+   * 15 张全部直接铺开，不折叠——与养成页的节点保持同一套阅读顺序
    */
-  function perkRow(entry, meta) {
-    const lv = itemLevel(meta, entry);
-    const max = maxLevelOf(entry);
-    const step = nextStep(meta, entry);
-    const isBuff = entry.scope === 'buff';
-    const isMechanic = entry.kind === 'mechanic';
-    // 共鸣树的连线：前置没点亮就不能买（服务端也会拦一次，这里只是提前把按钮收掉）
-    const ready = requiresMet(meta, entry);
-    const fam = el('span', { class: `m3-codex-fam m3-codex-fam--${entry.rarity}` }, rarityOf(entry).label || entry.rarity);
-
-    return el(
-      'div',
-      { class: `m3-codex-item m3-codex-item--${entry.rarity}${lv <= 0 ? ' m3-codex-item--locked' : ''}` },
-      el('span', { class: 'm3-codex-icon' }, lv > 0 || ready ? entry.icon : '🔒'),
-      el(
-        'div',
-        { class: 'm3-codex-main' },
-        el(
-          'div',
-          { class: 'm3-codex-head' },
-          el('span', { class: 'm3-codex-name' }, entry.name),
-          fam,
-          isMechanic ? el('span', { class: 'm3-codex-kind' }, '机制') : null,
-          // 机制节点一次性解锁，没有「几级」可言，直接给状态
-          isMechanic
-            ? el('span', { class: 'm3-codex-lv' }, lv > 0 ? '已点亮' : '未点亮')
-            : el('span', { class: 'm3-codex-lv' }, `Lv.${lv}/${max}`),
-          picks && picks[entry.id] > 0
-            ? el('span', { class: 'm3-codex-owned' }, `本轮 ×${picks[entry.id]}`)
-            : null,
-        ),
-        ...perkDetailParts(entry, meta, lv, max, step, isBuff, isMechanic),
-      ),
-      buyControl(entry, meta, step, ready, isMechanic),
-    );
-  }
-
-  /**
-   * 祝福列表里的紧凑行：一行放下图标 / 名字 / 稀有度 / 等级 / 购买按钮，
-   * 点左半行才展开效果详情——15 张大卡全铺着要滚很久，收起后一屏能扫完整个池子。
-   * 展开状态记在 expanded 里，服务端下发存档触发重绘时不会把它合上
-   */
-  function perkCompact(entry, meta) {
+  function perkTile(entry, meta) {
     const lv = itemLevel(meta, entry);
     const max = maxLevelOf(entry);
     const step = nextStep(meta, entry);
     const isBuff = entry.scope === 'buff';
     const isMechanic = entry.kind === 'mechanic';
     const ready = requiresMet(meta, entry);
-    const open = expanded.has(entry.id);
 
     const cls = [
-      'm3-codex-item', 'm3-codex-item--compact',
+      'm3-codex-tile', 'm3-codex-tile--perk',
       `m3-codex-item--${entry.rarity}`,
       lv <= 0 ? 'm3-codex-item--locked' : null,
-      open ? 'm3-codex-item--open' : null,
     ].filter(Boolean).join(' ');
 
     return el(
       'div',
       { class: cls },
       el(
-        'button',
-        {
-          class: 'm3-codex-toggle',
-          type: 'button',
-          title: open ? '收起详情' : '展开详情',
-          onClick: () => {
-            if (expanded.has(entry.id)) expanded.delete(entry.id);
-            else expanded.add(entry.id);
-            paint();
-          },
-        },
+        'div',
+        { class: 'm3-codex-tile-head' },
         el('span', { class: 'm3-codex-icon' }, lv > 0 || ready ? entry.icon : '🔒'),
-        el('span', { class: 'm3-codex-name' }, entry.name),
+        el('span', { class: 'm3-codex-tile-name' }, entry.name),
         el('span', { class: `m3-codex-fam m3-codex-fam--${entry.rarity}` }, rarityOf(entry).label || entry.rarity),
         isMechanic
           ? el('span', { class: 'm3-codex-lv' }, lv > 0 ? '已点亮' : '未点亮')
@@ -305,59 +288,64 @@ export function codexPanel(picks = null) {
         picks && picks[entry.id] > 0
           ? el('span', { class: 'm3-codex-owned' }, `本轮 ×${picks[entry.id]}`)
           : null,
-        el('span', { class: 'm3-codex-chevron', 'aria-hidden': 'true' }, '▾'),
       ),
-      buyControl(entry, meta, step, ready, isMechanic),
       el(
         'div',
-        { class: 'm3-codex-detail' },
+        { class: 'm3-codex-tile-body' },
         ...perkDetailParts(entry, meta, lv, max, step, isBuff, isMechanic),
       ),
+      el('div', { class: 'm3-codex-tile-foot' }, buyControl(entry, meta, step, ready, isMechanic)),
     );
   }
 
   /**
-   * 共鸣树上的一个节点按钮（图片区 = 坐标格，连线由 CSS 画，见 styles.css）
-   * 三种状态各有一套观感：已点亮 / 可解锁 / 前置未满足
+   * 流派里的一级：名称 + 等级常驻一行，下面直接展示效果、进度与购买按钮。
+   * 不折叠、不点开；三列统一高度，超出部分在列内滚动。
+   * 三种状态各有一套观感：已点亮 / 可解锁 / 前置未满足（压暗 + 锁）
    */
-  function treeNode(entry, meta) {
+  function treeStep(entry, meta) {
     const lv = itemLevel(meta, entry);
+    const max = maxLevelOf(entry);
+    const step = nextStep(meta, entry);
     const isMechanic = entry.kind === 'mechanic';
     const ready = requiresMet(meta, entry);
-    const cls = ['m3-tree-node', `m3-tree-node--${entry.rarity}`];
-    if (isMechanic) cls.push('m3-tree-node--mechanic');
-    if (lv > 0) cls.push('m3-tree-node--on');
-    else cls.push(ready ? 'm3-tree-node--next' : 'm3-tree-node--blocked');
-    if (entry.id === selectedId) cls.push('m3-tree-node--sel');
+    const cls = ['m3-tree-step'];
+    if (lv > 0) cls.push('m3-tree-step--on');
+    else if (!ready) cls.push('m3-tree-step--blocked');
 
     return el(
-      'button',
-      {
-        class: cls.join(' '),
-        type: 'button',
-        title: `${entry.name}：${descOf(entry, Math.max(1, lv))}`,
-        onClick: () => {
-          selectedId = entry.id;
-          paint();
-        },
-      },
-      el('span', { class: 'm3-tree-node-icon' }, ready ? entry.icon : '🔒'),
-      el('span', { class: 'm3-tree-node-name' }, entry.name),
+      'div',
+      { class: cls.join(' ') },
       el(
-        'span',
-        { class: 'm3-tree-node-lv' },
-        isMechanic
-          ? (lv > 0 ? '已点亮' : '机制')
-          : `Lv.${lv}/${maxLevelOf(entry)}`,
+        'div',
+        { class: 'm3-tree-step-head' },
+        el('span', { class: 'm3-tree-mark', 'aria-hidden': 'true' }, ready ? entry.icon : '🔒'),
+        el(
+          'span',
+          { class: 'm3-tree-step-main' },
+          el('span', { class: 'm3-tree-step-name' }, entry.name),
+          el(
+            'span',
+            { class: 'm3-tree-step-lv' },
+            isMechanic ? (lv > 0 ? '已点亮' : '机制') : `Lv.${lv}/${max}`,
+          ),
+        ),
+      ),
+      el(
+        'div',
+        { class: 'm3-tree-step-body' },
+        ...perkDetailParts(entry, meta, lv, max, step, true, isMechanic),
+        el('div', { class: 'm3-tree-step-action' }, buyControl(entry, meta, step, ready, isMechanic)),
       ),
     );
   }
 
-  /** 一条里程碑：名称 / 进度 / 奖励 + 领取按钮 */
+  /** 一条里程碑：名称 + 奖励 + 进度条 + 右侧领取按钮（单行两行高，27 条扫起来不累） */
   function milestoneRow(ms, meta) {
-    const state = ms.claimed ? '已领取' : (ms.done ? '可领取' : '未达成');
     // 「丰收闭环」会把奖励翻倍，这里显示的必须是真正会到账的数（服务端同口径）
     const reward = milestoneReward(ms, meta);
+    const have = Math.min(ms.have, ms.need);
+    const pct = ms.need > 0 ? Math.round((have / ms.need) * 100) : 100;
     return el(
       'div',
       { class: `m3-codex-item m3-codex-ms${ms.claimed ? ' m3-codex-ms--claimed' : ''}${ms.done && !ms.claimed ? ' m3-codex-ms--ready' : ''}` },
@@ -371,86 +359,89 @@ export function codexPanel(picks = null) {
           el('span', { class: 'm3-codex-name' }, ms.name),
           el('span', { class: 'm3-codex-reward' }, `✦${reward}`),
         ),
-        el('div', { class: 'm3-codex-desc' }, `进度 ${Math.min(ms.have, ms.need)}/${ms.need} · ${state}`),
+        el(
+          'span',
+          { class: 'm3-codex-bar m3-codex-bar--ms' },
+          el('span', { class: 'm3-codex-bar-fill', style: `width:${pct}%` }),
+        ),
       ),
       ms.done && !ms.claimed
         ? el('button', { class: 'm3-codex-buy m3-codex-buy--ready', type: 'button', onClick: () => claim(ms) }, '领取')
-        : el('span', { class: 'm3-codex-buy m3-codex-buy--max' }, state),
+        : el('span', { class: 'm3-codex-buy m3-codex-buy--max' }, ms.claimed ? '已领取' : `${have}/${ms.need}`),
     );
   }
 
   /**
-   * 共鸣树：3 条流派 × 3 层，节点按各自的 `tree` 坐标落格
+   * 三条流派各占一列卡片，节点按 1→2→3 纵向排列（连线由 CSS 画）
    *
-   * 布局与连线全部由 CSS 画（见 styles.css 的 .m3-tree-*）：根「精华 ✦」在上，
-   * 三条流派各成一列往下延伸，末端是机制节点。加节点只改 perks.js 的 `tree` 坐标，
-   * 这里、CSS 都不用动（列数按数据里的最大 col 现算）。
+   * 每一级都把效果、进度与购买按钮直接铺开，不折叠、不点开——
+   * 版面与其余分页一致，宽屏也不会出现「左边一大片、右边一小块」的失衡。
+   * 加节点只改 perks.js 的 `tree` 坐标，列数按数据里的最大 col 现算。
    */
   function treeSection(meta) {
     const cols = Math.max(...META_BUFFS.map((b) => b.tree.col)) + 1;
-    const center = (k) => `${(((k + 0.5) / cols) * 100).toFixed(3)}%`;
-    const edge = `${((0.5 / cols) * 100).toFixed(3)}%`;
-    const on = META_BUFFS.filter((b) => itemLevel(meta, b.id) > 0).length;
-    const sel = META_BUFFS.find((b) => b.id === selectedId) || META_BUFFS[0];
-
-    const grid = el(
-      'div',
-      { class: 'm3-tree-grid', style: `grid-template-columns:repeat(${cols},1fr)` },
-      el(
-        'div',
-        { class: 'm3-tree-rootcell' },
-        el(
-          'span',
-          { class: 'm3-tree-rootnode' },
-          el('span', { class: 'm3-tree-rooticon' }, '✦'),
-          el('span', { class: 'm3-tree-rootname' }, '精华'),
-        ),
-      ),
-      // 从根分叉到三条流派：一根横杆 + 每个流派一根下垂的短线
-      el(
-        'div',
-        { class: 'm3-tree-fan' },
-        el('span', { class: 'm3-tree-fan-bar', style: `left:${edge};right:${edge}` }),
-        el('span', { class: 'm3-tree-fan-up', style: `left:${center((cols - 1) / 2)}` }),
-        ...Array.from({ length: cols }, (_, k) => el('span', { class: 'm3-tree-fan-stub', style: `left:${center(k)}` })),
-      ),
-      ...META_BUFFS.map((entry) => el(
-        'div',
-        {
-          class: 'm3-tree-cell',
-          style: `grid-column:${entry.tree.col + 1};grid-row:${entry.tree.row + 3}`,
-        },
-        el('span', { class: 'm3-tree-link' }),
-        treeNode(entry, meta),
-      )),
-    );
+    const branches = Array.from({ length: cols }, (_, col) => ({
+      path: TREE_PATHS[col] || { name: `流派 ${col + 1}`, hint: '' },
+      nodes: META_BUFFS
+        .filter((b) => b.tree.col === col)
+        .sort((a, b) => a.tree.row - b.tree.row),
+    }));
 
     return el(
       'div',
-      { class: 'm3-codex-sec' },
-      el('div', { class: 'm3-codex-sec-title' }, `✦ 共鸣树 · 已点亮 ${on}/${META_BUFFS.length}`),
-      el(
-        'p',
-        { class: 'm3-codex-sub' },
-        '三条流派从根部往下点亮，连线即前置，只能逐级购买；'
-        + '前两格是可升级的数值优势，末端是一次性解锁的机制节点（改规则而非数值），不进三选一池。',
-      ),
-      // 树与选中节点详情共用一个布局包裹：窄屏上下排，宽屏左右分栏（见 styles.css 的
-      // .m3-tree-layout，差异只在媒体查询里切，节点 / 按钮等交互元素不随布局改变）
-      el(
-        'div',
-        { class: 'm3-tree-layout' },
-        grid,
-        el('div', { class: 'm3-tree-detail' }, perkRow(sel, meta)),
-      ),
+      { class: 'm3-tree-paths' },
+      ...branches.map(({ path, nodes }) => {
+        const lit = nodes.filter((n) => itemLevel(meta, n) > 0).length;
+        return el(
+          'div',
+          { class: 'm3-tree-branch' },
+          el(
+            'div',
+            { class: 'm3-tree-branch-head' },
+            el('span', { class: 'm3-tree-branch-name' }, path.name),
+            el('span', { class: 'm3-tree-branch-hint' }, path.hint),
+            el('span', { class: 'm3-tree-branch-lit' }, `${lit}/${nodes.length}`),
+          ),
+          el(
+            'div',
+            { class: 'm3-tree-branch-list' },
+            ...nodes.map((entry) => treeStep(entry, meta)),
+          ),
+        );
+      }),
     );
   }
 
-  /** 顶部：精华余额 + 收集度 + 关键统计（每个分页都常驻，花钱时随时看得到余额） */
+  /** 一条收集度指标：名称 / 进度 / 一行小字 + 进度条（顶部总览四宫格共用） */
+  function metric(label, have, total, note) {
+    const pct = total > 0 ? Math.round((have / total) * 100) : 100;
+    return el(
+      'div',
+      { class: 'm3-codex-metric' },
+      el(
+        'div',
+        { class: 'm3-codex-metric-head' },
+        el('span', { class: 'm3-codex-metric-label' }, label),
+        el('span', { class: 'm3-codex-metric-value' }, `${have}/${total}`),
+      ),
+      el(
+        'span',
+        { class: 'm3-codex-bar' },
+        el('span', { class: 'm3-codex-bar-fill', style: `width:${pct}%` }),
+      ),
+      note ? el('span', { class: 'm3-codex-metric-note' }, note) : null,
+    );
+  }
+
+  /** 顶部：精华余额 + 收集总览 + 关键统计（每个分页都常驻，花钱时随时看得到余额） */
   function summary(meta) {
-    const progress = poolProgress(meta);
+    const cfg = rogueCfg();
+    const view = collectionSummary(meta);
     const stats = meta.stats || {};
-    const ready = claimableCount(meta);
+    const pct = Math.round(view.ratio * 100);
+    // 底薪 + 平方曲线的纯基础值（不含共鸣 / 丰收），用来解释「打几层大概拿多少」
+    const baseOf = (floor) => Math.floor((floor * floor) / cfg.essenceDivisor)
+      + floor * (cfg.depthEssencePerFloor || 0);
     return el(
       'div',
       { class: 'm3-codex-top' },
@@ -459,8 +450,6 @@ export function codexPanel(picks = null) {
         { class: 'm3-codex-toprow' },
         el('span', { class: 'm3-codex-essence' }, '✦ ', el('b', {}, String(meta.essence))),
         el('span', { class: 'm3-codex-toplabel' }, '精华余额'),
-        el('span', { class: 'm3-codex-topitem' }, `祝福 ${progress.unlocked}/${progress.total}`),
-        el('span', { class: 'm3-codex-topitem' }, `满级 ${progress.maxed}`),
         el('span', { class: 'm3-codex-topitem' }, `累计获得 ✦${meta.essenceEarned}`),
         el('span', { class: 'm3-codex-topitem' }, `出战 ${stats.runs || 0} 轮`),
         el('span', { class: 'm3-codex-topitem' }, `最深 ${stats.bestFloor || 0} 层`),
@@ -470,21 +459,38 @@ export function codexPanel(picks = null) {
         ),
       ),
       el(
+        'div',
+        { class: 'm3-codex-overview' },
+        el(
+          'div',
+          { class: 'm3-codex-overview-head' },
+          el('span', { class: 'm3-codex-overview-title' }, '图鉴完成度'),
+          el('span', { class: 'm3-codex-overview-pct' }, `${pct}%`),
+        ),
+        el(
+          'span',
+          { class: 'm3-codex-bar m3-codex-bar--overview' },
+          el('span', { class: 'm3-codex-bar-fill', style: `width:${pct}%` }),
+        ),
+        el(
+          'div',
+          { class: 'm3-codex-metrics' },
+          metric('🎴 祝福', view.perksUnlocked, view.perksTotal, `满级 ${view.perksMaxed}`),
+          metric('🌳 共鸣树', view.buffsOn, view.buffsTotal, `机制节点同样计入`),
+          metric('🧩 角色', view.charsOn, view.charsTotal, `熟练合计 Lv.${view.mastery}`),
+          metric(
+            '🏅 里程碑',
+            view.milestonesClaimed,
+            view.milestonesTotal,
+            view.claimable > 0 ? `可领 ${view.claimable} 项` : '全部已处理',
+          ),
+        ),
+      ),
+      el(
         'p',
         { class: 'm3-codex-sub' },
-        '精华按每轮到达层数结算（第 10 层 20 · 20 层 80 · 30 层 180），在本面板花掉；未解锁的祝福不进三选一池。',
+        `精华按每轮到达层数结算：每层 1 点底薪 + 层数平方（第 10 层 ${baseOf(10)} · 20 层 ${baseOf(20)} · 30 层 ${baseOf(30)}，未计共鸣加成）。`,
       ),
-      ready > 0
-        ? el(
-          'button',
-          {
-            class: 'm3-codex-ready',
-            type: 'button',
-            onClick: () => switchTab('ms'),
-          },
-          `🏅 有 ${ready} 项里程碑奖励可领，点击前往 →`,
-        )
-        : null,
     );
   }
 
@@ -508,8 +514,8 @@ export function codexPanel(picks = null) {
       .map((key) => {
         const label = cfg[key]?.label || key;
         return section(
-          `宝箱遗物 · ${label}`,
-          `共 ${byRarity[key].length} 件 · 每轮每件最多持有 1 个 · 只从宝藏 / Boss / 事件 / 商店获得`,
+          `${label} · ${byRarity[key].length} 件`,
+          null,
           byRarity[key].map((relic) => item(relic, RELIC_GROUP_LABEL[relic.group] || '遗物')),
           ' m3-codex-list--relics',
         );
@@ -520,29 +526,48 @@ export function codexPanel(picks = null) {
   function charRow(ch, stats, own) {
     const prog = unlockProgress(ch, stats);
     const unlocked = !prog || prog.done;
-    const rec = own && own.runs
-      ? `出战 ${own.runs} 轮 · 最深 ${own.bestFloor || 0} 层 · 通关 ${own.wins || 0}`
-      : null;
     // 熟练度（纯展示：按该角色累计出战轮数分级，不接强度；对应成就徽章门槛 15 轮）
     const mast = characterMastery(own);
-    const mastText = mast.next === null
-      ? `熟练 Lv.${mast.level}（满级）`
-      : `熟练 Lv.${mast.level}（出战 ${mast.runs}/${mast.next} 轮）`;
+    const statsText = own && own.runs
+      ? `出战 ${own.runs} · 最深 ${own.bestFloor || 0} · 通关 ${own.wins || 0}`
+      : '尚未出战';
+    const nextText = mast.next === null ? '熟练已满级' : `距下一档还差 ${mast.next - mast.runs} 轮`;
+    // 未解锁时进度条改看「解锁条件」，已解锁时看熟练度，两种状态都有一致的进度反馈
+    const pct = unlocked
+      ? Math.round(mast.progress * 100)
+      : Math.round((Math.min(prog.have, prog.need) / prog.need) * 100);
     return el(
       'div',
-      { class: `m3-codex-item m3-codex-item--char${unlocked ? '' : ' m3-codex-item--locked'}` },
-      el('span', { class: 'm3-codex-icon' }, unlocked ? ch.icon : '🔒'),
+      { class: `m3-codex-tile m3-codex-tile--char${unlocked ? '' : ' m3-codex-item--locked'}` },
       el(
         'div',
-        { class: 'm3-codex-main' },
+        { class: 'm3-codex-tile-head' },
+        el('span', { class: 'm3-codex-icon' }, unlocked ? ch.icon : '🔒'),
+        el('span', { class: 'm3-codex-tile-name' }, ch.name),
+        el('span', { class: 'm3-codex-limit' }, ch.style),
+        // 熟练度称号：与 MASTERY_TIERS 的档位一一对应，满级用最高档配色
+        unlocked
+          ? el(
+            'span',
+            { class: `m3-codex-mastery m3-codex-mastery--${mast.level}` },
+            `${MASTERY_TITLE[mast.level] || MASTERY_TITLE[0]} Lv.${mast.level}`,
+          )
+          : null,
+      ),
+      el(
+        'div',
+        { class: 'm3-codex-tile-body' },
+        el('div', { class: 'm3-codex-desc' }, ch.desc),
         el(
           'div',
-          { class: 'm3-codex-head' },
-          el('span', { class: 'm3-codex-name' }, ch.name),
-          el('span', { class: 'm3-codex-limit' }, ch.style),
+          { class: 'm3-codex-meta' },
+          unlocked ? `${statsText} · ${nextText}` : `🔒 ${prog.label}（${prog.have}/${prog.need}）`,
         ),
-        el('div', { class: 'm3-codex-desc' }, ch.desc),
-        el('div', { class: 'm3-codex-meta' }, unlocked ? `${rec ? `${rec} · ` : '尚未出战 · '}⭐ ${mastText}` : `🔒 ${prog.label}（${prog.have}/${prog.need}）`),
+        el(
+          'span',
+          { class: 'm3-codex-bar m3-codex-bar--mastery' },
+          el('span', { class: 'm3-codex-bar-fill', style: `width:${pct}%` }),
+        ),
       ),
     );
   }
@@ -550,32 +575,88 @@ export function codexPanel(picks = null) {
   function charSections(meta) {
     const stats = meta.stats || {};
     const cs = meta.charStats || {};
-    return [
-      section(
-        '角色 / 职业',
-        '开局前选定身份，决定起手加成与一条专属被动（自带遗物）；解锁靠战绩，不用精华买强度',
-        CHARACTERS.map((ch) => charRow(ch, stats, cs[ch.id])),
-      ),
-    ];
+    // 标题已在 paneHead，这里直接铺列表，不再套一层「全部角色」小节
+    return el(
+      'div',
+      { class: 'm3-codex-list m3-codex-list--chars' },
+      ...CHARACTERS.map((ch) => charRow(ch, stats, cs[ch.id])),
+    );
   }
 
-  /** 按稀有度分组（普通 → 稀有 → 史诗），组标题带上该档的等级上限与费用；条目用紧凑行 */
+  /** 祝福筛选谓词（只影响本页展示，不影响三选一抽取） */
+  function perkMatch(perk, meta) {
+    const lv = itemLevel(meta, perk);
+    if (perkFilter === 'buyable') return requiresMet(meta, perk) && !!nextStep(meta, perk);
+    if (perkFilter === 'owned') return lv > 0;
+    if (perkFilter === 'locked') return lv <= 0;
+    return true;
+  }
+
+  /**
+   * 组内排序：把「现在最可能点的」排前面
+   * 已解锁可升级 → 未解锁但前置已满足 → 已满级 → 前置未满足
+   */
+  function perkRank(perk, meta) {
+    const lv = itemLevel(meta, perk);
+    const step = nextStep(meta, perk);
+    if (lv > 0 && step) return 0;
+    if (lv <= 0 && step && requiresMet(meta, perk)) return 1;
+    if (!step) return 2;
+    return 3;
+  }
+
+  /** 祝福筛选栏：四个胶囊 + 各档数量（数量按当前存档实时算） */
+  function perkFilterBar(meta) {
+    const counts = { all: PERKS.length, buyable: 0, owned: 0, locked: 0 };
+    for (const perk of PERKS) {
+      if (requiresMet(meta, perk) && nextStep(meta, perk)) counts.buyable += 1;
+      if (itemLevel(meta, perk) > 0) counts.owned += 1;
+      else counts.locked += 1;
+    }
+    return el(
+      'div',
+      { class: 'm3-codex-filters', role: 'toolbar', 'aria-label': '祝福筛选' },
+      ...PERK_FILTERS.map((f) => el(
+        'button',
+        {
+          class: `m3-codex-filter${perkFilter === f.id ? ' m3-codex-filter--on' : ''}`,
+          type: 'button',
+          'aria-pressed': perkFilter === f.id ? 'true' : 'false',
+          onClick: () => {
+            if (perkFilter === f.id) return;
+            perkFilter = f.id;
+            paint();
+          },
+        },
+        f.label,
+        el('span', { class: 'm3-codex-filter-count' }, String(counts[f.id])),
+      )),
+    );
+  }
+
+  /** 按稀有度分组（普通 → 稀有 → 史诗），组标题带上该档上限、费用与收集进度；条目用紧凑行 */
   function raritySections(meta) {
     const cfg = rogueCfg().rarities;
     const order = ['common', 'rare', 'epic'].filter((key) => cfg[key]);
     return order.map((key) => {
-      const perks = PERKS.filter((perk) => perk.rarity === key);
+      const all = PERKS.filter((perk) => perk.rarity === key);
+      if (all.length === 0) return null;
+      const perks = all
+        .filter((perk) => perkMatch(perk, meta))
+        .sort((a, b) => perkRank(a, meta) - perkRank(b, meta));
       if (perks.length === 0) return null;
       const rar = cfg[key];
       // 组内若有祝福单独封顶（如极简主义受 4 色下限约束只有 2 级），标题别只写稀有度上限造成误解
-      const caps = [...new Set(perks.map((perk) => maxLevelOf(perk)))];
+      const caps = [...new Set(all.map((perk) => maxLevelOf(perk)))];
       const capText = caps.length === 1
         ? `Lv.${rar.maxLevel}`
         : `Lv.${rar.maxLevel}（个别祝福单独封顶，见条目）`;
+      const owned = all.filter((perk) => itemLevel(meta, perk) > 0).length;
+      const maxed = all.filter((perk) => itemLevel(meta, perk) >= maxLevelOf(perk)).length;
       return section(
-        `局内祝福 · ${rar.label || key}（上限 ${capText}）`,
-        `解锁 ✦${rar.unlockCost} · 升级 ✦${rar.upgradeCost} 起，每级 ×${rar.costGrowth} · 点击条目展开效果`,
-        perks.map((perk) => perkCompact(perk, meta)),
+        `${rar.label || key} · ${owned}/${all.length} 已解锁 · ${maxed} 满级（上限 ${capText}）`,
+        null,
+        perks.map((perk) => perkTile(perk, meta)),
         ' m3-codex-list--perks',
       );
     }).filter(Boolean);
@@ -592,7 +673,11 @@ export function codexPanel(picks = null) {
     else window.scrollTo({ top: 0 });
   }
 
-  /** 分页按钮条：有可领里程碑时在「里程」上挂红点角标 */
+  /**
+   * 分页标签：下划线式导航
+   * 六个带边框的等宽卡片并排会显得又碎又乱，这里改成「透明文字 + 选中下划线」，
+   * 可领里程碑的计数也从浮动角标改成贴着文字的胶囊，不压到相邻分页。
+   */
   function tabBar(meta) {
     const ready = claimableCount(meta);
     return el(
@@ -607,60 +692,117 @@ export function codexPanel(picks = null) {
           'aria-selected': tab === t.id ? 'true' : 'false',
           onClick: () => switchTab(t.id),
         },
-        t.label,
+        el('span', { class: 'm3-codex-tab-icon', 'aria-hidden': 'true' }, t.icon),
+        el('span', { class: 'm3-codex-tab-label' }, t.label),
         t.id === 'ms' && ready > 0
-          ? el('span', { class: 'm3-codex-tab-dot' }, String(ready))
+          ? el('span', { class: 'm3-codex-tab-dot', title: `${ready} 项里程碑可领` }, String(ready))
           : null,
       )),
     );
   }
 
-  /** 当前分页的主体内容 */
+  /** 当前分页的主体内容（每页都以 paneHead 开头，保证切换后标题 / 说明 / 主操作的位置一致） */
   function tabBody(meta) {
+    const view = collectionSummary(meta);
     if (tab === 'perks') {
-      return el('div', { class: 'm3-codex-pane' }, ...raritySections(meta));
+      const sections = raritySections(meta);
+      const filterLabel = PERK_FILTERS.find((f) => f.id === perkFilter)?.label || '当前筛选';
+      return el(
+        'div',
+        { class: 'm3-codex-pane' },
+        paneHead(
+          '✨ 祝福',
+          `已解锁 ${view.perksUnlocked}/${view.perksTotal} · 满级 ${view.perksMaxed} · 筛选只影响展示，不改变三选一池`,
+        ),
+        perkFilterBar(meta),
+        ...(sections.length > 0
+          ? sections
+          : [el('p', { class: 'm3-codex-empty' }, `「${filterLabel}」下没有符合条件的祝福，换个筛选看看。`)]),
+      );
     }
     if (tab === 'relics') {
-      return el('div', { class: 'm3-codex-pane' }, ...relicSections());
+      return el(
+        'div',
+        { class: 'm3-codex-pane' },
+        paneHead('🎁 遗物', '每轮每件最多持有 1 个 · 只从宝藏 / Boss / 事件 / 商店获得'),
+        ...relicSections(),
+      );
     }
     if (tab === 'chars') {
-      return el('div', { class: 'm3-codex-pane' }, ...charSections(meta));
+      return el(
+        'div',
+        { class: 'm3-codex-pane' },
+        paneHead(
+          '🧩 角色',
+          `已解锁 ${view.charsOn}/${view.charsTotal} · 熟练合计 Lv.${view.mastery} · 解锁靠战绩，不用精华购买`,
+        ),
+        charSections(meta),
+      );
     }
     if (tab === 'quest') {
       return el(
         'div',
         { class: 'm3-codex-pane' },
+        paneHead(
+          '📜 局内任务',
+          `第 ${ROGUE.quest.fromFloor} 层起每层随机派一个收集任务 · 无失败惩罚 · 达成即当场生效`,
+        ),
         section(
-          '局内任务奖励',
-          `第 ${ROGUE.quest.fromFloor} 层起每层随机派一个「收集某颜色 N 个」的任务（无失败惩罚），达成即当场生效，奖励池共 ${QUEST_REWARDS.length} 种`,
-          QUEST_REWARDS.map((reward) => item(reward, '达成即得')),
+          `奖励池 · ${QUEST_REWARDS.length} 种`,
+          null,
+          QUEST_REWARDS.map((reward) => item(reward, null)),
           ' m3-codex-list--quest',
         ),
       );
     }
     if (tab === 'ms') {
-      // 里程碑单独一页：按「祝福收集 / 共鸣树 / 历练挑战」分组，20 条不再挤在养成页底部
+      // 里程碑单独一页：按「祝福收集 / 共鸣树 / 角色 / 进阶 / 历练」分组
       const states = milestoneState(meta);
+      const pending = states.filter((ms) => ms.done && !ms.claimed);
+      const reward = pending.reduce((sum, ms) => sum + milestoneReward(ms, meta), 0);
+      const claimed = states.length - pending.length;
       return el(
         'div',
         { class: 'm3-codex-pane' },
-        el(
-          'p',
-          { class: 'm3-codex-sub' },
-          '达成后一次性领取，奖励只有精华（不掺道具券，避免养成与对局道具两套经济互相打架）；点亮共鸣树「丰收闭环」后所有里程碑奖励 ×2。',
+        paneHead(
+          '🏅 里程碑',
+          `共 ${states.length} 项 · 已领取 ${claimed} 项 · 点亮「丰收闭环」后奖励 ×2`,
+          pending.length > 0
+            ? el(
+              'button',
+              {
+                class: 'm3-codex-claimall',
+                type: 'button',
+                onClick: () => {
+                  if (!claimAllRogueMilestones()) toast.info('未连接服务器，稍后再试');
+                },
+              },
+              `一键领取 ${pending.length} 项 · ✦${reward}`,
+            )
+            : null,
         ),
         ...MS_GROUPS.map((group) => {
           const rows = states.filter((ms) => group.kinds.includes(ms.kind));
-          return rows.length > 0
-            ? section(group.title, null, rows.map((ms) => milestoneRow(ms, meta)), ' m3-codex-list--ms')
-            : null;
+          if (rows.length === 0) return null;
+          const done = rows.filter((ms) => ms.claimed).length;
+          return section(
+            `${group.title} · ${done}/${rows.length}`,
+            null,
+            rows.map((ms) => milestoneRow(ms, meta)),
+            ' m3-codex-list--ms',
+          );
         }).filter(Boolean),
       );
     }
     // 默认页：只有共鸣树（局外养成主线）；里程碑领奖已拆到「里程」页
+    const on = META_BUFFS.filter((buff) => itemLevel(meta, buff) > 0).length;
     return el(
       'div',
       { class: 'm3-codex-pane' },
+      paneHead(
+        '🌳 共鸣树',
+        `已点亮 ${on}/${META_BUFFS.length} · 三条流派逐级点亮：前两格是数值优势，末端是机制节点`,
+      ),
       treeSection(meta),
     );
   }
@@ -668,7 +810,6 @@ export function codexPanel(picks = null) {
   /** 重画整块内容（服务端每次下发存档都会调一次） */
   function paint() {
     const meta = getRogueMeta();
-    if (!selectedId) selectedId = defaultSelection(meta);
     host.replaceChildren(
       summary(meta),
       tabBar(meta),

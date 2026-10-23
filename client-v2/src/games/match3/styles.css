@@ -745,57 +745,68 @@
   padding-top: 16px;
 }
 
-/* 分页栏：吸顶，长列表滚动时随时可以切走 */
+/* 分页标签：吸顶 + 下划线式导航（透明文字 + 选中下划线），不再是六个带边框的卡片 */
 .m3-codex-tabs {
   position: sticky;
   top: 0;
   z-index: 2;
   display: flex;
-  gap: 6px;
-  padding: 6px 0 8px;
+  gap: 0;
+  padding: 2px 0 0;
   background: var(--theme-modal-bg, var(--surface, #fff));
   border-bottom: 1px solid var(--theme-border-color, #e2e8f0);
 }
 
 .m3-codex-tab {
-  position: relative;
-  flex: 1;
-  min-height: 34px;
-  padding: 6px 4px;
-  border: 1px solid var(--theme-border-color, #e2e8f0);
-  border-radius: 8px;
-  background: var(--theme-panel-bg, #fff);
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 2px 6px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
   font-size: 13px;
+  line-height: 1.2;
+  white-space: nowrap;
   color: var(--theme-status-color, #4a5568);
   cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 
 .m3-codex-tab:hover {
-  border-color: var(--theme-btn-primary-bg, #007bff);
+  color: var(--theme-title-color, #2c3e50);
+  background: var(--theme-panel-bg-hover, #f0f6ff);
 }
 
 .m3-codex-tab--on {
-  border-color: var(--theme-btn-primary-bg, #007bff);
-  background: var(--theme-panel-bg-hover, #f0f6ff);
-  color: var(--theme-btn-primary-bg, #007bff);
+  border-bottom-color: var(--theme-accent, #27ae60);
+  background: transparent;
+  color: var(--theme-accent, #27ae60);
   font-weight: 700;
 }
 
-/* 可领里程碑的红点角标 */
+.m3-codex-tab-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* 可领里程碑：贴着文字的计数胶囊，不再浮动到相邻分页上 */
 .m3-codex-tab-dot {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  min-width: 16px;
-  height: 16px;
+  min-width: 15px;
+  height: 15px;
   padding: 0 4px;
   border-radius: 8px;
   background: var(--theme-accent, #27ae60);
   color: #fff;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
-  line-height: 16px;
+  line-height: 15px;
+  text-align: center;
   box-sizing: border-box;
 }
 
@@ -833,23 +844,201 @@
   color: var(--theme-status-color, #4a5568);
 }
 
-/* 「有奖励可领」的提示行：做成可点按钮，点一下直接跳到养成页领奖 */
-.m3-codex-ready {
-  align-self: flex-start;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
+/* ---- 图鉴收集总览：总完成度 + 四宫格进度 ---- */
+.m3-codex-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--theme-border-color, #e2e8f0);
+}
+
+.m3-codex-overview-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.m3-codex-overview-title {
   font-size: 12px;
   font-weight: 600;
+  color: var(--theme-title-color, #2c3e50);
+}
+
+.m3-codex-overview-pct {
+  font-size: 15px;
+  font-weight: 700;
   color: var(--theme-accent, #27ae60);
 }
 
-.m3-codex-ready:hover {
-  text-decoration: underline;
+/* 总完成度条比条目内的等级条更粗，作为顶部的主进度 */
+.m3-codex-bar--overview {
+  height: 6px;
+  margin-top: 0;
+  border-radius: 3px;
+}
+
+/* 四宫格：窄屏两列，宽屏一行四个 */
+.m3-codex-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+}
+
+.m3-codex-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.m3-codex-metric-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.m3-codex-metric-label {
+  font-size: 12px;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-codex-metric-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--theme-title-color, #2c3e50);
+}
+
+.m3-codex-metric .m3-codex-bar {
+  margin-top: 2px;
+}
+
+.m3-codex-metric-note {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--theme-status-color, #4a5568);
+  opacity: 0.8;
+}
+
+/* ---- 祝福筛选胶囊 ---- */
+.m3-codex-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.m3-codex-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 3px 10px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 14px;
+  background: var(--theme-panel-bg, #fff);
+  font-size: 12px;
+  color: var(--theme-status-color, #4a5568);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.m3-codex-filter:hover {
+  border-color: var(--theme-btn-primary-bg, #007bff);
+}
+
+.m3-codex-filter--on {
+  border-color: var(--theme-btn-primary-bg, #007bff);
+  background: var(--theme-panel-bg-hover, #f0f6ff);
+  color: var(--theme-btn-primary-bg, #007bff);
+  font-weight: 600;
+}
+
+.m3-codex-filter-count {
+  font-size: 10px;
+  line-height: 14px;
+  padding: 0 4px;
+  border-radius: 7px;
+  background: var(--theme-border-color, #e2e8f0);
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-codex-filter--on .m3-codex-filter-count {
+  background: var(--theme-btn-primary-bg, #007bff);
+  color: #fff;
+}
+
+.m3-codex-empty {
+  margin: 0;
+  padding: 18px 10px;
+  border: 1px dashed var(--theme-border-color, #e2e8f0);
+  border-radius: 10px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--theme-status-color, #4a5568);
+}
+
+/* ---- 里程碑一键领取（放在分页标题右上角） ---- */
+.m3-codex-claimall {
+  min-height: 32px;
+  padding: 5px 14px;
+  border: 1px solid var(--theme-accent, #27ae60);
+  border-radius: 9px;
+  background: var(--theme-accent, #27ae60);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: #fff;
+  cursor: pointer;
+}
+
+.m3-codex-claimall:hover {
+  filter: brightness(1.06);
+}
+
+/* ---- 角色熟练度徽章 ---- */
+.m3-codex-mastery {
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  line-height: 16px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--theme-status-color, #4a5568);
+}
+
+/* 档位配色：见习（灰）→ 新秀（蓝）→ 老手（紫）→ 大师（金） */
+.m3-codex-mastery--0 {
+  background: var(--theme-status-color, #4a5568);
+  opacity: 0.75;
+}
+
+.m3-codex-mastery--1 {
+  background: var(--theme-btn-primary-bg, #007bff);
+}
+
+.m3-codex-mastery--2 {
+  background: #b06cf0;
+}
+
+.m3-codex-mastery--3 {
+  background: linear-gradient(90deg, #e8a90c, #f6c544);
+  color: #4a3200;
+}
+
+/* 熟练度进度条：比等级条细，弱化但不能没有（下一档还差多少） */
+.m3-codex-bar--mastery {
+  height: 3px;
+  margin-top: 5px;
+}
+
+@media (min-width: 769px) {
+  .m3-codex-metrics {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
 .m3-codex-sub {
@@ -872,24 +1061,59 @@
   gap: 14px;
 }
 
-/* 共鸣树 + 选中节点详情的布局包裹：默认上下排；宽屏左右分栏见下方 @media(min-width:769px)。
-   注意默认规则必须写在媒体查询前面——两者同优先级，写在后面会顶掉分栏 */
-.m3-tree-layout {
+/* 分页标题：六个分页统一「标题 + 一句说明 + 右上角主操作」，
+   切换分页时视线落点固定，操作也不会藏在列表里 */
+.m3-codex-pane-head {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.m3-tree-detail {
+.m3-codex-pane-text {
   min-width: 0;
 }
 
+.m3-codex-pane-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--theme-title-color, #2c3e50);
+}
+
+.m3-codex-pane-hint {
+  margin: 3px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--theme-status-color, #4a5568);
+}
+
+.m3-codex-pane-action {
+  flex-shrink: 0;
+  align-self: center;
+}
+
+@media (max-width: 480px) {
+
+  /* 窄屏主操作折到说明下方，避免标题被按钮挤成两行 */
+  .m3-codex-pane-head {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .m3-codex-pane-action {
+    align-self: flex-start;
+  }
+}
+
 .m3-codex-sec-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   font-size: 13px;
   font-weight: 700;
   color: var(--theme-title-color, #2c3e50);
-  padding-bottom: 4px;
-  border-bottom: 1px solid var(--theme-border-color, #e2e8f0);
 }
 
 .m3-codex-list {
@@ -898,103 +1122,64 @@
   gap: 6px;
 }
 
-/* 只读图鉴卡（遗物 / 任务）：任何宽度下都是卡式内边距，列数交给下方媒体查询 */
-.m3-codex-list--relics .m3-codex-item,
-.m3-codex-list--quest .m3-codex-item {
-  align-items: flex-start;
-  gap: 6px;
-  padding: 8px;
-}
-
-.m3-codex-list--relics .m3-codex-head,
-.m3-codex-list--quest .m3-codex-head {
-  gap: 4px;
-}
-
-/* 平板（>480px）：遗物 / 任务先升到两列；手机竖屏仍是单列 */
+/* 图鉴网格：列数随宽度变化，卡高由列表的 --tile-h 统一指定（见 .m3-codex-tile） */
 @media (min-width: 481px) {
 
   .m3-codex-list--relics,
   .m3-codex-list--quest {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 6px;
-    align-items: start;
+    gap: 8px;
   }
 }
 
-/* PC / 横屏（≥769，与 modal 组件自己的 768 断点对齐）：弹窗加宽后各列表吃满横向空间。
-   注意：这里只切换「排列方式」，紧凑行的按钮 / 展开区等交互元素与命中区域一律不变，
-   避免布局分支改变事件路径 */
 @media (min-width: 769px) {
 
-  /* 祝福：两列紧凑行；某条展开时同排另一条不被拉高 */
   .m3-codex-list--perks {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
-    align-items: start;
   }
 
-  .m3-codex-list--perks>.m3-codex-item {
-    min-width: 0;
-  }
-
-  /* 遗物三列 */
   .m3-codex-list--relics {
     grid-template-columns: repeat(3, 1fr);
   }
 
-  /* 里程碑两列 */
   .m3-codex-list--ms {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 6px;
-    align-items: start;
+  }
+
+  .m3-codex-list--chars {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
   }
 }
 
-/* 更宽的桌面（≥960）：共鸣树左右分栏 + 任务四列 */
+/* 更宽的桌面（≥960）：任务四列 */
 @media (min-width: 960px) {
   .m3-codex-list--quest {
     grid-template-columns: repeat(4, 1fr);
   }
-
-  /* 树在左、选中节点详情卡贴右并吸顶跟随滚动。
-     比例偏向详情卡一些（1.35:1）：卡太窄时描述每行都折行、按钮又被拉成整行，显得空 */
-  .m3-tree-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
-    gap: 16px;
-    align-items: start;
-  }
-
-  .m3-tree-detail {
-    position: sticky;
-    /* 让开吸顶分页栏的高度 */
-    top: 58px;
-  }
-
-  /* 树节点在宽格里放大一点，避免三条流派之间空得太开。
-     基础 .m3-tree-node 规则在本文件后面，这里用双类选择器盖过它 */
-  .m3-tree-grid .m3-tree-node {
-    max-width: 170px;
-  }
-
-  /* 详情卡列偏窄：购买按钮折到内容下方，但保持自适应宽度贴右，
-     避免图标 / 描述 / 按钮挤一行，也不把按钮拉成整行长条 */
-  .m3-tree-detail .m3-codex-item {
-    flex-wrap: wrap;
-  }
-
-  .m3-tree-detail .m3-codex-buy {
-    flex: 0 0 auto;
-    align-self: flex-end;
-    margin-right: 2px;
-  }
 }
 
-/* 大屏桌面（≥1200）：弹窗进一步放宽，树与详情卡都更透气 */
+/* 每个分页的卡片规格：同页所有卡等高，内容超出时在卡内滚动 */
+.m3-codex-list--perks {
+  --tile-h: 214px;
+}
+
+.m3-codex-list--relics,
+.m3-codex-list--quest {
+  --tile-h: 148px;
+}
+
+.m3-codex-list--chars {
+  --tile-h: 172px;
+}
+
+/* 大屏桌面（≥1200）：弹窗进一步放宽 */
 @media (min-width: 1200px) {
   .modal-overlay--codex .modal {
     max-width: 1120px;
@@ -1040,9 +1225,12 @@
   opacity: 0.6;
 }
 
+/* 图标不再加底座：只保留一个小尺寸占位，让各行文字起点对齐 */
 .m3-codex-icon {
-  flex-shrink: 0;
-  font-size: 18px;
+  flex: 0 0 18px;
+  width: 18px;
+  text-align: center;
+  font-size: 15px;
   line-height: 1.2;
 }
 
@@ -1121,6 +1309,14 @@
   transition: width 0.2s ease;
 }
 
+/* 里程碑进度条：和名称同排更紧凑，27 条不用每条都占三行 */
+.m3-codex-bar--ms {
+  height: 3px;
+  margin-top: 4px;
+}
+
+/* 描述文字不再截断：方卡的内容区统一改成内部滚动，长文案也能看全 */
+
 .m3-codex-meta {
   margin-top: 4px;
   font-size: 11px;
@@ -1141,21 +1337,25 @@
   color: var(--theme-accent, #27ae60);
 }
 
-/* 解锁 / 升级 / 领取按钮：窄栏里也要点得中，故给足最小高度 */
+/* 解锁 / 升级 / 领取按钮：统一绿色实心、固定最小宽度，纵向扫一眼就能找到操作 */
 .m3-codex-buy {
   flex-shrink: 0;
+  min-width: 76px;
   min-height: 30px;
   padding: 4px 10px;
-  border: 1px solid var(--theme-btn-primary-bg, #007bff);
+  border: 1px solid var(--theme-accent, #27ae60);
   border-radius: 8px;
   font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+  white-space: nowrap;
   color: #fff;
-  background: var(--theme-btn-primary-bg, #007bff);
+  background: var(--theme-accent, #27ae60);
   cursor: pointer;
 }
 
 .m3-codex-buy:hover:not(:disabled) {
-  background: var(--theme-btn-primary-bg-hover, #0056b3);
+  filter: brightness(1.06);
 }
 
 .m3-codex-buy:disabled {
@@ -1163,82 +1363,97 @@
   cursor: not-allowed;
 }
 
+/* 领取按钮与购买按钮同色，仅用内阴影再加一档强调 */
 .m3-codex-buy--ready {
   border-color: var(--theme-accent, #27ae60);
   background: var(--theme-accent, #27ae60);
+  box-shadow: 0 0 0 2px rgba(39, 174, 96, 0.18);
 }
 
-/* 「已满级 / 已领取 / 未达成」这类不可点的状态：从按钮退化成标签 */
+/* 「已满级 / 已领取 / 进度」这类不可点的状态：从按钮退化成弱化标签，不抢操作的视线 */
 .m3-codex-buy--max {
+  min-width: 64px;
+  padding: 4px 6px;
   border-color: transparent;
   background: none;
+  font-size: 11px;
   color: var(--theme-status-color, #4a5568);
-  opacity: 0.8;
+  opacity: 0.7;
   cursor: default;
 }
 
-/* ===== 祝福紧凑行：默认只露一行，点开展开效果详情 =====
- * 外层两行布局：第一行 = 展开按钮（占满）+ 购买按钮；
- * 展开区 flex-basis:100% 折到第二行，收起时直接不占位。
+/* ===== 图鉴方卡：祝福 / 遗物 / 角色 / 任务共用 =====
+ * 同一页的所有卡等高（高度由列表的 --tile-h 指定）：
+ * 标题行与操作按钮固定，中间内容区 flex:1 + overflow-y:auto，长文案在卡内滚动。
  */
-.m3-codex-item--compact {
-  flex-wrap: wrap;
-  gap: 4px 8px;
-  padding: 5px 8px 5px 10px;
+.m3-codex-tile {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: var(--tile-h, 160px);
+  padding: 9px 10px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 10px;
+  background: var(--theme-panel-bg, #fff);
+  overflow: hidden;
 }
 
-.m3-codex-toggle {
-  flex: 1;
-  min-width: 0;
+.m3-codex-tile-head {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 2px 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  text-align: left;
-  color: inherit;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
+  gap: 6px;
+  min-width: 0;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--theme-border-color, #e2e8f0);
 }
 
-.m3-codex-toggle .m3-codex-name {
+.m3-codex-tile-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
   white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--theme-title-color, #2c3e50);
 }
 
-.m3-codex-toggle .m3-codex-lv {
-  white-space: nowrap;
+.m3-codex-tile-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: 4px;
+  scrollbar-width: thin;
 }
 
-/* 展开箭头：贴在购买按钮左边，展开时翻转 */
-.m3-codex-chevron {
+.m3-codex-tile-body .m3-codex-desc {
+  margin-top: 0;
+}
+
+.m3-codex-tile-foot {
   flex-shrink: 0;
-  margin-left: auto;
-  font-size: 10px;
-  line-height: 1;
-  color: var(--theme-status-color, #4a5568);
-  opacity: 0.55;
-  transition: transform 0.15s ease;
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 6px;
 }
 
-.m3-codex-item--open .m3-codex-chevron {
-  transform: rotate(180deg);
+/* 方卡沿用条目一致的稀有度左边框与未解锁虚线 */
+.m3-codex-tile.m3-codex-item--common {
+  border-left: 3px solid var(--theme-status-color, #4a5568);
 }
 
-.m3-codex-detail {
-  flex-basis: 100%;
-  display: none;
-  /* 与图标后的文字起点对齐 */
-  padding: 2px 0 2px 26px;
+.m3-codex-tile.m3-codex-item--rare {
+  border-left: 3px solid var(--theme-btn-primary-bg, #007bff);
 }
 
-.m3-codex-item--open .m3-codex-detail {
-  display: block;
+.m3-codex-tile.m3-codex-item--epic {
+  border-left: 3px solid #b06cf0;
 }
 
-.m3-codex-item--open {
-  padding-bottom: 8px;
+.m3-codex-tile.m3-codex-item--locked {
+  opacity: 0.72;
+  border-style: dashed;
 }
 
 @media (max-width: 768px) {
@@ -1256,18 +1471,21 @@
 
 @media (max-width: 480px) {
   .m3-codex-buy {
+    min-width: 62px;
     padding: 4px 8px;
     font-size: 11px;
   }
 
-  /* 五个分页（养成 / 里程 / 祝福 / 遗物 / 任务）挤一行：收窄间距与按钮内边距 */
-  .m3-codex-tabs {
-    gap: 4px;
+  /* 六个分页保持一行（下划线式比卡片省宽度），只收窄字号与图标 */
+  .m3-codex-tab {
+    gap: 3px;
+    min-height: 36px;
+    padding: 7px 1px 5px;
+    font-size: 11px;
   }
 
-  .m3-codex-tab {
+  .m3-codex-tab-icon {
     font-size: 12px;
-    padding: 6px 2px;
   }
 
   .modal-overlay--codex .modal {
@@ -1276,201 +1494,191 @@
 }
 
 /* ===== 肉鸽：共鸣树（局外养成的天赋树，见 codex.js 的 treeSection） =====
- * 3 条流派 × 3 层，节点按 perks.js 里的 `tree` 坐标落进 CSS grid。
- * 列宽等分且无列间距，所以第 k 列的中心线正好在 (k+0.5)/列数 处（JS 按这个算出百分比）。
- * 连线不用 SVG：横杆与下垂短线是绝对定位的小条，每格顶部再接一小段竖线——
- * 网格行高会随内容变，写死坐标的 SVG 会飘。
+ * 三条流派各占一列卡片，列内节点按 1→2→3 纵向排列；前置关系用左侧细连线表达。
+ * 每级内容全部常驻；三列统一高度，超出部分在列内滚动。
+ * 加节点只改 perks.js 的 `tree` 坐标，列数由 JS 按数据里的最大 col 现算。
  */
-.m3-tree-grid {
-  --m3-tree-line: var(--theme-border-color, #cbd5e0);
+.m3-tree-paths {
   display: grid;
-  row-gap: 0;
-  padding: 4px 0 2px;
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 
-/* 根：占满一行居中。它不是可买的节点，只是整棵树的起点 */
-.m3-tree-rootcell {
-  grid-column: 1 / -1;
-  display: flex;
-  justify-content: center;
-}
-
-.m3-tree-rootnode {
+.m3-tree-branch {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 6px 14px;
+  min-width: 0;
+  /* 三列同高：内容多的列在内部滚动，不再被文字撑得参差不齐 */
+  height: min(460px, 62vh);
   border: 1px solid var(--theme-border-color, #e2e8f0);
   border-radius: 12px;
-  background: var(--theme-panel-bg-hover, #f8f9fa);
-}
-
-.m3-tree-rooticon {
-  font-size: 18px;
-  line-height: 1;
-  color: var(--theme-accent, #27ae60);
-}
-
-.m3-tree-rootname {
-  font-size: 11px;
-  color: var(--theme-status-color, #4a5568);
-}
-
-/* 分叉行：一根横杆 + 每列一根下垂短线，把根接到三条流派上 */
-.m3-tree-fan {
-  position: relative;
-  grid-column: 1 / -1;
-  height: 26px;
-}
-
-.m3-tree-fan-bar,
-.m3-tree-fan-up,
-.m3-tree-fan-stub {
-  position: absolute;
-  background: var(--m3-tree-line);
-}
-
-.m3-tree-fan-bar {
-  top: 12px;
-  height: 2px;
-}
-
-/* 根 → 横杆 */
-.m3-tree-fan-up {
-  top: 0;
-  width: 2px;
-  height: 12px;
-  margin-left: -1px;
-}
-
-/* 横杆 → 第 1 层节点（其余层的连线由每格的 .m3-tree-link 续上） */
-.m3-tree-fan-stub {
-  top: 12px;
-  bottom: 0;
-  width: 2px;
-  margin-left: -1px;
-}
-
-.m3-tree-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.m3-tree-link {
-  flex-shrink: 0;
-  width: 2px;
-  height: 12px;
-  background: var(--m3-tree-line);
-}
-
-.m3-tree-node {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
-  width: 100%;
-  max-width: 108px;
-  padding: 6px 4px;
-  border: 1px solid var(--theme-border-color, #e2e8f0);
-  border-radius: 10px;
   background: var(--theme-panel-bg, #fff);
-  font: inherit;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  overflow: hidden;
 }
 
-/* 稀有度：窄节点上左边框不好看，改用顶边着色（与条目列表同一套配色） */
-.m3-tree-node--common {
-  border-top: 3px solid var(--theme-status-color, #4a5568);
+.m3-tree-branch-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 9px 12px 7px;
 }
 
-.m3-tree-node--rare {
-  border-top: 3px solid var(--theme-btn-primary-bg, #007bff);
-}
-
-.m3-tree-node--epic {
-  border-top: 3px solid #b06cf0;
-}
-
-.m3-tree-node-icon {
-  font-size: 18px;
-  line-height: 1.1;
-}
-
-.m3-tree-node-name {
-  font-size: 11px;
-  font-weight: 600;
+.m3-tree-branch-name {
+  font-size: 13px;
+  font-weight: 700;
   color: var(--theme-title-color, #2c3e50);
 }
 
-.m3-tree-node-lv {
-  font-size: 10px;
+.m3-tree-branch-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--theme-status-color, #4a5568);
+  opacity: 0.8;
 }
 
-/* 已点亮 */
-.m3-tree-node--on {
-  border-color: var(--theme-accent, #27ae60);
+.m3-tree-branch-lit {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--theme-status-color, #4a5568);
+  opacity: 0.8;
 }
 
-.m3-tree-node--on .m3-tree-node-lv {
+.m3-tree-branch-list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 6px 6px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+/* 一级节点：整行可点；连线画在左侧，节点的图标当作连线上的一颗珠子 */
+.m3-tree-step {
+  position: relative;
+}
+
+.m3-tree-step::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 16px;
+  z-index: 2;
+  width: 2px;
+  background: var(--theme-border-color, #e2e8f0);
+  opacity: 0.7;
+}
+
+/* 连线只连接节点中心：第一级从图标开始，最后一级到图标结束 */
+.m3-tree-step:first-child::before {
+  top: 16px;
+}
+
+.m3-tree-step:last-child::before {
+  bottom: calc(100% - 16px);
+}
+
+.m3-tree-step:only-child::before {
+  display: none;
+}
+
+.m3-tree-step+.m3-tree-step {
+  border-top: 1px solid var(--theme-border-color, #e2e8f0);
+}
+
+.m3-tree-step-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 5px 6px;
+}
+
+/* 图标直接坐在连线上（底色与卡片一致，把线断开），不加装饰底座 */
+.m3-tree-mark {
+  position: relative;
+  z-index: 3;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--theme-panel-bg, #fff);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.m3-tree-step-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.m3-tree-step-name {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--theme-title-color, #2c3e50);
+}
+
+.m3-tree-step-lv {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 11px;
+  white-space: nowrap;
+  color: var(--theme-status-color, #4a5568);
+  opacity: 0.9;
+}
+
+/* 已点亮：只把等级染成绿色，节点本身不再描边 */
+.m3-tree-step--on .m3-tree-step-lv {
   color: var(--theme-accent, #27ae60);
+  opacity: 1;
 }
 
-/* 前置已满足、还没买：虚线框提示「这一格可以买」 */
-.m3-tree-node--next {
-  border-style: dashed;
-}
-
-.m3-tree-node--next:hover {
-  border-color: var(--theme-btn-primary-bg, #007bff);
-}
-
-/* 前置未满足：压暗且不可点（连线是前置关系的可视化，所以这条很重要） */
-.m3-tree-node--blocked {
+/* 前置未满足：整块压暗并显示锁，详情照常展示，按钮显示「前置未解锁」 */
+.m3-tree-step--blocked {
   opacity: 0.5;
-  cursor: not-allowed;
 }
 
-/* 机制节点（末端那颗）：比数值节点大一号、圆角更圆，一眼看出「这是改规则的」 */
-.m3-tree-node--mechanic {
-  max-width: 116px;
-  padding: 9px 6px;
-  border-radius: 14px;
-  border-width: 2px;
+/* 详情常驻：与名称起点对齐，用留白分层，不再套一层边框卡片 */
+.m3-tree-step-body {
+  display: flex;
+  flex-direction: column;
+  /* 与名称起点对齐：左内边距 6 + 图标 22 + 间距 8 */
+  margin: 0 0 6px 36px;
+  padding: 0 6px 0 0;
 }
 
-/* 选中：下面的详情卡跟着它走 */
-.m3-tree-node--sel {
-  box-shadow: 0 0 0 2px var(--theme-btn-primary-bg, #007bff) inset;
+.m3-tree-step-body .m3-codex-desc {
+  font-size: 11.5px;
 }
 
-/* 「机制」标签：与稀有度标签并排，用反色小片区分 */
-.m3-codex-kind {
-  padding: 0 6px;
-  border-radius: 8px;
-  font-size: 10px;
-  line-height: 16px;
-  color: var(--theme-panel-bg, #fff);
-  background: var(--theme-title-color, #2c3e50);
-  opacity: 0.85;
+.m3-tree-step-action {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
 }
 
-@media (max-width: 480px) {
-  .m3-tree-node {
-    max-width: 88px;
-    padding: 5px 3px;
-  }
-
-  .m3-tree-node--mechanic {
-    max-width: 96px;
-  }
-
-  .m3-tree-node-name {
-    font-size: 10px;
+/* 平板及以上：三条流派并排，一屏看完所有前置关系 */
+@media (min-width: 769px) {
+  .m3-tree-paths {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    align-items: start;
   }
 }
 

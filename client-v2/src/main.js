@@ -88,6 +88,8 @@ registerRoute('chat', () => renderChat(viewRoot()));
 // 快捷键已迁到设置页，旧路由 #/shortcuts 重定向到设置页的「快捷键」分类
 registerRoute('friends', lazyView('./features/friends/index.js', 'renderFriends'));
 registerRoute('match3', lazyView('./games/match3/index.js', 'renderMatch3'));
+// 3D 火车驾驶（单机游戏，入口在统一游戏大厅「单机游戏」Tab）
+registerRoute('train3d', lazyView('./games/train3d/index.js', 'renderTrain3d'));
 // 肉鸽图鉴 / 养成：站点级整页入口（大厅 / 任意页面都能开），复用消消乐同一条整页外壳
 registerRoute('codex', lazyView('./games/match3/codex-page.js', 'renderCodexPageView'));
 registerRoute('leaderboard', lazyView('./features/leaderboard/index.js', 'renderLeaderboard'));

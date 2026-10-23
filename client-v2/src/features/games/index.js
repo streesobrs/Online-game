@@ -4,17 +4,16 @@
  *
  * 布局：
  * ┌─────────────────────────────────────────────────────┐
- * │ 模式切换: [🎮 联机匹配] [🤖 AI对战]                 │
- * ├──────────┬──────────────────────────────────────────┤
- * │ 游戏选择 │  主内容区                                 │
- * │ 🔴五子棋 │  ┌────────────────────────────────────┐  │
- * │ ⚪围棋   │  │  匹配/选择界面 或 游戏对战界面      │  │
- * │ 🟥象棋   │  │  （动态切换）                       │  │
- * │ 🐍贪吃蛇 │  └────────────────────────────────────┘  │
- * │          │                                          │
- * └──────────┴──────────────────────────────────────────┘
+ * │ 游戏大厅                                            │
+ * ├─────────────────────────────────────────────────────┤
+ * │ 🔴五子棋  ⚪围棋  🟥象棋  🐍贪吃蛇  🍬消消乐  🚆3D  │
+ * ├─────────────────────────────────────────────────────┤
+ * │ 选中游戏详情（图标/简介/标签）                      │
+ * │ [🌐联机匹配] [🤖AI对战] [🕹单机游戏]  ← 玩法平铺    │
+ * └─────────────────────────────────────────────────────┘
  *
- * 快捷键：1-4 切换游戏，T 联机/A AI，Enter 开始匹配（键位可在设置页自定义，
+ * 全部游戏与玩法均平铺展示，不做模式切换。快捷键 1-6 选择游戏，
+ * T 联机 / A AI，Enter 开始（键位可在设置页自定义，
  * 见 core/shortcuts.js；本视图通过 registerScopeHandler 注册作用域处理函数）
  */
 import { el } from '../../utils/dom.js';
@@ -30,11 +29,66 @@ import { registerScopeHandler, getBinding, formatCombo } from '../../core/shortc
 
 const GAME_MAP = Object.fromEntries(GAMES.map((g) => [g.id, g]));
 
-const AI_GAMES = [
-  { id: 'gobang', name: '五子棋', icon: '🔴' },
-  { id: 'go', name: '围棋', icon: '⚪' },
-  { id: 'chinese-chess', name: '象棋', icon: '🟥' },
+// 单机游戏：独立页面入口（不做联机/AI 匹配）
+const SOLO_GAMES = [
+  { id: 'match3', name: '消消乐', icon: '🍬' },
+  { id: 'train3d', name: '3D驾驶', icon: '🚆' },
 ];
+
+/** 模式展示文案 */
+const MODE_LABEL = { online: '联机', ai: 'AI', solo: '单机' };
+
+/** 每种游戏支持的玩法模式 */
+const MODES_BY_GAME = {
+  gobang: ['online', 'ai'],
+  go: ['online', 'ai'],
+  'chinese-chess': ['online', 'ai'],
+  snake: ['online'],
+  match3: ['solo'],
+  train3d: ['solo'],
+};
+
+/** 全部游戏平铺展示（棋类在前，单机在后） */
+const ALL_GAMES = [...GAMES, ...SOLO_GAMES].map((g) => ({
+  ...g,
+  modes: MODES_BY_GAME[g.id] || ['online'],
+}));
+
+
+/** 游戏展示元数据：简介 / 主题色 / 标签，供卡片与详情面板使用 */
+const GAME_UI = {
+  gobang: {
+    desc: '15×15 经典五子棋，横竖斜先连成五子者获胜',
+    accent: '#e05a4f',
+    tags: ['15×15 棋盘', '实时对局'],
+  },
+  go: {
+    desc: '19×19 围棋，围地多者胜，考验全局布局',
+    accent: '#5a6b8c',
+    tags: ['19×19 棋盘', '实时对局'],
+  },
+  'chinese-chess': {
+    desc: '中国象棋，将死对方主帅即可获胜',
+    accent: '#c0392b',
+    tags: ['10×9 棋盘', '实时对局'],
+  },
+  snake: {
+    desc: '多人同场贪吃蛇，活得越久得分越高',
+    accent: '#2f9e6e',
+    tags: ['多人同场', '实时对战'],
+  },
+  match3: {
+    desc: '三消闯关，连锁消除触发爽快连击',
+    accent: '#d05a9a',
+    tags: ['三消闯关', '肉鸽模式', '图鉴养成'],
+  },
+  train3d: {
+    desc: '3D 火车模拟驾驶，手动/自动挡与昼夜切换',
+    accent: '#2f7fd0',
+    tags: ['3D 模拟', '手动/自动挡', '昼夜切换'],
+  },
+};
+
 
 const DIFFICULTIES = [
   { id: 'easy', label: '🟢 简单', desc: 'AI 随机落子', color: '#48bb78' },
@@ -63,7 +117,6 @@ export function renderGames(container) {
 
   // 状态
   const state = {
-    mode: 'online',      // 'online' | 'ai'
     selectedGame: GAMES[0].id,
     difficulty: 'easy',
     isMatching: false,
@@ -73,84 +126,73 @@ export function renderGames(container) {
   // socket 断开时点击「放弃对局」：标记待放弃，重连成功后自动重发
   let pendingDiscard = false;
 
-  // 从 store 读取初始状态（路由跳转带过来的）
-  const initialMode = store.get('games.initMode');
+  // 从 store 读取初始游戏（路由跳转带过来的）
   const initialGame = store.get('games.initGame');
-  if (initialMode) { state.mode = initialMode; store.set('games.initMode', null); }
   if (initialGame) { state.selectedGame = initialGame; store.set('games.initGame', null); }
 
   // ---- 子容器 ----
-  const sidebarEl = el('div', { class: 'games-sidebar' });
-  const mainEl = el('div', { class: 'games-main' });
-  const modeTabs = el('div', { class: 'games-mode-tabs' });
+  const pickGrid = el('div', { class: 'games-grid' });
+  const pickHint = el('div', { class: 'games-pick-hint' });
+  const mainEl = el('section', { class: 'games-main' });
 
   const pageEl = el('div', { class: 'games-page' }, [
-    modeTabs,
-    el('div', { class: 'games-body' }, [sidebarEl, mainEl]),
+    el('header', { class: 'games-hero' }, [
+      el('div', { class: 'games-hero-text' }, [
+        el('h1', {}, '游戏大厅'),
+        el('p', {}, '全部游戏一屏浏览，选择游戏后直接开局'),
+      ]),
+    ]),
+    el('section', { class: 'games-pick' }, [
+      el('div', { class: 'games-pick-head' }, [
+        el('h2', {}, '选择游戏'),
+        pickHint,
+      ]),
+      pickGrid,
+    ]),
+    mainEl,
   ]);
 
   container.innerHTML = '';
   container.append(pageEl);
 
-  // ---- 渲染模式 Tab ----
-  function renderModeTabs() {
-    modeTabs.innerHTML = '';
-    const tabs = [
-      { key: 'online', icon: '🎮', label: '联机匹配' },
-      { key: 'ai', icon: '🤖', label: 'AI对战' },
-    ];
-    tabs.forEach((t) => {
-      const btn = el('button', {
-        class: 'games-mode-tab' + (state.mode === t.key ? ' active' : ''),
-        onClick: () => {
-          if (state.isMatching) return;
-          state.mode = t.key;
-          renderModeTabs();
-          renderSidebar();
-          renderMain();
-        },
-      }, `${t.icon} ${t.label}`);
-      modeTabs.append(btn);
-    });
-  }
-
-  // ---- 渲染侧边栏：游戏选择 ----
-  function renderSidebar() {
-    sidebarEl.innerHTML = '';
-    sidebarEl.append(el('div', { class: 'games-sidebar-title' }, '选择游戏'));
-
-    const games = state.mode === 'ai' ? AI_GAMES : GAMES;
-    games.forEach((g) => {
-      const card = el('div', {
-        class: 'games-game-card' + (state.selectedGame === g.id ? ' active' : ''),
+  // ---- 渲染游戏卡片墙：全部游戏平铺 ----
+  function renderPicker() {
+    pickGrid.innerHTML = '';
+    ALL_GAMES.forEach((g) => {
+      const ui = GAME_UI[g.id] || { accent: '#4299e1', desc: '' };
+      const badge = g.modes.map((m) => MODE_LABEL[m]).join(' · ');
+      pickGrid.append(el('button', {
+        type: 'button',
+        class: 'games-card' + (state.selectedGame === g.id ? ' active' : ''),
+        style: `--accent:${ui.accent || '#4299e1'}`,
         onClick: () => {
           if (state.isMatching) return;
           state.selectedGame = g.id;
-          renderSidebar();
+          renderPicker();
           renderMain();
         },
       }, [
-        el('div', { class: 'games-game-icon' }, g.icon),
-        el('div', { class: 'games-game-name' }, g.name),
-      ]);
-      sidebarEl.append(card);
+        el('span', { class: 'games-card-icon' }, g.icon),
+        el('span', { class: 'games-card-text' }, [
+          el('strong', {}, g.name),
+          el('small', {}, ui.desc || ''),
+        ]),
+        el('span', { class: 'games-card-badge' }, badge),
+      ]));
     });
 
-    if (state.mode === 'online') {
-      sidebarEl.append(el('div', { class: 'games-sidebar-tip' }, '💡 选择游戏后点击「开始匹配」'));
-    } else {
-      sidebarEl.append(el('div', { class: 'games-sidebar-tip' }, '💡 选择游戏和难度后开始 AI 对战'));
-    }
-    const pickKeys = ['games.pick1', 'games.pick2', 'games.pick3', 'games.pick4']
-      .map((id) => formatCombo(getBinding(id))).join(' / ');
-    sidebarEl.append(el('div', { class: 'games-sidebar-shortcuts' },
-      `快捷键: ${pickKeys} 选游戏 · ${formatCombo(getBinding('games.modeOnline'))} 联机 · ${formatCombo(getBinding('games.modeAi'))} AI · ${formatCombo(getBinding('games.start'))} 开始 · ${formatCombo(getBinding('games.cancel'))} 取消`));
+    const pickKeys = ['games.pick1', 'games.pick2', 'games.pick3', 'games.pick4', 'games.pick5', 'games.pick6']
+      .slice(0, ALL_GAMES.length)
+      .map((id) => formatCombo(getBinding(id)))
+      .join(' / ');
+    pickHint.textContent = `${pickKeys} 选择 · ${formatCombo(getBinding('games.start'))} 开始 · ${formatCombo(getBinding('games.cancel'))} 取消`;
   }
 
   // ---- 渲染主区域 ----
   function renderMain() {
     runCleanup();
     mainEl.innerHTML = '';
+    pageEl.classList.remove('is-playing');
 
     // 战局内刷新后的对局快照：优先展示恢复/放弃入口
     if (state.reconnectGame) {
@@ -163,84 +205,127 @@ export function renderGames(container) {
       return;
     }
 
-    if (state.mode === 'online') {
-      mainEl.append(renderOnlinePanel());
-    } else {
-      mainEl.append(renderAIPanel());
+    mainEl.append(renderGamePanel());
+  }
+
+  /** 详情面板左侧：选中游戏的主视觉 */
+  function renderGameHero(g, ui, modeLabel) {
+    const info = [
+      el('div', { class: 'games-detail-mode' }, modeLabel),
+      el('h2', { class: 'games-detail-name' }, g.name),
+      el('p', { class: 'games-detail-desc' }, ui.desc || ''),
+    ];
+    if (ui.tags && ui.tags.length) {
+      info.push(el('div', { class: 'games-tags' }, ui.tags.map((t) => el('span', {}, t))));
     }
-  }
-
-  // ---- 联机匹配面板 ----
-  function renderOnlinePanel() {
-    const g = GAME_MAP[state.selectedGame];
-    const infoBox = el('div', { class: 'games-info-box' }, [
-      el('div', { class: 'games-info-title' }, `${g.icon} ${g.name}`),
-      el('div', { class: 'games-info-desc' }, '联机对战：将与其他玩家进行实时匹配'),
-    ]);
-
-    const startBtn = el('button', { class: 'btn btn-primary btn-lg', style: 'width:100%;' }, '🎯 开始匹配');
-    startBtn.addEventListener('click', () => {
-      if (state.reconnectGame) { toast.warn('存在未完成的对局，请先继续或放弃'); return; }
-      if (!store.get('socketConnected')) { toast.error('未连接服务器'); return; }
-      if (!store.get('user')) { toast.error('请先登录'); return; }
-      state.isMatching = true;
-      renderMain();
-      emit('match_request', { game: state.selectedGame });
-    });
-
-    return el('div', { class: 'games-panel' }, [
-      el('h2', { class: 'games-panel-title' }, '联机匹配'),
-      infoBox,
-      el('div', { class: 'games-action-row' }, [startBtn]),
+    return el('div', { class: 'games-detail-hero', style: `--accent:${ui.accent || '#4299e1'}` }, [
+      el('div', { class: 'games-detail-icon' }, g.icon),
+      el('div', { class: 'games-detail-info' }, info),
     ]);
   }
 
-  // ---- AI 对战面板 ----
-  function renderAIPanel() {
-    const g = AI_GAMES.find((x) => x.id === state.selectedGame);
-    const gameLabel = g ? `${g.icon} ${g.name}` : state.selectedGame;
+  // ---- 详情面板：按游戏支持的玩法并列展示所有入口 ----
+  function renderGamePanel() {
+    const g = ALL_GAMES.find((x) => x.id === state.selectedGame) || ALL_GAMES[0];
+    const ui = GAME_UI[g.id] || {};
+    const fullLabel = { online: '联机匹配', ai: 'AI 对战', solo: '单机游戏' };
+    const modeLabel = g.modes.map((m) => fullLabel[m]).join(' · ');
 
+    const blocks = [];
+    if (g.modes.includes('online')) blocks.push(renderOnlineBlock());
+    if (g.modes.includes('ai')) blocks.push(renderAIBlock());
+    if (g.modes.includes('solo')) blocks.push(renderSoloBlock(g));
+
+    return el('div', { class: 'games-detail games-detail--flat' }, [
+      renderGameHero(g, ui, modeLabel),
+      el('div', { class: 'games-mode-section' }, [
+        el('div', { class: 'games-aside-title' }, '选择玩法 · 直接开局'),
+        el('div', { class: 'games-mode-grid' }, blocks),
+      ]),
+    ]);
+  }
+
+  /** 详情面板内的模式标题 */
+  function renderBlockHead(icon, label) {
+    return el('div', { class: 'games-block-head' }, [
+      el('span', { class: 'games-block-icon' }, icon),
+      el('span', {}, label),
+    ]);
+  }
+
+  // ---- 联机匹配入口 ----
+  function renderOnlineBlock() {
+    const startBtn = el('button', { class: 'btn btn-primary games-block-btn' }, '🎯 开始匹配');
+    startBtn.addEventListener('click', startMatch);
+    return el('div', { class: 'games-mode-block' }, [
+      renderBlockHead('🌐', '联机匹配'),
+      el('p', { class: 'games-block-desc' }, '系统匹配真人玩家，实时对局'),
+      startBtn,
+    ]);
+  }
+
+  /** 发起联机匹配（面板按钮与快捷键共用） */
+  function startMatch() {
+    if (state.isMatching) return;
+    if (state.reconnectGame) { toast.warn('存在未完成的对局，请先继续或放弃'); return; }
+    if (!store.get('socketConnected')) { toast.error('未连接服务器'); return; }
+    if (!store.get('user')) { toast.error('请先登录'); return; }
+    state.isMatching = true;
+    renderMain();
+    emit('match_request', { game: state.selectedGame });
+  }
+
+  // ---- AI 对战入口 ----
+  function renderAIBlock() {
     const difficultyCards = DIFFICULTIES.map((d) =>
-      el('div', {
-        class: 'games-difficulty-card' + (state.difficulty === d.id ? ' active' : ''),
-        style: `border-color:${state.difficulty === d.id ? d.color : ''};`,
+      el('button', {
+        type: 'button',
+        class: 'games-diff' + (state.difficulty === d.id ? ' active' : ''),
+        style: `--accent:${d.color}`,
         onClick: () => {
           state.difficulty = d.id;
           renderMain();
         },
       }, [
-        el('div', { class: 'games-difficulty-label', style: `color:${d.color};` }, d.label),
-        el('div', { class: 'games-difficulty-desc' }, d.desc),
+        el('span', { class: 'games-diff-label' }, d.label),
+        el('span', { class: 'games-diff-desc' }, d.desc),
       ])
     );
 
-    const startBtn = el('button', { class: 'btn btn-primary btn-lg', style: 'width:100%;margin-top:16px;' }, '🤖 开始 AI 对战');
+    const startBtn = el('button', { class: 'btn btn-primary games-block-btn' }, '🤖 开始 AI 对战');
     startBtn.addEventListener('click', () => startAIBattle());
 
-    return el('div', { class: 'games-panel' }, [
-      el('h2', { class: 'games-panel-title' }, 'AI 对战'),
-      el('div', { class: 'games-info-box' }, [
-        el('div', { class: 'games-info-title' }, gameLabel),
-        el('div', { class: 'games-info-desc' }, '选择 AI 难度，在本地进行人机对战'),
-      ]),
-      el('div', { class: 'games-difficulties' }, difficultyCards),
+    return el('div', { class: 'games-mode-block' }, [
+      renderBlockHead('🤖', 'AI 对战'),
+      el('div', { class: 'games-diff-list' }, difficultyCards),
       startBtn,
+    ]);
+  }
+
+  // ---- 单机游戏入口 ----
+  function renderSoloBlock(g) {
+    const enterBtn = el('button', { class: 'btn btn-primary games-block-btn' }, '🚀 进入游戏');
+    enterBtn.addEventListener('click', () => go(g.id));
+    return el('div', { class: 'games-mode-block' }, [
+      renderBlockHead('🕹', '单机游戏'),
+      el('p', { class: 'games-block-desc' }, '在独立页面中游玩，随时可返回大厅'),
+      enterBtn,
     ]);
   }
 
   // ---- 匹配中 UI ----
   function renderMatchingUI() {
     const g = GAME_MAP[state.selectedGame];
-    const cancelBtn = el('button', { class: 'btn btn-secondary btn-lg', style: 'width:100%;' }, '❌ 取消匹配');
+    const cancelBtn = el('button', { class: 'btn btn-secondary', style: 'min-width:220px;' }, '❌ 取消匹配');
     cancelBtn.addEventListener('click', () => {
       state.isMatching = false;
       renderMain();
       emit('cancel_match');
     });
-    return el('div', { class: 'games-panel games-matching' }, [
+    return el('div', { class: 'games-detail games-detail--center games-matching' }, [
       el('div', { class: 'games-matching-spinner' }, '🔍'),
-      el('h2', { class: 'games-panel-title' }, `正在寻找${g.icon} ${g.name}对手...`),
-      el('div', { class: 'games-matching-dots' }, '请稍候'),
+      el('h2', { class: 'games-detail-name' }, `正在寻找 ${g.icon} ${g.name} 对手…`),
+      el('div', { class: 'games-matching-dots' }, '匹配成功后自动进入对局，请稍候'),
       cancelBtn,
     ]);
   }
@@ -258,10 +343,10 @@ export function renderGames(container) {
         ? `👤 ${snapshot.player1Nickname} vs ${snapshot.player2Nickname}`
         : '');
 
-    const resumeBtn = el('button', { class: 'btn btn-primary btn-lg', style: 'width:100%;' }, '▶️ 继续对局');
+    const resumeBtn = el('button', { class: 'btn btn-primary btn-lg games-cta' }, '▶️ 继续对局');
     resumeBtn.addEventListener('click', () => resumeReconnectGame(snapshot));
 
-    const discardBtn = el('button', { class: 'btn btn-secondary btn-lg', style: 'width:100%;' }, '🚪 放弃对局');
+    const discardBtn = el('button', { class: 'btn btn-secondary games-cta' }, '🚪 放弃对局');
     discardBtn.addEventListener('click', () => {
       if (!store.get('socketConnected')) {
         // socket 未连接时 discard 事件会被 socket 层丢弃，标记待放弃，重连后自动重发
@@ -273,15 +358,18 @@ export function renderGames(container) {
       toast.info('正在放弃对局…');
     });
 
-    return el('div', { class: 'games-panel' }, [
-      el('h2', { class: 'games-panel-title' }, '♻️ 发现未完成的对局'),
-      el('div', { class: 'games-info-box' }, [
-        el('div', { class: 'games-info-title' }, `${modeLabel} · ${gameName}`),
-        el('div', { class: 'games-info-desc' }, opponentLabel || '刷新前有对局尚未结束'),
+    return el('div', { class: 'games-detail' }, [
+      el('div', { class: 'games-detail-hero', style: '--accent:#ed8936' }, [
+        el('div', { class: 'games-detail-icon' }, '♻️'),
+        el('div', { class: 'games-detail-info' }, [
+          el('div', { class: 'games-detail-mode' }, '未完成的对局'),
+          el('h2', { class: 'games-detail-name' }, `${modeLabel} · ${gameName}`),
+          el('p', { class: 'games-detail-desc' }, opponentLabel || '刷新前有对局尚未结束'),
+        ]),
       ]),
-      el('div', { class: 'games-action-row', style: 'display:flex;flex-direction:column;gap:10px;' }, [
-        resumeBtn,
-        discardBtn,
+      el('div', { class: 'games-detail-aside' }, [
+        el('div', { class: 'games-aside-title' }, '请选择'),
+        el('div', { class: 'games-aside-actions' }, [resumeBtn, discardBtn]),
       ]),
     ]);
   }
@@ -297,11 +385,9 @@ export function renderGames(container) {
     // 清理重连快照（本次已消费）
     state.reconnectGame = null;
     store.set('reconnectGame', null);
-    state.mode = snapshot.mode === 'ai' ? 'ai' : 'online';
     state.selectedGame = gameType;
     if (snapshot.difficulty) state.difficulty = snapshot.difficulty;
-    renderModeTabs();
-    renderSidebar();
+    renderPicker();
 
     if (snapshot.mode === 'ai') {
       await startAIBattle(snapshot);
@@ -334,6 +420,7 @@ export function renderGames(container) {
       const mod = await import(`../ai-battle/play.js`);
       const container = el('div', { class: 'games-play-area' });
       mainEl.append(container);
+      pageEl.classList.add('is-playing');
       const cleanupFn = mod.startAIBattle(container, { gameType, difficulty, snapshot });
       const prevCleanup = currentCleanup;
       currentCleanup = () => {
@@ -466,6 +553,7 @@ export function renderGames(container) {
       const container = el('div', { class: 'games-play-area' });
       mainEl.innerHTML = '';
       mainEl.append(container);
+      pageEl.classList.add('is-playing');
       const cleanupFn = mod[exportName](container);
       const prevCleanup = currentCleanup;
       currentCleanup = () => {
@@ -491,18 +579,13 @@ export function renderGames(container) {
     'go': 'go',
     'chinese-chess': 'chinese-chess',
     'snake': 'snake',
-    'ai-battle': 'ai',
-    'lobby': 'online',
+    'ai-battle': 'gobang',
   };
   const mapped = oldGameMap[oldRoute];
-  if (mapped) {
-    if (mapped === 'ai') state.mode = 'ai';
-    else state.selectedGame = mapped;
-  }
+  if (mapped) state.selectedGame = mapped;
 
   // ---- 初始化渲染 ----
-  renderModeTabs();
-  renderSidebar();
+  renderPicker();
   renderMain();
 
   // 主动查询服务端当前进行中的对局（双保险：事件可能在懒加载挂载前到达，
@@ -514,31 +597,29 @@ export function renderGames(container) {
   // ---- 页面内快捷键（走统一分发，键位由设置页「⌨ 快捷键」决定）----
   function runLobbyShortcut(op) {
     if (!op) return;
-    const gamesList = state.mode === 'ai' ? AI_GAMES : GAMES;
+    const current = ALL_GAMES.find((g) => g.id === state.selectedGame) || ALL_GAMES[0];
 
     if (op.type === 'pick') {
-      const target = gamesList[op.index];
+      const target = ALL_GAMES[op.index];
       if (target && !state.isMatching) {
         state.selectedGame = target.id;
-        renderSidebar();
+        renderPicker();
         renderMain();
       }
     } else if (op.type === 'mode') {
-      if (state.mode !== op.mode && !state.isMatching) {
-        state.mode = op.mode;
-        renderModeTabs();
-        renderSidebar();
-        renderMain();
+      if (state.isMatching) return;
+      if (op.mode === 'ai') {
+        if (!current.modes.includes('ai')) { toast.warn(`${current.name}暂不支持 AI 对战`); return; }
+        startAIBattle();
+      } else if (op.mode === 'online') {
+        if (!current.modes.includes('online')) { toast.warn(`${current.name}暂不支持联机对战`); return; }
+        startMatch();
       }
     } else if (op.type === 'start') {
-      if (!state.isMatching && state.mode === 'online') {
-        if (state.reconnectGame) { toast.warn('存在未完成的对局，请先继续或放弃'); return; }
-        if (!store.get('socketConnected')) { toast.error('未连接服务器'); return; }
-        if (!store.get('user')) { toast.error('请先登录'); return; }
-        state.isMatching = true;
-        renderMain();
-        emit('match_request', { game: state.selectedGame });
-      }
+      if (state.isMatching) return;
+      if (current.modes.includes('solo')) { go(current.id); return; }
+      if (current.modes.includes('online')) { startMatch(); return; }
+      if (current.modes.includes('ai')) startAIBattle();
     } else if (op.type === 'cancel') {
       if (state.isMatching) {
         state.isMatching = false;
@@ -570,12 +651,11 @@ export function renderGames(container) {
 }
 
 /**
- * 快速跳转到游戏大厅的指定模式/游戏
- * @param {'online'|'ai'} mode
+ * 快速跳转到游戏大厅并选中指定游戏
+ * @param {'online'|'ai'} [_mode] - 保留参数兼容旧调用；大厅已改为平铺，不再区分模式
  * @param {string} [gameId] - 游戏 id
  */
-export function goGames(mode, gameId) {
-  if (mode) store.set('games.initMode', mode);
+export function goGames(_mode, gameId) {
   if (gameId) store.set('games.initGame', gameId);
   go('games');
 }

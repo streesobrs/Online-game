@@ -22,24 +22,17 @@ const DONE_KEY = 'v2_onboarding_done';
 const MAIN_STEPS = [
   {
     view: 'games',
-    selector: '.games-mode-tabs',
+    selector: '.games-card',
     icon: '🎮',
-    title: '对战模式',
-    text: '这里是模式切换按钮。点「联机对战」实时匹配真人玩家，点「AI 对战」和电脑练手。当前默认联机对战。',
-  },
-  {
-    view: 'games',
-    selector: '.games-game-card',
-    icon: '♟️',
     title: '选择游戏',
-    text: '点左侧任一游戏卡片即可选定：🔴 五子棋 · ⚪ 围棋 · 🟥 象棋 · 🐍 贪吃蛇。卡片高亮表示已选中。',
+    text: '全部游戏平铺在这里，卡片右上角标注支持的玩法（联机 / AI / 单机）。点任一卡片即可选中，高亮表示当前选择。',
   },
   {
     view: 'games',
-    selector: '.games-action-row .btn',
+    selector: '.games-mode-grid',
     icon: '🚀',
-    title: '开始对战',
-    text: '选定游戏后点这个「开始匹配」按钮：联机模式进入匹配队列，匹配到对手自动开局；AI 模式直接开始人机对局。',
+    title: '选择玩法',
+    text: '选中游戏后，下方并列展示它支持的全部玩法入口：联机匹配实时匹配真人玩家，AI 对战可以直接和电脑练手，单机游戏则进入独立页面。',
   },
   {
     view: 'games',

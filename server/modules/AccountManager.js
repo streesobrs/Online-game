@@ -3578,7 +3578,10 @@ class AccountManager {
       // 基础层数在 30 层封口：深渊段再深也不进平方曲线
       const baseFloor = floor > 30 ? 30 : floor;
       const base = Math.floor((baseFloor * baseFloor) / cfg.essenceDivisor);
-      gain = Math.floor(base * this.rogueBuffMult(r, 'essenceboost'));
+      // 线性底薪（与客户端 essenceForRun 同口径）：浅层平方曲线几乎为 0，补一个每层保底；
+      // 不参与精华共鸣倍率，避免被结算增益放大成刷取点
+      gain = Math.floor(base * this.rogueBuffMult(r, 'essenceboost'))
+        + baseFloor * (cfg.depthEssencePerFloor || 0);
       if (this._rogueMechanicOn(r, 'harvest')) {
         gain += Math.floor(baseFloor * (cfg.mechanics?.harvest?.essencePerFloor || 0));
       }
@@ -3752,11 +3755,45 @@ class AccountManager {
   }
 
   /**
+   * 一次性领取所有「已达成且未领取」的里程碑（图鉴的「一键领取」）
+   *
+   * 与单条领取共用同一套服务端判定和翻倍口径，只是把循环放进同一把存档锁里，
+   * 避免客户端连发 N 个请求时重复读写存档。已领取 / 未达成的条目跳过。
+   * @param {string} userId 账号 ID
+   * @returns {Promise<{ok:boolean, message?:string, count?:number, reward?:number, rogue:object}>}
+   */
+  async claimRogueMilestones(userId) {
+    const cfg = config.match3Rogue;
+    let result = { ok: false, message: '没有可领取的里程碑' };
+    const rogue = await this._patchMatch3Rogue(userId, (r) => {
+      const states = this._rogueMilestoneState(r);
+      const pending = states.filter((s) => s.done && !r.claimed[s.id]);
+      if (pending.length === 0) return;
+      const mult = this._rogueMechanicOn(r, 'harvest')
+        ? (cfg.mechanics?.harvest?.milestoneMult || 1)
+        : 1;
+      let reward = 0;
+      for (const state of pending) {
+        const def = cfg.milestones.find((m) => m.id === state.id);
+        if (!def) continue;
+        const add = Math.floor(def.reward * mult);
+        r.essence += add;
+        r.essenceEarned += add;
+        r.claimed[def.id] = Date.now();
+        reward += add;
+      }
+      result = { ok: true, count: pending.length, reward };
+    });
+    return { ...result, rogue };
+  }
+
+  /**
    * 里程碑达成情况（服务端自己算，不信客户端）
    *
    * kind → 进度口径（与客户端 meta.js 的 milestoneState 必须一一对应）：
    * unlocked/maxed/all 看祝福收集度；buffs 看共鸣树点亮数；
-   * runs/floor/quests/wins/boss 看累计战绩 stats。
+   * chars/mastery 看角色解锁与熟练度；picks 看累计选取张数；
+   * ascension 看通关过的最高进阶；runs/floor/quests/wins/boss 看累计战绩 stats。
    * @returns {Array<{id:string, need:number, have:number, done:boolean}>}
    */
   _rogueMilestoneState(rogue) {
@@ -3772,11 +3809,24 @@ class AccountManager {
     // 共鸣树点亮数（buffs 表在归一化时已裁成只含 lv>0 的条目，这里仍按 lv>0 数，稳妥）
     const buffsOn = Object.keys(cfg.buffs)
       .filter((id) => (rogue.buffs[id]?.lv || 0) > 0).length;
+    // 角色与熟练度（与客户端 meta.js 的 milestoneState 同口径）：
+    // chars 只看资格解锁；mastery 按每个角色出战轮数落在 cfg.masteryTiers 的档数累加
+    const charIds = Object.keys(cfg.characters || {});
+    const charsOn = charIds.filter((id) => this._rogueCharacterUnlocked(id, rogue)).length;
+    const tiers = Array.isArray(cfg.masteryTiers) ? cfg.masteryTiers : [3, 8, 15];
+    const mastery = charIds.reduce((sum, id) => {
+      const runs = Math.max(0, Math.floor(rogue.charStats?.[id]?.runs || 0));
+      return sum + tiers.filter((t) => runs >= t).length;
+    }, 0);
     const st = rogue.stats || {};
     const haveOf = {
       unlocked,
       maxed,
       buffs: buffsOn,
+      chars: charsOn,
+      mastery,
+      picks: st.picked || 0,
+      ascension: st.bestAscWin || 0,
       runs: st.runs || 0,
       floor: st.bestFloor || 0,
       quests: st.questsDone || 0,

@@ -391,6 +391,15 @@ export function claimRogueMilestone(milestoneId) {
 }
 
 /**
+ * 一键领取所有「已达成且未领取」的里程碑
+ * 服务端在同一个存档锁里批量结算，回执同样走 match3:rogueMeta（带汇总的 message）
+ * @returns {boolean} 是否已发出（未连接时为 false）
+ */
+export function claimAllRogueMilestones() {
+  return emit('match3_rogue_claim_all');
+}
+
+/**
  * 上报结算；floor 仅肉鸽试炼使用（本轮到达的层数）
  * 肉鸽还会带上本轮选到的祝福次数与达成的局内任务数：它们不进发放，只作养成存档的统计字段
  * 胜利闭环（开发方案 3.3）：win 是否通关 / bossKills 三个 Boss 击败数 / endless 是否进过深渊

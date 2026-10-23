@@ -468,6 +468,10 @@ export const ROGUE_META = {
   // 本轮精华 = ⌊到达层数² / 这个数⌋。只按层数给，不看分数：后期得分倍率能堆到 ×45，
   // 按分结算会让「打深」与「堆分」两条路收益差几个量级，层数最直观也最好控
   essenceDivisor: 5,
+  // 每层精华底薪（开发方案 5.7 调整）：在平方曲线之外，每到达 1 层额外给 N 精华。
+  // 平方曲线在 3 层以内只给 0~1 精华，新手一轮几乎白打；线性底薪让「敢打」就有回报，
+  // 同时仍要求逐层推进，不会出现「开场即退」的刷取路径。第 10/20/30 层分别多 10/20/30
+  depthEssencePerFloor: 1,
   // 单轮层数上限：精华与经验都按它截断。正常打不到（标定上限 50 层、实测最深 44 层），
   // 只为拦住「层数报个大数」的异常上报。服务端同名值在手，改一边必须同步改另一边
   maxFloor: 100,
@@ -520,10 +524,12 @@ export const ROGUE_META = {
   /**
    * 图鉴收集里程碑（一次性领取，只发精华）
    * - kind：unlocked=已解锁祝福数 / maxed=已满级祝福数 / all=集齐全部祝福 /
-   *   buffs=共鸣树已点亮节点数 / runs=累计出战轮数 / floor=最深到达层 /
-   *   quests=累计完成局内任务数 / wins=通关次数 / boss=累计击败 Boss 数
+   *   buffs=共鸣树已点亮节点数 / chars=已解锁角色数 / mastery=角色熟练度等级之和 /
+   *   ascension=通关过的最高进阶 / picks=累计选取祝福张数 /
+   *   runs=累计出战轮数 / floor=最深到达层 / quests=累计完成局内任务数 /
+   *   wins=通关次数 / boss=累计击败 Boss 数
    * - need：达标所需数量（kind=all 时忽略，按祝福总数算）
-   * 顺序即展示顺序；codex 按 kind 分成「祝福收集 / 共鸣树 / 历练挑战」三组。
+   * 顺序即展示顺序；codex 按 kind 分成「祝福收集 / 共鸣树 / 角色与熟练度 / 进阶挑战 / 历练挑战」五组。
    * 与 server/config.js 手工镜像，改一边必须同步改另一边。
    */
   milestones: [
@@ -550,6 +556,18 @@ export const ROGUE_META = {
     { id: 'win3', name: '通关 3 次', kind: 'wins', need: 3, reward: 360 },
     { id: 'boss3', name: '累计击败 3 个 Boss', kind: 'boss', need: 3, reward: 120 },
     { id: 'boss9', name: '累计击败 9 个 Boss', kind: 'boss', need: 9, reward: 300 },
+    // ---- 角色与熟练度（进度取 stats / charStats，服务端权威） ----
+    // chars：已解锁角色数（资格解锁，见 characters.js 的 unlock）
+    // mastery：所有角色熟练度等级之和（出战 3/8/15 轮各 1 级，纯荣誉，不接强度）
+    { id: 'char3', name: '解锁 3 个角色', kind: 'chars', need: 3, reward: 80 },
+    { id: 'charAll', name: '解锁全部 7 个角色', kind: 'chars', need: 7, reward: 220 },
+    { id: 'mastery4', name: '角色熟练度累计 4 级', kind: 'mastery', need: 4, reward: 100 },
+    { id: 'mastery9', name: '角色熟练度累计 9 级', kind: 'mastery', need: 9, reward: 240 },
+    // ---- 进阶（进度取 stats.bestAscWin：通关过的最高进阶） ----
+    { id: 'asc3', name: '在进阶 3 通关', kind: 'ascension', need: 3, reward: 200 },
+    { id: 'asc6', name: '在进阶 6 通关', kind: 'ascension', need: 6, reward: 360 },
+    // ---- 祝福抽取（进度取 stats.picked：累计选到的祝福张数） ----
+    { id: 'pick50', name: '累计选取 50 张祝福', kind: 'picks', need: 50, reward: 80 },
   ],
 };
 

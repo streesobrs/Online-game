@@ -13,7 +13,7 @@
  */
 import { ROGUE_META } from '../config/config.js';
 import { META_BUFFS, PERKS, valueAt } from './perks.js';
-import { CHARACTERS } from './characters.js';
+import { CHARACTERS, characterMastery, unlockedCharacters } from './characters.js';
 import { ascensionEssenceMult } from './ascension.js';
 import { CURRENT_META_VER, migrateMeta } from '../save/migrate.js';
 
@@ -34,6 +34,8 @@ export function rogueCfg() {
     rarities: remoteCfg?.rarities || ROGUE_META.rarities,
     milestones: remoteCfg?.milestones || ROGUE_META.milestones,
     essenceDivisor: remoteCfg?.essenceDivisor || ROGUE_META.essenceDivisor,
+    // 每层精华底薪（平方曲线之外的线性部分）：服务端为准，离线用本地镜像
+    depthEssencePerFloor: remoteCfg?.depthEssencePerFloor ?? ROGUE_META.depthEssencePerFloor ?? 0,
     // 单轮层数上限（防刷分用的天花板，正常打不到）：精华与经验的预览都要按它截断，
     // 否则界面上会显示出一个服务端根本不会发的数
     maxFloor: remoteCfg?.maxFloor || ROGUE_META.maxFloor,
@@ -329,7 +331,7 @@ export function abyssEssence(floor) {
 
 /**
  * 本轮能拿多少精华：只按到达层数，与分数无关
- * 平方增长（第 10 层 20 / 20 层 80 / 30 层 180）——越深收益越高，
+ * 平方增长 + 每层底薪（第 10 层 30 / 20 层 100 / 30 层 210，含 1/层底薪）——越深收益越高，
  * 而深层又得靠祝福堆起来，正好形成「打深 → 解锁 → 打更深」的正循环。
  * 局外增益「精华共鸣」在这里乘上去（未解锁 ×1，与不买时逐位一致），
  * 「丰收闭环」再加一笔按层数的定额（未解锁 +0）；
@@ -349,7 +351,9 @@ export function essenceForRun(floor, meta = null, opts = {}) {
   // 基础层数：深渊段封在 30；未通关的正常 run 本来也到不了 31，仍受 maxFloor 截断
   const baseFloor = raw > 30 ? 30 : Math.min(cfg.maxFloor, raw);
   const base = Math.floor((baseFloor * baseFloor) / cfg.essenceDivisor);
-  let gain = Math.floor(base * buffFactor(meta, 'essenceboost'));
+  // 线性底薪：平方曲线在浅层几乎为 0，先补一个「每到达 1 层就给」的保底，
+  // 再乘精华共鸣 / 加丰收闭环（底薪不参与倍率，避免被结算增益放大成刷取点）
+  let gain = Math.floor(base * buffFactor(meta, 'essenceboost')) + baseFloor * (cfg.depthEssencePerFloor || 0);
   if (mechanicOn(meta, 'harvest')) gain += Math.floor(baseFloor * cfg.mechanics.harvest.essencePerFloor);
   if (opts.win) {
     gain += cfg.winBonus;
@@ -379,6 +383,10 @@ export function poolProgress(meta) {
  * 进度口径（服务端 _rogueMilestoneState 是同一份映射，两边必须一致）：
  * - unlocked / maxed / all：祝福收集度（poolProgress）
  * - buffs：共鸣树已点亮节点数
+ * - chars：已解锁角色数（资格解锁，与 characters.js 同口径）
+ * - mastery：所有角色熟练度等级之和（出战 3/8/15 轮各 1 级）
+ * - picks：累计选到的祝福张数（stats.picked）
+ * - ascension：通关过的最高进阶（stats.bestAscWin）
  * - runs / floor / quests / wins / boss：累计战绩（stats，服务端权威下发）
  * @returns {Array<object>} 每条 = 定义项 + { need, have, done, claimed }
  */
@@ -389,10 +397,16 @@ export function milestoneState(meta) {
     if (buffLevel(meta, buff.id) > 0) buffsOn += 1;
   }
   const stats = meta?.stats || {};
+  const charStats = meta?.charStats || {};
   const haveOf = {
     unlocked,
     maxed,
     buffs: buffsOn,
+    // 角色与熟练度：与角色页 / 入口屏同一份推导，避免图鉴与选择屏各算各的
+    chars: unlockedCharacters(stats).length,
+    mastery: CHARACTERS.reduce((sum, ch) => sum + characterMastery(charStats[ch.id]).level, 0),
+    picks: stats.picked || 0,
+    ascension: stats.bestAscWin || 0,
     runs: stats.runs || 0,
     floor: stats.bestFloor || 0,
     quests: stats.questsDone || 0,
@@ -410,4 +424,46 @@ export function milestoneState(meta) {
 /** 有几条里程碑是「已达成但还没领」的（菜单上挂小红点用） */
 export function claimableCount(meta) {
   return milestoneState(meta).filter((m) => m.done && !m.claimed).length;
+}
+
+/**
+ * 图鉴收集总览（顶部进度条用）
+ *
+ * 只做**展示口径**的汇总，不参与任何发放：四项收集度（祝福 / 共鸣树 / 角色 / 里程碑）
+ * 各给一份 have/total，并折算一个总完成度。数值全部来自现有存档与纯函数推导，
+ * 不新增存档字段，因此服务端无需额外下发。
+ * @param {object} meta - 养成存档
+ */
+export function collectionSummary(meta) {
+  const perks = poolProgress(meta);
+  const milestones = milestoneState(meta);
+  let buffsOn = 0;
+  for (const buff of META_BUFFS) {
+    if (buffLevel(meta, buff.id) > 0) buffsOn += 1;
+  }
+  const stats = meta?.stats || {};
+  const charStats = meta?.charStats || {};
+  const charsOn = unlockedCharacters(stats).length;
+  const mastery = CHARACTERS.reduce((sum, ch) => sum + characterMastery(charStats[ch.id]).level, 0);
+  const claimed = milestones.filter((m) => m.claimed).length;
+  const claimable = milestones.filter((m) => m.done && !m.claimed).length;
+  // 完成度按「条目数」平权：祝福解锁 + 共鸣树点亮 + 角色解锁 + 里程碑领取
+  const done = perks.unlocked + buffsOn + charsOn + claimed;
+  const total = perks.total + META_BUFFS.length + CHARACTERS.length + milestones.length;
+  return {
+    perksUnlocked: perks.unlocked,
+    perksMaxed: perks.maxed,
+    perksTotal: perks.total,
+    buffsOn,
+    buffsTotal: META_BUFFS.length,
+    charsOn,
+    charsTotal: CHARACTERS.length,
+    mastery,
+    milestonesClaimed: claimed,
+    milestonesTotal: milestones.length,
+    claimable,
+    done,
+    total,
+    ratio: total > 0 ? done / total : 0,
+  };
 }

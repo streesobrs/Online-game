@@ -4376,6 +4376,51 @@ io.on('connection', (socket) => {
     }
   });
 
+  // 肉鸽局外养成：一键领取全部已达成里程碑
+  // 与单条领取共用服务端判定，只是把循环放进同一把存档锁里，避免客户端连发多请求
+  socket.on('match3_rogue_claim_all', async () => {
+    const user = userManager.getUserBySocketId(socket.id);
+    if (!user || !user.accountId) {
+      socket.emit('match3_rogue_meta', { ok: false, message: '登录后才能领取奖励' });
+      return;
+    }
+
+    try {
+      const res = await gameManager.accountManager.claimRogueMilestones(user.accountId);
+      const message = res.ok
+        ? `已领取 ${res.count} 项里程碑，共 ✦${res.reward}`
+        : res.message;
+      socket.emit('match3_rogue_meta', {
+        ok: res.ok,
+        message,
+        count: res.count,
+        reward: res.reward,
+        meta: res.rogue
+      });
+
+      if (res.ok) {
+        logger.info('肉鸽图鉴里程碑已批量领取', {
+          accountId: user.accountId, count: res.count, reward: res.reward
+        });
+        if (operationLogger) {
+          operationLogger.log({
+            userId: user.accountId,
+            username: user.nickname || '',
+            action: 'match3_rogue_milestone_batch',
+            category: 'game',
+            targetName: 'match3',
+            amount: res.reward,
+            details: { count: res.count },
+            ip: socket.handshake?.address || ''
+          });
+        }
+      }
+    } catch (err) {
+      logger.error('批量领取肉鸽里程碑失败', { accountId: user.accountId, error: err.message });
+      socket.emit('match3_rogue_meta', { ok: false, message: '操作失败，请稍后再试' });
+    }
+  });
+
   // ========== 观战相关事件 ==========
 
   // 开始观战

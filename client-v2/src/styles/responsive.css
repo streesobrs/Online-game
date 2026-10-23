@@ -45,7 +45,6 @@
   .btn,
   .nav-btn,
   .account-btn,
-  .games-mode-tab,
   .games-difficulty-card,
   .ai-difficulty-btn,
   .ai-game-type-card {
@@ -345,13 +344,6 @@
   .games-sidebar-tip {
     padding: 6px 8px;
     font-size: 11px;
-  }
-
-  /* 模式 Tab：padding 缩小 + 字号降 */
-  .games-mode-tab {
-    padding: 8px 16px;
-    font-size: 14px;
-    flex: 1;
   }
 
   /* 联机/AI 面板 info-box 内容紧凑 */
@@ -654,21 +646,6 @@
 
 /* 480px 以下再进一步收紧内容 */
 @media (max-width: 480px) {
-
-  /* Games */
-  .games-mode-tabs {
-    gap: 4px;
-  }
-
-  .games-mode-tab {
-    padding: 7px 12px;
-    font-size: 13px;
-  }
-
-  .games-action-row .btn-lg {
-    padding: 10px 16px;
-    font-size: 15px;
-  }
 
   /* 对局状态条：tag 再小 */
   .game-status-group {

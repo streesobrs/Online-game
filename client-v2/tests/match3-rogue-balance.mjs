@@ -53,8 +53,9 @@ const BUFFS_REF = Object.fromEntries(
 );
 /** 某条数值增益买到满级的倍率（上限由稀有度决定，见 ROGUE_META.rarities） */
 const buffMaxFactor = (id) => valueAt(BUFFS_REF[id], maxLevelOf(BUFFS_REF[id]));
-/** 中位层数 → 基础精华（未乘「精华共鸣」） */
-const essenceAt = (floor) => Math.floor((floor * floor) / ROGUE_META.essenceDivisor);
+/** 中位层数 → 基础精华（未乘「精华共鸣」）：平方曲线 + 每层底薪，与 meta.js 的 essenceForRun 同口径 */
+const essenceAt = (floor) => Math.floor((floor * floor) / ROGUE_META.essenceDivisor)
+  + floor * (ROGUE_META.depthEssencePerFloor || 0);
 /** 中位层数 → 基础经验（未乘「经验共鸣」） */
 const expAt = (floor) => Math.floor(floor * floor * EXP_FLOOR_FACTOR);
 
@@ -1051,8 +1052,8 @@ try {
   // 反刷分上限是 rogueMaxScorePerMove（肉鸽已放开到 18000000，见 server/config.js），这里看整轮均步得分还有多少余量。
   // 基准看「全满级 / 树 + 祝福全满」两档（含极简主义 Lv3 的 3 色），不用默认档
   console.log(`整轮均步得分最高 ${Math.round(st.maxPerMove)}（反刷分上限 ${MAX_SCORE_PER_MOVE}，余量 ${(MAX_SCORE_PER_MOVE / st.maxPerMove).toFixed(1)} 倍）`);
-  // 结算尺度：精华 ⌊层数²/divisor⌋、经验 ⌊层数²×factor⌋，两者都再乘对应的局外增益
-  console.log(`按中位层数结算：精华 +${essenceAt(st.median)}（÷${ROGUE_META.essenceDivisor}）`
+  // 结算尺度：精华 ⌊层数²/divisor⌋ + 层数×底薪、经验 ⌊层数²×factor⌋，两者都再乘对应的局外增益
+  console.log(`按中位层数结算：精华 +${essenceAt(st.median)}（÷${ROGUE_META.essenceDivisor} + 底薪 ${ROGUE_META.depthEssencePerFloor}/层）`
     + ` · 经验 +${expAt(st.median)}（×${EXP_FLOOR_FACTOR}）`);
 
   // P3 / P4（开发方案 3.5 / 3.6）：金币与遗物的产出 / 消耗、新节点踩点次数
@@ -1187,7 +1188,7 @@ try {
     console.log(`${tag}层保底 ${minRarity}：${N} 次三选一违约 ${bad} 次（应为 0；池抽空时产品回退全池，属预期）`);
   }
 
-  // 胜利 / 深渊精华尺度：通关 30 层 = 基础 180 + winBonus；深渊基础封 30，增量调和收敛
+  // 胜利 / 深渊精华尺度：通关 30 层 = 基础（180 平方 + 30 底薪）+ winBonus；深渊基础封 30，增量调和收敛
   const e30 = essenceForRun(30, null, { win: true });
   const e35 = essenceForRun(35, null, { win: true });
   const e50 = essenceForRun(50, null, { win: true });

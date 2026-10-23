@@ -486,6 +486,10 @@ module.exports = {
     },
     startingPerks: ['supply', 'minimal', 'focus'],  // 新号初始解锁（必须都是成长类，保证开局三选一有牌）
     essenceDivisor: 5,                              // 本轮精华 = ⌊到达层数² / 这个数⌋
+    depthEssencePerFloor: 1,                        // 每层精华底薪：平方曲线之外的线性部分（浅层保底）
+    // 角色熟练度档位（出战轮数门槛）：与客户端 characters.js 的 MASTERY_TIERS 手工镜像。
+    // 服务端只用它算「熟练度累计等级」类里程碑，不参与任何发放系数
+    masteryTiers: [3, 8, 15],
     maxFloor: 100,                                  // 单轮层数上限：精华与经验都按它截断（正常打不到，只拦异常上报）
     maxEssencePerRun: 50000,                        // 单轮发放上限：正常 50 层也就 500 精华，只为拦住异常上报
     maxPicksPerRun: 50,                             // 单轮上报的祝福选取次数上限（统计字段，宽松校验）
@@ -528,7 +532,17 @@ module.exports = {
       { id: 'win1', name: '通关 1 次', kind: 'wins', need: 1, reward: 150 },
       { id: 'win3', name: '通关 3 次', kind: 'wins', need: 3, reward: 360 },
       { id: 'boss3', name: '累计击败 3 个 Boss', kind: 'boss', need: 3, reward: 120 },
-      { id: 'boss9', name: '累计击败 9 个 Boss', kind: 'boss', need: 9, reward: 300 }
+      { id: 'boss9', name: '累计击败 9 个 Boss', kind: 'boss', need: 9, reward: 300 },
+      // 角色与熟练度（开发方案 5.7 调整）：chars=已解锁角色数 / mastery=熟练度等级之和
+      { id: 'char3', name: '解锁 3 个角色', kind: 'chars', need: 3, reward: 80 },
+      { id: 'charAll', name: '解锁全部 7 个角色', kind: 'chars', need: 7, reward: 220 },
+      { id: 'mastery4', name: '角色熟练度累计 4 级', kind: 'mastery', need: 4, reward: 100 },
+      { id: 'mastery9', name: '角色熟练度累计 9 级', kind: 'mastery', need: 9, reward: 240 },
+      // 进阶（ascension=通关过的最高进阶，stats.bestAscWin）
+      { id: 'asc3', name: '在进阶 3 通关', kind: 'ascension', need: 3, reward: 200 },
+      { id: 'asc6', name: '在进阶 6 通关', kind: 'ascension', need: 6, reward: 360 },
+      // 祝福抽取（picks=累计选到的祝福张数，stats.picked）
+      { id: 'pick50', name: '累计选取 50 张祝福', kind: 'picks', need: 50, reward: 80 }
     ]
   },
 

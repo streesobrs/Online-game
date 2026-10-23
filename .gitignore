@@ -49,6 +49,12 @@ out/
 .cache/
 .temp/
 
+# train3d 验证残留（当前沙箱无法删除子目录文件，可手动清理）
+client-v2/_train3d_harness.html
+client-v2/_deleteme.txt
+client-v2/tests/_tmp-train3d-sim.mjs
+client-v2/tests/_tmp-curvature.mjs
+
 # 测试覆盖率
 coverage/
 .nyc_output/

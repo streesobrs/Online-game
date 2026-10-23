@@ -18,6 +18,7 @@
   <link rel="stylesheet" href="./src/games/chinese-chess/styles.css">
   <link rel="stylesheet" href="./src/games/snake/styles.css">
   <link rel="stylesheet" href="./src/games/match3/styles.css">
+  <link rel="stylesheet" href="./src/games/train3d/styles.css">
   <!-- 功能模块样式 -->
   <link rel="stylesheet" href="./src/features/games/styles.css">
   <link rel="stylesheet" href="./src/features/chat/styles.css">
@@ -51,6 +52,14 @@
   </div>
   <!-- 第三方库：用 v1 服务端自带的 socket.io（绝对路径，挂到 window.io） -->
   <script src="/socket.io/socket.io.js"></script>
+  <!-- Three.js 本地化（离线可用），供 3D 驾驶模块 import 'three' -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three/three.module.js"
+    }
+  }
+  </script>
   <!-- 应用入口（原生 ES Modules，无构建） -->
   <script type="module" src="./src/main.js"></script>
 </body>
