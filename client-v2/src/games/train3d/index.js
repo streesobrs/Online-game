@@ -13,6 +13,7 @@ import { go } from '../../core/router.js';
 import { eventBus } from '../../core/eventBus.js';
 import { MAX_SPEED, stepTrain } from './physics.js';
 import { TrainAutopilot } from './autopilot.js';
+import { TrainAudio } from './audio.js';
 
 /** 当前挂载实例的清理函数（路由不会调用视图 cleanup，这里自己兜底） */
 let activeCleanup = null;
@@ -53,6 +54,177 @@ const SHELL_HTML = `
   <div id="station-status">准备发车：按 W 推牵引挡</div>
   <div id="cam-mode">📷 第三人称跟随</div>
   <div id="auto-mode">🎮 手动驾驶</div>
+  <button id="audio-mode" type="button" title="静音/开启音效（M）">🔈 开启音效</button>
+  <button id="quality-mode" type="button" title="设置">⚙ 设置</button>
+  <div id="quality-panel" hidden>
+    <div class="quality-head"><b>设置</b><span>画面 / 世界</span></div>
+    <p id="quality-summary" class="quality-summary"></p>
+    <button id="quality-auto" class="quality-reset quality-auto" type="button">恢复自动设置</button>
+
+    <div class="quality-sep">世界种子</div>
+    <div class="seed-row">
+      <input id="world-seed" type="text" maxlength="40" spellcheck="false" autocomplete="off" aria-label="世界种子">
+      <button id="world-seed-apply" class="seed-btn" type="button">生成</button>
+      <button id="world-seed-random" class="seed-btn" type="button">随机</button>
+    </div>
+    <p class="seed-hint">同一 seed 生成同一套世界与轨道；生成后会重建世界并回到起点。</p>
+
+    <div class="quality-sep">世界生成（点生成后生效）</div>
+    <label class="quality-row">
+      <span>车站数量</span>
+      <select data-setting="stationCount">
+        <option value="0">自动</option>
+        <option value="6">6</option>
+        <option value="8">8</option>
+        <option value="10">10</option>
+        <option value="12">12</option>
+        <option value="14">14</option>
+        <option value="16">16</option>
+      </select>
+    </label>
+    <label class="quality-row">
+      <span>地形起伏</span>
+      <input type="range" data-setting="terrainRelief" min="0.3" max="1.6" step="0.1">
+      <output data-value="terrainRelief">1.00x</output>
+    </label>
+    <label class="quality-row">
+      <span>湖泊大小</span>
+      <input type="range" data-setting="lakeScale" min="0.4" max="1.4" step="0.1">
+      <output data-value="lakeScale">1.00x</output>
+    </label>
+    <label class="quality-row">
+      <span>河流长度</span>
+      <input type="range" data-setting="riverScale" min="0.3" max="1" step="0.1">
+      <output data-value="riverScale">1.00x</output>
+    </label>
+    <label class="quality-row">
+      <span>雪山数量</span>
+      <select data-setting="mountainCount">
+        <option value="0">自动</option>
+        <option value="-1">关闭</option>
+        <option value="8">8</option>
+        <option value="12">12</option>
+        <option value="16">16</option>
+        <option value="20">20</option>
+        <option value="24">24</option>
+        <option value="30">30</option>
+      </select>
+    </label>
+    <label class="quality-row">
+      <span>雪山高度</span>
+      <input type="range" data-setting="mountainHeight" min="0.6" max="1.4" step="0.1">
+      <output data-value="mountainHeight">1.00x</output>
+    </label>
+    <label class="quality-row">
+      <span>每站建筑</span>
+      <input type="range" data-setting="buildingsPerTown" min="6" max="36" step="1">
+      <output data-value="buildingsPerTown">22</output>
+    </label>
+    <button id="world-seed-apply-bottom" class="quality-reset" type="button" data-action="generate">按当前种子和设置生成</button>
+
+    <div class="quality-sep">画面</div>
+    <label class="quality-row">
+      <span>分辨率</span>
+      <input type="range" data-setting="resolution" min="0.6" max="2.0" step="0.05">
+      <output data-value="resolution">1.00x</output>
+    </label>
+    <label class="quality-row">
+      <span>阴影</span>
+      <select data-setting="shadows">
+        <option value="0">关闭</option>
+        <option value="1024">低 1024</option>
+        <option value="1536">中 1536</option>
+        <option value="2048">高 2048</option>
+      </select>
+    </label>
+    <label class="quality-row">
+      <span>软阴影</span>
+      <select data-setting="softShadows">
+        <option value="1">开</option>
+        <option value="0">关</option>
+      </select>
+    </label>
+    <label class="quality-row">
+      <span>植被投影</span>
+      <select data-setting="foliageShadows">
+        <option value="1">开</option>
+        <option value="0">关</option>
+      </select>
+    </label>
+    <label class="quality-row">
+      <span>水面</span>
+      <select data-setting="water">
+        <option value="1">显示</option>
+        <option value="0">隐藏</option>
+      </select>
+    </label>
+    <label class="quality-row">
+      <span>帧率上限</span>
+      <select data-setting="fpsLimit">
+        <option value="0">无限制</option>
+        <option value="30">30</option>
+        <option value="45">45</option>
+        <option value="60">60</option>
+        <option value="90">90</option>
+        <option value="120">120</option>
+      </select>
+    </label>
+
+    <div class="quality-sep">世界细节</div>
+    <label class="quality-row">
+      <span>树木密度</span>
+      <input type="range" data-setting="vegetation" min="0" max="1" step="0.05">
+      <output data-value="vegetation">100%</output>
+    </label>
+    <label class="quality-row">
+      <span>灌木密度</span>
+      <input type="range" data-setting="bushes" min="0" max="1" step="0.05">
+      <output data-value="bushes">100%</output>
+    </label>
+    <label class="quality-row">
+      <span>岩石密度</span>
+      <input type="range" data-setting="rocks" min="0" max="1" step="0.05">
+      <output data-value="rocks">100%</output>
+    </label>
+    <label class="quality-row">
+      <span>城镇密度</span>
+      <input type="range" data-setting="towns" min="0" max="1" step="0.05">
+      <output data-value="towns">100%</output>
+    </label>
+    <label class="quality-row">
+      <span>可视距离</span>
+      <input type="range" data-setting="drawDistance" min="0.5" max="1.5" step="0.05">
+      <output data-value="drawDistance">1.00x</output>
+    </label>
+
+    <div class="quality-sep">下次进入生效</div>
+    <label class="quality-row">
+      <span>抗锯齿</span>
+      <select data-setting="antialias">
+        <option value="1">开</option>
+        <option value="0">关</option>
+      </select>
+    </label>
+    <label class="quality-row">
+      <span>地形精度</span>
+      <select data-setting="terrain">
+        <option value="360">低 360</option>
+        <option value="480">中 480</option>
+        <option value="600">高 600</option>
+        <option value="900">超高 900</option>
+      </select>
+    </label>
+    <label class="quality-row">
+      <span>模型细节</span>
+      <select data-setting="modelDetail">
+        <option value="low">低</option>
+        <option value="high">高</option>
+      </select>
+    </label>
+
+    <p>世界生成项点“生成”后生效；其余画面项即时生效；“下次进入”的三项在重新进入游戏时应用。</p>
+    <button class="quality-reset" type="button" data-action="auto">恢复自动设置</button>
+  </div>
 
   <div id="auto-panel" hidden>
     <div class="auto-head">
@@ -78,7 +250,7 @@ const SHELL_HTML = `
     • <kbd>空格</kbd> 挡位回中（惰行）<br>
     • <kbd>G</kbd> 切换自动/手动驾驶（自动过弯限速、精准停站）<br>
     • <kbd>C</kbd> 切换第一/第三人称视角<br>
-    • <kbd>N</kbd> 切换黑夜/白天<br>
+    • <kbd>N</kbd> 切换黑夜/白天 · <kbd>M</kbd> 静音/开启音效<br>
     • <kbd>鼠标拖拽</kbd> 环顾四周 · <kbd>滚轮</kbd> 缩放
   </div>
 
@@ -102,14 +274,14 @@ const SHELL_HTML = `
 </div>`;
 
 /** 本游戏占用、需要在捕获阶段拦截的按键（否则会触发全局导航快捷键） */
-const GAME_KEYS = new Set(['KeyW', 'KeyS', 'ArrowUp', 'ArrowDown', 'Space', 'KeyN', 'KeyC', 'KeyG']);
+const GAME_KEYS = new Set(['KeyW', 'KeyS', 'ArrowUp', 'ArrowDown', 'Space', 'KeyN', 'KeyC', 'KeyG', 'KeyM']);
 
 /**
  * 渲染 3D 火车驾驶视图
  * @param {HTMLElement} container - 视图容器（#view-root）
  * @returns {Function} cleanup
  */
-export function renderTrain3d(container) {
+export function renderTrain3d(container, options = {}) {
   if (typeof activeCleanup === 'function') activeCleanup();
   container.innerHTML = SHELL_HTML;
   const root = container.querySelector('.train3d-page');
@@ -119,12 +291,173 @@ export function renderTrain3d(container) {
 
   /**
    * 触屏适配：粗指针（手机/平板）或窄窗口都按触屏布局处理。
-   * lowPower 同时用于降低渲染开销，避免移动端 GPU 掉帧。
+   * 画质设置优先读取上次选择；没有记录时按设备自动给默认档。
    */
   const touchUi = window.matchMedia('(pointer: coarse)').matches
     || window.matchMedia('(hover: none)').matches
     || window.innerWidth <= 760;
-  const lowPower = touchUi || window.innerWidth <= 900;
+
+  const SETTINGS_KEY = 'train3d.settings';
+  const SETTINGS_VERSION = 3;
+  const SETTINGS_SHADOWS = [0, 1024, 1536, 2048];
+  const SETTINGS_TERRAIN = [360, 480, 600, 900];
+  const clamp01 = (value) => Math.max(0, Math.min(1, value));
+  const finiteOr = (value, fallback) => (value != null && Number.isFinite(Number(value)) ? Number(value) : fallback);
+
+  function autoSettings() {
+    const weak = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4)
+      || (navigator.deviceMemory && navigator.deviceMemory <= 4);
+    const smallScreen = window.innerWidth <= 900;
+    const world = {
+      stationCount: 0,
+      terrainRelief: 1,
+      lakeScale: 1,
+      riverScale: 1,
+      mountainCount: 0,
+      mountainHeight: 1,
+      buildingsPerTown: 22
+    };
+    if (smallScreen) {
+      return {
+        ...world,
+        version: SETTINGS_VERSION,
+        resolution: 1.15, shadows: 0,
+        vegetation: 0.4, bushes: 0.4, rocks: 0.45, towns: 0.4,
+        drawDistance: 1.0, fpsLimit: 0,
+        softShadows: false, foliageShadows: false, water: true,
+        antialias: false, terrain: 480, modelDetail: 'low'
+      };
+    }
+    if (weak) {
+      return {
+        ...world,
+        version: SETTINGS_VERSION,
+        resolution: 1.5, shadows: 1536,
+        vegetation: 0.72, bushes: 0.7, rocks: 0.7, towns: 0.65,
+        drawDistance: 1.05, fpsLimit: 0,
+        softShadows: true, foliageShadows: true, water: true,
+        antialias: true, terrain: 600, modelDetail: 'high'
+      };
+    }
+    return {
+      ...world,
+      version: SETTINGS_VERSION,
+      resolution: 2.0, shadows: 2048,
+      vegetation: 1, bushes: 1, rocks: 1, towns: 1,
+      drawDistance: 1.1, fpsLimit: 0,
+      softShadows: true, foliageShadows: true, water: true,
+      antialias: true, terrain: 900, modelDetail: 'high'
+    };
+  }
+
+  function normalizeSettings(raw, base) {
+    const s = { ...base, ...(raw || {}) };
+    s.resolution = Math.max(0.6, Math.min(2.0, finiteOr(s.resolution, base.resolution)));
+    s.shadows = SETTINGS_SHADOWS.includes(Number(s.shadows)) ? Number(s.shadows) : base.shadows;
+    s.vegetation = clamp01(finiteOr(s.vegetation, base.vegetation));
+    s.bushes = clamp01(finiteOr(s.bushes, base.bushes));
+    s.rocks = clamp01(finiteOr(s.rocks, base.rocks));
+    s.towns = clamp01(finiteOr(s.towns, base.towns));
+    s.drawDistance = Math.max(0.5, Math.min(1.5, finiteOr(s.drawDistance, base.drawDistance)));
+    s.fpsLimit = [0, 30, 45, 60, 90, 120].includes(Number(s.fpsLimit)) ? Number(s.fpsLimit) : base.fpsLimit;
+    s.softShadows = Boolean(s.softShadows);
+    s.foliageShadows = Boolean(s.foliageShadows);
+    s.water = Boolean(s.water);
+    s.antialias = Boolean(s.antialias);
+    s.terrain = SETTINGS_TERRAIN.includes(Number(s.terrain)) ? Number(s.terrain) : base.terrain;
+    s.modelDetail = s.modelDetail === 'low' ? 'low' : 'high';
+    s.stationCount = [0, 6, 8, 10, 12, 14, 16].includes(Number(s.stationCount)) ? Number(s.stationCount) : base.stationCount;
+    s.terrainRelief = Math.max(0.3, Math.min(1.6, finiteOr(s.terrainRelief, base.terrainRelief)));
+    s.lakeScale = Math.max(0.4, Math.min(1.4, finiteOr(s.lakeScale, base.lakeScale)));
+    s.riverScale = Math.max(0.3, Math.min(1.0, finiteOr(s.riverScale, base.riverScale)));
+    s.mountainCount = [-1, 0, 8, 12, 16, 20, 24, 30].includes(Number(s.mountainCount)) ? Number(s.mountainCount) : base.mountainCount;
+    s.mountainHeight = Math.max(0.6, Math.min(1.4, finiteOr(s.mountainHeight, base.mountainHeight)));
+    s.buildingsPerTown = Math.round(Math.max(6, Math.min(36, finiteOr(s.buildingsPerTown, base.buildingsPerTown))));
+    s.version = SETTINGS_VERSION;
+    return s;
+  }
+
+  function readSettings() {
+    const base = autoSettings();
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const migrated = normalizeSettings(parsed, base);
+        if (!parsed || parsed.version !== SETTINGS_VERSION) {
+          // 旧存档可能压低过渲染分辨率/地形精度：一次性抬到可见清晰度下限
+          migrated.resolution = Math.max(migrated.resolution, Math.min(devicePixelRatio || 1, 1.5));
+          migrated.drawDistance = Math.max(migrated.drawDistance, 1.0);
+          migrated.terrain = Math.max(migrated.terrain, 480);
+          migrated.antialias = true;
+          try {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(migrated));
+          } catch (error) {
+            // 忽略持久化失败
+          }
+        }
+        return migrated;
+      }
+    } catch (error) {
+      // 损坏的存档/隐私模式回退到自动设置
+    }
+    return base;
+  }
+
+  let settings = readSettings();
+  const lowDetail = settings.modelDetail === 'low';
+
+  /* ============================================================
+     世界种子：同一字符串生成同一套轨道/地形/植被/城镇
+     ============================================================ */
+  const SEED_KEY = 'train3d.seed';
+
+  function randomSeed() {
+    return Math.random().toString(36).slice(2, 10);
+  }
+
+  function normalizeSeed(value) {
+    const text = String(value == null ? '' : value).trim().slice(0, 40);
+    return text || randomSeed();
+  }
+
+  function readWorldSeed() {
+    try {
+      const saved = localStorage.getItem(SEED_KEY);
+      if (saved) return normalizeSeed(saved);
+    } catch (error) {
+      // 隐私模式下使用临时随机种子
+    }
+    const seed = randomSeed();
+    try {
+      localStorage.setItem(SEED_KEY, seed);
+    } catch (error) {
+      // 忽略持久化失败
+    }
+    return seed;
+  }
+
+  function hashSeed(value) {
+    let h = 2166136261;
+    for (let i = 0; i < value.length; i++) {
+      h ^= value.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function random() {
+      a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  const WORLD_SEED = options.seed ? normalizeSeed(options.seed) : readWorldSeed();
+  const rand = mulberry32(hashSeed(WORLD_SEED));
 
   /** 统一登记监听，卸载时逐条注销 */
   const teardown = [];
@@ -135,6 +468,32 @@ export function renderTrain3d(container) {
 
   on($('.train3d-back'), 'click', () => go('games'));
 
+  /* ---- 音效解锁：浏览器要求首次用户手势后才能出声 ---- */
+  let audioStartedAt = 0;
+  const unlockAudio = () => {
+    const hadContext = Boolean(audio.ctx);
+    audio.ensureStarted();
+    if (!hadContext) {
+      if (audio.ctx) audioStartedAt = performance.now();
+      updateAudioUi();
+    } else if (audio.ctx && audio.ctx.state === 'suspended') {
+      updateAudioUi();
+    }
+  };
+  on(window, 'pointerdown', unlockAudio, { capture: true });
+  on(window, 'keydown', unlockAudio, { capture: true });
+  on($('#audio-mode'), 'click', () => {
+    if (!audio.ctx) {
+      audio.ensureStarted();
+      if (audio.ctx) audioStartedAt = performance.now();
+      updateAudioUi();
+      return;
+    }
+    // pointerdown 解锁与 click 同一次点击时，不要立刻把刚打开的音效又静音
+    if (performance.now() - audioStartedAt < 400) return;
+    toggleAudioMute();
+  });
+
 
 
   /* ============================================================
@@ -143,14 +502,14 @@ export function renderTrain3d(container) {
   const WATER_LEVEL = 0;
   const STOP_OFFSET = 22.5;          // 停车目标 = 站台中心 + 该偏移（6 节车厢居中）
   const STOP_WINDOW = 10;            // 手动停靠允许偏差
-  const FRAME_COUNT = 2400;
+  const FRAME_COUNT = 3000;
   const WORLD_UP = new THREE.Vector3(0, 1, 0);
   const CAR_SPACING = 9;
   const CAR_COUNT = 6;
 
   /* 过弯倾摆：按 v²κ/g 计算理论倾角，再乘视觉增益并限幅 */
-  const TRAIN_TILT_GAIN = 0.8;
-  const TRAIN_MAX_TILT = 0.14;       // rad ≈ 8°
+  const TRAIN_TILT_GAIN = 0.55;
+  const TRAIN_MAX_TILT = 0.10;       // rad ≈ 5.7°
   const TRAIN_TILT_SMOOTH = 4.0;
   const GRAVITY = 9.81;
 
@@ -159,7 +518,7 @@ export function renderTrain3d(container) {
   const REPEAT_INTERVAL_MS = 120;
 
   /* 自动控制 */
-  const AUTO_CRUISE = 150 / 3.6;         // 区间目标速度 150 km/h（曲线区自动降速）
+  const AUTO_CRUISE = 185 / 3.6;         // 区间目标速度 185 km/h（曲线区自动降速）
   const AUTO_DWELL_TIME = 5.0;           // 站停时间
   const AUTO_PERFECT_DEVIATION = 0.35;   // 完美停靠偏差阈值（米）
   const AUTO_GOOD_DEVIATION = 1.0;       // 良好停靠偏差阈值（米）
@@ -172,10 +531,13 @@ export function renderTrain3d(container) {
   /* ============================================================
      1. 渲染器 / 场景 / 相机
      ============================================================ */
-  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  const renderer = new THREE.WebGLRenderer({
+    antialias: settings.antialias,
+    powerPreference: 'high-performance'
+  });
   renderer.setSize(Math.max(1, stage.clientWidth), Math.max(1, stage.clientHeight));
-  renderer.setPixelRatio(Math.min(devicePixelRatio, lowPower ? 1.5 : 1.75));
-  renderer.shadowMap.enabled = true;
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, settings.resolution));
+  renderer.shadowMap.enabled = settings.shadows > 0;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   stage.appendChild(renderer.domElement);
@@ -217,8 +579,9 @@ export function renderTrain3d(container) {
   scene.add(hemiLight);
 
   const sun = new THREE.DirectionalLight(0xfff1d6, 2.2);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(lowPower ? 1024 : 2048, lowPower ? 1024 : 2048);
+  sun.castShadow = settings.shadows > 0;
+  const initialShadowSize = Math.max(1024, settings.shadows || 1024);
+  sun.shadow.mapSize.set(initialShadowSize, initialShadowSize);
   sun.shadow.camera.near = 1;
   sun.shadow.camera.far = 900;
   const SHADOW_EXTENT = 220;
@@ -230,7 +593,7 @@ export function renderTrain3d(container) {
   sun.shadow.normalBias = 0.6;
   scene.add(sun, sun.target);
 
-  scene.fog = new THREE.FogExp2(0x9bc4e2, 0.00025);
+  scene.fog = new THREE.FogExp2(0x9bc4e2, 0.00018 / settings.drawDistance);
 
   /* ============================================================
      2. 昼夜
@@ -246,7 +609,7 @@ export function renderTrain3d(container) {
   function toggleDayNight() {
     isNight = !isNight;
     if (isNight) {
-      scene.fog = new THREE.FogExp2(0x1a2538, 0.0008);
+      scene.fog = new THREE.FogExp2(0x1a2538, 0.0006 / settings.drawDistance);
       hemiLight.intensity = 0.55; hemiLight.color.setHex(0x8899cc);
       sun.intensity = 0.9; sun.color.setHex(0xccddff);
       skyMat.uniforms.topColor.value.setHex(0x0a1128);
@@ -259,7 +622,7 @@ export function renderTrain3d(container) {
       stationLights.forEach(l => { l.intensity = 35; });
       if (waterMesh) waterMesh.material.color.setHex(0x112233);
     } else {
-      scene.fog = new THREE.FogExp2(0x9bc4e2, 0.00025);
+      scene.fog = new THREE.FogExp2(0x9bc4e2, 0.00018 / settings.drawDistance);
       hemiLight.intensity = 1.1; hemiLight.color.setHex(0xcfe8ff);
       sun.intensity = 2.2; sun.color.setHex(0xfff1d6);
       skyMat.uniforms.topColor.value.setHex(0x0077ff);
@@ -277,13 +640,68 @@ export function renderTrain3d(container) {
   /* ============================================================
      3. 地形 / 空间索引
      ============================================================ */
+  /* 内圈河谷：从中央湖向外延伸，在地形上切出一条低于水面的河床 */
+  const terrainBase = 105 + rand() * 35;
+  const terrainWave = [
+    { freq: 0.0014 + rand() * 0.0012, amp: (18 + rand() * 24) * settings.terrainRelief, phase: rand() * Math.PI * 2 },
+    { freq: 0.0021 + rand() * 0.0014, amp: (22 + rand() * 28) * settings.terrainRelief, phase: rand() * Math.PI * 2 },
+    { freq: 0.0042 + rand() * 0.0022, amp: (10 + rand() * 16) * settings.terrainRelief, phase: rand() * Math.PI * 2 }
+  ];
+  const lakeAngle = rand() * Math.PI * 2;
+  const lakeCenterR = rand() * 180;
+  const lakeX = Math.cos(lakeAngle) * lakeCenterR;
+  const lakeZ = Math.sin(lakeAngle) * lakeCenterR;
+  const lakeRadius = (800 + rand() * 380) * settings.lakeScale;
+  const lakeDepth = 130 + rand() * 55;
+
+  const riverAngle = rand() * Math.PI * 2;
+  const riverSteps = 8 + Math.floor(rand() * 4);
+  const riverWiggle = 0.12 + rand() * 0.14;
+  const riverWiggleFreq = 0.6 + rand() * 0.8;
+  const riverPhase = rand() * Math.PI * 2;
+  const riverEnd = Math.max(lakeRadius * 0.55, (1250 + rand() * 400) * settings.riverScale);
+  const riverStart = lakeRadius * 0.35;
+  const riverBank = 70 + rand() * 35;
+  const riverPath = [];
+  for (let i = 0; i < riverSteps; i++) {
+    const u = i / (riverSteps - 1);
+    const dist = riverStart + u * (riverEnd - riverStart);
+    const a = riverAngle + Math.sin(u * Math.PI * 2 * riverWiggleFreq + riverPhase) * riverWiggle;
+    riverPath.push({ x: lakeX + Math.cos(a) * dist, z: lakeZ + Math.sin(a) * dist });
+  }
+  function riverDistance(x, z) {
+    let best = Infinity;
+    for (let i = 0; i < riverPath.length - 1; i++) {
+      const a = riverPath[i];
+      const b = riverPath[i + 1];
+      const abx = b.x - a.x;
+      const abz = b.z - a.z;
+      const apx = x - a.x;
+      const apz = z - a.z;
+      const len2 = abx * abx + abz * abz;
+      const t = len2 > 0 ? Math.max(0, Math.min(1, (apx * abx + apz * abz) / len2)) : 0;
+      const dx = x - (a.x + abx * t);
+      const dz = z - (a.z + abz * t);
+      const d = dx * dx + dz * dz;
+      if (d < best) best = d;
+    }
+    return Math.sqrt(best);
+  }
+
   function getTerrainHeight(x, z) {
-    let y = Math.sin(x * 0.002) * 30 + Math.cos(z * 0.003) * 35 + Math.sin((x + z) * 0.005) * 15;
-    y += 120;
-    const lakeDist = Math.sqrt(x * x + z * z);
-    if (lakeDist < 1000) {
-      const t = lakeDist / 1000;
-      y -= (1 - t * t) * 160;
+    let y = terrainBase;
+    y += Math.sin(x * terrainWave[0].freq + terrainWave[0].phase) * terrainWave[0].amp;
+    y += Math.cos(z * terrainWave[1].freq + terrainWave[1].phase) * terrainWave[1].amp;
+    y += Math.sin((x + z) * terrainWave[2].freq + terrainWave[2].phase) * terrainWave[2].amp;
+    const lakeDist = Math.sqrt((x - lakeX) ** 2 + (z - lakeZ) ** 2);
+    if (lakeDist < lakeRadius) {
+      const t = lakeDist / lakeRadius;
+      y -= (1 - t * t) * lakeDepth;
+    }
+    const riverDist = riverDistance(x, z);
+    if (riverDist < riverBank) {
+      const carve = 1 - THREE.MathUtils.smoothstep(riverDist, riverBank * 0.28, riverBank);
+      y = y * (1 - carve) + (WATER_LEVEL - 7) * carve;
     }
     return y;
   }
@@ -323,10 +741,21 @@ export function renderTrain3d(container) {
   /* ============================================================
      4. 轨道曲线
      ============================================================ */
+  const trackPointCount = 16 + Math.floor(rand() * 9);
+  const trackBaseRadius = 3000 + rand() * 300;
+  const trackHarmonic = 2 + Math.floor(rand() * 3);
+  const trackPhase = rand() * Math.PI * 2;
+  const trackRadialAmp = 300 + rand() * 300;
+  const trackSecondFreq = 5 + Math.floor(rand() * 3);
+  const trackSecondAmp = 80 + rand() * 100;
+  const trackAngleJitter = 0.03 + rand() * 0.05;
   const trackControlPoints = [];
-  for (let i = 0; i < 16; i++) {
-    const angle = (i / 16) * Math.PI * 2;
-    const r = 2200 + Math.sin(angle * 3) * 600;
+  for (let i = 0; i < trackPointCount; i++) {
+    const baseAngle = (i / trackPointCount) * Math.PI * 2;
+    const angle = baseAngle + (rand() - 0.5) * trackAngleJitter;
+    const r = trackBaseRadius
+      + Math.sin(baseAngle * trackHarmonic + trackPhase) * trackRadialAmp
+      + Math.sin(baseAngle * trackSecondFreq + trackPhase * 1.7) * trackSecondAmp;
     trackControlPoints.push(new THREE.Vector2(Math.cos(angle) * r, Math.sin(angle) * r));
   }
 
@@ -336,7 +765,7 @@ export function renderTrain3d(container) {
   );
 
   const rawY = [];
-  const N_SAMPLE = 400;
+  const N_SAMPLE = 480;
   for (let i = 0; i < N_SAMPLE; i++) {
     const t = i / N_SAMPLE;
     const p = trackCurveXZ.getPointAt(t);
@@ -345,15 +774,40 @@ export function renderTrain3d(container) {
     rawY.push(y + 2.0);
   }
 
-  const smoothY = [];
+  // 轨道纵断面：轻度平滑短尺度折点，并限制桥梁/路堑高度，
+  // 避免大范围削山或把整条线路抬成高架。
+  let smoothY = rawY;
+  const smoothRadius = 8;
+  for (let pass = 0; pass < 2; pass++) {
+    const next = [];
+    for (let i = 0; i < N_SAMPLE; i++) {
+      let sum = 0;
+      for (let j = -smoothRadius; j <= smoothRadius; j++) {
+        sum += smoothY[(i + j + N_SAMPLE) % N_SAMPLE];
+      }
+      next.push(sum / (smoothRadius * 2 + 1));
+    }
+    smoothY = next;
+  }
   for (let i = 0; i < N_SAMPLE; i++) {
-    let sum = 0;
-    for (let j = -5; j <= 5; j++) sum += rawY[(i + j + N_SAMPLE) % N_SAMPLE];
-    smoothY.push(sum / 11);
+    const d = smoothY[i] - rawY[i];
+    if (d > 16) smoothY[i] = rawY[i] + 16 + (d - 16) * 0.12;
+    else if (d < -9) smoothY[i] = rawY[i] - 9 + (d + 9) * 0.12;
+  }
+  {
+    const next = [];
+    for (let i = 0; i < N_SAMPLE; i++) {
+      let sum = 0;
+      for (let j = -2; j <= 2; j++) {
+        sum += smoothY[(i + j + N_SAMPLE) % N_SAMPLE];
+      }
+      next.push(sum / 5);
+    }
+    smoothY = next;
   }
 
   const finalTrackPoints = [];
-  const SAMPLE_N = 1200;
+  const SAMPLE_N = 1600;
   for (let i = 0; i < SAMPLE_N; i++) {
     const t = i / SAMPLE_N;
     const xz = trackCurveXZ.getPointAt(t);
@@ -366,22 +820,124 @@ export function renderTrain3d(container) {
   }
 
   const trackCurve = new THREE.CatmullRomCurve3(finalTrackPoints, true, 'centripetal');
-  trackCurve.arcLengthDivisions = 4000;
+  trackCurve.arcLengthDivisions = 5000;
   trackCurve.updateArcLengths();
   const trackLength = trackCurve.getLength();
 
-  const trackLookup = makeLookup(trackCurve.getPoints(1500), 100);
+  /* 隧道段：轨道低于自然地面的区段，保留山体，不再挖成路堑 */
+  const TUNNEL_DEPTH = 7.0;
+  const TUNNEL_MIN_LENGTH = 18;
+  const TUNNEL_PORTAL_DEPTH = 4.2;
+  const tunnelRanges = [];
+  {
+    const samples = Math.max(500, Math.ceil(trackLength / 6));
+    let startT = -1;
+    for (let i = 0; i <= samples; i++) {
+      const t = i / samples;
+      const p = trackCurve.getPointAt(t % 1);
+      const depth = getTerrainHeight(p.x, p.z) - p.y;
+      const active = depth > TUNNEL_DEPTH;
+      if (active && startT < 0) startT = t;
+      if ((!active || i === samples) && startT >= 0) {
+        const endT = i === samples ? 1 : t;
+        if ((endT - startT) * trackLength >= TUNNEL_MIN_LENGTH) {
+          tunnelRanges.push({ startT, endT });
+        }
+        startT = -1;
+      }
+    }
+  }
+  function isTunnelT(t) {
+    for (const range of tunnelRanges) {
+      if (t >= range.startT && t <= range.endT) return true;
+    }
+    return false;
+  }
+
+  // 洞门从“埋深 7m 的山腹”外扩到“刚好覆盖隧道顶 4.2m 的山脚”，
+  // 否则 4.2m 高的洞口会被 7m 厚的山体整个埋住。
+  {
+    const portalStep = 4 / Math.max(1, trackLength);
+    for (const range of tunnelRanges) {
+      let s = range.startT;
+      let moved = 0;
+      while (s > 0.005 && moved < 120) {
+        const prevT = (s - portalStep + 1) % 1;
+        const p = trackCurve.getPointAt(prevT);
+        if (getTerrainHeight(p.x, p.z) - p.y < TUNNEL_PORTAL_DEPTH) break;
+        s = prevT;
+        moved += 4;
+      }
+      range.startT = s;
+
+      let e = range.endT;
+      moved = 0;
+      while (e < 0.995 && moved < 120) {
+        const nextT = (e + portalStep) % 1;
+        const p = trackCurve.getPointAt(nextT);
+        if (getTerrainHeight(p.x, p.z) - p.y < TUNNEL_PORTAL_DEPTH) break;
+        e = nextT;
+        moved += 4;
+      }
+      range.endT = e;
+    }
+  }
+
+  // 洞门外侧的削坡切口：把草坡在洞口附近压下去，露出洞门和岩土面
+  const tunnelPortalCuts = [];
+  for (const range of tunnelRanges) {
+    for (const [t, outwardSign] of [[range.startT, -1], [range.endT, 1]]) {
+      const p = trackCurve.getPointAt(t);
+      const tan = trackCurve.getTangentAt(t).normalize();
+      tunnelPortalCuts.push({
+        x: p.x, z: p.z, y: p.y,
+        ox: tan.x * outwardSign,
+        oz: tan.z * outwardSign
+      });
+    }
+  }
+
+  const lookupPoints = [];
+  for (let i = 0; i < 2200; i++) {
+    const t = i / 2200;
+    const p = trackCurve.getPointAt(t);
+    p.tunnel = isTunnelT(t);
+    lookupPoints.push(p);
+  }
+  const trackLookup = makeLookup(lookupPoints, 100);
 
   function getGroundY(x, z, naturalY = getTerrainHeight(x, z)) {
     const hit = queryLookup(trackLookup, x, z, 80);
     if (!hit) return naturalY;
+    for (const portal of tunnelPortalCuts) {
+      const dx = x - portal.x;
+      const dz = z - portal.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist < 24) {
+        const along = dx * portal.ox + dz * portal.oz;
+        if (along > -2) {
+          const blend = THREE.MathUtils.smoothstep(dist, 10, 24);
+          return (portal.y - 1.6) * (1 - blend) + naturalY * blend;
+        }
+      }
+    }
+    if (hit.point.tunnel) return naturalY;
     const flatY = hit.point.y - 1.5;
     const diff = flatY - naturalY;
+    // 高架段不要再把地面抬到轨道底下，否则桥墩和桥下净空会被土方填掉
+    const bridge = THREE.MathUtils.smoothstep(diff, 6, 16);
+    if (bridge >= 0.999) return naturalY;
+
     const support = 1 - THREE.MathUtils.smoothstep(diff, 25, 65);
     const flatTarget = naturalY + (flatY - naturalY) * support;
-    if (hit.dist < 20) return flatTarget;
-    const t = THREE.MathUtils.smoothstep(hit.dist, 20, 80);
-    return flatTarget * (1 - t) + naturalY * t;
+    let ground;
+    if (hit.dist < 12) {
+      ground = flatTarget;
+    } else {
+      const t = THREE.MathUtils.smoothstep(hit.dist, 12, 40);
+      ground = flatTarget * (1 - t) + naturalY * t;
+    }
+    return ground * (1 - bridge) + naturalY * bridge;
   }
 
   /* ============================================================
@@ -411,7 +967,7 @@ export function renderTrain3d(container) {
   }
 
   /* ---- 曲线限速表：供自动驾驶前瞻减速 ---- */
-  const CURVE_LAT_LIMIT = 1.7;       // 允许的横向加速度 m/s²
+  const CURVE_LAT_LIMIT = 2.8;       // 允许的横向加速度 m/s²（提高后过弯减速更温和）
   const CURVE_LIMIT_STEP = 10;       // 限速表分辨率（米）
   const CURVE_LIMIT_COUNT = Math.ceil(trackLength / CURVE_LIMIT_STEP);
   const curveSpeedLimits = new Float32Array(CURVE_LIMIT_COUNT);
@@ -476,7 +1032,7 @@ export function renderTrain3d(container) {
      6. 地面 / 水面
      ============================================================ */
   // 地形顶点在挂载时同步生成，移动端降低细分以免首屏卡顿
-  const GROUND_SEG = lowPower ? 320 : 512;
+  const GROUND_SEG = settings.terrain;
   const groundGeo = new THREE.PlaneGeometry(12000, 12000, GROUND_SEG, GROUND_SEG);
   groundGeo.rotateX(-Math.PI / 2);
   {
@@ -492,16 +1048,73 @@ export function renderTrain3d(container) {
 
   const groundMat = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0 });
   {
+    // 程序化地表纹理：给大片平滑地形增加细碎草/土/田块层次，远景不再是一整块色斑
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 512;
+    const texCtx = canvas.getContext('2d');
+    texCtx.fillStyle = '#e8e8df';
+    texCtx.fillRect(0, 0, 512, 512);
+    let texState = hashSeed('ground:' + WORLD_SEED);
+    const texRand = () => {
+      texState = (Math.imul(texState, 1664525) + 1013904223) >>> 0;
+      return texState / 4294967296;
+    };
+    for (let i = 0; i < 220; i++) {
+      const x = texRand() * 512;
+      const y = texRand() * 512;
+      const r = 8 + texRand() * 70;
+      const light = texRand() > 0.5;
+      texCtx.fillStyle = light
+        ? `rgba(255,255,245,${0.035 + texRand() * 0.05})`
+        : `rgba(55,65,40,${0.025 + texRand() * 0.045})`;
+      texCtx.beginPath();
+      texCtx.arc(x, y, r, 0, Math.PI * 2);
+      texCtx.fill();
+    }
+    for (let i = 0; i < 7000; i++) {
+      const x = texRand() * 512;
+      const y = texRand() * 512;
+      const dark = texRand() > 0.45;
+      texCtx.fillStyle = dark
+        ? `rgba(45,55,35,${0.05 + texRand() * 0.12})`
+        : `rgba(255,255,245,${0.05 + texRand() * 0.12})`;
+      texCtx.fillRect(x, y, 1 + texRand() * 2, 1 + texRand() * 2);
+    }
+    for (let i = 0; i < 70; i++) {
+      const x = texRand() * 512;
+      const y = texRand() * 512;
+      texCtx.strokeStyle = `rgba(75,80,55,${0.04 + texRand() * 0.08})`;
+      texCtx.lineWidth = 1 + texRand() * 2;
+      texCtx.beginPath();
+      texCtx.moveTo(x, y);
+      texCtx.lineTo(x + (texRand() - 0.5) * 180, y + (texRand() - 0.5) * 180);
+      texCtx.stroke();
+    }
+    const groundTex = new THREE.CanvasTexture(canvas);
+    groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping;
+    groundTex.repeat.set(64, 64);
+    groundTex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    groundTex.colorSpace = THREE.SRGBColorSpace;
+    groundMat.map = groundTex;
+    groundMat.needsUpdate = true;
+  }
+  {
     const pos = groundGeo.attributes.position;
     const colors = new Float32Array(pos.count * 3);
     const c = new THREE.Color();
     for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), z = pos.getZ(i);
       const y = pos.getY(i);
       if (y < WATER_LEVEL) c.setHex(0xc2b280);
       else if (y < WATER_LEVEL + 15) c.setHex(0xd2b48c);
       else if (y < 70) c.setHex(0x6d9b58);
-      else if (y < 100) c.setHex(0x5a7a47);
-      else c.setHex(0x8a8a80);
+      else if (y < 110) c.setHex(0x557a43);
+      else if (y < 160) c.setHex(0x4a6b3c);
+      else if (y < 190) c.setHex(0x77776c);
+      else c.setHex(0xe8eef2);
+      // 轻微色相/明度变化，避免大片单色
+      const n = Math.sin(x * 0.013 + z * 0.009) * 0.5 + 0.5;
+      c.offsetHSL((n - 0.5) * 0.012, 0, (n - 0.5) * 0.055);
       colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
     }
     groundGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -529,16 +1142,127 @@ export function renderTrain3d(container) {
   /* ============================================================
      7. 车站
      ============================================================ */
-  const stations = [
-    { name: '森林站', t: 0.05 },
-    { name: '溪谷站', t: 0.17 },
-    { name: '高架站', t: 0.29 },
-    { name: '雪山站', t: 0.42 },
-    { name: '矿场站', t: 0.55 },
-    { name: '平原站', t: 0.68 },
-    { name: '海岸站', t: 0.81 },
-    { name: '终点站', t: 0.93 }
+  const STATION_NAMES = [
+    '森林站', '溪谷站', '湖畔站', '高架站', '雪山站', '矿场站',
+    '花田站', '平原站', '古镇站', '海岸站', '云岭站',
+    '晨雾站', '松林站', '石桥站', '风车镇', '月台站', '远山站'
   ];
+  {
+    for (let i = STATION_NAMES.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [STATION_NAMES[i], STATION_NAMES[j]] = [STATION_NAMES[j], STATION_NAMES[i]];
+    }
+  }
+  const randomStationCount = 8 + Math.floor(rand() * 5);
+  const stationCount = settings.stationCount || randomStationCount;
+
+  const STATION_PLATFORM_CHECK = 6.25;
+  const STATION_TUNNEL_MARGIN = 90 / trackLength;
+  function terrainSpreadAt(cx, cz, tan, side, radius) {
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const [along, across] of [[0, 0], [radius, 0], [-radius, 0], [0, radius], [0, -radius]]) {
+      const x = cx + tan.x * along + side.x * across;
+      const z = cz + tan.z * along + side.z * across;
+      const y = getTerrainHeight(x, z);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+    }
+    return maxY - minY;
+  }
+
+  function stationSiteScore(t) {
+    const p = trackCurve.getPointAt(t);
+    const tan = trackCurve.getTangentAt(t).normalize();
+    const side = new THREE.Vector3().crossVectors(WORLD_UP, tan).normalize();
+    // 站台和雨棚不能压在隧道口/隧道段上
+    for (const range of tunnelRanges) {
+      if (t + STATION_TUNNEL_MARGIN > range.startT && t - STATION_TUNNEL_MARGIN < range.endT) {
+        return -1e9;
+      }
+    }
+    const naturalTrack = getTerrainHeight(p.x, p.z);
+    const clearance = p.y - naturalTrack;
+    if (naturalTrack < WATER_LEVEL + 1.5) return -1e9;
+    if (clearance > 5) return -1e9; // 不把站台放在高架桥上
+    if (clearance < -2) return -1e9; // 也不放在路堑/隧道里
+
+    const platformX = p.x + side.x * STATION_PLATFORM_CHECK;
+    const platformZ = p.z + side.z * STATION_PLATFORM_CHECK;
+    const platformNatural = getTerrainHeight(platformX, platformZ);
+    if (platformNatural < WATER_LEVEL + 1.5) return -1e9;
+    const platformSpread = terrainSpreadAt(platformX, platformZ, tan, side, 8);
+
+    let townSpread = 0;
+    for (const townDist of [100, 160]) {
+      const tx = p.x - side.x * townDist;
+      const tz = p.z - side.z * townDist;
+      const townNatural = getTerrainHeight(tx, tz);
+      if (townNatural < WATER_LEVEL + 1.5) return -1e9;
+      townSpread = Math.max(townSpread, terrainSpreadAt(tx, tz, tan, side, 14));
+    }
+
+    const pAhead = trackCurve.getPointAt((t + 0.002) % 1);
+    const pBehind = trackCurve.getPointAt((t - 0.002 + 1) % 1);
+    const grade = Math.abs(pAhead.y - pBehind.y);
+    const tanA = trackCurve.getTangentAt((t + 0.004) % 1);
+    const tanB = trackCurve.getTangentAt((t - 0.004 + 1) % 1);
+    const curve = 1 - Math.max(-1, Math.min(1, tanA.dot(tanB)));
+    const cut = Math.max(0, -clearance);
+    const platformDrop = Math.max(0, p.y - platformNatural);
+
+    return -clearance * clearance * 40
+      - platformDrop * 3
+      - platformSpread * 4
+      - townSpread * 1.5
+      - grade * 25
+      - curve * 1200
+      - cut * 50;
+  }
+
+  const stations = [];
+  const minStationGap = 0.55 / stationCount;
+  let prevStationT = -1;
+  for (let i = 0; i < stationCount; i++) {
+    const desired = (i + 0.5 + (rand() - 0.5) * 0.16) / stationCount;
+    const window = 0.7 / stationCount;
+    const minSearchT = i === 0 ? 0.35 / stationCount : 0.008;
+    const maxSearchT = i === stationCount - 1 ? 1 - 0.35 / stationCount : 0.992;
+    let bestT = null;
+    let bestScore = -Infinity;
+    const steps = 72;
+    for (let s = 0; s <= steps; s++) {
+      const t = desired - window + (s / steps) * window * 2;
+      if (t < minSearchT || t > maxSearchT) continue;
+      if (i > 0 && t - prevStationT < minStationGap) continue;
+      const score = stationSiteScore(t);
+      if (score < -1e8) continue;
+      if (score > bestScore) {
+        bestScore = score;
+        bestT = t;
+      }
+    }
+    if (bestT === null) {
+      // 窗口内全是桥/水/陡坡时，退到整圈搜索可用站点（降采样，避免生成卡顿）
+      for (let t = minSearchT; t <= maxSearchT; t += 0.004) {
+        if (i > 0 && t - prevStationT < minStationGap) continue;
+        const score = stationSiteScore(t);
+        if (score < -1e8) continue;
+        if (score > bestScore) {
+          bestScore = score;
+          bestT = t;
+        }
+      }
+    }
+    if (bestT === null) {
+      bestT = Math.min(0.985, Math.max(desired, prevStationT + minStationGap));
+    }
+    stations.push({
+      name: i === stationCount - 1 ? '终点站' : STATION_NAMES[i],
+      t: bestT
+    });
+    prevStationT = bestT;
+  }
 
   function getBasis(tan) {
     const side = new THREE.Vector3().crossVectors(WORLD_UP, tan).normalize();
@@ -546,11 +1270,23 @@ export function renderTrain3d(container) {
     return { side, up };
   }
 
+  /* 每个车站旁预留一片城镇用地（比站台更靠线路外侧，避免和站房重叠） */
+  const townCenters = stations.map((station) => {
+    const p = trackCurve.getPointAt(station.t);
+    const tan = trackCurve.getTangentAt(station.t).normalize();
+    const { side } = getBasis(tan);
+    const dist = 100 + rand() * 60;
+    const x = p.x - side.x * dist;
+    const z = p.z - side.z * dist;
+    return { x, z, y: getGroundY(x, z), dist };
+  });
+
   /* ============================================================
      8. 森林
      ============================================================ */
+  const detailGroups = [];
   (function generateForest() {
-    const TREE_COUNT = lowPower ? 1600 : 4000;
+    const TREE_COUNT = 7600;
     const trunkGeo = new THREE.CylinderGeometry(1, 1.5, 8, 5);
     trunkGeo.translate(0, 4, 0);
     const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a3d28 });
@@ -559,33 +1295,180 @@ export function renderTrain3d(container) {
 
     const crownGeo = new THREE.ConeGeometry(5, 18, 7);
     crownGeo.translate(0, 15, 0);
-    const crownMat = new THREE.MeshStandardMaterial({ color: 0x2f6b3a, flatShading: true });
+    const crownMat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true });
     const crowns = new THREE.InstancedMesh(crownGeo, crownMat, TREE_COUNT);
     crowns.castShadow = true;
     crowns.receiveShadow = true;
 
+    const palette = [0x2f6b3a, 0x3d7a45, 0x4b8a4e, 0x2a5f38, 0x6b8f3e, 0x356b33];
+    const color = new THREE.Color();
     const dummy = new THREE.Object3D();
     let placed = 0;
-    for (let i = 0; i < TREE_COUNT * 4 && placed < TREE_COUNT; i++) {
-      const x = (Math.random() - 0.5) * 9000;
-      const z = (Math.random() - 0.5) * 9000;
+    for (let i = 0; i < TREE_COUNT * 6 && placed < TREE_COUNT; i++) {
+      const x = (rand() - 0.5) * 10500;
+      const z = (rand() - 0.5) * 10500;
       const natural = getTerrainHeight(x, z);
       const y = getGroundY(x, z, natural);
-      if (y < WATER_LEVEL + 2 || y > 180) continue;
+      if (y < WATER_LEVEL + 2 || y > 185) continue;
       if (queryLookup(trackLookup, x, z, 50)) continue;
+      if (riverDistance(x, z) < 110) continue;
+      if (townCenters.some(tc => (x - tc.x) ** 2 + (z - tc.z) ** 2 < 85 * 85)) continue;
 
-      const scale = 0.6 + Math.random() * 1.5;
+      const scale = 0.55 + rand() * 1.55;
       dummy.position.set(x, y, z);
-      dummy.rotation.y = Math.random() * Math.PI * 2;
+      dummy.rotation.y = rand() * Math.PI * 2;
       dummy.scale.set(scale, scale, scale);
       dummy.updateMatrix();
       trunks.setMatrixAt(placed, dummy.matrix);
       crowns.setMatrixAt(placed, dummy.matrix);
+      crowns.setColorAt(placed, color.setHex(palette[placed % palette.length]));
       placed++;
     }
     trunks.count = placed; crowns.count = placed;
+    if (crowns.instanceColor) crowns.instanceColor.needsUpdate = true;
+    detailGroups.push({ key: 'vegetation', max: placed, meshes: [trunks, crowns] });
     scene.add(trunks, crowns);
   })();
+
+  /* 灌木 / 岩石：让线路两侧不至于只有草皮 */
+  (function generateUndergrowth() {
+    const BUSH_COUNT = 1800;
+    const bushGeo = new THREE.DodecahedronGeometry(1, 0);
+    bushGeo.translate(0, 0.5, 0);
+    const bushMat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 1 });
+    const bushes = new THREE.InstancedMesh(bushGeo, bushMat, BUSH_COUNT);
+    bushes.receiveShadow = true;
+    const bushPalette = [0x4f7a3e, 0x5e8a45, 0x3f6b3a, 0x6f8f4c];
+    const dummy = new THREE.Object3D();
+    const color = new THREE.Color();
+    let bushPlaced = 0;
+    for (let i = 0; i < BUSH_COUNT * 5 && bushPlaced < BUSH_COUNT; i++) {
+      const x = (rand() - 0.5) * 10500;
+      const z = (rand() - 0.5) * 10500;
+      const y = getGroundY(x, z);
+      if (y < WATER_LEVEL + 2 || y > 170) continue;
+      if (queryLookup(trackLookup, x, z, 30)) continue;
+      if (riverDistance(x, z) < 55) continue;
+      if (townCenters.some(tc => (x - tc.x) ** 2 + (z - tc.z) ** 2 < 55 * 55)) continue;
+      const scale = 0.6 + rand() * 1.6;
+      dummy.position.set(x, y, z);
+      dummy.rotation.y = rand() * Math.PI * 2;
+      dummy.scale.set(scale * 1.4, scale * 0.75, scale * 1.4);
+      dummy.updateMatrix();
+      bushes.setMatrixAt(bushPlaced, dummy.matrix);
+      bushes.setColorAt(bushPlaced, color.setHex(bushPalette[bushPlaced % bushPalette.length]));
+      bushPlaced++;
+    }
+    bushes.count = bushPlaced;
+    if (bushes.instanceColor) bushes.instanceColor.needsUpdate = true;
+    detailGroups.push({ key: 'bushes', max: bushPlaced, meshes: [bushes] });
+    scene.add(bushes);
+
+    const ROCK_COUNT = 620;
+    const rockGeo = new THREE.DodecahedronGeometry(1, 0);
+    rockGeo.translate(0, 0.5, 0);
+    const rockMat = new THREE.MeshStandardMaterial({ color: 0x8a8a80, flatShading: true, roughness: 1 });
+    const rocks = new THREE.InstancedMesh(rockGeo, rockMat, ROCK_COUNT);
+    rocks.castShadow = true;
+    rocks.receiveShadow = true;
+    let rockPlaced = 0;
+    for (let i = 0; i < ROCK_COUNT * 5 && rockPlaced < ROCK_COUNT; i++) {
+      const x = (rand() - 0.5) * 10500;
+      const z = (rand() - 0.5) * 10500;
+      const y = getGroundY(x, z);
+      if (y < WATER_LEVEL + 2 || y > 190) continue;
+      if (queryLookup(trackLookup, x, z, 40)) continue;
+      if (townCenters.some(tc => (x - tc.x) ** 2 + (z - tc.z) ** 2 < 45 * 45)) continue;
+      const scale = 0.7 + rand() * 2.8;
+      dummy.position.set(x, y, z);
+      dummy.rotation.y = rand() * Math.PI * 2;
+      dummy.scale.set(scale * 1.3, scale * 0.8, scale);
+      dummy.updateMatrix();
+      rocks.setMatrixAt(rockPlaced, dummy.matrix);
+      rockPlaced++;
+    }
+    rocks.count = rockPlaced;
+    detailGroups.push({ key: 'rocks', max: rockPlaced, meshes: [rocks] });
+    scene.add(rocks);
+  })();
+
+  /* 远景雪山：更宽、更矮、带不规则山脊和绿色山脚，避免一排黑色尖锥 */
+  (function createMountains() {
+    const randomMountainCount = 10 + Math.floor(rand() * 7);
+    const MOUNTAIN_COUNT = settings.mountainCount === -1
+      ? 0
+      : (settings.mountainCount || randomMountainCount);
+    if (MOUNTAIN_COUNT === 0) return;
+    const mountainGeo = new THREE.ConeGeometry(1, 1, 11, 6);
+    mountainGeo.translate(0, 0.5, 0);
+    {
+      const pos = mountainGeo.attributes.position;
+      let ridgeState = hashSeed('ridge:' + WORLD_SEED);
+      const ridgeRand = () => {
+        ridgeState = (Math.imul(ridgeState, 1664525) + 1013904223) >>> 0;
+        return ridgeState / 4294967296;
+      };
+      const phaseA = ridgeRand() * Math.PI * 2;
+      const phaseB = ridgeRand() * Math.PI * 2;
+      const color = new THREE.Color();
+      const rockLow = new THREE.Color(0x59614f);
+      const rockMid = new THREE.Color(0x6d685d);
+      const rockHigh = new THREE.Color(0x5c5a54);
+      const green = new THREE.Color(0x4c6a45);
+      const snow = new THREE.Color(0xe8eef2);
+      const colors = new Float32Array(pos.count * 3);
+      for (let i = 0; i < pos.count; i++) {
+        let x = pos.getX(i);
+        let z = pos.getZ(i);
+        const y = pos.getY(i);
+        const angle = Math.atan2(z, x);
+        if (y < 0.995) {
+          const spread = 1 - y;
+          const ridge = 1
+            + (Math.sin(angle * 3 + phaseA) * 0.16 + Math.sin(angle * 7 + phaseB) * 0.08) * spread
+            + Math.sin(angle * 11 + phaseA * 1.7) * 0.04 * spread;
+          x *= ridge;
+          z *= ridge;
+          pos.setX(i, x);
+          pos.setZ(i, z);
+        }
+        const snowT = THREE.MathUtils.smoothstep(y, 0.58, 0.74);
+        color.copy(rockLow).lerp(rockMid, THREE.MathUtils.smoothstep(y, 0.05, 0.5));
+        color.lerp(rockHigh, THREE.MathUtils.smoothstep(y, 0.4, 0.82) * 0.35);
+        color.lerp(green, (1 - THREE.MathUtils.smoothstep(y, 0.02, 0.2)) * 0.55);
+        color.lerp(snow, snowT);
+        color.offsetHSL(0, 0, Math.sin(angle * 5 + phaseB) * 0.025);
+        colors[i * 3] = color.r;
+        colors[i * 3 + 1] = color.g;
+        colors[i * 3 + 2] = color.b;
+      }
+      mountainGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    }
+    mountainGeo.computeVertexNormals();
+    const mountainMat = new THREE.MeshStandardMaterial({
+      vertexColors: true, roughness: 1, metalness: 0,
+      emissive: 0x11110d, emissiveIntensity: 0.25
+    });
+    const mountains = new THREE.InstancedMesh(mountainGeo, mountainMat, MOUNTAIN_COUNT);
+    mountains.receiveShadow = true;
+    const dummy = new THREE.Object3D();
+    for (let i = 0; i < MOUNTAIN_COUNT; i++) {
+      const angle = (i / MOUNTAIN_COUNT) * Math.PI * 2 + (rand() - 0.5) * 0.35;
+      const radius = 4800 + rand() * 900;
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+      const baseY = getGroundY(x, z) - 12;
+      const R = 360 + rand() * 420;
+      const H = (220 + rand() * 300) * settings.mountainHeight;
+      dummy.position.set(x, baseY, z);
+      dummy.rotation.set(0, rand() * Math.PI * 2, 0);
+      dummy.scale.set(R, H, R);
+      dummy.updateMatrix();
+      mountains.setMatrixAt(i, dummy.matrix);
+    }
+    scene.add(mountains);
+  })();
+
 
   /* ============================================================
      9. 轨道 / 轨枕 / 桥墩
@@ -594,7 +1477,7 @@ export function renderTrain3d(container) {
   scene.add(trackGroup);
 
   (function buildTrack() {
-    const N = 1200;
+    const N = 1600;
     const offsetDist = 0.75;
     const railW = 0.15;
     const railH = 0.25;
@@ -699,6 +1582,194 @@ export function renderTrain3d(container) {
         pillars.setMatrixAt(i, dummy.matrix);
       }
       trackGroup.add(pillars);
+    }
+  })();
+
+  /* ============================================================
+     9.5 隧道 / 明洞
+     ============================================================ */
+  const TUNNEL_HEIGHT = 4.2;
+  const TUNNEL_HALF = 2.8;
+  (function buildTunnels() {
+    if (!tunnelRanges.length) return;
+    const tunnelMat = new THREE.MeshStandardMaterial({
+      color: 0x6e6a60, emissive: 0x2a2820, emissiveIntensity: 0.8,
+      roughness: 1, metalness: 0, side: THREE.DoubleSide
+    });
+    const floorMat = new THREE.MeshStandardMaterial({
+      color: 0x3a3b37, roughness: 1, metalness: 0, side: THREE.DoubleSide
+    });
+    const bandMat = new THREE.MeshStandardMaterial({
+      color: 0xc5c1b0, roughness: 0.9, metalness: 0, side: THREE.DoubleSide
+    });
+    const portalMat = new THREE.MeshStandardMaterial({
+      color: 0x99998f, roughness: 0.9, metalness: 0.05
+    });
+    const lightMat = new THREE.MeshBasicMaterial({
+      color: 0xffd58a, toneMapped: false, side: THREE.DoubleSide
+    });
+
+    const frameAt = (t) => {
+      const p = trackCurve.getPointAt(t);
+      const tan = trackCurve.getTangentAt(t).normalize();
+      const side = new THREE.Vector3().crossVectors(WORLD_UP, tan).normalize();
+      const up = new THREE.Vector3().crossVectors(tan, side).normalize();
+      return { p, tan, side, up };
+    };
+
+    for (const range of tunnelRanges) {
+      const runLength = (range.endT - range.startT) * trackLength;
+      const segments = Math.max(2, Math.ceil(runLength / 4));
+      const positions = [];
+      const indices = [];
+      const floorPositions = [];
+      const floorIndices = [];
+      const bandPositions = [];
+      const bandIndices = [];
+
+      for (let s = 0; s <= segments; s++) {
+        const t = range.startT + (range.endT - range.startT) * (s / segments);
+        const { p, side, up } = frameAt(t);
+        for (const [x, y] of [
+          [-TUNNEL_HALF, -0.25], [-TUNNEL_HALF, TUNNEL_HEIGHT],
+          [TUNNEL_HALF, TUNNEL_HEIGHT], [TUNNEL_HALF, -0.25]
+        ]) {
+          positions.push(
+            p.x + side.x * x + up.x * y,
+            p.y + side.y * x + up.y * y,
+            p.z + side.z * x + up.z * y
+          );
+        }
+        for (const x of [-TUNNEL_HALF, TUNNEL_HALF]) {
+          floorPositions.push(
+            p.x + side.x * x - up.x * 0.18,
+            p.y + side.y * x - up.y * 0.18,
+            p.z + side.z * x - up.z * 0.18
+          );
+        }
+        // 两侧墙脚浅色导向带（向洞内偏移一点，避免与墙面 z-fighting）
+        for (const x of [-TUNNEL_HALF, TUNNEL_HALF]) {
+          const bx = x > 0 ? x - 0.04 : x + 0.04;
+          for (const y of [0.55, 1.35]) {
+            bandPositions.push(
+              p.x + side.x * bx + up.x * y,
+              p.y + side.y * bx + up.y * y,
+              p.z + side.z * bx + up.z * y
+            );
+          }
+        }
+      }
+
+      for (let s = 0; s < segments; s++) {
+        const a = s * 4;
+        const b = a + 4;
+        // 左壁 / 顶板 / 右壁
+        indices.push(a, a + 1, b, a + 1, b + 1, b);
+        indices.push(a + 1, a + 2, b + 1, a + 2, b + 2, b + 1);
+        indices.push(a + 2, a + 3, b + 2, a + 3, b + 3, b + 2);
+
+        const fa = s * 2;
+        const fb = fa + 2;
+        floorIndices.push(fa, fb, fa + 1, fb, fb + 1, fa + 1);
+
+        const ba = s * 4;
+        const bb = ba + 4;
+        bandIndices.push(ba, ba + 1, bb, ba + 1, bb + 1, bb);
+        bandIndices.push(ba + 2, ba + 3, bb + 2, ba + 3, bb + 3, bb + 2);
+      }
+
+      const tunnelGeo = new THREE.BufferGeometry();
+      tunnelGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      tunnelGeo.setIndex(indices);
+      tunnelGeo.computeVertexNormals();
+      scene.add(new THREE.Mesh(tunnelGeo, tunnelMat));
+
+      const floorGeo = new THREE.BufferGeometry();
+      floorGeo.setAttribute('position', new THREE.Float32BufferAttribute(floorPositions, 3));
+      floorGeo.setIndex(floorIndices);
+      floorGeo.computeVertexNormals();
+      scene.add(new THREE.Mesh(floorGeo, floorMat));
+
+      const bandGeo = new THREE.BufferGeometry();
+      bandGeo.setAttribute('position', new THREE.Float32BufferAttribute(bandPositions, 3));
+      bandGeo.setIndex(bandIndices);
+      bandGeo.computeVertexNormals();
+      scene.add(new THREE.Mesh(bandGeo, bandMat));
+
+      // 顶灯做成一段段小灯，而不是一条连续灯带；连续灯带在驾驶室视角会变成巨大三角形
+      const lightPositions = [];
+      const lightIndices = [];
+      const lightCount = Math.max(1, Math.floor(runLength / 14));
+      for (let k = 0; k < lightCount; k++) {
+        const d0 = 3 + (k + 0.5) * Math.max(1, runLength - 6) / lightCount;
+        const d1 = d0 + 1.4;
+        const t0 = range.startT + (d0 / runLength) * (range.endT - range.startT);
+        const t1 = range.startT + (d1 / runLength) * (range.endT - range.startT);
+        const f0 = frameAt(t0);
+        const f1 = frameAt(t1);
+        const base = lightPositions.length / 3;
+        const lightY = TUNNEL_HEIGHT - 0.07;
+        for (const f of [f0, f1]) {
+          for (const x of [-0.28, 0.28]) {
+            lightPositions.push(
+              f.p.x + f.side.x * x + f.up.x * lightY,
+              f.p.y + f.side.y * x + f.up.y * lightY,
+              f.p.z + f.side.z * x + f.up.z * lightY
+            );
+          }
+        }
+        lightIndices.push(base, base + 1, base + 2, base + 1, base + 3, base + 2);
+      }
+      if (lightPositions.length) {
+        const lightGeo = new THREE.BufferGeometry();
+        lightGeo.setAttribute('position', new THREE.Float32BufferAttribute(lightPositions, 3));
+        lightGeo.setIndex(lightIndices);
+        lightGeo.computeVertexNormals();
+        scene.add(new THREE.Mesh(lightGeo, lightMat));
+      }
+
+      const addPortal = (t) => {
+        const { p, tan, side, up } = frameAt(t);
+        const group = new THREE.Group();
+        group.position.copy(p);
+        group.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(side, up, tan));
+
+        const sideW = 1.4;
+        const sideD = 2.6;
+        const headH = 2.8;
+        const foundation = 1.8;
+        const pillarGeo = new THREE.BoxGeometry(sideW, TUNNEL_HEIGHT + foundation, sideD);
+        for (const sx of [-1, 1]) {
+          const pillar = new THREE.Mesh(pillarGeo, portalMat);
+          pillar.position.set(
+            sx * (TUNNEL_HALF + sideW / 2),
+            (TUNNEL_HEIGHT - foundation) / 2,
+            0
+          );
+          pillar.castShadow = true;
+          group.add(pillar);
+
+          const wing = new THREE.Mesh(
+            new THREE.BoxGeometry(3.6, 3.6, 1.1),
+            portalMat
+          );
+          wing.position.set(sx * (TUNNEL_HALF + sideW + 1.7), 0.2, 0.9);
+          wing.rotation.y = sx * 0.35;
+          wing.castShadow = true;
+          group.add(wing);
+        }
+        const lintel = new THREE.Mesh(
+          new THREE.BoxGeometry(TUNNEL_HALF * 2 + sideW * 2, headH, sideD),
+          portalMat
+        );
+        lintel.position.set(0, TUNNEL_HEIGHT + headH / 2, 0);
+        lintel.castShadow = true;
+        group.add(lintel);
+        scene.add(group);
+      };
+
+      addPortal(range.startT);
+      addPortal(range.endT);
     }
   })();
 
@@ -813,6 +1884,116 @@ export function renderTrain3d(container) {
     scene.add(group);
   }
   stations.forEach(buildStation);
+
+  /* ============================================================
+      10.5 车站旁的城镇（实例化，低 draw call）
+     ============================================================ */
+  (function buildTowns() {
+    const PER_TOWN = settings.buildingsPerTown;
+    const total = townCenters.length * PER_TOWN;
+    const bodyGeo = new THREE.BoxGeometry(1, 1, 1);
+    bodyGeo.translate(0, 0.5, 0);
+    const roofGeo = new THREE.ConeGeometry(1, 1, 4);
+    roofGeo.translate(0, 0.5, 0);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, flatShading: true });
+    const bodies = new THREE.InstancedMesh(bodyGeo, bodyMat, total);
+    const roofs = new THREE.InstancedMesh(roofGeo, roofMat, total);
+    bodies.castShadow = true;
+    bodies.receiveShadow = true;
+    roofs.castShadow = true;
+    roofs.receiveShadow = true;
+
+    const bodyPalette = [0xe5dccb, 0xd8c6a5, 0xc7a47d, 0xc2c9c9, 0xb9c4ad, 0xd9b8a0, 0xe8e1d5];
+    const roofPalette = [0x8b3a2e, 0x6d4c41, 0x455a64, 0x7a4b3a, 0x5d4037];
+    const dummy = new THREE.Object3D();
+    const color = new THREE.Color();
+    let placed = 0;
+
+    for (let n = 0; n < PER_TOWN; n++) {
+      for (let ti = 0; ti < townCenters.length; ti++) {
+        const center = townCenters[ti];
+        const angle = rand() * Math.PI * 2;
+        const radius = 12 + rand() * 68;
+        const x = center.x + Math.cos(angle) * radius;
+        const z = center.z + Math.sin(angle) * radius;
+        const y = getGroundY(x, z);
+        if (y < WATER_LEVEL + 2) continue;
+        if (queryLookup(trackLookup, x, z, 32)) continue;
+        if (riverDistance(x, z) < 50) continue;
+
+        const tall = rand() < 0.12;
+        const w = 7 + rand() * 7;
+        const d = 7 + rand() * 7;
+        const h = tall ? 22 + rand() * 12 : 6 + rand() * 11;
+        const rot = rand() * Math.PI * 2;
+
+        dummy.position.set(x, y, z);
+        dummy.rotation.set(0, rot, 0);
+        dummy.scale.set(w, h, d);
+        dummy.updateMatrix();
+        bodies.setMatrixAt(placed, dummy.matrix);
+        bodies.setColorAt(placed, color.setHex(bodyPalette[(placed + ti) % bodyPalette.length]));
+
+        const roofH = tall ? 2.5 + rand() * 2 : 2.5 + rand() * 3.5;
+        dummy.position.set(x, y + h, z);
+        dummy.rotation.set(0, rot + Math.PI / 4, 0);
+        dummy.scale.set(w * 0.76, roofH, d * 0.76);
+        dummy.updateMatrix();
+        roofs.setMatrixAt(placed, dummy.matrix);
+        roofs.setColorAt(placed, color.setHex(roofPalette[(placed + ti) % roofPalette.length]));
+        placed++;
+      }
+    }
+    bodies.count = placed;
+    roofs.count = placed;
+    if (bodies.instanceColor) bodies.instanceColor.needsUpdate = true;
+    if (roofs.instanceColor) roofs.instanceColor.needsUpdate = true;
+    detailGroups.push({ key: 'towns', max: placed, meshes: [bodies, roofs] });
+    scene.add(bodies, roofs);
+  })();
+
+  /* 城镇地标：每镇一座高塔，远处也能看出城镇位置 */
+  (function buildTownLandmarks() {
+    const count = townCenters.length;
+    const bodyGeo = new THREE.CylinderGeometry(1, 1.15, 1, 8);
+    bodyGeo.translate(0, 0.5, 0);
+    const roofGeo = new THREE.ConeGeometry(1.3, 1, 8);
+    roofGeo.translate(0, 0.5, 0);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xe4dccb, roughness: 0.8 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x7a4b3a, roughness: 0.9, flatShading: true });
+    const bodies = new THREE.InstancedMesh(bodyGeo, bodyMat, count);
+    const roofs = new THREE.InstancedMesh(roofGeo, roofMat, count);
+    bodies.castShadow = true;
+    bodies.receiveShadow = true;
+    roofs.castShadow = true;
+    roofs.receiveShadow = true;
+    const dummy = new THREE.Object3D();
+    let placed = 0;
+    for (let i = 0; i < count; i++) {
+      const center = townCenters[i];
+      const y = getGroundY(center.x, center.z);
+      if (y < WATER_LEVEL + 2) continue;
+      const h = 34 + rand() * 14;
+      const w = 3.4 + rand() * 1.4;
+      const ox = (rand() - 0.5) * 14;
+      const oz = (rand() - 0.5) * 14;
+      dummy.position.set(center.x + ox, y, center.z + oz);
+      dummy.rotation.set(0, rand() * Math.PI * 2, 0);
+      dummy.scale.set(w, h, w);
+      dummy.updateMatrix();
+      bodies.setMatrixAt(placed, dummy.matrix);
+
+      dummy.position.set(center.x + ox, y + h, center.z + oz);
+      dummy.scale.set(w * 1.25, 5 + rand() * 2, w * 1.25);
+      dummy.updateMatrix();
+      roofs.setMatrixAt(placed, dummy.matrix);
+      placed++;
+    }
+    bodies.count = placed;
+    roofs.count = placed;
+    scene.add(bodies, roofs);
+  })();
 
   /* ============================================================
      11. 列车
@@ -1003,7 +2184,7 @@ export function renderTrain3d(container) {
         addBox(bodyGroup, 0.05, 2.0, 0.95, s * 1.218, 1.52, z, MAT.bodyShade);
         addBox(bodyGroup, 0.015, 0.26, 0.95, s * 1.258, 1.1, z, MAT.stripe);
         addBox(bodyGroup, 0.025, 0.6, 0.6, s * 1.249, 2.1, z, MAT.window);
-        if (!lowPower) {
+        if (!lowDetail) {
           addBox(bodyGroup, 0.02, 1.96, 0.045, s * 1.246, 1.52, z, MAT.windowFrame);
           addBox(bodyGroup, 0.03, 0.05, 0.62, s * 1.249, 0.58, z, MAT.stripeLight);
         }
@@ -1042,7 +2223,7 @@ export function renderTrain3d(container) {
     /* ---- 车顶设备 / 受电弓 ---- */
     addBox(bodyGroup, 1.15, 0.22, 1.5, 0, 3.03, centerZ - 1.4, MAT.roof, { cast: true });
     addBox(bodyGroup, 1.15, 0.22, 1.5, 0, 3.03, centerZ + 1.4, MAT.roof, { cast: true });
-    if (!lowPower) addBox(bodyGroup, 0.18, 0.06, length - 1.2, 0, 3.0, centerZ, MAT.dark);
+    if (!lowDetail) addBox(bodyGroup, 0.18, 0.06, length - 1.2, 0, 3.0, centerZ, MAT.dark);
     if (!isLead && (carIndex === 2 || carIndex === 4)) addPantograph(bodyGroup);
 
     /* ---- 贯通道（只在车厢之间） ---- */
@@ -1192,7 +2373,7 @@ export function renderTrain3d(container) {
       bodyGroup.add(headlightSpot.target);
 
       // 前挡风雨刷
-      if (!lowPower) {
+      if (!lowDetail) {
         addBox(bodyGroup, 0.025, 0.72, 0.025, 0.42, 1.86, frontZ + 0.13, MAT.dark, { rz: -0.55 });
       }
     }
@@ -1224,6 +2405,17 @@ export function renderTrain3d(container) {
   let autoInfo = null;              // 控制器最近一帧的输出（HUD/驾驶屏使用）
   let autoStoppedDeviation = 0;
   let lastAutoDwellSecond = -1;
+  let departureShake = 0;
+  let departureShakeTime = 0;
+
+  const audio = new TrainAudio();
+
+  /** 起步震动：车体轻弹 + 镜头轻微抖动，约 1 秒衰减 */
+  function triggerDepartureShake(strength = 1) {
+    departureShake = Math.max(departureShake, strength);
+    departureShakeTime = 0;
+    audio.launch();
+  }
 
   const autopilot = new TrainAutopilot({
     stops: stations.map((station) => station.t * trackLength + STOP_OFFSET),
@@ -1250,6 +2442,16 @@ export function renderTrain3d(container) {
   const autoLimitEl = $('#auto-limit');
   const autoNextEl = $('#auto-next');
   const touchAutoBtn = $('#touch-auto');
+  const audioModeEl = $('#audio-mode');
+  const qualityModeEl = $('#quality-mode');
+  const qualityPanelEl = $('#quality-panel');
+  const qualitySummaryEl = $('#quality-summary');
+  const qualityAutoEl = $('#quality-auto');
+  const worldSeedEl = $('#world-seed');
+  const worldSeedApplyEl = $('#world-seed-apply');
+  const worldSeedRandomEl = $('#world-seed-random');
+  const worldSeedApplyBottomEl = $('#world-seed-apply-bottom');
+  if (worldSeedEl) worldSeedEl.value = WORLD_SEED;
 
   /** 停站后“如何发车”提示：触屏与键盘文案不同 */
   const START_HINT = touchUi
@@ -1258,10 +2460,206 @@ export function renderTrain3d(container) {
 
   if (touchUi) statusEl.textContent = '准备发车：按住 ＋ 推牵引挡';
 
+  updateAudioUi();
+
   let lastStatusText = '';
   function setStatus(text) {
     if (text !== lastStatusText) { lastStatusText = text; statusEl.textContent = text; }
   }
+
+  function updateAudioUi() {
+    if (!audioModeEl) return;
+    if (!audio.available) {
+      audioModeEl.textContent = '🔇 无音效';
+      audioModeEl.classList.add('muted');
+      audioModeEl.disabled = true;
+      return;
+    }
+    if (!audio.ctx) {
+      audioModeEl.textContent = '🔈 开启音效';
+      audioModeEl.classList.remove('muted');
+      return;
+    }
+    audioModeEl.textContent = audio.muted ? '🔇 静音' : '🔊 音效开';
+    audioModeEl.classList.toggle('muted', audio.muted);
+  }
+
+  function toggleAudioMute() {
+    if (!audio.available) return;
+    if (!audio.ctx) {
+      audio.ensureStarted();
+      updateAudioUi();
+      return;
+    }
+    // 首次解锁音频的同一手势不立刻静音，避免“点开启音效反而没声”
+    if (performance.now() - audioStartedAt < 400) {
+      updateAudioUi();
+      return;
+    }
+    audio.setMuted(!audio.muted);
+    updateAudioUi();
+  }
+
+  /* ============================================================
+     12.5 画质设置（逐项可调）
+     ============================================================ */
+  function saveSettings() {
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    } catch (error) {
+      // 隐私模式下忽略持久化失败
+    }
+  }
+
+  function syncSettingsUi() {
+    if (qualityModeEl) qualityModeEl.textContent = '⚙ 设置';
+    if (qualitySummaryEl) {
+      const shadowText = settings.shadows ? `阴影 ${settings.shadows}` : '阴影关';
+      const fpsText = settings.fpsLimit ? `${settings.fpsLimit}fps` : '不限帧';
+      const actualScale = Math.min(devicePixelRatio || 1, settings.resolution);
+      qualitySummaryEl.textContent =
+        `实际 ${actualScale.toFixed(2)}x（上限 ${settings.resolution.toFixed(2)}x）· ${shadowText} · ` +
+        `雾 ${settings.drawDistance.toFixed(2)}x · 地形 ${settings.terrain}（下次） · ${fpsText} · ` +
+        `抗锯齿${settings.antialias ? '开' : '关'}（下次）`;
+    }
+    if (!qualityPanelEl) return;
+    const boolKeys = new Set(['antialias', 'softShadows', 'foliageShadows', 'water']);
+    qualityPanelEl.querySelectorAll('[data-setting]').forEach((el) => {
+      const key = el.dataset.setting;
+      if (boolKeys.has(key)) el.value = settings[key] ? '1' : '0';
+      else if (key === 'modelDetail') el.value = settings.modelDetail;
+      else el.value = String(settings[key]);
+    });
+    const factorKeys = new Set(['resolution', 'drawDistance', 'terrainRelief', 'lakeScale', 'riverScale', 'mountainHeight']);
+    qualityPanelEl.querySelectorAll('[data-value]').forEach((out) => {
+      const key = out.dataset.value;
+      if (factorKeys.has(key)) out.textContent = `${settings[key].toFixed(2)}x`;
+      else if (key === 'buildingsPerTown') out.textContent = String(settings.buildingsPerTown);
+      else out.textContent = `${Math.round(settings[key] * 100)}%`;
+    });
+  }
+
+  function applySettings() {
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, settings.resolution));
+
+    const shadows = settings.shadows > 0;
+    const shadowChanged = renderer.shadowMap.enabled !== shadows;
+    renderer.shadowMap.enabled = shadows;
+    sun.castShadow = shadows;
+
+    const shadowType = settings.softShadows ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+    const typeChanged = renderer.shadowMap.type !== shadowType;
+    renderer.shadowMap.type = shadowType;
+    if (typeChanged && sun.shadow.map) {
+      sun.shadow.map.dispose();
+      sun.shadow.map = null;
+    }
+
+    if (shadows && sun.shadow.mapSize.x !== settings.shadows) {
+      sun.shadow.mapSize.set(settings.shadows, settings.shadows);
+      if (sun.shadow.map) {
+        sun.shadow.map.dispose();
+        sun.shadow.map = null;
+      }
+    }
+    if (shadowChanged || typeChanged) {
+      const seen = new Set();
+      scene.traverse((object) => {
+        const material = object.material;
+        if (!material) return;
+        const list = Array.isArray(material) ? material : [material];
+        for (const mat of list) {
+          if (!seen.has(mat)) {
+            seen.add(mat);
+            mat.needsUpdate = true;
+          }
+        }
+      });
+    }
+    renderer.shadowMap.needsUpdate = true;
+
+    for (const group of detailGroups) {
+      const factor = settings[group.key] ?? 1;
+      const count = Math.max(0, Math.floor(group.max * factor));
+      for (const mesh of group.meshes) {
+        mesh.count = count;
+        mesh.castShadow = settings.foliageShadows;
+      }
+    }
+
+    if (waterMesh) waterMesh.visible = settings.water;
+    if (scene.fog) {
+      scene.fog.density = (isNight ? 0.0006 : 0.00018) / settings.drawDistance;
+    }
+  }
+
+  function handleSettingChange(event) {
+    const input = event.target.closest('[data-setting]');
+    if (!input) return;
+    const key = input.dataset.setting;
+    if (key === 'antialias' || key === 'softShadows' || key === 'foliageShadows' || key === 'water') {
+      settings[key] = input.value === '1';
+    } else if (key === 'modelDetail') {
+      settings.modelDetail = input.value;
+    } else {
+      settings[key] = Number(input.value);
+    }
+
+    settings = normalizeSettings(settings, autoSettings());
+    saveSettings();
+    applySettings();
+    syncSettingsUi();
+  }
+
+  function resetSettings() {
+    settings = autoSettings();
+    saveSettings();
+    applySettings();
+    syncSettingsUi();
+  }
+
+  on(qualityAutoEl, 'click', resetSettings);
+
+  function applyWorldSeed(value) {
+    const next = normalizeSeed(value);
+    try {
+      localStorage.setItem(SEED_KEY, next);
+    } catch (error) {
+      // 隐私模式下仍用传入的 seed 重建当前世界
+    }
+    renderTrain3d(container, { seed: next });
+  }
+
+  on(worldSeedApplyEl, 'click', () => applyWorldSeed(worldSeedEl.value));
+  on(worldSeedApplyBottomEl, 'click', () => applyWorldSeed(worldSeedEl.value));
+  on(worldSeedRandomEl, 'click', () => {
+    const next = randomSeed();
+    worldSeedEl.value = next;
+    applyWorldSeed(next);
+  });
+  on(worldSeedEl, 'keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    event.stopPropagation();
+    applyWorldSeed(worldSeedEl.value);
+  });
+
+  on(qualityModeEl, 'click', () => {
+    qualityPanelEl.hidden = !qualityPanelEl.hidden;
+  });
+  on(qualityPanelEl, 'input', handleSettingChange);
+  on(qualityPanelEl, 'change', handleSettingChange);
+  on(qualityPanelEl, 'click', (event) => {
+    if (event.target.closest('[data-action="auto"]')) resetSettings();
+  });
+  on(document, 'pointerdown', (event) => {
+    if (qualityPanelEl.hidden) return;
+    if (qualityPanelEl.contains(event.target) || qualityModeEl.contains(event.target)) return;
+    qualityPanelEl.hidden = true;
+  });
+
+  applySettings();
+  syncSettingsUi();
 
   /* ============================================================
      13. 挡位 UI / 连发
@@ -1298,6 +2696,9 @@ export function renderTrain3d(container) {
   };
 
   function stepNotch(dir) {
+    const wasStopped = isStopped;
+    const wasAtRest = speed < 0.5 && notch <= 0;
+
     if (dir > 0) {
       if (notch >= 8) return;
       if (notch < 0) notch = 0;
@@ -1312,7 +2713,14 @@ export function renderTrain3d(container) {
       isStopped = false;
       stopPromptEl.style.display = 'none';
       signalLights.forEach(s => s.material.color.setHex(0xff0000));
+      audio.depart();
     }
+
+    // 从静止推牵引挡（站内或线路起点）时给一次起步震动
+    if (notch > 0 && wasAtRest) {
+      triggerDepartureShake(wasStopped ? 1 : 0.85);
+    }
+
     updateNotchUI();
   }
 
@@ -1553,6 +2961,8 @@ export function renderTrain3d(container) {
       autoPanelEl.hidden = false;
       updateNotchUI(true);
 
+      if (!isStopped && speed < 0.5) triggerDepartureShake(0.9);
+
       if (isStopped && stations[autopilot.targetIdx]) {
         // 手动停站后直接切自动：用实际停车位置算偏差，倒计时结束后自动发车
         const stopArc = stations[autopilot.targetIdx].t * trackLength + STOP_OFFSET;
@@ -1601,6 +3011,7 @@ export function renderTrain3d(container) {
       }
       setStatus(`🚉 已抵达：${station.name}`);
       currentTargetName = station.name;
+      audio.arrive();
       drawScreen();
     }
 
@@ -1611,6 +3022,8 @@ export function renderTrain3d(container) {
       const station = stations[autoInfo.stopIndex];
       setStatus(`🤖 自动发车 · 下一站 ${station.name}`);
       currentTargetName = station.name;
+      audio.depart();
+      triggerDepartureShake(1);
       drawScreen();
     }
 
@@ -1651,6 +3064,7 @@ export function renderTrain3d(container) {
 
         setStatus(`🚉 已抵达：${stations[nearIdx].name}`);
         if (signalLights[nearIdx]) signalLights[nearIdx].material.color.setHex(0x00ff00);
+        audio.arrive();
         drawScreen();
       }
     }
@@ -1701,7 +3115,16 @@ export function renderTrain3d(container) {
       if (dt > 0) car.roll = THREE.MathUtils.damp(car.roll, targetRoll, TRAIN_TILT_SMOOTH, dt);
       else car.roll = targetRoll;
       const carBody = car.obj.userData.bodyGroup;
-      if (carBody) carBody.rotation.z = car.roll;
+      if (carBody) {
+        carBody.rotation.z = car.roll;
+        // 起步时车体轻微下沉/回弹，和镜头震动同步
+        const bounceAmp = departureShake > 0
+          ? departureShake * Math.exp(-departureShakeTime * 3.5)
+          : 0;
+        const bounce = Math.sin(departureShakeTime * 14 + i * 0.35) * 0.004 * bounceAmp;
+        carBody.position.y = bounce;
+        carBody.rotation.x = Math.sin(departureShakeTime * 14 + 0.5) * 0.0015 * bounceAmp;
+      }
     }
   }
 
@@ -1720,6 +3143,9 @@ export function renderTrain3d(container) {
   const _euler = new THREE.Euler(0, 0, 0, 'YXZ');
   const _quatFwd = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
   const _quatLook = new THREE.Quaternion();
+  const _shakeQuat = new THREE.Quaternion();
+  const _shakeRight = new THREE.Vector3();
+  const _shakeUp = new THREE.Vector3();
 
   /* 触摸手势：单指拖动环顾 / 双指捏合缩放（鼠标行为保持不变） */
   const activePointers = new Map();
@@ -1832,8 +3258,16 @@ export function renderTrain3d(container) {
 
   function updateCamera(dt, snap = false) {
     const head = cars[0].obj;
+    const headT = ((travel % trackLength) + trackLength) % trackLength / trackLength;
+    const inTunnel = tunnelRanges.some(
+      (range) => headT >= range.startT - 0.0005 && headT <= range.endT + 0.0005
+    );
+    if (headlightSpot) {
+      if (inTunnel) headlightSpot.intensity = Math.max(headlightSpot.intensity, 140);
+      else if (!isNight) headlightSpot.intensity = 0;
+    }
 
-    if (cameraMode === 'third') {
+    if (cameraMode === 'third' && !inTunnel) {
       _camTarget.copy(head.position);
       _camTarget.y += 2.5;
 
@@ -1878,6 +3312,25 @@ export function renderTrain3d(container) {
       camera.quaternion.copy(head.quaternion).multiply(_bankQuat).multiply(_quatFwd).multiply(_quatLook);
     }
 
+    // 起步震动：低频、轻微的车体下沉/回弹，不是高频抖动
+    if (departureShake > 0 && dt > 0) {
+      departureShakeTime += dt;
+      const amp = departureShake * Math.exp(-departureShakeTime * 3.5);
+      if (amp < 0.01 || departureShakeTime > 2.0) {
+        departureShake = 0;
+        departureShakeTime = 0;
+      } else {
+        const t = departureShakeTime;
+        const sx = Math.sin(t * 13 + 0.4) * 0.004 * amp;
+        const sy = Math.sin(t * 17) * 0.008 * amp;
+        _shakeRight.set(1, 0, 0).applyQuaternion(camera.quaternion);
+        _shakeUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
+        camera.position.addScaledVector(_shakeRight, sx).addScaledVector(_shakeUp, sy);
+        _shakeQuat.setFromAxisAngle(_zAxis, Math.sin(t * 12) * 0.0015 * amp);
+        camera.quaternion.multiply(_shakeQuat);
+      }
+    }
+
     sun.position.copy(head.position).add(_sunOffset);
     sun.target.position.copy(head.position);
   }
@@ -1901,6 +3354,13 @@ export function renderTrain3d(container) {
      20. 输入
      ============================================================ */
   on(window, 'keydown', (e) => {
+    // 焦点在输入框/下拉框时不要触发行车按键（种子输入、画质滑杆）
+    const tag = e.target && e.target.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
+      if (GAME_KEYS.has(e.code)) e.stopPropagation();
+      return;
+    }
+
     // 捕获阶段处理：拦下本游戏按键，避免触发全局导航快捷键（G/C 等）
     if (GAME_KEYS.has(e.code)) e.stopPropagation();
     if (e.code === 'KeyW' || e.code === 'ArrowUp' ||
@@ -1921,6 +3381,11 @@ export function renderTrain3d(container) {
 
     if (e.code === 'KeyG') {
       if (!e.repeat) toggleAuto();
+      return;
+    }
+
+    if (e.code === 'KeyM') {
+      if (!e.repeat) toggleAudioMute();
       return;
     }
 
@@ -1959,6 +3424,11 @@ export function renderTrain3d(container) {
   on(window, 'blur', () => {
     holdState.up.active = false;
     holdState.down.active = false;
+  });
+
+  on(document, 'visibilitychange', () => {
+    if (document.hidden) audio.suspend();
+    else audio.resume();
   });
 
   /* ============================================================
@@ -2036,13 +3506,28 @@ export function renderTrain3d(container) {
   const clock = new THREE.Clock();
   let screenTimer = 0;
   let lastKmh = -1;
+  let lastFrameAt = 0;
 
-  function tick() {
+  function tick(now) {
+    if (settings.fpsLimit > 0) {
+      const nowMs = typeof now === 'number' ? now : performance.now();
+      const minInterval = 1000 / settings.fpsLimit;
+      if (nowMs - lastFrameAt < minInterval - 1) return;
+      lastFrameAt = nowMs;
+    }
     const dt = Math.min(clock.getDelta(), 0.05);
 
     updateAutoDrive(dt);
     updatePhysics(dt);
     updateTrainPosition(dt);
+    audio.update(dt, {
+      speed,
+      throttle: autoMode ? autoThrottle : notch,
+      notch,
+      autoMode,
+      isStopped,
+      travel
+    });
     updateCamera(dt);
     updateHold();
 
@@ -2084,6 +3569,7 @@ export function renderTrain3d(container) {
     renderer.setAnimationLoop(null);
     resizeObserver.disconnect();
     teardown.forEach((off) => off());
+    audio.dispose();
 
     // 释放几何体 / 材质 / 纹理，避免反复进出页面时显存持续增长
     const released = new Set();

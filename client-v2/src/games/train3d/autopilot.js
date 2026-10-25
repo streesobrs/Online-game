@@ -15,7 +15,7 @@
 import { MAX_SPEED, clamp, throttleForAcceleration } from './physics.js';
 
 export const AUTOPILOT_DEFAULTS = Object.freeze({
-  cruiseSpeed: 150 / 3.6,   // 区间目标速度 ≈150 km/h（曲线区自动降速）
+  cruiseSpeed: 185 / 3.6,   // 区间目标速度 ≈185 km/h（曲线区自动降速）
   dwellTime: 5.0,           // 站停时间（秒）
   planDecel: 2.8,           // 规划减速度（常用制动，进站更果断）
   stopGap: 0.12,            // 停车曲线终点距停车点的小偏移

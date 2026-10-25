@@ -5,7 +5,7 @@
  * 浏览器里的 updatePhysics 与测试脚本共用同一套公式，避免"测试通过但游戏里不一样"。
  */
 
-export const MAX_SPEED = 45;          // m/s ≈ 162 km/h
+export const MAX_SPEED = 55.6;        // m/s ≈ 200 km/h
 export const MAX_TRACTION = 3.5;      // 满牵引加速度（低速）
 export const MAX_BRAKE = 3.6;         // 满制动减速度
 
@@ -18,9 +18,9 @@ export function resistanceAt(speed) {
   return 0.25 + 0.005 * speed + 0.0003 * speed * speed;
 }
 
-/** 牵引力随速度衰减系数 */
+/** 牵引力随速度衰减系数（高速仍保留足够牵引，才能跑到 200 km/h） */
 export function tractionFactor(speed) {
-  return Math.max(0.15, 1 - 0.55 * speed / MAX_SPEED);
+  return Math.max(0.15, 1 - 0.32 * speed / MAX_SPEED);
 }
 
 /**

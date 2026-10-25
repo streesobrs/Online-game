@@ -120,6 +120,10 @@ function logAdminRest(req, action, details = {}, target = {}) {
 
 // 静态文件服务 - 只暴露前端目录。
 // 注意：不要在这里挂载项目根目录，否则 data/（账号与密码哈希）、server/（源码）、.git 都能被直接下载。
+// 旧浏览器/直接访问 /favicon.ico 时统一跳到 SVG 图标，避免控制台 404。
+app.get('/favicon.ico', (req, res) => {
+  res.redirect(302, '/favicon.svg');
+});
 app.use(express.static(path.join(__dirname, '..', 'client')));
 
 // 静态资源服务 - 勋章图标等
