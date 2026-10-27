@@ -166,7 +166,7 @@ export const api = {
   },
 
   games: {
-    /** 对战历史 @param {string} accountId @param {number} [limit=20] */
+    /** 对战历史 @param {string} accountId @param {number|'all'} [limit=20] */
     history: (accountId, limit = 20) => api.get(`/api/games/history?accountId=${encodeURIComponent(accountId || '')}&limit=${limit}`),
     stats: () => api.get('/api/games/stats'),
   },

@@ -5,6 +5,7 @@
  */
 import { FEATURES } from '../data/navItems.js';
 import { handleNavClick, isActive, go } from '../core/router.js';
+import { registerScopeHandler } from '../core/shortcuts.js';
 import { store } from '../core/store.js';
 import { el } from '../utils/dom.js';
 import { api } from '../core/api.js';
@@ -211,6 +212,11 @@ export function renderNavDrawer(container) {
 
   scrim.addEventListener('click', () => setOpen(false));
 
+  // 全局快捷键（默认 Tab）：开关侧边栏，键位可在「设置 → 快捷键」修改
+  const offGlobalShortcut = registerScopeHandler('global', (op) => {
+    if (op && op.type === 'toggleDrawer') setOpen();
+  });
+
   handle.addEventListener('pointerdown', onPointerDown);
   handle.addEventListener('pointermove', onPointerMove);
   handle.addEventListener('pointerup', onPointerUp);
@@ -243,6 +249,7 @@ export function renderNavDrawer(container) {
     unsubscribeUser();
     unsubscribeView();
     unsubscribeBadge();
+    offGlobalShortcut();
     handle.removeEventListener('pointerdown', onPointerDown);
     handle.removeEventListener('pointermove', onPointerMove);
     handle.removeEventListener('pointerup', onPointerUp);

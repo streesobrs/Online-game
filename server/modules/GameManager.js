@@ -1289,22 +1289,21 @@ class GameManager {
   }
 
   // 保存贪吃蛇游戏记录
+  // 单人对局：记录结构只保留玩家与贪吃蛇成绩，不再套用双人对局的 player2 / winner / result
   async saveSnakeGameRecord(data) {
     try {
+      const user = data.accountId ? this.userManager.getUserByAccountId(data.accountId) : null;
       const record = {
         gameId: this.generateGameId('snake'),
         gameType: 'snake',
-        player1: data.accountId,
-        player2: 'computer', // 贪吃蛇是单人游戏
-        player1Nickname: '玩家',
-        player2Nickname: '电脑',
-        winner: data.score > 0 ? data.accountId : 'computer',
-        result: data.score > 0 ? 'win' : 'end',
-        moves: data.moveHistory,
+        player: {
+          id: data.accountId,
+          nickname: user?.nickname || '玩家'
+        },
         score: data.score,
         maxLength: data.maxLength || 0, // 蛇的最大长度
         foodEaten: data.foodEaten || 0, // 吃到的食物数量
-        gameMode: 'single', // 游戏模式：single
+        moves: Array.isArray(data.moveHistory) ? data.moveHistory : [],
         startTime: data.startTime,
         endTime: data.endTime,
         duration: data.endTime - data.startTime,
@@ -1316,7 +1315,6 @@ class GameManager {
 
       // 记录操作日志
       if (this.operationLogger && data.accountId) {
-        const user = this.userManager.getUserByAccountId(data.accountId);
         this.operationLogger.log({
           userId: data.accountId,
           username: user?.nickname || user?.username || '',
@@ -1326,13 +1324,9 @@ class GameManager {
           targetName: 'snake',
           details: {
             score: data.score,
-            result: record.result,
-            winner: record.winner,
             maxLength: record.maxLength,
             foodEaten: record.foodEaten,
-            duration: record.duration,
-            player1: record.player1,
-            player2: record.player2
+            duration: record.duration
           }
         });
       }
@@ -1342,7 +1336,8 @@ class GameManager {
   }
 
   // 保存消消乐成绩
-  // 单人游戏：只更新账号字段，不写入 games 集合（消消乐不进对战历史 / 回放）
+  // 单人游戏：账号字段更新汇总数据，同时向 games 集合写一条对局记录（用于对战历史，不含回放）。
+  // 记录结构按玩法区分：闯关只带 level/stars，肉鸽只带 floor/cleared/win，其余模式只带分数与连锁。
   // 逐关明细（星表）单独存 data/match3/<用户ID>.json，
   // 账号文件里只留不随关卡数增长的汇总标量（最高分 / 最高连锁 / 最高关 / 总星数…）
   // @returns {{success:boolean, progress?:object}} progress 为合并后的进度摘要，回给客户端
@@ -1425,6 +1420,41 @@ class GameManager {
 
       await this.accountManager.updateUser(accountId, updates);
       await this.accountManager.saveMatch3Stars(accountId, starsMap);
+
+      // 写入对战历史：消消乐是单人玩法，记录结构按模式区分，不再套用双人对局的 player2 / winner / result。
+      // 闯关只带 level/stars，肉鸽只带 floor/cleared/win，无尽/三色爽局只带分数与连锁；
+      // 不提供回放，客户端按 gameType 隐藏回放入口
+      try {
+        const endedAt = Date.now();
+        const durationMs = Math.max(0, Math.floor(data.durationMs || 0));
+        const record = {
+          gameId: this.generateGameId('match3'),
+          gameType: 'match3',
+          player: {
+            id: accountId,
+            nickname: account.account?.nickname || '玩家'
+          },
+          mode,
+          score,
+          maxCombo: combo,
+          moves: Math.max(0, Math.floor(data.moves || 0)),
+          startTime: endedAt - durationMs,
+          endTime: endedAt,
+          duration: durationMs,
+          savedAt: endedAt
+        };
+        if (isLevel) {
+          record.level = level;
+          record.stars = stars;
+        } else if (isRogue) {
+          record.floor = rogueFloor;
+          record.cleared = Math.max(0, Math.floor(data.cleared || 0));
+          record.win = data.win === true;
+        }
+        await dataStore.add('games', record);
+      } catch (err) {
+        logger.warn('保存消消乐对战记录失败', { accountId, error: err.message });
+      }
 
       // 肉鸽试炼：发精华（开发方案 5.7）
       // 只按到达层数换算，且在服务端算——客户端改本地存档也变不出精华来。
@@ -1956,23 +1986,87 @@ class GameManager {
     return games;
   }
 
-  // 获取游戏历史
-  async getGameHistory(accountId, limit = 10) {
+  // 判断账号是否参与该局（兼容旧记录的 player1/player2 与新记录的 player/players）
+  isGameParticipant(game, accountId) {
+    if (!accountId) return false;
+    if (game.player?.id === accountId) return true;
+    if (Array.isArray(game.players) && game.players.some(p => p?.id === accountId)) return true;
+    return game.player1 === accountId || game.player2 === accountId;
+  }
+
+  // 把游戏记录转成历史项：各玩法保留自己的字段结构，不互相填充无意义字段
+  toHistoryItem(game, accountId) {
+    const base = {
+      gameId: game.gameId,
+      gameType: game.gameType,
+      date: game.endTime,
+      duration: game.duration
+    };
+
+    if (game.gameType === 'match3') {
+      const mode = game.mode || game.gameMode || 'endless';
+      const item = {
+        ...base,
+        player: game.player || { id: game.player1, nickname: game.player1Nickname || '玩家' },
+        mode,
+        score: game.score || 0,
+        maxCombo: game.maxCombo || 0,
+        moves: game.moves || 0
+      };
+      if (mode === 'level') {
+        item.level = game.level ?? null;
+        item.stars = game.stars || 0;
+      } else if (mode === 'rogue') {
+        item.floor = game.floor ?? null;
+        item.cleared = game.cleared || 0;
+        item.win = game.win === true;
+      }
+      return item;
+    }
+
+    if (game.gameType === 'snake') {
+      return {
+        ...base,
+        player: game.player || { id: game.player1, nickname: game.player1Nickname || '玩家' },
+        score: game.score || 0,
+        maxLength: game.maxLength || 0,
+        foodEaten: game.foodEaten || 0,
+        moves: Array.isArray(game.moves) ? game.moves.length : (game.moves || 0)
+      };
+    }
+
+    // 棋类：双人对局，保留双方信息与胜负
+    const players = Array.isArray(game.players)
+      ? game.players
+      : [
+          { id: game.player1, nickname: game.player1Nickname },
+          { id: game.player2, nickname: game.player2Nickname }
+        ];
+    const opponent = players[0]?.id === accountId ? players[1] : players[0];
+    return {
+      ...base,
+      players,
+      opponent: opponent?.nickname || 'AI',
+      result: game.winner === accountId ? 'win' : (game.winner === null || game.winner === undefined ? 'draw' : 'loss'),
+      moves: Array.isArray(game.moves) ? game.moves.length : (game.moves || 0),
+      boardSize: game.boardSize,
+      gameMode: game.gameMode,
+      difficulty: game.difficulty,
+      winReason: game.winReason
+    };
+  }
+
+  // 获取游戏历史（limit 为 null 时返回全部，供前端本地分页）
+  async getGameHistory(accountId, limit = 10, offset = 0) {
     try {
       const games = await dataStore.read('games');
-      return games
-        .filter(game => game.player1 === accountId || game.player2 === accountId)
-        .sort((a, b) => b.endTime - a.endTime)
-        .slice(0, limit)
-        .map(game => ({
-          gameId: game.gameId,
-          gameType: game.gameType,
-          opponent: game.player1 === accountId ? game.player2Nickname : game.player1Nickname,
-          result: game.gameType === 'snake' ? game.result : (game.winner === accountId ? 'win' : game.winner === null ? 'draw' : 'loss'),
-          moves: game.moves?.length || 0,
-          date: game.endTime,
-          duration: game.duration
-        }));
+      const list = games
+        .filter(game => this.isGameParticipant(game, accountId))
+        .sort((a, b) => b.endTime - a.endTime);
+      const start = Math.max(0, parseInt(offset) || 0);
+      const size = Number.isFinite(Number(limit)) && Number(limit) > 0 ? Number(limit) : null;
+      const sliced = size ? list.slice(start, start + size) : list.slice(start);
+      return sliced.map(game => this.toHistoryItem(game, accountId));
     } catch (err) {
       logger.error('获取游戏历史失败', { accountId, error: err.message });
       return [];
@@ -1989,17 +2083,15 @@ class GameManager {
         return null;
       }
 
+      // 单人玩法（新记录）只有 player，双人对局（含旧记录）保留 player1 / player2
+      const player1 = game.player || { id: game.player1, nickname: game.player1Nickname };
+      const player2 = game.player ? null : { id: game.player2, nickname: game.player2Nickname };
+
       return {
         gameId: game.gameId,
         gameType: game.gameType,
-        player1: {
-          id: game.player1,
-          nickname: game.player1Nickname
-        },
-        player2: {
-          id: game.player2,
-          nickname: game.player2Nickname
-        },
+        player1,
+        player2,
         winner: game.winner,
         result: game.result,
         moves: game.moves || [],

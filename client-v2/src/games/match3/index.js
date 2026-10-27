@@ -18,6 +18,8 @@ import { getRogueMeta, loadLocalSession, onProgress, onRogueMeta, requestProgres
 import { LEVEL_COUNT } from './config/levels.js';
 import { viewRoot, el } from '../../utils/dom.js';
 import { startGameActivity, stopGameActivity } from '../../core/activity.js';
+import { store } from '../../core/store.js';
+import { go } from '../../core/router.js';
 
 /**
  * 渲染消消乐视图
@@ -92,6 +94,12 @@ export function renderMatch3(container = viewRoot()) {
           el('span', { class: 'm3-menu-name' }, '娱乐'),
           el('span', { class: 'm3-menu-meta' }, '2 种玩法 · 无尽三色 / 肉鸽试炼'),
         ),
+      ),
+      // 消消乐是独立路由，玩法选择是顶层页，这里没有其它上级可返回，直接给回大厅入口
+      el(
+        'div',
+        { class: 'm3-actions' },
+        el('button', { class: 'm3-btn m3-btn--ghost', onClick: () => go('games') }, '← 返回大厅'),
       ),
     );
   }
@@ -209,6 +217,14 @@ export function renderMatch3(container = viewRoot()) {
   // 养成存档（精华余额 / 祝福等级 / 可领里程碑）同样随服务端变化，菜单上的状态行要跟着刷新
   const offMeta = onRogueMeta(() => currentScreen?.());
   renderMenu();
+
+  // 大厅面板里预选的玩法：进入后直接打开对应模式（只消费一次，刷新不再重复）
+  const presetMode = store.get('games.initMode');
+  store.set('games.initMode', null);
+  if (presetMode === 'level') renderLevelView();
+  else if (presetMode === 'endless') renderEndlessView();
+  else if (presetMode === 'endless3') renderEndless3View();
+  else if (presetMode === 'rogue') renderRogueView();
   requestProgress();
 
   return () => {

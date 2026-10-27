@@ -1178,7 +1178,7 @@ class UpdateManager {
       throw new Error('更新进行中，无法回滚');
     }
 
-    const backupPath = path.join(this.paths.backup, backupName);
+    const backupPath = this._resolveBackupPath(backupName);
     if (!fs.existsSync(backupPath)) {
       throw new Error('备份不存在');
     }
@@ -1377,12 +1377,26 @@ class UpdateManager {
   }
 
   deleteBackup(backupName) {
-    const backupPath = path.join(this.paths.backup, backupName);
+    const backupPath = this._resolveBackupPath(backupName);
     if (!fs.existsSync(backupPath)) {
       throw new Error('备份不存在');
     }
     fs.rmSync(backupPath, { recursive: true, force: true });
     this._pushLog('info', `已删除备份: ${backupName}`);
+  }
+
+  // 将备份名解析为备份目录内的绝对路径，拒绝任何目录穿越
+  _resolveBackupPath(backupName) {
+    const name = String(backupName || '').trim();
+    if (!name || name.includes('..') || /[\\/]/.test(name) || path.isAbsolute(name)) {
+      throw new Error('非法备份名称');
+    }
+    const backupRoot = path.resolve(this.paths.backup);
+    const resolved = path.resolve(backupRoot, name);
+    if (!resolved.startsWith(backupRoot + path.sep)) {
+      throw new Error('非法备份名称');
+    }
+    return resolved;
   }
 
   /**
@@ -1453,7 +1467,7 @@ class UpdateManager {
    * @returns {Object} diff 结果
    */
   getFileDiff(backupName, fileRelPath) {
-    const backupPath = path.join(this.paths.backup, backupName);
+    const backupPath = this._resolveBackupPath(backupName);
     if (!fs.existsSync(backupPath)) {
       throw new Error('备份不存在');
     }

@@ -423,6 +423,7 @@
         <option value="go">围棋</option>
         <option value="xiangqi">象棋</option>
         <option value="snake">贪吃蛇</option>
+        <option value="match3">消消乐</option>
       </select>
       <select class="filter-select" id="resultFilter" onchange="loadGames()">
         <option value="all">全部结果</option>
@@ -454,6 +455,13 @@
     const socket = io();
     let userToken = null;
     let currentAccountId = null;
+    let gamesById = {};
+
+    // 统一附带登录 Token，服务端据此校验账号归属
+    function authHeaders(extra) {
+      const token = localStorage.getItem('userToken') || '';
+      return Object.assign({ 'Authorization': token ? `Bearer ${token}` : '' }, extra || {});
+    }
 
     // 游戏类型配置
     const gameTypeConfig = {
@@ -461,7 +469,8 @@
       gomoku: { name: '五子棋', icon: '⚫', color: '#1a1a1a' },
       go: { name: '围棋', icon: '⚪', color: '#6c757d' },
       'chinese-chess': { name: '象棋', icon: '🏰', color: '#dc3545' },
-      snake: { name: '贪吃蛇', icon: '🐍', color: '#28a745' }
+      snake: { name: '贪吃蛇', icon: '🐍', color: '#28a745' },
+      match3: { name: '消消乐', icon: '🍬', color: '#f59e0b' }
     };
 
     // 初始化
@@ -490,7 +499,7 @@
       emptyState.style.display = 'none';
 
       try {
-        const res = await fetch(`/api/games/history?accountId=${currentAccountId}&limit=50`);
+        const res = await fetch(`/api/games/history?accountId=${currentAccountId}&limit=50`, { headers: authHeaders() });
         const data = await res.json();
 
         loadingState.style.display = 'none';
@@ -502,6 +511,7 @@
 
         // 筛选
         let games = data.data;
+        gamesById = Object.fromEntries(data.data.map(g => [g.gameId, g]));
         const gameTypeFilter = document.getElementById('gameTypeFilter').value;
         const resultFilter = document.getElementById('resultFilter').value;
 
@@ -528,46 +538,158 @@
       }
     }
 
-    // 渲染游戏列表
+    // 渲染游戏列表（各玩法只显示自己的字段）
     function renderGames(games) {
       const gamesList = document.getElementById('gamesList');
       gamesList.innerHTML = '';
 
+      const modeNames = { level: '闯关', endless: '无尽', endless3: '三色爽局', rogue: '肉鸽试炼' };
+
       games.forEach(game => {
         const config = gameTypeConfig[game.gameType] || { name: '未知', icon: '❓', color: '#6c757d' };
+        const isMatch3 = game.gameType === 'match3';
+        const isSnake = game.gameType === 'snake';
         const card = document.createElement('div');
         card.className = 'game-card';
 
         let resultClass = 'result-draw';
-        let resultText = '平局';
-        if (game.result === 'win') {
-          resultClass = 'result-win';
-          resultText = '胜利 ✨';
-        } else if (game.result === 'loss') {
-          resultClass = 'result-loss';
-          resultText = '失败';
+        let resultText = '已结算';
+        let typeName = config.name;
+        const metaParts = [];
+
+        if (isMatch3) {
+          typeName = `消消乐 · ${modeNames[game.mode] || ''}`.trim();
+          metaParts.push(`🎯 得分: ${game.score || 0}`);
+          metaParts.push(`📍 步数: ${game.moves || 0}`);
+          if (game.mode === 'level') {
+            metaParts.push(`⭐ 星数: ${game.stars || 0}`);
+            if (game.level) metaParts.push(`🎮 第 ${game.level} 关`);
+          } else if (game.mode === 'rogue') {
+            if (game.floor) metaParts.push(`🎮 第 ${game.floor} 层`);
+            metaParts.push(`🃏 ${game.win ? '已通关' : '未通关'}`);
+          }
+        } else if (isSnake) {
+          metaParts.push(`🎯 得分: ${game.score || 0}`);
+          metaParts.push(`🐍 最长: ${game.maxLength || 0}`);
+          metaParts.push(`🍎 食物: ${game.foodEaten || 0}`);
+          metaParts.push(`📍 步数: ${game.moves || 0}`);
+        } else {
+          if (game.result === 'win') {
+            resultClass = 'result-win';
+            resultText = '胜利 ✨';
+          } else if (game.result === 'loss') {
+            resultClass = 'result-loss';
+            resultText = '失败';
+          } else if (game.result === 'draw') {
+            resultText = '平局';
+          }
+          metaParts.push(`🎯 对手: ${game.opponent || 'AI'}`);
+          metaParts.push(`📍 回合: ${game.moves || 0}`);
         }
+        metaParts.push(`⏱ ${formatDurationMs(game.duration)}`);
+        metaParts.push(`📅 ${formatDate(game.date || game.endTime)}`);
+
+        // 消消乐没有逐帧回放；棋类与贪吃蛇有可回放的移动记录
+        const canReplay = !isMatch3 && game.moves > 0 && game.gameId;
 
         card.innerHTML = `
           <div class="game-icon" style="background: ${config.color}20;">
             ${config.icon}
           </div>
           <div class="game-info">
-            <div class="game-type-name">${config.name}</div>
+            <div class="game-type-name">${typeName}</div>
             <div class="game-meta">
-              <span>🎯 对手: ${game.opponent || 'AI'}</span>
-              <span>📍 回合: ${game.moves}</span>
-              <span>📅 ${formatDate(game.date || game.endTime)}</span>
+              ${metaParts.map(p => `<span>${p}</span>`).join('')}
             </div>
           </div>
           <div style="display: flex; align-items: center; gap: 8px;">
             <div class="game-result ${resultClass}">${resultText}</div>
-            ${game.moves > 0 && game.gameId ? `<button onclick="openReplay('${game.gameId}', '${game.gameType}')" style="padding:6px 12px;border:none;border-radius:6px;background:#3498db;color:white;cursor:pointer;font-size:12px;font-weight:bold;">🎬 回放</button>` : ''}
+            ${canReplay ? `<button onclick="openReplay('${game.gameId}', '${game.gameType}')" style="padding:6px 12px;border:none;border-radius:6px;background:#3498db;color:white;cursor:pointer;font-size:12px;font-weight:bold;">🎬 回放</button>` : ''}
+            <button onclick="openGameDetail('${game.gameId}')" style="padding:6px 12px;border:none;border-radius:6px;background:#718096;color:white;cursor:pointer;font-size:12px;font-weight:bold;">详情</button>
           </div>
         `;
 
         gamesList.appendChild(card);
       });
+    }
+
+    // 毫秒时长 → 分:秒
+    function formatDurationMs(ms) {
+      const sec = Math.round((ms || 0) / 1000);
+      return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+    }
+
+    // 打开对局详情（按玩法展示各自的字段）
+    function openGameDetail(gameId) {
+      const game = gamesById[gameId];
+      if (!game) return;
+      const meta = gameTypeConfig[game.gameType] || { name: '未知', icon: '❓' };
+      const modeNames = { level: '闯关', endless: '无尽', endless3: '三色爽局', rogue: '肉鸽试炼' };
+      const rows = [];
+      const add = (label, value) => {
+        if (value === undefined || value === null || value === '') return;
+        rows.push([label, String(value)]);
+      };
+
+      add('游戏', meta.name);
+      if (game.gameType === 'match3') {
+        add('模式', modeNames[game.mode] || game.mode);
+        add('得分', game.score);
+        add('最高连锁', game.maxCombo);
+        add('步数', game.moves);
+        if (game.mode === 'level') {
+          add('关卡', game.level ? `第 ${game.level} 关` : null);
+          add('星数', game.stars || 0);
+        } else if (game.mode === 'rogue') {
+          add('到达层数', game.floor ? `第 ${game.floor} 层` : null);
+          add('是否通关', game.win ? '是' : '否');
+        }
+      } else if (game.gameType === 'snake') {
+        add('得分', game.score);
+        add('最大长度', game.maxLength);
+        add('吃到食物', game.foodEaten);
+        add('步数', game.moves);
+      } else {
+        add('结果', { win: '胜利', loss: '失败', draw: '平局' }[game.result] || game.result);
+        add('对手', game.opponent);
+        add('回合数', game.moves);
+        add('棋盘', game.boardSize ? `${game.boardSize} × ${game.boardSize}` : null);
+        add('模式', game.gameMode === 'ai' ? '人机对战' : game.gameMode === 'pvp' ? '联机对战' : null);
+      }
+      add('时长', formatDurationMs(game.duration));
+      add('时间', formatDate(game.date || game.endTime));
+
+      const overlay = document.createElement('div');
+      overlay.className = 'account-modal-overlay';
+      const modalEl = document.createElement('div');
+      modalEl.className = 'account-modal';
+      modalEl.style.maxWidth = '420px';
+
+      const title = document.createElement('div');
+      title.className = 'account-modal-title';
+      title.textContent = `${meta.icon} ${meta.name} 详情`;
+
+      const grid = document.createElement('div');
+      grid.style.cssText = 'display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-size:14px;';
+      rows.forEach(([label, value]) => {
+        const labelEl = document.createElement('div');
+        labelEl.style.color = '#718096';
+        labelEl.textContent = label;
+        const valueEl = document.createElement('div');
+        valueEl.style.cssText = 'color:#2d3748;font-weight:600;';
+        valueEl.textContent = value;
+        grid.append(labelEl, valueEl);
+      });
+
+      const closeBtn = document.createElement('button');
+      closeBtn.textContent = '关闭';
+      closeBtn.style.cssText = 'margin-top:16px;width:100%;padding:10px;border:none;border-radius:8px;background:#3498db;color:white;font-weight:bold;cursor:pointer;';
+      closeBtn.onclick = () => overlay.remove();
+      overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+      modalEl.append(title, grid, closeBtn);
+      overlay.append(modalEl);
+      document.body.appendChild(overlay);
     }
 
     // 格式化日期

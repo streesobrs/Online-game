@@ -1110,9 +1110,10 @@ class AdminManager {
       // 使用配置默认值并限制最大行数
       const requestLines = Number.isInteger(lines) && lines > 0 ? lines : config.log.adminFileReadLines;
       const safeLines = Math.min(requestLines, config.log.adminFileReadMaxLines);
-      const filePath = path.join(config.paths.logs, filename);
-      // 防止目录遍历
-      if (!filePath.startsWith(config.paths.logs)) {
+      const logsRoot = path.resolve(config.paths.logs);
+      const filePath = path.resolve(logsRoot, filename);
+      // 防止目录遍历：必须位于日志目录内（带分隔符，避免 logs2 这类同前缀目录绕过）
+      if (filePath !== logsRoot && !filePath.startsWith(logsRoot + path.sep)) {
         socket.emit('log_file_content', { error: '非法路径' });
         return;
       }
@@ -1422,7 +1423,10 @@ class AdminManager {
     try {
       const games = await dataStore.read('games');
       const userGames = games
-        .filter(g => g.player1 === accountId || g.player2 === accountId)
+        .filter(g => g.player?.id === accountId
+          || g.player1 === accountId
+          || g.player2 === accountId
+          || (Array.isArray(g.players) && g.players.some(p => p?.id === accountId)))
         .sort((a, b) => b.endTime - a.endTime)
         .slice(0, limit);
 

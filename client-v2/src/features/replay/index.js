@@ -201,7 +201,8 @@ function buildBoardDOM(gameType) {
   if (gameType === 'go') return el('div', { class: 'replay-board-grid' });
   if (gameType === 'chinese-chess') {
     return el('div', { style: 'position:relative;' }, [
-      el('svg', { style: 'display:block;', width: 280, height: 310, viewBox: '0 0 280 310', html: CHESS_BOARD_SVG }),
+      // 用 div.innerHTML 解析 SVG，保证棋盘线按 SVG 命名空间渲染
+      el('div', { style: 'width:280px;height:310px;', html: `<svg width="280" height="310" viewBox="0 0 280 310" style="display:block;">${CHESS_BOARD_SVG}</svg>` }),
       el('div', { style: 'position:absolute;inset:0;' }),
     ]);
   }
@@ -236,76 +237,81 @@ function renderBoard() {
   else if (gameType === 'snake') renderSnake();
 }
 
+// 棋盘留白（最外层棋盘线距边框的距离）
+const BOARD_PAD = 20;
+// 五子棋 15×15、围棋 19×19：格子尺寸不同，棋盘整体宽度保持一致
+const BOARD_CONFIG = { gobang: { size: 15, cell: 36 }, go: { size: 19, cell: 28 } };
+// 星位坐标（[行, 列]）
+const BOARD_STARS = {
+  15: [[3, 3], [3, 11], [7, 7], [11, 3], [11, 11]],
+  19: [[3, 3], [3, 9], [3, 15], [9, 3], [9, 9], [9, 15], [15, 3], [15, 9], [15, 15]],
+};
+
+/**
+ * 初始化棋盘：按交叉点绘制横竖棋盘线，棋子单独放在 overlay 层。
+ * 只在棋盘规格变化时重建，逐帧渲染不会反复创建 DOM。
+ */
 function setupGridBoard(container, size, cell) {
-  if (!container.hasChildNodes()) {
-    container.style.cssText = `display:grid;grid-template-columns:repeat(${size},${cell}px);grid-template-rows:repeat(${size},${cell}px);padding:15px;background:#e8c56f;background-image:radial-gradient(circle,#8a6d3b 1px,transparent 1px);background-size:${cell}px ${cell}px;border:2px solid #8a6d3b;border-radius:4px;`;
-    for (let r = 0; r < size; r++) {
-      for (let c = 0; c < size; c++) {
-        container.append(el('div', { style: `width:${cell}px;height:${cell}px;display:flex;align-items:center;justify-content:center;` }));
-      }
-    }
+  const key = `${size}-${cell}`;
+  if (container.dataset.boardKey === key) return;
+  container.dataset.boardKey = key;
+
+  const span = cell * (size - 1);
+  const total = span + BOARD_PAD * 2;
+  let svg = '';
+  for (let i = 0; i < size; i++) {
+    const p = BOARD_PAD + i * cell;
+    svg += `<line x1="${BOARD_PAD}" y1="${p}" x2="${BOARD_PAD + span}" y2="${p}" stroke="#b08d4f" stroke-width="1"/>`;
+    svg += `<line x1="${p}" y1="${BOARD_PAD}" x2="${p}" y2="${BOARD_PAD + span}" stroke="#b08d4f" stroke-width="1"/>`;
   }
-  return container;
+  (BOARD_STARS[size] || []).forEach(([r, c]) => {
+    svg += `<circle cx="${BOARD_PAD + c * cell}" cy="${BOARD_PAD + r * cell}" r="3" fill="#8a6d3b"/>`;
+  });
+
+  container.style.cssText = `position:relative;width:${total}px;height:${total}px;box-sizing:border-box;background:#e8c56f;border:2px solid #8a6d3b;border-radius:4px;overflow:hidden;`;
+  // 用 innerHTML 让浏览器按 SVG 命名空间解析棋盘线（createElement('svg') 不会生成真正的 SVG）
+  container.innerHTML = `<svg width="${total}" height="${total}" style="position:absolute;left:0;top:0;">${svg}</svg>`;
+  container.append(el('div', { class: 'replay-stone-layer', style: 'position:absolute;inset:0;' }));
 }
 
 function renderGobang() {
-  const area = document.querySelector('.replay-board-area');
-  const board = area?.firstChild;
-  if (!board) return;
-  const size = 19, cell = 30;
-  setupGridBoard(board, size, cell);
-  board.querySelectorAll('.replay-last-move').forEach((n) => n.classList.remove('replay-last-move'));
-
-  const target = state.currentMoveIndex;
-  const cells = board.children;
-  // 先清除全部棋子再按当前步数重绘（简单可靠）
-  Array.from(cells).forEach((cellEl) => { cellEl.innerHTML = ''; });
-  for (let i = 0; i < target && i < state.replay.moves.length; i++) {
-    const mv = state.replay.moves[i];
-    if (!mv || !mv.position) continue;
-    const { r, c } = mv.position;
-    if (r < 0 || r >= size || c < 0 || c >= size) continue;
-    const cellEl = cells[r * size + c];
-    const stone = el('div', {
-      style: `width:${cell - 6}px;height:${cell - 6}px;border-radius:50%;${mv.color === 1 ? 'background:radial-gradient(circle at 35% 35%,#555,#111);' : 'background:radial-gradient(circle at 35% 35%,#fff,#ccc);'}box-shadow:0 1px 3px rgba(0,0,0,.4);`,
-    });
-    cellEl.append(stone);
-    if (i === target - 1) cellEl.classList.add('replay-last-move');
-  }
-  board.querySelectorAll('.replay-last-move').forEach((n) => {
-    const ring = el('div', { style: 'position:absolute;inset:1px;border-radius:50%;border:2px solid #f1c40f;pointer-events:none;' });
-    n.style.position = 'relative';
-    n.append(ring);
-  });
+  renderStoneBoard('gobang');
 }
 
 function renderGo() {
+  renderStoneBoard('go');
+}
+
+// 五子棋 / 围棋共用：棋子落在棋盘线交叉点上，最后一手加金色描边
+function renderStoneBoard(gameType) {
   const area = document.querySelector('.replay-board-area');
   const board = area?.firstChild;
   if (!board) return;
-  const size = 19, cell = 28;
+  const { size, cell } = BOARD_CONFIG[gameType];
   setupGridBoard(board, size, cell);
-  board.querySelectorAll('.replay-last-move').forEach((n) => n.classList.remove('replay-last-move'));
+
+  const layer = board.querySelector('.replay-stone-layer');
+  if (!layer) return;
+  layer.innerHTML = '';
 
   const target = state.currentMoveIndex;
-  const cells = board.children;
-  Array.from(cells).forEach((cellEl) => { cellEl.innerHTML = ''; });
+  const diameter = cell - 6;
   for (let i = 0; i < target && i < state.replay.moves.length; i++) {
-    const mv = state.replay.moves[i];
-    if (!mv || !mv.position) continue;
-    const { r, c } = mv.position;
+    const move = state.replay.moves[i];
+    const pos = move?.position;
+    if (!pos || typeof pos.r !== 'number' || typeof pos.c !== 'number') continue;
+    const { r, c } = pos;
     if (r < 0 || r >= size || c < 0 || c >= size) continue;
-    const cellEl = cells[r * size + c];
-    cellEl.append(el('div', {
-      style: `width:${cell - 6}px;height:${cell - 6}px;border-radius:50%;${mv.color === 1 ? 'background:radial-gradient(circle at 35% 35%,#333,#000);' : 'background:radial-gradient(circle at 35% 35%,#fff,#d0d0d0);'}box-shadow:0 1px 3px rgba(0,0,0,.4);`,
+
+    const isBlack = move.color === 1;
+    const bg = isBlack
+      ? 'background:radial-gradient(circle at 35% 35%,#555,#111);'
+      : 'background:radial-gradient(circle at 35% 35%,#fff,#ccc);';
+    const ring = i === target - 1 ? ',0 0 0 2px #f1c40f' : '';
+    layer.append(el('div', {
+      style: `position:absolute;left:${BOARD_PAD + c * cell - diameter / 2}px;top:${BOARD_PAD + r * cell - diameter / 2}px;width:${diameter}px;height:${diameter}px;border-radius:50%;${bg}box-shadow:0 1px 3px rgba(0,0,0,.4)${ring};`,
     }));
-    if (i === target - 1) cellEl.classList.add('replay-last-move');
   }
-  board.querySelectorAll('.replay-last-move').forEach((n) => {
-    const ring = el('div', { style: 'position:absolute;inset:1px;border-radius:50%;border:2px solid #f1c40f;pointer-events:none;' });
-    n.style.position = 'relative';
-    n.append(ring);
-  });
 }
 
 function getInitialChessBoard() {
@@ -407,6 +413,7 @@ function renderSnake() {
   if (target === 0) return;
 
   let snake = [], foods = [];
+  // init 帧格式: ['init', timestamp, direction, snake[[x,y]...], foodCount, f1x, f1y, ..., score]
   if (moves.length > 0 && Array.isArray(moves[0]) && moves[0][0] === 'init') {
     const initMove = moves[0];
     snake = (initMove[3] || []).map((s) => ({ x: s[0], y: s[1] }));
@@ -416,7 +423,18 @@ function renderSnake() {
         const fx = initMove[5 + fi * 2], fy = initMove[6 + fi * 2];
         if (typeof fx === 'number' && typeof fy === 'number') foods.push({ x: fx, y: fy });
       }
+    } else if (Array.isArray(foodCount) && typeof foodCount[0] === 'number') {
+      // 兼容另一种旧格式：初始食物直接存成 [x, y]
+      foods.push({ x: foodCount[0], y: foodCount[1] });
     }
+  } else if (moves.length > 0 && Array.isArray(moves[0])) {
+    // 旧版 v2 记录没有 init 帧，只有每步蛇头坐标：按第一帧的方向还原 3 节蛇身
+    const first = moves[0];
+    const dir = ['up', 'down', 'left', 'right'].includes(first[0]) ? first[0] : 'right';
+    const back = { right: [-1, 0], left: [1, 0], down: [0, -1], up: [0, 1] }[dir];
+    snake = [0, 1, 2]
+      .map((i) => ({ x: first[1] + back[0] * i, y: first[2] + back[1] * i }))
+      .filter((s) => s.x >= 0 && s.y >= 0);
   }
 
   for (let i = 1; i < target && i < moves.length; i++) {

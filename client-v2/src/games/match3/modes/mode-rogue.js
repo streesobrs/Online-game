@@ -200,6 +200,8 @@ function renderStats(bonus, floor, title, rewinds = 0) {
 export function renderRogue(container, { onExit }) {
   let board = null;
   let finished = false;
+  // 离开本模式（回到菜单 / 切玩法）后置 false：延迟回调不再重建棋盘，避免往已卸载的容器里渲染
+  let alive = true;
 
   // ---- 本轮 run 的全部状态 ----
   let bonus = createBonus();
@@ -229,6 +231,7 @@ export function renderRogue(container, { onExit }) {
   let quest = null;        // 本层局内任务（perks.js 的 questFor），只在当层有效
   let perkModal = null;    // 三选一的模态框（盖在已达标的盘面上，见 renderPerkChoice）
   let nodeModal = null;    // 非战斗节点（事件 / 宝藏 / 篝火 / 商店）的模态框，盖在地图屏上
+  let codexCleanup = null; // 结算页打开的整页图鉴：模式被整体切走时要一并退订
   // ---- 胜利闭环（开发方案 3.3）----
   let bossKills = 0;       // 本轮已击败的 Boss 数（0-3，通关上报用）
   let boss = null;         // 当前 Boss 层运行时状态（boss.js），非 Boss 层 / 层间为 null
@@ -453,6 +456,11 @@ export function renderRogue(container, { onExit }) {
     paintStatsRef = () => { };
     closePerkModal();
     closeNodeModal();
+    // 图鉴页可能还开着：退订它的服务端监听，避免切走模式后回调继续跑
+    if (codexCleanup) {
+      codexCleanup();
+      codexCleanup = null;
+    }
     disposeBoard();
   }
 
@@ -1785,7 +1793,7 @@ export function renderRogue(container, { onExit }) {
         toast.info(`⏳ 时光倒流：第 ${floor} 层重打（还剩 ${rewindsLeft} 次）`);
         paintStats();
         setTimeout(() => {
-          if (!finished) mountFloor(null, false);
+          if (!finished && alive) mountFloor(null, false);
         }, 0);
         return;
       }
@@ -2346,9 +2354,11 @@ export function renderRogue(container, { onExit }) {
     const cleanup = renderCodexPage(container, {
       onExit: () => {
         cleanup();
+        codexCleanup = null;
         container.replaceChildren(...saved);
       },
     });
+    codexCleanup = cleanup;
   }
 
   /** 结算页的精华行文案 */
@@ -2421,6 +2431,7 @@ export function renderRogue(container, { onExit }) {
   requestProgress();
 
   return () => {
+    alive = false;
     offProgress();
     offMeta();
     offResult();

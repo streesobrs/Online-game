@@ -1240,6 +1240,12 @@
 
     const API_BASE = '/api';
 
+    // 统一附带登录 Token，服务端据此校验账号归属
+    function authHeaders(extra) {
+      const token = localStorage.getItem('userToken') || '';
+      return Object.assign({ 'Authorization': token ? `Bearer ${token}` : '' }, extra || {});
+    }
+
     // 监听其他页面登录状态变化（例如在大厅登录后切换到商店）
     window.addEventListener('storage', (e) => {
       if (e.key === 'currentAccountId' && e.newValue && e.newValue !== userId) {
@@ -1802,7 +1808,7 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/shop/data?userId=${userId}`);
+        const res = await fetch(`${API_BASE}/shop/data?userId=${userId}`, { headers: authHeaders() });
         const data = await res.json();
         if (data.success) {
           shopData = data.data;
@@ -1812,7 +1818,7 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/shop/inventory?userId=${userId}`);
+        const res = await fetch(`${API_BASE}/shop/inventory?userId=${userId}`, { headers: authHeaders() });
         const data = await res.json();
         if (data.success) {
           inventory = data.inventory;
@@ -1822,7 +1828,7 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/shop/cosmetics?userId=${userId}`);
+        const res = await fetch(`${API_BASE}/shop/cosmetics?userId=${userId}`, { headers: authHeaders() });
         const data = await res.json();
         if (data.success) {
           cosmetics = data.cosmetics;
@@ -1832,7 +1838,7 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/shop/vip?userId=${userId}`);
+        const res = await fetch(`${API_BASE}/shop/vip?userId=${userId}`, { headers: authHeaders() });
         const data = await res.json();
         if (data.success) {
           vipInfo = data.vip;
@@ -1842,7 +1848,7 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/currency/balance?userId=${userId}`);
+        const res = await fetch(`${API_BASE}/currency/balance?userId=${userId}`, { headers: authHeaders() });
         const data = await res.json();
         if (data.success) {
           document.getElementById('starCoins').textContent = data.balance;
@@ -1858,7 +1864,7 @@
       try {
         const res = await fetch(`${API_BASE}/shop/buy`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ userId, itemId, quantity })
         });
         const data = await res.json();
@@ -1889,7 +1895,7 @@
       try {
         const res = await fetch(`${API_BASE}/shop/buy`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ userId, itemId: cosmeticId, quantity: 1 })
         });
         const data = await res.json();
@@ -1920,7 +1926,7 @@
       try {
         const res = await fetch(`${API_BASE}/shop/cosmetics/equip`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ userId, category, cosmeticId })
         });
         const data = await res.json();
@@ -1940,7 +1946,7 @@
       try {
         const res = await fetch(`${API_BASE}/shop/use-item`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ userId, itemId })
         });
         const data = await res.json();

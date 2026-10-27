@@ -33,6 +33,20 @@ const GAME_META = {
   snake: { name: '贪吃蛇', icon: '🐍' },
 };
 
+/** 对战历史里的游戏元信息：额外含消消乐（单人玩法，不进上面的战绩统计网格） */
+const HISTORY_GAME_META = {
+  ...GAME_META,
+  match3: { name: '消消乐', icon: '🍬' },
+};
+
+/** 消消乐模式名称 */
+const MATCH3_MODE_NAMES = {
+  level: '闯关',
+  endless: '无尽',
+  endless3: '三色爽局',
+  rogue: '肉鸽试炼',
+};
+
 /**
  * 等级里程碑奖励：档位表由服务端下发（config.levelRewards.milestones → getLevelRewards），
  * 客户端不再自己抄一份奖励文案，避免两边漂掉。字段见 getAvailableLevelRewards 返回的 `all`：
@@ -74,6 +88,11 @@ function formatDate(ts) {
 function formatDuration(sec) {
   if (!sec && sec !== 0) return '-';
   return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+}
+
+/** 对局记录里的 duration 单位是毫秒，展示前先换算成秒 */
+function formatDurationMs(ms) {
+  return formatDuration(Math.round((ms || 0) / 1000));
 }
 
 /**
@@ -206,6 +225,10 @@ export function renderProfile(container) {
   let cosmeticConfig = null;
   let historyData = [];
   let historyFilter = { type: 'all', result: 'all' };
+  // 对战历史展示方式：list=列表（默认）/ grid=卡片，记忆到本地
+  let historyView = localStorage.getItem('profileHistoryView') === 'grid' ? 'grid' : 'list';
+  let historyPage = 1; // 当前页码（前端分页）
+  const HISTORY_PAGE_SIZE = 20;
   let embeddedCleanup = null; // 嵌入视图（成就/商城/主题）的清理函数
   // 邮箱 / 资产明细
   let mails = null; // null = 尚未加载
@@ -1354,76 +1377,229 @@ export function renderProfile(container) {
     const userId = currentUserId();
     contentEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:40px;' }, '⏳ 加载中...'));
     try {
-      const res = await api.games.history(userId, 50);
+      // limit=all：返回全部记录，分页在前端完成，保证筛选/计数针对全部历史
+      const res = await api.games.history(userId, 'all');
       historyData = res.data || [];
     } catch (err) {
       toast.error(err.message || '加载对战历史失败');
       historyData = [];
     }
     contentEl.innerHTML = '';
+    historyPage = 1;
+
+    let filtered = [];
+    let totalPages = 1;
+
+    // 列表 / 卡片 两种展示方式，切换时只更新列表容器，不重新请求数据
+    const listBtn = el('button', {
+      class: 'profile-view-btn' + (historyView === 'list' ? ' active' : ''),
+      title: '列表视图',
+      onClick: () => setView('list'),
+    }, '☰ 列表');
+    const gridBtn = el('button', {
+      class: 'profile-view-btn' + (historyView === 'grid' ? ' active' : ''),
+      title: '卡片视图',
+      onClick: () => setView('grid'),
+    }, '▦ 卡片');
+    const viewToggle = el('div', { class: 'profile-view-toggle' }, [listBtn, gridBtn]);
+
+    const listEl = el('div', { class: 'profile-history-list' });
+    const emptyEl = el('div', { class: 'text-muted', style: 'text-align:center;padding:30px;' }, '暂无对战记录');
+    const pagerInfo = el('span', { class: 'profile-pager-info' });
+    const prevBtn = el('button', {
+      class: 'profile-pager-btn',
+      onClick: () => gotoPage(historyPage - 1),
+    }, '上一页');
+    const nextBtn = el('button', {
+      class: 'profile-pager-btn',
+      onClick: () => gotoPage(historyPage + 1),
+    }, '下一页');
+    const pagerEl = el('div', { class: 'profile-pager' }, [prevBtn, pagerInfo, nextBtn]);
 
     const filterBar = el('div', { class: 'profile-filter-bar' }, [
       el('span', { class: 'profile-filter-label' }, '游戏:'),
-      buildFilter('type', ['all', ...Object.keys(GAME_META)]),
+      buildFilter('type', ['all', ...Object.keys(HISTORY_GAME_META)]),
       el('span', { class: 'profile-filter-label' }, '结果:'),
       buildFilter('result', ['all', 'win', 'loss', 'draw']),
+      viewToggle,
     ]);
-
-    const filtered = historyData.filter((g) =>
-      (historyFilter.type === 'all' || g.gameType === historyFilter.type) &&
-      (historyFilter.result === 'all' || g.result === historyFilter.result));
 
     contentEl.append(el('div', { class: 'panel profile-card' }, [
       filterBar,
-      filtered.length === 0
-        ? el('div', { class: 'text-muted', style: 'text-align:center;padding:30px;' }, '暂无对战记录')
-        : el('div', { class: 'profile-history-list' }, filtered.map(historyCard)),
+      pagerEl,
+      listEl,
+      emptyEl,
     ]));
+
+    setView(historyView);
+    applyFilters();
+
+    function setView(view) {
+      historyView = view === 'grid' ? 'grid' : 'list';
+      localStorage.setItem('profileHistoryView', historyView);
+      listEl.classList.toggle('grid', historyView === 'grid');
+      listBtn.classList.toggle('active', historyView === 'list');
+      gridBtn.classList.toggle('active', historyView === 'grid');
+    }
+
+    function applyFilters() {
+      filtered = historyData.filter((g) =>
+        (historyFilter.type === 'all' || g.gameType === historyFilter.type) &&
+        (historyFilter.result === 'all' || g.result === historyFilter.result));
+      totalPages = Math.max(1, Math.ceil(filtered.length / HISTORY_PAGE_SIZE));
+      if (historyPage > totalPages) historyPage = totalPages;
+      renderPage();
+    }
+
+    function renderPage() {
+      const hasData = filtered.length > 0;
+      const start = (historyPage - 1) * HISTORY_PAGE_SIZE;
+      listEl.innerHTML = '';
+      filtered.slice(start, start + HISTORY_PAGE_SIZE).forEach(g => listEl.append(historyCard(g)));
+      listEl.style.display = hasData ? '' : 'none';
+      emptyEl.style.display = hasData ? 'none' : 'block';
+      pagerEl.style.display = hasData ? 'flex' : 'none';
+      pagerInfo.textContent = `共 ${filtered.length} 条 · 第 ${historyPage} / ${totalPages} 页`;
+      prevBtn.disabled = historyPage <= 1;
+      nextBtn.disabled = historyPage >= totalPages;
+    }
+
+    function gotoPage(page) {
+      if (page < 1 || page > totalPages || page === historyPage) return;
+      historyPage = page;
+      renderPage();
+    }
 
     function buildFilter(key, options) {
       const sel = el('select', {
         class: 'profile-filter-select',
         onChange: (e) => {
           historyFilter[key] = e.target.value;
-          renderHistoryTab();
+          historyPage = 1;
+          applyFilters();
         },
       }, options.map((opt) =>
         el('option', { value: opt, selected: historyFilter[key] === opt },
-          key === 'type' ? (GAME_META[opt]?.name || '全部') : ({ all: '全部', win: '胜利', loss: '失败', draw: '平局' }[opt] || opt))));
+          key === 'type' ? (HISTORY_GAME_META[opt]?.name || '全部') : ({ all: '全部', win: '胜利', loss: '失败', draw: '平局' }[opt] || opt))));
       return sel;
     }
   }
 
   function historyCard(g) {
-    const meta = GAME_META[g.gameType] || { name: g.gameType, icon: '🎮' };
-    const resultMap = { win: ['胜利', '#48bb78'], loss: ['失败', '#e53e3e'], draw: ['平局', '#718096'], end: ['结束', '#718096'] };
-    const [resultText, resultColor] = resultMap[g.result] || ['未知', '#718096'];
-    return el('div', { class: 'profile-history-item' }, [
-      el('div', { class: 'profile-history-icon' }, meta.icon),
-      el('div', { class: 'profile-history-info' }, [
-        el('div', { class: 'profile-history-name' }, [
-          meta.name,
-          el('span', { class: 'profile-history-result', style: `color:${resultColor};` }, resultText),
-        ]),
-        el('div', { class: 'profile-history-meta' },
-          `🎯 对手 ${g.opponent || 'AI'} · 📍 ${g.moves || 0} 回合 · ⏱ ${formatDuration(g.duration)} · 📅 ${formatDate(g.date)}`),
-      ]),
-      // 回放按钮（对齐 v1 games-history.html「🎬 回放」）
+    const meta = HISTORY_GAME_META[g.gameType] || { name: g.gameType, icon: '🎮' };
+    const resultMap = { win: ['胜利', '#48bb78'], loss: ['失败', '#e53e3e'], draw: ['平局', '#718096'] };
+
+    // 各玩法只展示自己的字段，不强行套用对手/胜负
+    let title;
+    let resultNode;
+    let metaText;
+    if (g.gameType === 'match3') {
+      title = `消消乐 · ${MATCH3_MODE_NAMES[g.mode] || '消消乐'}`;
+      resultNode = el('span', { class: 'profile-history-result', style: 'color:#718096;' }, '已结算');
+      const progress = g.mode === 'level' && g.level
+        ? ` · 第 ${g.level} 关`
+        : (g.mode === 'rogue' && g.floor ? ` · 第 ${g.floor} 层` : '');
+      metaText = `🎯 得分 ${g.score || 0} · ⭐ ${g.stars || 0} 星 · 📍 ${g.moves || 0} 步${progress} · ⏱ ${formatDurationMs(g.duration)} · 📅 ${formatDate(g.date)}`;
+    } else if (g.gameType === 'snake') {
+      title = meta.name;
+      resultNode = el('span', { class: 'profile-history-result', style: 'color:#718096;' }, '已结算');
+      metaText = `🎯 得分 ${g.score || 0} · 🐍 最长 ${g.maxLength || 0} · 🍎 ${g.foodEaten || 0} · ⏱ ${formatDurationMs(g.duration)} · 📅 ${formatDate(g.date)}`;
+    } else {
+      title = meta.name;
+      const [resultText, resultColor] = resultMap[g.result] || ['未知', '#718096'];
+      resultNode = el('span', { class: 'profile-history-result', style: `color:${resultColor};` }, resultText);
+      metaText = `🎯 对手 ${g.opponent || 'AI'} · 📍 ${g.moves || 0} 回合 · ⏱ ${formatDurationMs(g.duration)} · 📅 ${formatDate(g.date)}`;
+    }
+
+    // 右侧操作区固定两列：消消乐没有回放，用等宽占位保证「详情」按钮上下对齐
+    const canReplay = g.gameType !== 'match3' && Number(g.moves) > 0;
+    const actions = el('div', { class: 'profile-history-actions' }, [
+      canReplay
+        ? el('button', {
+            class: 'profile-history-replay',
+            title: '查看本局回放',
+            onClick: async () => {
+              if (!g.gameId) { toast.warn('该对局无回放记录'); return; }
+              toast.info('⏳ 加载回放中...');
+              try {
+                const replay = await requestReplay(g.gameId);
+                showReplay(replay);
+              } catch (e) {
+                toast.error(e.message || '回放加载失败');
+              }
+            },
+          }, '🎬 回放')
+        : el('span', { class: 'profile-history-action-placeholder', 'aria-hidden': 'true' }),
       el('button', {
         class: 'profile-history-replay',
-        title: '查看本局回放',
-        onClick: async () => {
-          if (!g.gameId) { toast.warn('该对局无回放记录'); return; }
-          toast.info('⏳ 加载回放中...');
-          try {
-            const replay = await requestReplay(g.gameId);
-            showReplay(replay);
-          } catch (e) {
-            toast.error(e.message || '回放加载失败');
-          }
-        },
-      }, '🎬 回放'),
+        title: '查看本局详情',
+        onClick: () => openGameDetail(g),
+      }, '详情'),
     ]);
+
+    return el('div', { class: 'profile-history-item' }, [
+      el('div', { class: 'profile-history-main' }, [
+        el('div', { class: 'profile-history-icon' }, meta.icon),
+        el('div', { class: 'profile-history-info' }, [
+          el('div', { class: 'profile-history-name' }, [title, resultNode]),
+          el('div', { class: 'profile-history-meta' }, metaText),
+        ]),
+      ]),
+      actions,
+    ]);
+  }
+
+  /** 对局详情弹窗：按玩法展示各自的字段 */
+  function openGameDetail(g) {
+    const meta = HISTORY_GAME_META[g.gameType] || { name: g.gameType, icon: '🎮' };
+    const rows = [];
+    const add = (label, value) => {
+      if (value === undefined || value === null || value === '') return;
+      rows.push([label, String(value)]);
+    };
+
+    add('游戏', meta.name);
+    if (g.gameType === 'match3') {
+      add('模式', MATCH3_MODE_NAMES[g.mode] || g.mode);
+      add('得分', g.score);
+      add('最高连锁', g.maxCombo);
+      add('步数', g.moves);
+      if (g.mode === 'level') {
+        add('关卡', g.level ? `第 ${g.level} 关` : null);
+        add('星数', `⭐ ${g.stars || 0}`);
+      } else if (g.mode === 'rogue') {
+        add('到达层数', g.floor ? `第 ${g.floor} 层` : null);
+        add('是否通关', g.win ? '是' : '否');
+      }
+    } else if (g.gameType === 'snake') {
+      add('得分', g.score);
+      add('最大长度', g.maxLength);
+      add('吃到食物', g.foodEaten);
+      add('步数', g.moves);
+    } else {
+      const resultMap = { win: '胜利', loss: '失败', draw: '平局' };
+      add('结果', resultMap[g.result] || g.result);
+      add('对手', g.opponent);
+      add('回合数', g.moves);
+      add('棋盘', g.boardSize ? `${g.boardSize} × ${g.boardSize}` : null);
+      add('模式', g.gameMode === 'ai' ? '人机对战' : g.gameMode === 'pvp' ? '联机对战' : g.gameMode);
+      add('难度', g.difficulty);
+    }
+    add('时长', formatDurationMs(g.duration));
+    add('时间', formatDate(g.date));
+
+    const grid = el('div', { style: 'display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-size:14px;' },
+      rows.flatMap(([label, value]) => [
+        el('div', { style: 'color:var(--text-muted,#adb5bd);' }, label),
+        el('div', { style: 'color:var(--text,#212529);font-weight:500;' }, value),
+      ]));
+
+    modal.show({
+      title: `${meta.icon} ${meta.name} 详情`,
+      content: grid,
+      confirmText: '关闭',
+      showCancel: false,
+    });
   }
 
   // ============ 辅助：头像显示 ============

@@ -5,6 +5,8 @@
  */
 import { eventBus } from '../../core/eventBus.js';
 import { emit } from '../../core/socket.js';
+import { store } from '../../core/store.js';
+import { go } from '../../core/router.js';
 import { el, viewRoot } from '../../utils/dom.js';
 import { modal } from '../../components/modal.js';
 
@@ -156,10 +158,26 @@ eventBus.on('achievement:unlocked', (data) => {
 export function renderAchievements(container = viewRoot()) {
   let achData = null;
   let activeTabId = null;
+  // 从游戏大厅「成就 →」跳转时带上的游戏标识：首次渲染直接选中该游戏分类
+  const INIT_GAME = store.get('achievements.initGame');
+  store.set('achievements.initGame', null); // 已消费，避免下次进入仍停在游戏分类
 
   const overviewEl = el('div', { class: 'ach-overview' });
   const tabsEl = el('div', { class: 'ach-tabs' });
   const contentEl = el('div', { class: 'ach-scroll' });
+
+  // 从游戏大厅跳转进来时的返回入口：嵌进总进度卡片标题行，不额外占用垂直空间
+  const backBtn = INIT_GAME
+    ? el('button', {
+      class: 'ach-back-btn',
+      type: 'button',
+      title: '返回游戏大厅',
+      onClick: () => {
+        store.set('games.initGame', INIT_GAME);
+        go('games');
+      },
+    }, '← 返回大厅')
+    : null;
 
   container.innerHTML = '';
   container.append(
@@ -207,16 +225,18 @@ export function renderAchievements(container = viewRoot()) {
   }
 
   function renderOverview() {
+    const d = achData;
     overviewEl.innerHTML = '';
     overviewEl.append(
       el('div', { class: 'ach-overview-top' }, [
+        backBtn,
         el('span', { class: 'title' }, '成就进度'),
-        el('span', { class: 'count' }, `${achData.unlockedCount}/${achData.totalAchievements}`),
+        el('span', { class: 'count' }, d ? `${d.unlockedCount}/${d.totalAchievements}` : '--/--'),
       ]),
       el('div', { class: 'ach-overview-bar' }, [
-        el('div', { class: 'ach-overview-bar-fill', style: `width:${achData.progressPercent}%;` }),
+        el('div', { class: 'ach-overview-bar-fill', style: `width:${d ? d.progressPercent : 0}%;` }),
       ]),
-      el('div', { class: 'ach-overview-pct' }, `已完成 ${achData.progressPercent}%`)
+      el('div', { class: 'ach-overview-pct' }, d ? `已完成 ${d.progressPercent}%` : '加载中…')
     );
   }
 
@@ -225,7 +245,9 @@ export function renderAchievements(container = viewRoot()) {
     achData.catTabs.forEach((t, idx) => { t.id = `cat-${idx}`; });
     renderOverview();
     renderTabs();
-    renderTab(activeTabId || achData.catTabs[0].id);
+    // 首次渲染优先落到来源游戏的分类；分类不存在（无成就）时回退到「全部成就」
+    const gameTab = INIT_GAME && achData.catTabs.find((t) => t.type === INIT_GAME);
+    renderTab(activeTabId || (gameTab ? gameTab.id : achData.catTabs[0].id));
   }
 
   // 未登录提示
@@ -236,6 +258,9 @@ export function renderAchievements(container = viewRoot()) {
 
   // 注册为活跃视图（解锁后自动刷新列表）
   achievementsViews.add(container);
+
+  // 先渲染总进度卡片骨架（数据未到时返回按钮已可见）
+  renderOverview();
 
   // 请求成就列表；socket 未连接时 emit 会丢弃，连接后补拉
   function load() { emit('get_achievements'); }

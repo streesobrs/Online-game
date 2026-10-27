@@ -19,19 +19,39 @@ function isTypingTarget(target) {
   return tag === 'input' || tag === 'textarea' || tag === 'select' || !!target?.isContentEditable;
 }
 
+/** 对局进行中暂停全局快捷键（避免 WASD 等游戏操作触发页面跳转） */
+let suppressed = false;
+
+/** 游戏开始/结束时调用，暂停或恢复快捷键分发 */
+export function setShortcutsSuppressed(value) {
+  suppressed = !!value;
+}
+
 function handleKeydown(e) {
+  if (suppressed) return;
   if (isTypingTarget(e.target)) return;
 
   const hit = resolveShortcut(e, store.get('currentView'));
   if (!hit) return;
 
-  // 个别绑定（如大厅的 Enter）不拦截默认行为，避免影响按钮的原生回车点击
-  if (hit.preventDefault !== false) e.preventDefault();
-
   if (hit.scope === 'global') {
+    // 界面操作键（如开关侧边栏）：交给注册了 global 作用域的模块处理；
+    // 目标模块未挂载时不拦截，保留浏览器原生行为（如 Tab 切换焦点）
+    if (hit.op) {
+      const uiHandler = getScopeHandler('global');
+      // 弹窗内保留原生 Tab 焦点切换，不抢快捷键
+      if (!uiHandler || document.body.classList.contains('modal-open')) return;
+      if (hit.preventDefault !== false) e.preventDefault();
+      uiHandler(hit.op, hit);
+      return;
+    }
+    if (hit.preventDefault !== false) e.preventDefault();
     go(hit.view);
     return;
   }
+
+  // 个别绑定（如大厅的 Enter）不拦截默认行为，避免影响按钮的原生回车点击
+  if (hit.preventDefault !== false) e.preventDefault();
   const handler = getScopeHandler(hit.scope);
   if (handler) handler(hit.op, hit);
 }

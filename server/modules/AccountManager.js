@@ -243,16 +243,22 @@ class AccountManager {
   }
 
   // 哈希密码
-  hashPassword(password, salt) {
-    return crypto.pbkdf2Sync(password, salt, this.iterations, this.keyLength, this.digest).toString('hex');
+  hashPassword(password, salt, iterations = this.iterations) {
+    return crypto.pbkdf2Sync(password, salt, iterations, this.keyLength, this.digest).toString('hex');
+  }
+
+  // 读取账号密码哈希使用的迭代次数（历史账号没有该字段时按旧默认值处理）
+  getPasswordIterations(security) {
+    const value = Number(security?.passwordIterations);
+    return Number.isFinite(value) && value > 0 ? value : 10000;
   }
 
   // 验证密码（使用常量时间比较，防止时序攻击）
-  verifyPassword(password, salt, hash) {
+  verifyPassword(password, salt, hash, iterations = this.iterations) {
     if (!salt || !hash) {
       return false;
     }
-    const hashToVerify = this.hashPassword(password, salt);
+    const hashToVerify = this.hashPassword(password, salt, iterations);
     try {
       // 长度不同时也先做一次常量时间比较以保持时间恒定
       const a = Buffer.from(hashToVerify, 'hex');
@@ -357,12 +363,36 @@ class AccountManager {
       const hasHash = !!account.account?.security?.passwordHash;
       logger.info('密码验证信息', { hasSalt, hasHash });
 
-      if (!this.verifyPassword(password, account.account?.security?.passwordSalt, account.account?.security?.passwordHash)) {
+      if (!this.verifyPassword(password, account.account?.security?.passwordSalt,
+        account.account?.security?.passwordHash, this.getPasswordIterations(account.account?.security))) {
         logger.warn('账号登录失败 - 密码验证失败', { username, id: account.account?.id });
         return {
           success: false,
           message: '用户名或密码错误'
         };
+      }
+
+      // 旧账号哈希迭代次数偏低时，在登录成功后透明升级
+      const storedIterations = this.getPasswordIterations(account.account?.security);
+      if (storedIterations < this.iterations) {
+        try {
+          const upgradedSalt = this.generateSalt();
+          const upgradedHash = this.hashPassword(password, upgradedSalt);
+          await dataStore.update('accounts', { 'account.id': account.account.id }, {
+            'account.security': {
+              passwordSalt: upgradedSalt,
+              passwordHash: upgradedHash,
+              passwordIterations: this.iterations
+            }
+          });
+          account.account.security = {
+            passwordSalt: upgradedSalt,
+            passwordHash: upgradedHash,
+            passwordIterations: this.iterations
+          };
+        } catch (e) {
+          logger.warn('密码哈希升级失败', { id: account.account.id, error: e.message });
+        }
       }
 
       // 检查是否为回归玩家（用于成就检测）
@@ -680,7 +710,8 @@ class AccountManager {
       // 更新账号信息
       account.account.security = {
         passwordSalt: salt,
-        passwordHash: hash
+        passwordHash: hash,
+        passwordIterations: this.iterations
       };
       account.account.updatedAt = Date.now();
       account.updatedAt = Date.now();
@@ -711,7 +742,7 @@ class AccountManager {
         id: guestId,
         type: 'guest',
         username: null,
-        nickname: nickname || `玩家${guestId.substr(0, 4)}`,
+        nickname: this.normalizeNickname(nickname, `玩家${guestId.substr(0, 4)}`),
         createdAt: now,
         updatedAt: now,
         lastSeen: now,
@@ -987,11 +1018,12 @@ class AccountManager {
           ...guestAccount.account,
           type: 'registered',
           username: username.toLowerCase(),
-          nickname: nickname || username,
+          nickname: this.normalizeNickname(nickname, username),
           updatedAt: now,
           security: {
             passwordSalt: salt,
-            passwordHash: passwordHash
+            passwordHash: passwordHash,
+            passwordIterations: this.iterations
           },
           activity: {
             ...guestAccount.account.activity,
@@ -1036,7 +1068,7 @@ class AccountManager {
           id: accountId,
           type: 'registered',
           username: username.toLowerCase(),
-          nickname: nickname || username,
+          nickname: this.normalizeNickname(nickname, username),
           createdAt: now,
           updatedAt: now,
           lastSeen: now,
@@ -1050,7 +1082,8 @@ class AccountManager {
           },
           security: {
             passwordSalt: salt,
-            passwordHash: passwordHash
+            passwordHash: passwordHash,
+            passwordIterations: this.iterations
           },
           activity: {
             chatMessages: 0,
@@ -1181,7 +1214,7 @@ class AccountManager {
       }
 
       // 验证密码
-      const isValid = this.verifyPassword(password, account.account?.security?.passwordSalt, account.account?.security?.passwordHash);
+      const isValid = this.verifyPassword(password, account.account?.security?.passwordSalt, account.account?.security?.passwordHash, this.getPasswordIterations(account.account?.security));
 
       if (!isValid) {
         return {
@@ -1294,7 +1327,7 @@ class AccountManager {
 
       // 处理nickname更新
       if (updates.nickname !== undefined) {
-        updateData['account.nickname'] = updates.nickname;
+        updateData['account.nickname'] = this.normalizeNickname(updates.nickname, account.account?.nickname || '玩家');
       }
 
       // 处理profile更新：用 dot-notation 精确更新每个字段，
@@ -1962,7 +1995,7 @@ class AccountManager {
       }
 
       // 验证旧密码
-      const isValid = this.verifyPassword(oldPassword, account.account?.security?.passwordSalt, account.account?.security?.passwordHash);
+      const isValid = this.verifyPassword(oldPassword, account.account?.security?.passwordSalt, account.account?.security?.passwordHash, this.getPasswordIterations(account.account?.security));
       if (!isValid) {
         return {
           success: false,
@@ -1985,7 +2018,8 @@ class AccountManager {
       await dataStore.update('accounts', { 'account.id': id }, {
         'account.security': {
           passwordSalt: newSalt,
-          passwordHash: newHash
+          passwordHash: newHash,
+          passwordIterations: this.iterations
         },
         'account.updatedAt': Date.now()
       });
@@ -2030,7 +2064,8 @@ class AccountManager {
       await dataStore.update('accounts', { 'account.id': id }, {
         'account.security': {
           passwordSalt: salt,
-          passwordHash: hash
+          passwordHash: hash,
+          passwordIterations: this.iterations
         },
         'account.updatedAt': Date.now()
       });
@@ -2054,6 +2089,17 @@ class AccountManager {
     if (!username || typeof username !== 'string') return false;
     if (username.length < config.validation.usernameMinLength || username.length > config.validation.usernameMaxLength) return false;
     return /^[a-zA-Z0-9_]+$/.test(username);
+  }
+
+  // 清理昵称：去掉 HTML 尖括号与控制字符并限制长度，避免存储型 XSS
+  normalizeNickname(nickname, fallback = '玩家') {
+    const raw = typeof nickname === 'string' ? nickname : '';
+    const cleaned = raw
+      .replace(/[<>]/g, '')
+      .replace(/[\u0000-\u001F\u007F]/g, '')
+      .trim()
+      .slice(0, 32);
+    return cleaned || fallback;
   }
 
   // 验证密码格式
@@ -2174,7 +2220,8 @@ class AccountManager {
       await dataStore.update('accounts', { 'account.id': accountId }, {
         'account.security': {
           passwordSalt: newSalt,
-          passwordHash: newHash
+          passwordHash: newHash,
+          passwordIterations: this.iterations
         },
         'account.type': 'registered',
         'account.updatedAt': Date.now()
@@ -2227,10 +2274,11 @@ class AccountManager {
           id: this.generateId(),
           type: 'registered',
           username: username,
-          nickname: nickname || username,
+          nickname: this.normalizeNickname(nickname, username),
           security: {
             passwordSalt: salt,
-            passwordHash: hash
+            passwordHash: hash,
+            passwordIterations: this.iterations
           },
           isAdmin: isAdmin,
           isBanned: false,

@@ -28,6 +28,7 @@ import {
 } from '../save/sync.js';
 import { el } from '../../../utils/dom.js';
 import { toast } from '../../../components/toast.js';
+import { modal } from '../../../components/modal.js';
 
 function readStore(key) {
   try {
@@ -201,6 +202,22 @@ export function renderLevelMode(container, { onExit }) {
       '提前结算',
     );
 
+    /** 对局中离开 / 重开会丢掉当前这一局的进度，先确认；已结算或还没走步则直接执行 */
+    function confirmLeave(action, confirmText) {
+      const played = board ? board.getState().moves > 0 : false;
+      if (finished || !played) {
+        action();
+        return;
+      }
+      modal.show({
+        title: '离开本局？',
+        content: el('p', { style: 'margin:0;' }, '本局尚未结算，离开后进度不会保留。'),
+        confirmText,
+        cancelText: '继续游戏',
+        onConfirm: action,
+      });
+    }
+
     container.replaceChildren(
       head(`${level.name}`, `第 ${level.id} 关 · ${level.rows}×${level.cols} · ${level.colors} 色`),
       el(
@@ -221,8 +238,8 @@ export function renderLevelMode(container, { onExit }) {
         { class: 'm3-actions' },
         settleBtn,
         detailBtn,
-        el('button', { class: 'm3-btn m3-btn--ghost', onClick: () => renderPlay(level) }, '重开'),
-        el('button', { class: 'm3-btn m3-btn--ghost', onClick: () => renderList() }, '返回列表'),
+        el('button', { class: 'm3-btn m3-btn--ghost', onClick: () => confirmLeave(() => renderPlay(level), '重新开始') }, '重开'),
+        el('button', { class: 'm3-btn m3-btn--ghost', onClick: () => confirmLeave(renderList, '返回列表') }, '返回列表'),
       ),
     );
 

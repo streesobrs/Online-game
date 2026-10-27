@@ -181,6 +181,25 @@
   text-align: center;
 }
 
+/* 倒车模式标：仅倒车时出现在 HUD 下方 */
+.train3d-page #reverse-mode {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 10px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: rgba(231, 76, 60, 0.3);
+  border: 1px solid rgba(231, 76, 60, 0.65);
+  color: #ffb3a7;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.train3d-page #reverse-mode[hidden] {
+  display: none;
+}
+
 .train3d-page #station-status {
   position: absolute;
   left: 50%;
@@ -697,6 +716,13 @@
   color: #b6ffd6;
 }
 
+/* 倒车键激活时用红色区分方向 */
+.train3d-page #touch-reverse.on {
+  border-color: rgba(231, 76, 60, 0.8);
+  background: rgba(231, 76, 60, 0.3);
+  color: #ffb3a7;
+}
+
 .train3d-page .touch-back {
   position: absolute;
   top: calc(14px + env(safe-area-inset-top, 0px));
@@ -809,6 +835,11 @@
 
   /* 压缩顶部 HUD，避免与返回键/档位重叠 */
   .train3d-page #hud h1 {
+    display: none;
+  }
+
+  /* 窄屏由右下角“倒车/前进”按键指示方向，避免 HUD 过高压到状态条 */
+  .train3d-page #reverse-mode {
     display: none;
   }
 

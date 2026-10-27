@@ -104,6 +104,33 @@ const GAME_TOUR_STEPS = [
   },
 ];
 
+/** 首次进入贪吃蛇单机：分数 / 方向 / 道具与重开 */
+const SNAKE_TOUR_STEPS = [
+  {
+    icon: '🐍',
+    title: '单机对局',
+    find: () => document.querySelector('.snake-hud'),
+    text: '上方显示分数、历史最高分和当前移动速度。吃食物加分，速度会随分数逐渐变快。',
+  },
+  {
+    icon: '🕹️',
+    title: '方向控制',
+    // PC 上虚拟按键隐藏，改为高亮棋盘；移动端高亮虚拟按键
+    find: () => {
+      const controls = document.querySelector('.snake-virtual-controls');
+      if (controls && controls.offsetParent !== null) return controls;
+      return document.querySelector('.snake-canvas');
+    },
+    text: '用方向键 / WASD（手机用屏幕按键或滑动棋盘）控制方向，不能 180° 掉头；撞墙或撞到自己本局就结束。',
+  },
+  {
+    icon: '🎒',
+    title: '道具与重开',
+    find: () => document.querySelector('.snake-solo-actions'),
+    text: '对局开始后会出现道具栏，双击道具即可使用；「重新开始」随时重开一局，左上角「返回大厅」离开对局。',
+  },
+];
+
 /** 首次进入邮件 Tab：列表 / 领取 */
 const MAIL_TOUR_STEPS = [
   {
@@ -188,6 +215,7 @@ let stepIndex = 0;
 let resizeHandler = null;
 let currentSteps = [];
 let onFinish = null;
+let onGuideEnd = null;
 
 /* ===== 公共 API ===== */
 
@@ -229,19 +257,25 @@ export function startOnboarding() {
  * 场景引导：首次触发后记录标记（v2_tour_<key>），之后不再打扰。
  * 若已有其他引导在运行则本次不触发（也不标记，下次进入仍可触发）。
  */
-export function startTour(key, steps) {
+export function startTour(key, steps, options = {}) {
   if (active) return;
   const flag = `v2_tour_${key}`;
   if (localStorage.getItem(flag) === '1') return;
   localStorage.setItem(flag, '1');
-  startGuide(steps, null);
+  startGuide(steps, options.onFinish || null, options.onStart, options.onEnd);
 }
 
+/** 当前是否有引导弹窗打开（供游戏循环暂停用） */
+export function isOnboardingActive() { return active; }
+
 /** 场景引导标记用的 key（与下方 startXxxTour 一一对应） */
-const TOUR_KEYS = ['game', 'mail', 'shop', 'assets', 'spectate'];
+const TOUR_KEYS = ['game', 'snake', 'mail', 'shop', 'assets', 'spectate'];
 
 /** 首次进入对局触发 */
 export function startGameTour() { startTour('game', GAME_TOUR_STEPS); }
+
+/** 首次进入贪吃蛇单机触发 */
+export function startSnakeTour(options) { startTour('snake', SNAKE_TOUR_STEPS, options); }
 
 /** 首次进入邮件 Tab 触发 */
 export function startMailTour() { startTour('mail', MAIL_TOUR_STEPS); }
@@ -263,12 +297,14 @@ export function resetAllTours() {
 /* ===== 引擎实现 ===== */
 
 /** 启动一套引导 */
-function startGuide(steps, finishCb) {
+function startGuide(steps, finishCb, onStartCb, onEndCb) {
   if (active) return;
   active = true;
   currentSteps = steps;
   onFinish = finishCb;
+  onGuideEnd = onEndCb || null;
   stepIndex = 0;
+  if (typeof onStartCb === 'function') onStartCb();
 
   mask = el('div', { class: 'onboarding-mask' });
   pop = el('div', { class: 'onboarding-pop' });
@@ -439,7 +475,10 @@ function finish() {
     resizeHandler = null;
   }
   const cb = onFinish;
+  const endCb = onGuideEnd;
   onFinish = null;
+  onGuideEnd = null;
   currentSteps = [];
+  if (endCb) endCb();
   if (cb) cb();
 }

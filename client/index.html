@@ -5620,6 +5620,12 @@
       return div.innerHTML;
     }
 
+    // 统一附带登录 Token，服务端据此校验账号归属
+    function authHeaders(extra) {
+      const token = localStorage.getItem('userToken') || '';
+      return Object.assign({ 'Authorization': token ? `Bearer ${token}` : '' }, extra || {});
+    }
+
     // 维护模式相关状态
     let maintenanceState = {
       active: false,
@@ -10368,7 +10374,7 @@
     async function syncServerSnakeItems() {
       try {
         const userId = localStorage.getItem('gameUserId') || 'guest';
-        const res = await fetch(`/api/shop/inventory?userId=${userId}`);
+        const res = await fetch(`/api/shop/inventory?userId=${userId}`, { headers: authHeaders() });
         const data = await res.json();
         if (data.success && data.inventory && data.inventory.items) {
           const snakeItemIds = Object.keys(SNAKE_ITEM_TYPES);
@@ -10522,7 +10528,7 @@
         if (!userId) return;
         await fetch('/api/shop/use-item', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ userId, itemId })
         });
       } catch (e) {
@@ -13167,7 +13173,7 @@
     async function loadUserCosmetics(userId) {
       if (!userId) return;
       try {
-        const response = await fetch(`/api/shop/cosmetics?userId=${userId}`);
+        const response = await fetch(`/api/shop/cosmetics?userId=${userId}`, { headers: authHeaders() });
         const result = await response.json();
         if (result.success) {
           userCosmetics = result.cosmetics;

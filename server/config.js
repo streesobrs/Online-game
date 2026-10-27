@@ -269,7 +269,7 @@ module.exports = {
 
   // ========== 安全与认证配置 ==========
   security: {
-    passwordHashIterations: 10000,                  // PBKDF2密码哈希迭代次数（越高越安全但越慢）
+    passwordHashIterations: 210000,                 // PBKDF2密码哈希迭代次数（越高越安全但越慢）
     passwordKeyLength: 64,                          // 密码哈希密钥长度（字节）
     passwordSaltBytes: 16,                          // 密码盐值随机字节数
     userIdBytes: 8,                                 // 注册用户ID随机字节数（16位十六进制）

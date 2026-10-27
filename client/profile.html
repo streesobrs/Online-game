@@ -1855,6 +1855,12 @@
       return localStorage.getItem('userToken');
     }
 
+    // 统一附带登录 Token，服务端据此校验账号归属
+    function authHeaders(extra) {
+      const token = getToken() || '';
+      return Object.assign({ 'Authorization': token ? `Bearer ${token}` : '' }, extra || {});
+    }
+
     // ===== 经验计算（从服务器动态加载）=====
     let EXP_MAP = {};
     async function loadLevelConfig() {
@@ -1898,7 +1904,7 @@
     // 加载用户外观数据
     async function loadUserCosmetics() {
       try {
-        const res = await fetch(`/api/shop/cosmetics?userId=${currentAccountId}`);
+        const res = await fetch(`/api/shop/cosmetics?userId=${currentAccountId}`, { headers: authHeaders() });
         const json = await res.json();
         if (json.success) {
           userCosmetics = json.cosmetics || {};
@@ -2168,7 +2174,7 @@
       try {
         const res = await fetch('/api/shop/cosmetics/equip', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ userId: currentAccountId, category: 'avatar', cosmeticId: avatarId })
         });
         const json = await res.json();
@@ -2192,7 +2198,7 @@
       try {
         const res = await fetch('/api/shop/cosmetics/equip', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ userId: currentAccountId, category: 'avatarCustom', cosmeticId: avatarFile })
         });
         const json = await res.json();
@@ -2225,7 +2231,7 @@
       try {
         const res = await fetch('/api/avatar/delete', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ userId: currentAccountId, avatarFile: avatarFile })
         });
         const json = await res.json();
@@ -2269,7 +2275,7 @@
       try {
         const res = await fetch('/api/avatar/rename', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ userId: currentAccountId, avatarFile: avatarFile, name: trimmedName })
         });
         const json = await res.json();
@@ -2292,7 +2298,7 @@
       try {
         const res = await fetch('/api/shop/cosmetics/equip', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ userId: currentAccountId, category: 'frame', cosmeticId: frameId })
         });
         const json = await res.json();
@@ -2475,7 +2481,7 @@
           pendingReplaceFile = null;
           const replaceRes = await fetch('/api/avatar/upload', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: authHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({
               userId: currentAccountId,
               avatar: base64Data,
@@ -2500,7 +2506,7 @@
         // 先尝试普通上传
         const res = await fetch('/api/avatar/upload', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ userId: currentAccountId, avatar: base64Data })
         });
         const json = await res.json();
@@ -3045,8 +3051,8 @@
       if (!accountId) return;
       try {
         const [buffsRes, vipRes] = await Promise.all([
-          fetch('/api/buffs/' + accountId),
-          fetch('/api/shop/vip?userId=' + accountId)
+          fetch('/api/buffs/' + accountId, { headers: authHeaders() }),
+          fetch('/api/shop/vip?userId=' + accountId, { headers: authHeaders() })
         ]);
         const buffsData = await buffsRes.json();
         const vipData = await vipRes.json();
@@ -3158,7 +3164,7 @@
     async function fetchProfile(accountId) {
       try {
         await loadLevelConfig();
-        const res = await fetch('/api/profile/' + accountId);
+        const res = await fetch('/api/profile/' + accountId, { headers: authHeaders() });
         const json = await res.json();
         if (json.success && json.data) {
           document.getElementById('loadingState').style.display = 'none';
@@ -3203,7 +3209,7 @@
       const accountId = currentAccountId;
       if (!accountId) return;
       try {
-        const res = await fetch('/api/currency/' + accountId + '/transactions?limit=30');
+        const res = await fetch('/api/currency/' + accountId + '/transactions?limit=30', { headers: authHeaders() });
         const json = await res.json();
         const list = document.getElementById('txList');
         document.getElementById('txCount').textContent = '共 ' + (json.transactions?.length || 0) + ' 笔记录';
@@ -3231,7 +3237,7 @@
       const accountId = currentAccountId;
       if (!accountId) return;
       try {
-        const res = await fetch('/api/currency/' + accountId + '/exp-transactions?limit=30');
+        const res = await fetch('/api/currency/' + accountId + '/exp-transactions?limit=30', { headers: authHeaders() });
         const json = await res.json();
         const list = document.getElementById('expTxList');
         document.getElementById('expTxCount').textContent = '共 ' + (json.transactions?.length || 0) + ' 笔记录';
@@ -3315,7 +3321,7 @@
       const accountId = currentAccountId;
       if (!accountId) return;
       try {
-        const res = await fetch('/api/mails/' + accountId);
+        const res = await fetch('/api/mails/' + accountId, { headers: authHeaders() });
         const json = await res.json();
         if (json.success) {
           currentMails = json.mails || [];
@@ -3439,7 +3445,7 @@
       if (!accountId) return;
       try {
         if (hasRewards) {
-          const res = await fetch('/api/mails/' + accountId + '/claim/' + mailId, { method: 'POST' });
+          const res = await fetch('/api/mails/' + accountId + '/claim/' + mailId, { method: 'POST', headers: authHeaders() });
           const json = await res.json();
           if (json.success) {
             showToast('🎉 领取成功！', 'success');
@@ -3449,7 +3455,7 @@
             showToast(json.message || '领取失败', 'error');
           }
         } else {
-          const res = await fetch('/api/mails/' + accountId + '/read/' + mailId, { method: 'POST' });
+          const res = await fetch('/api/mails/' + accountId + '/read/' + mailId, { method: 'POST', headers: authHeaders() });
           const json = await res.json();
           if (json.success) {
             loadMails();
@@ -3471,7 +3477,7 @@
         return;
       }
       try {
-        const res = await fetch('/api/mails/' + accountId + '/claim-all', { method: 'POST' });
+        const res = await fetch('/api/mails/' + accountId + '/claim-all', { method: 'POST', headers: authHeaders() });
         const json = await res.json();
         if (json.success) {
           showToast('🎉 一键领取成功！共领取 ' + (json.claimedCount || 0) + ' 封邮件', 'success');
@@ -3490,7 +3496,7 @@
       const accountId = currentAccountId;
       if (!accountId) return;
       try {
-        const res = await fetch('/api/mails/' + accountId + '/' + mailId, { method: 'DELETE' });
+        const res = await fetch('/api/mails/' + accountId + '/' + mailId, { method: 'DELETE', headers: authHeaders() });
         const json = await res.json();
         if (json.success) {
           showToast('已删除', 'success');
@@ -3507,7 +3513,7 @@
 
     async function checkCompensation(accountId) {
       try {
-        const res = await fetch('/api/currency/' + accountId + '/compensation');
+        const res = await fetch('/api/currency/' + accountId + '/compensation', { headers: authHeaders() });
         const json = await res.json();
         const section = document.getElementById('compensationSection');
         if (!json.success) return;
@@ -3564,7 +3570,7 @@
         btn.textContent = '处理中...';
       }
       try {
-        const res = await fetch('/api/currency/compensate', { method: 'POST' });
+        const res = await fetch('/api/currency/compensate', { method: 'POST', headers: authHeaders() });
         const json = await res.json();
         if (json.success) {
           showToast('🎉 补偿完成！' + (json.totalCoins > 0 ? `共发放 ${json.totalCoins}💎` : '无需补偿'), 'success');
@@ -3591,7 +3597,7 @@
     async function claimLevelReward(level) {
       if (!currentAccountId) return;
       try {
-        const res = await fetch('/api/level-rewards/' + currentAccountId + '/claim', { method: 'POST' });
+        const res = await fetch('/api/level-rewards/' + currentAccountId + '/claim', { method: 'POST', headers: authHeaders() });
         const json = await res.json();
         if (json.success && json.rewards?.length > 0) {
           showToast('🎉 成功领取 ' + json.rewards.length + ' 项等级奖励！', 'success');

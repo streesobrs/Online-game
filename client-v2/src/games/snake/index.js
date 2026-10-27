@@ -9,9 +9,11 @@ import { createSnakeBoard } from './board.js';
 import { startDualMatch, cleanupDualMatch } from './play.js';
 import { emit } from '../../core/socket.js';
 import { store } from '../../core/store.js';
+import { go } from '../../core/router.js';
 import { api } from '../../core/api.js';
 import { viewRoot, el } from '../../utils/dom.js';
 import { toast } from '../../components/toast.js';
+import { isOnboardingActive } from '../../components/onboarding.js';
 import { modal } from '../../components/modal.js';
 
 const SOLO_CONFIG = {
@@ -111,7 +113,10 @@ export function renderSnake(container = viewRoot()) {
   // ---- 方向控制（防 180° 反转，与 v1 一致）----
   function setDirection(dir) {
     if (state.gameOver) return;
-    if (!state.running) return; // 未开始时忽略（开始后方向恒 right）
+    // 引导弹窗打开时忽略操作，避免误触直接开局
+    if (isOnboardingActive()) return;
+    // 还没开始时，第一次按方向键直接开局（开始方向为右，仍不能立刻反向）
+    if (!state.running) startGame();
     const cur = state.direction;
     if (dir === 'up' && cur === 'down') return;
     if (dir === 'down' && cur === 'up') return;
@@ -130,6 +135,7 @@ export function renderSnake(container = viewRoot()) {
     }
     if (dir) {
       e.preventDefault();
+      e.stopPropagation(); // 避免冒泡到 window 触发全局导航快捷键
       setDirection(dir);
     }
   }
@@ -342,10 +348,14 @@ export function renderSnake(container = viewRoot()) {
     const now = Date.now();
     const isInvincible = state.invincibleEndTime > now;
 
-    // 碰撞：撞墙 / 撞自己（无敌时间内跳过，对齐 v1）
+    // 碰撞：撞墙 / 撞自己（无敌时间内撞自己可穿过，撞墙仍挡住，避免蛇头跑出棋盘看不见）
     const hitWall = next.x < 0 || next.x >= SOLO_CONFIG.gridSize || next.y < 0 || next.y >= SOLO_CONFIG.gridSize;
     const hitSelf = state.snake.some((s) => s.x === next.x && s.y === next.y);
-    if (!isInvincible && (hitWall || hitSelf)) {
+    if (hitWall) {
+      if (!isInvincible) handleCollision(); // 复活弹窗或结束接管，本帧不移动
+      return; // 无敌期间停在墙边，等玩家转向
+    }
+    if (!isInvincible && hitSelf) {
       handleCollision(); // 复活弹窗或结束接管，本帧不移动
       return;
     }
@@ -439,7 +449,10 @@ export function renderSnake(container = viewRoot()) {
 
   // ---- 游戏循环 ----
   function loop(now) {
-    if (state.running && now - state.lastTime >= state.speed) {
+    // 引导弹窗打开时暂停推进，避免玩家看说明时蛇继续移动撞死
+    if (state.running && isOnboardingActive()) {
+      state.lastTime = now;
+    } else if (state.running && now - state.lastTime >= state.speed) {
       state.lastTime = now;
       move();
     }
@@ -464,12 +477,40 @@ export function renderSnake(container = viewRoot()) {
     state.maxLength = state.snake.length;
     state.foodEaten = 0;
     resetFoods();
+    // 记录初始状态，供回放还原蛇身与食物
+    // 格式: ['init', timestamp, direction, snake[[x,y]...], foodCount, f1x, f1y, ..., score]
+    const initRecord = [
+      'init',
+      Date.now(),
+      state.direction,
+      state.snake.map((s) => [s.x, s.y]),
+      state.foods.length,
+    ];
+    state.foods.forEach((f) => initRecord.push(f.x, f.y));
+    initRecord.push(state.score);
+    state.moveHistory.push(initRecord);
     updateHud();
     board.render({ snake: state.snake, foods: state.foods, invincible: false });
     startBtn.textContent = '重新开始';
     if (!state.rafId) state.rafId = requestAnimationFrame(loop);
     // 通知服务端单机对局开始（对齐 v1 startSnakeGame）
     emit('snake_game_start', { gameType: 'snake' });
+  }
+
+  // ---- 初始棋盘（等待玩家点击开始，不自动跑起来）----
+  function prepareInitial() {
+    state.snake = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
+    state.direction = 'right';
+    state.nextDirection = 'right';
+    state.score = 0;
+    state.speed = SOLO_CONFIG.initialSpeed;
+    state.running = false;
+    state.gameOver = false;
+    state.foods = [];
+    resetFoods();
+    updateHud();
+    board.render({ snake: state.snake, foods: state.foods, invincible: false });
+    startBtn.textContent = '开始游戏';
   }
 
   // ---- 虚拟按键 ----
@@ -506,10 +547,21 @@ export function renderSnake(container = viewRoot()) {
     itemListEl,
   ]);
   const controls = el('div', { class: 'snake-virtual-controls' }, [upBtn, leftBtn, downBtn, rightBtn]);
-  const actions = el('div', { style: 'text-align:center;margin-top:12px;' }, [startBtn]);
+  const actions = el('div', { class: 'snake-solo-actions', style: 'text-align:center;margin-top:12px;' }, [startBtn]);
+
+  // 返回大厅：统一大厅内直接挂载，hash 不变也能触发大厅重渲染
+  const backBtn = el('button', { class: 'snake-back-btn' }, '← 返回大厅');
+  backBtn.addEventListener('click', () => go('games'));
+  const head = el('div', { class: 'snake-solo-head' }, [
+    backBtn,
+    el('span', { class: 'snake-solo-title' }, '🐍 贪吃蛇 · 单机'),
+  ]);
+
+  // 大厅的 .games-play-area 是 flex 居中容器，这里用纵向面板包住各区块
+  const panel = el('div', { class: 'snake-solo' }, [head, hud, itemBarEl, boardEl, controls, actions]);
 
   container.innerHTML = '';
-  container.append(hud, itemBarEl, boardEl, controls, actions);
+  container.append(panel);
 
   // 触摸滑动控制方向（移动端，任务 5.1.2）
   let touchStart = null;
@@ -532,7 +584,7 @@ export function renderSnake(container = viewRoot()) {
   document.addEventListener('keydown', onKeydown);
 
   // 初始渲染（未开始时展示初始蛇 + 食物）
-  startGame();
+  prepareInitial();
   // 加载贪吃蛇道具（本地缓存 + 服务端背包同步，对齐 v1 loadSnakeItems）
   loadSnakeItems();
 

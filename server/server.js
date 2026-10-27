@@ -9,6 +9,7 @@ const fs = require('fs');
 const config = require('./config');
 const logger = require('./utils/logger');
 const dataStore = require('./utils/dataStore');
+const sessionTokenUtil = require('./utils/sessionToken');
 const runtimeConfig = require('./modules/runtimeConfig');
 
 // 初始化运行时配置（从磁盘加载覆盖值，必须在使用config之前调用）
@@ -106,6 +107,78 @@ function authenticateToken(req, res, next) {
   }
 
   return res.status(401).json({ success: false, message: '无效的认证Token' });
+}
+
+// 用户端 REST 鉴权：只信任服务端签发的会话 Token，不再信任请求体里的 userId
+function authenticateUser(req, res, next) {
+  const authorization = String(req.headers.authorization || '');
+  const token = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+  const accountId = token ? sessionTokenUtil.verifySessionToken(token) : null;
+
+  if (!accountId) {
+    return res.status(401).json({ success: false, message: '登录状态已失效，请重新登录' });
+  }
+
+  req.authAccountId = accountId;
+  next();
+}
+
+// 可选鉴权：有合法 Token 时附带身份，用于「本人可见完整资料、他人只看公开资料」的场景
+function optionalUser(req, res, next) {
+  const authorization = String(req.headers.authorization || '');
+  const token = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+  req.authAccountId = token ? sessionTokenUtil.verifySessionToken(token) : null;
+  next();
+}
+
+// 校验目标账号必须与登录身份一致，防止越权操作他人数据
+function requireSelf(getTargetId) {
+  return (req, res, next) => {
+    const targetId = getTargetId(req);
+    if (!targetId || String(targetId) !== req.authAccountId) {
+      return res.status(403).json({ success: false, message: '无权操作该账号' });
+    }
+    next();
+  };
+}
+
+// 登录失败限流：同一来源 IP + 用户名连续失败 5 次后锁定 10 分钟
+const loginFailureMap = new Map();
+const LOGIN_FAILURE_LIMIT = 5;
+const LOGIN_FAILURE_WINDOW = 10 * 60 * 1000;
+const LOGIN_LOCK_DURATION = 10 * 60 * 1000;
+
+function getLoginKey(socket, username) {
+  const ip = socket.handshake?.address || socket.conn?.remoteAddress || 'unknown';
+  return `${ip}|${String(username || '').toLowerCase()}`;
+}
+
+function getLoginLockRemaining(key) {
+  const entry = loginFailureMap.get(key);
+  if (!entry) return 0;
+  if (Date.now() - entry.firstAt > LOGIN_FAILURE_WINDOW) {
+    loginFailureMap.delete(key);
+    return 0;
+  }
+  if (entry.lockedUntil && entry.lockedUntil > Date.now()) {
+    return Math.ceil((entry.lockedUntil - Date.now()) / 60000);
+  }
+  return 0;
+}
+
+function recordLoginFailure(key) {
+  const now = Date.now();
+  const entry = loginFailureMap.get(key) || { count: 0, firstAt: now, lockedUntil: 0 };
+  entry.count += 1;
+  if (entry.count >= LOGIN_FAILURE_LIMIT) {
+    entry.lockedUntil = now + LOGIN_LOCK_DURATION;
+    entry.count = 0;
+  }
+  loginFailureMap.set(key, entry);
+}
+
+function clearLoginFailures(key) {
+  loginFailureMap.delete(key);
 }
 
 // 管理端 REST 操作日志统一入口：记录 时间/操作人/操作/目标
@@ -364,7 +437,7 @@ app.get('/api/config/levelExp', (req, res) => {
 // ========== 商店API ==========
 
 // 获取商店数据
-app.get('/api/shop/data', async (req, res) => {
+app.get('/api/shop/data', authenticateUser, requireSelf(req => req.query.userId), async (req, res) => {
   try {
     const userId = req.query.userId;
     const data = await shopManager.getShopData(userId, accountManager);
@@ -376,7 +449,7 @@ app.get('/api/shop/data', async (req, res) => {
 });
 
 // 购买商品
-app.post('/api/shop/buy', async (req, res) => {
+app.post('/api/shop/buy', authenticateUser, requireSelf(req => req.body.userId), async (req, res) => {
   try {
     const { userId, itemId, quantity = 1 } = req.body;
     if (!userId || !itemId) {
@@ -394,7 +467,7 @@ app.post('/api/shop/buy', async (req, res) => {
 });
 
 // 获取用户背包
-app.get('/api/shop/inventory', async (req, res) => {
+app.get('/api/shop/inventory', authenticateUser, requireSelf(req => req.query.userId), async (req, res) => {
   try {
     const { userId } = req.query;
     if (!userId) {
@@ -409,7 +482,7 @@ app.get('/api/shop/inventory', async (req, res) => {
 });
 
 // 获取用户外观
-app.get('/api/shop/cosmetics', async (req, res) => {
+app.get('/api/shop/cosmetics', authenticateUser, requireSelf(req => req.query.userId), async (req, res) => {
   try {
     const { userId } = req.query;
     if (!userId) {
@@ -424,7 +497,7 @@ app.get('/api/shop/cosmetics', async (req, res) => {
 });
 
 // 装备外观
-app.post('/api/shop/cosmetics/equip', async (req, res) => {
+app.post('/api/shop/cosmetics/equip', authenticateUser, requireSelf(req => req.body.userId), async (req, res) => {
   try {
     const { userId, category, cosmeticId } = req.body;
     if (!userId || !category) {
@@ -450,7 +523,7 @@ app.get('/api/shop/cosmetics/config', async (req, res) => {
 });
 
 // 上传自定义头像
-app.post('/api/avatar/upload', async (req, res) => {
+app.post('/api/avatar/upload', authenticateUser, requireSelf(req => req.body.userId), async (req, res) => {
   try {
     const { userId, avatar, replaceIndex, name } = req.body;
     if (!userId || !avatar) {
@@ -465,7 +538,7 @@ app.post('/api/avatar/upload', async (req, res) => {
 });
 
 // 删除自定义头像
-app.post('/api/avatar/delete', async (req, res) => {
+app.post('/api/avatar/delete', authenticateUser, requireSelf(req => req.body.userId), async (req, res) => {
   try {
     const { userId, avatarFile } = req.body;
     if (!userId || !avatarFile) {
@@ -480,7 +553,7 @@ app.post('/api/avatar/delete', async (req, res) => {
 });
 
 // 重命名自定义头像
-app.post('/api/avatar/rename', async (req, res) => {
+app.post('/api/avatar/rename', authenticateUser, requireSelf(req => req.body.userId), async (req, res) => {
   try {
     const { userId, avatarFile, name } = req.body;
     if (!userId || !avatarFile || !name) {
@@ -495,7 +568,7 @@ app.post('/api/avatar/rename', async (req, res) => {
 });
 
 // 获取用户会员信息
-app.get('/api/shop/vip', async (req, res) => {
+app.get('/api/shop/vip', authenticateUser, requireSelf(req => req.query.userId), async (req, res) => {
   try {
     const { userId } = req.query;
     if (!userId) {
@@ -510,7 +583,7 @@ app.get('/api/shop/vip', async (req, res) => {
 });
 
 // 获取星钻余额
-app.get('/api/currency/balance', async (req, res) => {
+app.get('/api/currency/balance', authenticateUser, requireSelf(req => req.query.userId), async (req, res) => {
   try {
     const { userId } = req.query;
     if (!userId) {
@@ -525,7 +598,7 @@ app.get('/api/currency/balance', async (req, res) => {
 });
 
 // 使用道具
-app.post('/api/shop/use-item', async (req, res) => {
+app.post('/api/shop/use-item', authenticateUser, requireSelf(req => req.body.userId), async (req, res) => {
   try {
     const { userId, itemId } = req.body;
     if (!userId || !itemId) {
@@ -550,7 +623,7 @@ app.post('/api/shop/use-item', async (req, res) => {
 });
 
 // 获取活跃buff
-app.get('/api/buffs/:userId', async (req, res) => {
+app.get('/api/buffs/:userId', authenticateUser, requireSelf(req => req.params.userId), async (req, res) => {
   try {
     const userId = req.params.userId;
     const account = await accountManager._getAccount(userId);
@@ -840,16 +913,21 @@ app.put('/api/accounts/:id/exp', authenticateToken, async (req, res) => {
 // ========== 游戏相关API ==========
 
 // 获取游戏历史记录
-app.get('/api/games/history', async (req, res) => {
+app.get('/api/games/history', authenticateUser, requireSelf(req => req.query.accountId), async (req, res) => {
   try {
     const { accountId, limit = 20, offset = 0 } = req.query;
-    const history = await gameManager.getGameHistory(accountId, parseInt(limit));
+    // limit=all 表示返回全部记录（前端本地分页用），否则按 offset/limit 分页
+    const all = String(limit) === 'all';
+    const limitNum = all ? null : Math.max(1, parseInt(limit) || 20);
+    const offsetNum = Math.max(0, parseInt(offset) || 0);
+    const history = await gameManager.getGameHistory(accountId, limitNum, offsetNum);
     res.json({
       success: true,
       data: history,
       pagination: {
-        limit: parseInt(limit),
-        offset: parseInt(offset)
+        limit: all ? history.length : limitNum,
+        offset: offsetNum,
+        ...(all ? { total: history.length } : {})
       }
     });
   } catch (err) {
@@ -964,7 +1042,7 @@ app.get('/api/feedbacks', async (req, res) => {
 });
 
 // 提交反馈
-app.post('/api/feedbacks', async (req, res) => {
+app.post('/api/feedbacks', authenticateUser, requireSelf(req => req.body.accountId), async (req, res) => {
   try {
     const { accountId, nickname, type, title, content } = req.body;
     if (!accountId || !nickname || !title || !content) {
@@ -986,7 +1064,7 @@ app.post('/api/feedbacks', async (req, res) => {
 });
 
 // 投票
-app.post('/api/feedbacks/:id/vote', async (req, res) => {
+app.post('/api/feedbacks/:id/vote', authenticateUser, requireSelf(req => req.body.accountId), async (req, res) => {
   try {
     const { id } = req.params;
     const { accountId, voteType = 'up' } = req.body;
@@ -1013,7 +1091,7 @@ app.post('/api/feedbacks/:id/vote', async (req, res) => {
 });
 
 // 添加评论
-app.post('/api/feedbacks/:id/comments', async (req, res) => {
+app.post('/api/feedbacks/:id/comments', authenticateUser, requireSelf(req => req.body.accountId), async (req, res) => {
   try {
     const { id } = req.params;
     const { accountId, content } = req.body;
@@ -1199,7 +1277,7 @@ app.get('/api/users/all', async (req, res) => {
 
 // ========== 好友相关API ==========
 // 获取好友状态：好友列表 + 收到的申请 + 已发出的申请
-app.get('/api/friends/:accountId', async (req, res) => {
+app.get('/api/friends/:accountId', authenticateUser, requireSelf(req => req.params.accountId), async (req, res) => {
   try {
     const { accountId } = req.params;
     if (!accountId) {
@@ -1214,7 +1292,7 @@ app.get('/api/friends/:accountId', async (req, res) => {
 });
 
 // 发起好友申请
-app.post('/api/friends/request', async (req, res) => {
+app.post('/api/friends/request', authenticateUser, requireSelf(req => req.body.fromUserId), async (req, res) => {
   try {
     const { fromUserId, toUserId } = req.body || {};
     if (!fromUserId || !toUserId) {
@@ -1248,7 +1326,7 @@ app.post('/api/friends/request', async (req, res) => {
 });
 
 // 同意/拒绝好友申请
-app.post('/api/friends/respond', async (req, res) => {
+app.post('/api/friends/respond', authenticateUser, requireSelf(req => req.body.userId), async (req, res) => {
   try {
     const { userId, fromUserId, accept } = req.body || {};
     if (!userId || !fromUserId) {
@@ -1274,7 +1352,7 @@ app.post('/api/friends/respond', async (req, res) => {
 });
 
 // 删除好友
-app.delete('/api/friends/:accountId/:friendId', async (req, res) => {
+app.delete('/api/friends/:accountId/:friendId', authenticateUser, requireSelf(req => req.params.accountId), async (req, res) => {
   try {
     const { accountId, friendId } = req.params;
     if (!accountId || !friendId) {
@@ -1537,7 +1615,7 @@ app.get('/api/leaderboard/weekly', async (req, res) => {
 // ========== 星钻货币系统 API ==========
 
 // 获取用户星钻余额
-app.get('/api/currency/:accountId', async (req, res) => {
+app.get('/api/currency/:accountId', authenticateUser, requireSelf(req => req.params.accountId), async (req, res) => {
   try {
     const result = await accountManager.getCurrency(req.params.accountId);
     res.json(result);
@@ -1548,7 +1626,7 @@ app.get('/api/currency/:accountId', async (req, res) => {
 });
 
 // 获取星钻交易记录
-app.get('/api/currency/:accountId/transactions', async (req, res) => {
+app.get('/api/currency/:accountId/transactions', authenticateUser, requireSelf(req => req.params.accountId), async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 50;
     const result = await accountManager.getCurrencyTransactions(req.params.accountId, limit);
@@ -1560,7 +1638,7 @@ app.get('/api/currency/:accountId/transactions', async (req, res) => {
 });
 
 // 获取经验记录
-app.get('/api/currency/:accountId/exp-transactions', async (req, res) => {
+app.get('/api/currency/:accountId/exp-transactions', authenticateUser, requireSelf(req => req.params.accountId), async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 50;
     const result = await accountManager.getExpTransactions(req.params.accountId, limit);
@@ -1574,7 +1652,7 @@ app.get('/api/currency/:accountId/exp-transactions', async (req, res) => {
 // ========== 老玩家星钻补偿 API ==========
 
 // 触发补偿（只执行一次，已补偿的账号自动跳过）
-app.post('/api/currency/compensate', async (req, res) => {
+app.post('/api/currency/compensate', authenticateToken, async (req, res) => {
   try {
     const result = await accountManager.compensateOldPlayers();
     if (result && result.success && operationLogger) {
@@ -1591,7 +1669,7 @@ app.post('/api/currency/compensate', async (req, res) => {
 });
 
 // 查询单个账号是否已补偿
-app.get('/api/currency/:accountId/compensation', async (req, res) => {
+app.get('/api/currency/:accountId/compensation', authenticateUser, requireSelf(req => req.params.accountId), async (req, res) => {
   try {
     const { accountId } = req.params;
     const account = await accountManager.getAccount(accountId);
@@ -1613,7 +1691,7 @@ app.get('/api/currency/:accountId/compensation', async (req, res) => {
 // ========== 等级奖励系统 API ==========
 
 // 获取可领取的等级奖励列表
-app.get('/api/level-rewards/:accountId', async (req, res) => {
+app.get('/api/level-rewards/:accountId', authenticateUser, requireSelf(req => req.params.accountId), async (req, res) => {
   try {
     const result = await accountManager.getAvailableLevelRewards(req.params.accountId);
     res.json(result);
@@ -1706,7 +1784,7 @@ app.get('/api/multiplier-calendar', async (req, res) => {
 });
 
 // 领取所有可领取的等级奖励
-app.post('/api/level-rewards/:accountId/claim', async (req, res) => {
+app.post('/api/level-rewards/:accountId/claim', authenticateUser, requireSelf(req => req.params.accountId), async (req, res) => {
   try {
     const result = await accountManager.checkLevelRewards(req.params.accountId);
     res.json(result);
@@ -1719,11 +1797,11 @@ app.post('/api/level-rewards/:accountId/claim', async (req, res) => {
 // ========== 个人资料 API ==========
 
 // 获取完整的个人资料信息（含等级、成就、货币）
-app.get('/api/profile/:accountId', async (req, res) => {
+app.get('/api/profile/:accountId', optionalUser, async (req, res) => {
   try {
     const accountId = req.params.accountId;
-    // selfId：谁在请求。用于隐私过滤（自己看自己 = 完整数据，别人看 = 按隐私设置过滤）
-    const selfId = req.query.selfId || null;
+    // 身份只来自服务端校验过的 Token，不再信任 query 里的 selfId
+    const selfId = req.authAccountId || null;
     const account = await accountManager.getAccount(accountId);
     if (!account) {
       return res.status(404).json({ success: false, message: '账号不存在' });
@@ -1851,7 +1929,7 @@ app.get('/api/profile/:accountId', async (req, res) => {
 // ========== 邮件系统 API ==========
 
 // 获取用户邮件列表
-app.get('/api/mails/:accountId', async (req, res) => {
+app.get('/api/mails/:accountId', authenticateUser, requireSelf(req => req.params.accountId), async (req, res) => {
   try {
     const { accountId } = req.params;
     const result = await accountManager.getMails(accountId);
@@ -1863,7 +1941,7 @@ app.get('/api/mails/:accountId', async (req, res) => {
 });
 
 // 领取单封邮件
-app.post('/api/mails/:accountId/claim/:mailId', async (req, res) => {
+app.post('/api/mails/:accountId/claim/:mailId', authenticateUser, requireSelf(req => req.params.accountId), async (req, res) => {
   try {
     const { accountId, mailId } = req.params;
     const result = await accountManager.claimMail(accountId, mailId);
@@ -1875,7 +1953,7 @@ app.post('/api/mails/:accountId/claim/:mailId', async (req, res) => {
 });
 
 // 一键领取所有邮件
-app.post('/api/mails/:accountId/claim-all', async (req, res) => {
+app.post('/api/mails/:accountId/claim-all', authenticateUser, requireSelf(req => req.params.accountId), async (req, res) => {
   try {
     const { accountId } = req.params;
     const result = await accountManager.claimAllMails(accountId);
@@ -1887,7 +1965,7 @@ app.post('/api/mails/:accountId/claim-all', async (req, res) => {
 });
 
 // 标记所有邮件为已读
-app.post('/api/mails/:accountId/read-all', async (req, res) => {
+app.post('/api/mails/:accountId/read-all', authenticateUser, requireSelf(req => req.params.accountId), async (req, res) => {
   try {
     const { accountId } = req.params;
     const result = await accountManager.readAllMails(accountId);
@@ -1899,7 +1977,7 @@ app.post('/api/mails/:accountId/read-all', async (req, res) => {
 });
 
 // 标记单封邮件为已读
-app.post('/api/mails/:accountId/read/:mailId', async (req, res) => {
+app.post('/api/mails/:accountId/read/:mailId', authenticateUser, requireSelf(req => req.params.accountId), async (req, res) => {
   try {
     const { accountId, mailId } = req.params;
     const result = await accountManager.readMail(accountId, mailId);
@@ -1911,7 +1989,7 @@ app.post('/api/mails/:accountId/read/:mailId', async (req, res) => {
 });
 
 // 删除单封邮件
-app.delete('/api/mails/:accountId/:mailId', async (req, res) => {
+app.delete('/api/mails/:accountId/:mailId', authenticateUser, requireSelf(req => req.params.accountId), async (req, res) => {
   try {
     const { accountId, mailId } = req.params;
     const result = await accountManager.deleteMail(accountId, mailId);
@@ -1923,7 +2001,7 @@ app.delete('/api/mails/:accountId/:mailId', async (req, res) => {
 });
 
 // 清理所有已领取的邮件
-app.post('/api/mails/:accountId/cleanup', async (req, res) => {
+app.post('/api/mails/:accountId/cleanup', authenticateUser, requireSelf(req => req.params.accountId), async (req, res) => {
   try {
     const { accountId } = req.params;
     const result = await accountManager.deleteClaimedMails(accountId);
@@ -2574,10 +2652,32 @@ io.on('connection', (socket) => {
 
   // 账号密码登录
   socket.on('account_login', async (data) => {
-    const { username, password } = data;
+    const { username, password } = data || {};
     logger.info('收到账号登录请求', { socketId: socket.id, username });
 
+    const loginKey = getLoginKey(socket, username);
+    const lockMinutes = getLoginLockRemaining(loginKey);
+    if (lockMinutes > 0) {
+      logger.warn('账号登录被限流', { socketId: socket.id, username, lockMinutes });
+      socket.emit('login_result', {
+        success: false,
+        message: `登录失败次数过多，请 ${lockMinutes} 分钟后再试`
+      });
+      return;
+    }
+
+    if (!username || !password) {
+      socket.emit('login_result', { success: false, message: '请输入用户名和密码' });
+      return;
+    }
+
     const result = await accountManager.accountLogin(username, password);
+
+    if (result.success) {
+      clearLoginFailures(loginKey);
+    } else {
+      recordLoginFailure(loginKey);
+    }
 
     if (result.success && result.data) {
       // 获取当前用户会话
@@ -4690,14 +4790,30 @@ adminNamespace.on('connection', (socket) => {
 
   // 处理账号登录请求
   socket.on('admin_account_login', async (data) => {
-    const { username, password } = data;
+    const { username, password } = data || {};
 
     logger.info('收到后台账号登录请求', {
       socketId: socket.id,
       username
     });
 
+    const loginKey = `admin|${getLoginKey(socket, username)}`;
+    const lockMinutes = getLoginLockRemaining(loginKey);
+    if (lockMinutes > 0) {
+      socket.emit('admin_login_result', {
+        success: false,
+        message: `登录失败次数过多，请 ${lockMinutes} 分钟后再试`
+      });
+      return;
+    }
+
     const result = await adminManager.verifyAccountLogin(username, password);
+
+    if (result.success) {
+      clearLoginFailures(loginKey);
+    } else {
+      recordLoginFailure(loginKey);
+    }
 
     if (result.success) {
       // 登录成功，发送结果和 token

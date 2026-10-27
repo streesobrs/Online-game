@@ -262,11 +262,219 @@
   color: var(--text-secondary, #718096);
 }
 
-/* ---- 详情面板：全部玩法平铺展示 ---- */
+/* ---- 详情面板：左侧玩法 + 右侧信息栏（成就 / 图鉴 / 道具） ---- */
 .games-detail--flat {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 296px;
+  gap: 26px;
+  align-items: start;
+}
+
+/* 3D 驾驶没有侧栏：主区域铺满 */
+.games-detail--flat.games-detail--noside {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.games-detail-main {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-width: 0;
+}
+
+.games-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.games-side-card {
+  --accent: #4299e1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--surface-alt, #f7fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+}
+
+.games-side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.games-side-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary, #1a202c);
+}
+
+.games-side-link {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.games-side-link:hover {
+  text-decoration: underline;
+}
+
+.games-side-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.games-side-empty {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary, #a0aec0);
+}
+
+.games-side-metric {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.games-side-strong {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--accent);
+}
+
+.games-side-label {
+  font-size: 11px;
+  color: var(--text-secondary, #718096);
+}
+
+.games-side-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.games-side-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.games-side-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.games-side-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.games-side-row-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-secondary, #4a5568);
+}
+
+.games-side-tag {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  background: var(--surface, #fff);
+  color: var(--text-secondary, #a0aec0);
+}
+
+.games-side-tag.is-on {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+}
+
+.games-side-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary, #718096);
+}
+
+.games-side-badge {
+  margin: 0;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* 道具列表：行之间用分隔线，不再套一层卡片 */
+.games-item-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.games-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  min-width: 0;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.games-item-row:last-child {
+  border-bottom: none;
+}
+
+.games-item-icon {
+  flex: none;
+  width: 18px;
+  font-size: 14px;
+  line-height: 1;
+  text-align: center;
+}
+
+.games-item-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--text-secondary, #4a5568);
+}
+
+.games-item-count {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.games-item-count.is-zero {
+  font-weight: 500;
+  color: var(--text-secondary, #a0aec0);
 }
 
 .games-mode-section {
@@ -278,18 +486,28 @@
 .games-mode-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 14px;
+  gap: 24px;
   align-items: stretch;
 }
 
+/* 只有一个玩法卡片时（消消乐 / 3D 驾驶）不让它铺满整行 */
+.games-mode-grid--single {
+  grid-template-columns: minmax(0, 520px);
+}
+
+/* 玩法块不再做嵌套卡片，仅靠间距与分隔线区分，减少视觉噪音 */
 .games-mode-block {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 16px;
-  border-radius: 14px;
-  background: var(--surface-alt, #f7fafc);
-  border: 1px solid var(--border-color, #e2e8f0);
+  gap: 12px;
+  min-width: 0;
+}
+
+@media (min-width: 720px) {
+  .games-mode-grid > .games-mode-block + .games-mode-block {
+    border-left: 1px solid var(--border-color, #e2e8f0);
+    padding-left: 24px;
+  }
 }
 
 .games-mode-block .games-block-btn {
@@ -300,18 +518,23 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+}
+
+.games-block-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.games-block-name {
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-primary, #1a202c);
 }
 
-.games-block-icon {
-  font-size: 16px;
-}
-
 .games-block-desc {
-  font-size: 12px;
-  line-height: 1.6;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
   color: var(--text-secondary, #718096);
 }
 
@@ -332,50 +555,57 @@
   margin-top: auto;
 }
 
-/* ---- AI 难度 ---- */
-.games-diff-list {
+/* ---- 分段选择条：AI 难度 / 单机子玩法 ---- */
+.games-segmented {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 11px;
+  background: var(--surface-alt, #f1f5f9);
 }
 
-.games-diff {
-  --accent: #4299e1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  padding: 10px 12px 10px 14px;
-  border-radius: 10px;
-  border: 1px solid var(--border-color, #e2e8f0);
-  border-left: 4px solid var(--accent);
-  background: var(--surface, #fff);
-  cursor: pointer;
-  text-align: left;
-  font: inherit;
-  color: inherit;
-  transition: background 0.16s, border-color 0.16s, transform 0.16s;
-}
-
-.games-diff:hover {
-  transform: translateX(2px);
-}
-
-.games-diff.active {
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface, #fff));
-  border-color: var(--accent);
-  border-left-color: var(--accent);
-}
-
-.games-diff-label {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--accent);
-}
-
-.games-diff-desc {
-  font-size: 12px;
+.games-segment {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
   color: var(--text-secondary, #718096);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.16s, color 0.16s, box-shadow 0.16s;
+}
+
+.games-segment:hover {
+  color: var(--text-primary, #1a202c);
+}
+
+.games-segment.active {
+  background: var(--surface, #fff);
+  color: var(--accent, var(--text-primary, #1a202c));
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1);
+}
+
+.games-segment-hint {
+  margin: -4px 0 0;
+  min-height: 18px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary, #718096);
+}
+
+@media (max-width: 560px) {
+  .games-segmented {
+    flex-wrap: wrap;
+  }
+
+  .games-segment {
+    flex: 1 1 40%;
+  }
 }
 
 /* ---- 匹配中 ---- */
@@ -426,6 +656,18 @@
 }
 
 /* ---- 响应式：窄屏改为上下堆叠，游戏卡片横向平铺 ---- */
+@media (max-width: 1100px) {
+  /* 主区域变窄时侧栏不再并排，改到下方两列 */
+  .games-detail--flat {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .games-side {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+}
+
 @media (max-width: 1000px) {
   .games-page {
     grid-template-columns: minmax(0, 1fr);
@@ -446,6 +688,12 @@
   .games-detail {
     grid-template-columns: minmax(0, 1fr);
     gap: 18px;
+  }
+
+  /* 窄屏：侧栏改到主区域下方，两张卡片并排 */
+  .games-side {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   }
 
   .games-detail-aside {

@@ -727,13 +727,118 @@
   gap: 10px;
 }
 
+/* 卡片视图：自动换行的网格 */
+.profile-history-list.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.profile-history-list.grid .profile-history-item {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.profile-history-list.grid .profile-history-name {
+  justify-content: space-between;
+}
+
+.profile-history-list.grid .profile-history-actions {
+  margin-left: 0;
+  justify-content: flex-end;
+}
+
+/* 视图切换（列表 / 卡片） */
+.profile-view-toggle {
+  margin-left: auto;
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--surface-alt, #f1f3f5);
+}
+
+.profile-view-btn {
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text-secondary, #718096);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.profile-view-btn.active {
+  background: var(--surface, #fff);
+  color: var(--text, #2d3748);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.profile-history-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* 历史分页（位于列表上方） */
+.profile-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin: 0 0 12px;
+}
+
+.profile-pager-info {
+  font-size: 12px;
+  color: var(--text-secondary, #718096);
+}
+
+.profile-pager-btn {
+  border: 1px solid var(--border, #e9ecef);
+  background: var(--surface, #fff);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: var(--text, #2d3748);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.profile-pager-btn:hover:not(:disabled) {
+  background: var(--surface-alt, #f1f3f5);
+}
+
+.profile-pager-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .profile-history-item {
   display: flex;
   align-items: center;
   gap: 14px;
-  background: var(--surface-alt, #f7fafc);
-  border-radius: 8px;
-  padding: 12px 14px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e9ecef);
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.profile-history-item:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+.profile-history-info {
+  flex: 1;
+  min-width: 0;
 }
 
 .profile-history-icon {
@@ -760,9 +865,24 @@
   margin-top: 4px;
 }
 
+/* 右侧操作区：固定两列宽度，保证「回放」「详情」在各玩法间对齐 */
+.profile-history-actions {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 无回放的玩法用等宽占位，详情按钮与棋类卡片对齐 */
+.profile-history-action-placeholder {
+  width: 68px;
+  flex-shrink: 0;
+}
+
 /* 历史回放按钮 */
 .profile-history-replay {
-  margin-left: auto;
+  min-width: 68px;
   flex-shrink: 0;
   border: none;
   border-radius: 6px;

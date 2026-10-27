@@ -16,6 +16,27 @@
   text-align: center;
 }
 
+/* ===== 从游戏大厅进入时的返回入口（嵌在总进度标题行内，不占额外高度） ===== */
+.ach-back-btn {
+  flex-shrink: 0;
+  margin-right: 8px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  background: transparent;
+  color: var(--theme-info-label-color, #718096);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.ach-back-btn:hover {
+  background: var(--surface-hover, #e9ecef);
+  border-color: var(--theme-primary, #3498db);
+  color: var(--theme-info-value-color, #2d3748);
+}
+
 /* ===== 顶部总进度 ===== */
 .ach-overview {
   background: var(--theme-container-bg, #ffffff);
@@ -33,6 +54,7 @@
 }
 
 .ach-overview-top .title {
+  margin-right: auto;
   font-size: 14px;
   font-weight: 600;
   color: var(--text, #2d3748);

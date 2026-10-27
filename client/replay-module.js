@@ -466,6 +466,19 @@
             foods.push({ x: fx, y: fy });
           }
         }
+      } else if (Array.isArray(initFoodCount) && typeof initFoodCount[0] === 'number') {
+        // 兼容旧格式：初始食物直接存成 [x, y]
+        foods.push({ x: initFoodCount[0], y: initFoodCount[1] });
+      }
+    } else if (moves.length > 0 && Array.isArray(moves[0])) {
+      // 旧版 v2 记录没有 init 帧：按第一帧蛇头与方向近似还原 3 节蛇身
+      var firstMove = moves[0];
+      var fallbackDir = ['up', 'down', 'left', 'right'].indexOf(firstMove[0]) >= 0 ? firstMove[0] : 'right';
+      var backOffset = { right: [-1, 0], left: [1, 0], down: [0, -1], up: [0, 1] }[fallbackDir];
+      for (var si = 0; si < 3; si++) {
+        var sx = firstMove[1] + backOffset[0] * si;
+        var sy = firstMove[2] + backOffset[1] * si;
+        if (sx >= 0 && sy >= 0) snake.push({ x: sx, y: sy });
       }
     }
 

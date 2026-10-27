@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { go } from '../../core/router.js';
 import { eventBus } from '../../core/eventBus.js';
+import { store } from '../../core/store.js';
 import { MAX_SPEED, stepTrain } from './physics.js';
 import { TrainAutopilot } from './autopilot.js';
 import { TrainAudio } from './audio.js';
@@ -49,6 +50,7 @@ const SHELL_HTML = `
         <div id="notch-handle"></div>
       </div>
     </div>
+    <div id="reverse-mode" hidden>⏪ 倒车模式</div>
   </div>
 
   <div id="station-status">准备发车：按 W 推牵引挡</div>
@@ -248,6 +250,7 @@ const SHELL_HTML = `
     <b>🎛️ 驾驶操作</b><br>
     • <kbd>W</kbd> / <kbd>S</kbd> 点按切一挡 · 长按连发<br>
     • <kbd>空格</kbd> 挡位回中（惰行）<br>
+    • <kbd>R</kbd> 切换前进/倒车（需先停稳）<br>
     • <kbd>G</kbd> 切换自动/手动驾驶（自动过弯限速、精准停站）<br>
     • <kbd>C</kbd> 切换第一/第三人称视角<br>
     • <kbd>N</kbd> 切换黑夜/白天 · <kbd>M</kbd> 静音/开启音效<br>
@@ -263,6 +266,7 @@ const SHELL_HTML = `
       <button class="touch-btn touch-power" type="button" data-touch-hold="1" aria-label="牵引加挡">＋</button>
     </div>
     <div class="touch-actions">
+      <button class="touch-btn touch-mini" id="touch-reverse" type="button" data-touch-tap="reverse">倒车</button>
       <button class="touch-btn touch-mini" id="touch-auto" type="button" data-touch-tap="auto">自动</button>
       <button class="touch-btn touch-mini" id="touch-cam" type="button" data-touch-tap="cam">视角</button>
       <button class="touch-btn touch-mini" id="touch-night" type="button" data-touch-tap="night">昼夜</button>
@@ -274,7 +278,7 @@ const SHELL_HTML = `
 </div>`;
 
 /** 本游戏占用、需要在捕获阶段拦截的按键（否则会触发全局导航快捷键） */
-const GAME_KEYS = new Set(['KeyW', 'KeyS', 'ArrowUp', 'ArrowDown', 'Space', 'KeyN', 'KeyC', 'KeyG', 'KeyM']);
+const GAME_KEYS = new Set(['KeyW', 'KeyS', 'ArrowUp', 'ArrowDown', 'Space', 'KeyN', 'KeyC', 'KeyG', 'KeyM', 'KeyR']);
 
 /**
  * 渲染 3D 火车驾驶视图
@@ -819,15 +823,25 @@ export function renderTrain3d(container, options = {}) {
     finalTrackPoints.push(new THREE.Vector3(xz.x, y, xz.z));
   }
 
-  const trackCurve = new THREE.CatmullRomCurve3(finalTrackPoints, true, 'centripetal');
+  let trackCurve = new THREE.CatmullRomCurve3(finalTrackPoints, true, 'centripetal');
   trackCurve.arcLengthDivisions = 5000;
   trackCurve.updateArcLengths();
-  const trackLength = trackCurve.getLength();
+  let trackLength = trackCurve.getLength();
 
   /* 隧道段：轨道低于自然地面的区段，保留山体，不再挖成路堑 */
   const TUNNEL_DEPTH = 7.0;
   const TUNNEL_MIN_LENGTH = 18;
-  const TUNNEL_PORTAL_DEPTH = 4.2;
+  const TUNNEL_HEIGHT = 4.2;
+  const TUNNEL_HALF = 2.8;
+  // 洞门口要求山体比轨面至少高 6.2m：洞顶净高 4.2m，若只留 4.2m 覆盖，
+  // 粗地形网格的三角形会贴着洞顶甚至切进洞内（洞口里看到草皮/棋盘纹）。
+  const TUNNEL_PORTAL_DEPTH = 6.2;
+  // 洞口路堑：把洞门外一段、横向一定范围的地形压到轨面以下，挖出真正的引道切口。
+  // 地形网格很粗（低画质约 33m/格），只靠“压几米”无法形成洞口，必须整条走廊下挖。
+  const PORTAL_CUT_LENGTH = 60;   // 沿洞外方向的开挖长度（m）
+  const PORTAL_CUT_HALF = 13;     // 轨面中线两侧的平底半宽（m）
+  const PORTAL_CUT_SLOPE = 24;    // 平底之外回填到自然地面的横向过渡宽度（m）
+  const PORTAL_CUT_FLOOR = 1.75;  // 路堑底面比轨面低多少（m）
   const tunnelRanges = [];
   {
     const samples = Math.max(500, Math.ceil(trackLength / 6));
@@ -883,18 +897,119 @@ export function renderTrain3d(container, options = {}) {
     }
   }
 
+  // 隧道内纵断面：洞里没有“山体起伏”要跟，轨面必须是一条平滑曲线，
+  // 否则洞外的地形起伏会被折算成轨面的上下坡，第一人称在洞里晃得厉害。
+  // 做法：两端洞门高程之间拉一条平滑弦线；若弦线某处高过洞顶覆土上限，
+  // 就整条隧道统一下压“最大差值”，用两端为零的缓坡形状施加。
+  // 这样纵断面只有一条平顺曲线，不会跟着地形一坑一坑地起伏，
+  // 同时保证管片不会拱出地表。
+  if (tunnelRanges.length) {
+    const marginT = 30 / trackLength;
+    const pointCount = finalTrackPoints.length;
+    const baseY = finalTrackPoints.map((p) => p.y);
+    // 轨面允许的最高位置：地形再减去洞顶覆土厚度，超过就会把管片顶出地表
+    const coverLimit = finalTrackPoints.map(
+      (p) => getTerrainHeight(p.x, p.z) - TUNNEL_PORTAL_DEPTH
+    );
+    const chordAt = (y0, y1, u) => y0 + (y1 - y0) * THREE.MathUtils.smoothstep(u, 0, 1);
+
+    for (const range of tunnelRanges) {
+      const span = Math.max(1e-6, range.endT - range.startT);
+      const spanMeters = Math.max(1, span * trackLength);
+      const y0 = baseY[Math.round(range.startT * pointCount) % pointCount];
+      const y1 = baseY[Math.round(range.endT * pointCount) % pointCount];
+
+      // 下压量沿隧道中段取满，靠近洞门（至少 24m）缓入缓出，避免洞口出现折角
+      const ramp = THREE.MathUtils.clamp(24 / spanMeters, 0.04, 0.2);
+      const sagWeight = (u) => THREE.MathUtils.smoothstep(u, 0, ramp) *
+        THREE.MathUtils.smoothstep(1 - u, 0, ramp);
+
+      // 一次算完整条隧道需要的最大下压量：只压“最深的那个坑”，
+      // 其余位置也压同样的量，曲线因此是单峰缓坡而不是逐点贴合地形。
+      let need = 0;
+      for (let i = 0; i < pointCount; i++) {
+        const t = i / pointCount;
+        if (t < range.startT || t > range.endT) continue;
+        const u = (t - range.startT) / span;
+        const deficit = chordAt(y0, y1, u) - coverLimit[i];
+        if (deficit > need) need = deficit;
+      }
+
+      const margin = Math.min(marginT, span * 0.5);
+      const extStart = range.startT - margin;
+      const extEnd = range.endT + margin;
+      for (let i = 0; i < pointCount; i++) {
+        const t = i / pointCount;
+        if (t < extStart || t > extEnd) continue;
+        const u = THREE.MathUtils.clamp((t - range.startT) / span, 0, 1);
+        let y = chordAt(y0, y1, u) - need * sagWeight(u);
+        // 兜底：洞身范围内任何一点都不得拱出覆土（洞外过渡段不套这个约束）
+        if (t >= range.startT && t <= range.endT) y = Math.min(y, coverLimit[i]);
+        let weight;
+        if (t < range.startT) {
+          weight = THREE.MathUtils.smoothstep((t - extStart) / (range.startT - extStart), 0, 1);
+        } else if (t > range.endT) {
+          weight = 1 - THREE.MathUtils.smoothstep((t - range.endT) / (extEnd - range.endT), 0, 1);
+        } else {
+          weight = 1;
+        }
+        finalTrackPoints[i].y = finalTrackPoints[i].y * (1 - weight) + y * weight;
+      }
+    }
+
+    trackCurve = new THREE.CatmullRomCurve3(finalTrackPoints, true, 'centripetal');
+    trackCurve.arcLengthDivisions = 5000;
+    trackCurve.updateArcLengths();
+    trackLength = trackCurve.getLength();
+  }
+
   // 洞门外侧的削坡切口：把草坡在洞口附近压下去，露出洞门和岩土面
   const tunnelPortalCuts = [];
   for (const range of tunnelRanges) {
     for (const [t, outwardSign] of [[range.startT, -1], [range.endT, 1]]) {
       const p = trackCurve.getPointAt(t);
       const tan = trackCurve.getTangentAt(t).normalize();
+      const side = new THREE.Vector3().crossVectors(WORLD_UP, tan).normalize();
       tunnelPortalCuts.push({
         x: p.x, z: p.z, y: p.y,
         ox: tan.x * outwardSign,
-        oz: tan.z * outwardSign
+        oz: tan.z * outwardSign,
+        px: side.x,
+        pz: side.z,
+        t,
+        sign: outwardSign,
+        tunnelIndex: tunnelRanges.indexOf(range)
       });
     }
+  }
+
+  const _portalCutInfo = { weight: 0, floorY: 0 };
+  /** 某点受洞口路堑影响的程度（0~1）与对应的开挖底面高度 */
+  function portalCutInfo(x, z) {
+    let weight = 0;
+    let floorY = 0;
+    for (const portal of tunnelPortalCuts) {
+      const dx = x - portal.x;
+      const dz = z - portal.z;
+      const along = dx * portal.ox + dz * portal.oz;
+      if (along < -1 || along > PORTAL_CUT_LENGTH) continue;
+      const lat = Math.abs(dx * portal.px + dz * portal.pz);
+      if (lat > PORTAL_CUT_HALF + PORTAL_CUT_SLOPE) continue;
+      const wAlong = 1 - THREE.MathUtils.smoothstep(
+        along, PORTAL_CUT_LENGTH * 0.55, PORTAL_CUT_LENGTH
+      );
+      const wLat = 1 - THREE.MathUtils.smoothstep(
+        lat, PORTAL_CUT_HALF, PORTAL_CUT_HALF + PORTAL_CUT_SLOPE
+      );
+      const w = wAlong * wLat;
+      if (w > weight) {
+        weight = w;
+        floorY = portal.y - PORTAL_CUT_FLOOR;
+      }
+    }
+    _portalCutInfo.weight = weight;
+    _portalCutInfo.floorY = floorY;
+    return _portalCutInfo;
   }
 
   const lookupPoints = [];
@@ -909,35 +1024,34 @@ export function renderTrain3d(container, options = {}) {
   function getGroundY(x, z, naturalY = getTerrainHeight(x, z)) {
     const hit = queryLookup(trackLookup, x, z, 80);
     if (!hit) return naturalY;
-    for (const portal of tunnelPortalCuts) {
-      const dx = x - portal.x;
-      const dz = z - portal.z;
-      const dist = Math.hypot(dx, dz);
-      if (dist < 24) {
-        const along = dx * portal.ox + dz * portal.oz;
-        if (along > -2) {
-          const blend = THREE.MathUtils.smoothstep(dist, 10, 24);
-          return (portal.y - 1.6) * (1 - blend) + naturalY * blend;
+
+    let ground = naturalY;
+    if (!hit.point.tunnel) {
+      const flatY = hit.point.y - 1.5;
+      const diff = flatY - naturalY;
+      // 高架段不要再把地面抬到轨道底下，否则桥墩和桥下净空会被土方填掉
+      const bridge = THREE.MathUtils.smoothstep(diff, 6, 16);
+      if (bridge < 0.999) {
+        const support = 1 - THREE.MathUtils.smoothstep(diff, 25, 65);
+        const flatTarget = naturalY + (flatY - naturalY) * support;
+        let corridor;
+        if (hit.dist < 12) {
+          corridor = flatTarget;
+        } else {
+          const t = THREE.MathUtils.smoothstep(hit.dist, 12, 40);
+          corridor = flatTarget * (1 - t) + naturalY * t;
         }
+        ground = corridor * (1 - bridge) + naturalY * bridge;
       }
     }
-    if (hit.point.tunnel) return naturalY;
-    const flatY = hit.point.y - 1.5;
-    const diff = flatY - naturalY;
-    // 高架段不要再把地面抬到轨道底下，否则桥墩和桥下净空会被土方填掉
-    const bridge = THREE.MathUtils.smoothstep(diff, 6, 16);
-    if (bridge >= 0.999) return naturalY;
 
-    const support = 1 - THREE.MathUtils.smoothstep(diff, 25, 65);
-    const flatTarget = naturalY + (flatY - naturalY) * support;
-    let ground;
-    if (hit.dist < 12) {
-      ground = flatTarget;
-    } else {
-      const t = THREE.MathUtils.smoothstep(hit.dist, 12, 40);
-      ground = flatTarget * (1 - t) + naturalY * t;
+    // 洞口路堑：沿洞外方向整条走廊下挖到轨面以下，横向超出平底后回填到自然地面。
+    // 只削不填（取 min），避免把本来低于轨面的地形又垫高。
+    const cut = portalCutInfo(x, z);
+    if (cut.weight > 0.001 && ground > cut.floorY) {
+      ground += (cut.floorY - ground) * cut.weight;
     }
-    return ground * (1 - bridge) + naturalY * bridge;
+    return ground;
   }
 
   /* ============================================================
@@ -1046,7 +1160,52 @@ export function renderTrain3d(container, options = {}) {
     pos.needsUpdate = true;
   }
 
+  // 洞内地形遮挡：粗地形网格的三角形会斜着切进洞身，在洞口里露出一块地形。
+  // 在地面着色器里直接丢弃“洞身棱柱”内的片元，洞口里就不再渲染地形。
+  const PORTAL_CLIP_MAX = 32;
+  const portalClipCount = Math.min(PORTAL_CLIP_MAX, tunnelPortalCuts.length);
+  const portalClipA = [];
+  const portalClipB = [];
+  for (let i = 0; i < PORTAL_CLIP_MAX; i++) portalClipA.push(new THREE.Vector4());
+  for (let i = 0; i < PORTAL_CLIP_MAX; i++) portalClipB.push(new THREE.Vector4());
+  for (let i = 0; i < portalClipCount; i++) {
+    const portal = tunnelPortalCuts[i];
+    portalClipA[i].set(portal.x, portal.y, portal.z, 0);
+    // 棱柱：沿洞内方向（-outward）45m、洞口轨面中线两侧 4.2m、轨面上下一定范围
+    portalClipB[i].set(-portal.ox, -portal.oz, portal.px, portal.pz);
+  }
+
   const groundMat = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0 });
+  groundMat.onBeforeCompile = (shader) => {
+    shader.uniforms.uPortalCount = { value: portalClipCount };
+    shader.uniforms.uPortalA = { value: portalClipA };
+    shader.uniforms.uPortalB = { value: portalClipB };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vGWorldPos;')
+      .replace(
+        '#include <begin_vertex>',
+        '#include <begin_vertex>\n\tvGWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;'
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>
+varying vec3 vGWorldPos;
+uniform int uPortalCount;
+uniform vec4 uPortalA[${PORTAL_CLIP_MAX}];
+uniform vec4 uPortalB[${PORTAL_CLIP_MAX}];`)
+      .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+for (int i = 0; i < ${PORTAL_CLIP_MAX}; i++) {
+  if (i >= uPortalCount) break;
+  vec4 pa = uPortalA[i];
+  vec4 pb = uPortalB[i];
+  vec2 rel = vGWorldPos.xz - pa.xz;
+  float along = dot(rel, pb.xy);
+  float lat = abs(dot(rel, pb.zw));
+  float dy = vGWorldPos.y - pa.y;
+  // 只裁掉洞身内部（含稍高于洞顶的一小条）的地形；上界不能太高，
+  // 否则会把洞顶覆土一起裁掉，管片就从地表露出来。
+  if (along > -0.5 && along < 45.0 && lat < 4.2 && dy < 4.5 && dy > -8.0) discard;
+}`);
+  };
   {
     // 程序化地表纹理：给大片平滑地形增加细碎草/土/田块层次，远景不再是一整块色斑
     const canvas = document.createElement('canvas');
@@ -1098,6 +1257,30 @@ export function renderTrain3d(container, options = {}) {
     groundMat.map = groundTex;
     groundMat.needsUpdate = true;
   }
+  const _groundColor = new THREE.Color();
+  const _cutRock = new THREE.Color(0x8a7d66);
+  /**
+   * 地面顶点色：按高度分层；洞口路堑范围内压向岩土色，
+   * 否则开挖到低海拔的坡面会变成一大片刺眼的沙色三角面。
+   */
+  function groundColorAt(x, z, y, out = _groundColor) {
+    if (y < WATER_LEVEL) out.setHex(0xc2b280);
+    else if (y < WATER_LEVEL + 15) out.setHex(0xd2b48c);
+    else if (y < 70) out.setHex(0x6d9b58);
+    else if (y < 110) out.setHex(0x557a43);
+    else if (y < 160) out.setHex(0x4a6b3c);
+    else if (y < 190) out.setHex(0x77776c);
+    else out.setHex(0xe8eef2);
+    // 轻微色相/明度变化，避免大片单色
+    const n = Math.sin(x * 0.013 + z * 0.009) * 0.5 + 0.5;
+    out.offsetHSL((n - 0.5) * 0.012, 0, (n - 0.5) * 0.055);
+    const cut = portalCutInfo(x, z);
+    if (cut.weight > 0.08) {
+      out.lerp(_cutRock, Math.min(1, cut.weight * 1.3) * 0.8);
+    }
+    return out;
+  }
+
   {
     const pos = groundGeo.attributes.position;
     const colors = new Float32Array(pos.count * 3);
@@ -1105,16 +1288,7 @@ export function renderTrain3d(container, options = {}) {
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i);
       const y = pos.getY(i);
-      if (y < WATER_LEVEL) c.setHex(0xc2b280);
-      else if (y < WATER_LEVEL + 15) c.setHex(0xd2b48c);
-      else if (y < 70) c.setHex(0x6d9b58);
-      else if (y < 110) c.setHex(0x557a43);
-      else if (y < 160) c.setHex(0x4a6b3c);
-      else if (y < 190) c.setHex(0x77776c);
-      else c.setHex(0xe8eef2);
-      // 轻微色相/明度变化，避免大片单色
-      const n = Math.sin(x * 0.013 + z * 0.009) * 0.5 + 0.5;
-      c.offsetHSL((n - 0.5) * 0.012, 0, (n - 0.5) * 0.055);
+      groundColorAt(x, z, y, c);
       colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
     }
     groundGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -1588,8 +1762,6 @@ export function renderTrain3d(container, options = {}) {
   /* ============================================================
      9.5 隧道 / 明洞
      ============================================================ */
-  const TUNNEL_HEIGHT = 4.2;
-  const TUNNEL_HALF = 2.8;
   (function buildTunnels() {
     if (!tunnelRanges.length) return;
     const tunnelMat = new THREE.MeshStandardMaterial({
@@ -1604,6 +1776,10 @@ export function renderTrain3d(container, options = {}) {
     });
     const portalMat = new THREE.MeshStandardMaterial({
       color: 0x99998f, roughness: 0.9, metalness: 0.05
+    });
+    // 洞脸墙：贴着开挖面的岩土色，代替原来孤零零的立柱/门楣盒子
+    const wallMat = new THREE.MeshStandardMaterial({
+      color: 0x8b816d, roughness: 1, metalness: 0, side: THREE.DoubleSide
     });
     const lightMat = new THREE.MeshBasicMaterial({
       color: 0xffd58a, toneMapped: false, side: THREE.DoubleSide
@@ -1728,48 +1904,99 @@ export function renderTrain3d(container, options = {}) {
         scene.add(new THREE.Mesh(lightGeo, lightMat));
       }
 
-      const addPortal = (t) => {
-        const { p, tan, side, up } = frameAt(t);
+      const addPortal = (t, outwardSign) => {
+        const p = trackCurve.getPointAt(t);
+        const tan = trackCurve.getTangentAt(t).normalize();
+        const side = new THREE.Vector3().crossVectors(WORLD_UP, tan).normalize();
+        const up = new THREE.Vector3().crossVectors(tan, side).normalize();
+        const outward = new THREE.Vector3(
+          tan.x * outwardSign, 0, tan.z * outwardSign
+        ).normalize();
+
+        // 洞口比隧道管片略大一圈（12cm），避免门框内侧面与管壁/顶板共面闪烁
+        const holeHalf = TUNNEL_HALF + 0.12;
+        const holeTop = TUNNEL_HEIGHT + 0.12;
+        // 洞口下缘压到路堑面以下：原 -0.45 高于道床，洞门墙体把道床齐刷刷切断，
+        // 从外面看轨道像是一头撞在墙上；压低后道床可以直接穿进洞里。
+        const holeBottom = -2.0;
+        const wallBottom = holeBottom - 2.6;
+        const wallHalf = PORTAL_CUT_HALF - 1;
+        const wallDepth = 2.2;
+        const faceOffset = 0.35;
+
+        // 洞脸墙的迎外面放在洞口稍外侧，墙体往山体里挤 2.2m：
+        // 这样粗地形网格横跨洞口的三角形会被墙挡住，而不是斜着切进洞口。
+        const ox = p.x + outward.x * faceOffset;
+        const oz = p.z + outward.z * faceOffset;
+
+        const lats = [];
+        for (let lat = -wallHalf; lat <= wallHalf + 1e-6; lat += 1) lats.push(lat);
+        // 墙顶跟着洞脸处的自然地形走（略埋 0.55m），最低也要压住洞口顶 0.9m
+        const topAt = (lat) => Math.max(
+          getTerrainHeight(ox + side.x * lat, oz + side.z * lat) - p.y + 0.55,
+          holeTop + 0.9
+        );
+
+        const shape = new THREE.Shape();
+        shape.moveTo(lats[0], wallBottom);
+        shape.lineTo(lats[lats.length - 1], wallBottom);
+        for (let i = lats.length - 1; i >= 0; i--) shape.lineTo(lats[i], topAt(lats[i]));
+        shape.closePath();
+        const hole = new THREE.Path();
+        hole.moveTo(-holeHalf, holeBottom);
+        hole.lineTo(holeHalf, holeBottom);
+        hole.lineTo(holeHalf, holeTop);
+        hole.lineTo(-holeHalf, holeTop);
+        hole.closePath();
+        shape.holes.push(hole);
+
+        const geo = new THREE.ExtrudeGeometry(shape, {
+          depth: wallDepth, bevelEnabled: false, curveSegments: 1
+        });
+        // 挤出方向是局部 +Z（= tan）。+tan 侧是山体时直接挤进去；
+        // 否则把墙体挪到 [-depth, 0]，保证迎洞外的端面始终在局部 z=0。
+        if (outwardSign > 0) geo.translate(0, 0, -wallDepth);
+
         const group = new THREE.Group();
-        group.position.copy(p);
-        group.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(side, up, tan));
+        group.position.set(ox, p.y, oz);
+        group.quaternion.setFromRotationMatrix(
+          new THREE.Matrix4().makeBasis(side, up, tan)
+        );
+        const wall = new THREE.Mesh(geo, wallMat);
+        wall.castShadow = true;
+        wall.receiveShadow = true;
+        group.add(wall);
 
-        const sideW = 1.4;
-        const sideD = 2.6;
-        const headH = 2.8;
-        const foundation = 1.8;
-        const pillarGeo = new THREE.BoxGeometry(sideW, TUNNEL_HEIGHT + foundation, sideD);
+        // 洞口一圈混凝土门框：让洞口边缘清晰，不至于和岩土面糊在一起
+        const frameZ = outwardSign * 0.16;
+        const frameD = 0.32;
+        const frameT = 0.55;
         for (const sx of [-1, 1]) {
-          const pillar = new THREE.Mesh(pillarGeo, portalMat);
-          pillar.position.set(
-            sx * (TUNNEL_HALF + sideW / 2),
-            (TUNNEL_HEIGHT - foundation) / 2,
-            0
-          );
-          pillar.castShadow = true;
-          group.add(pillar);
-
-          const wing = new THREE.Mesh(
-            new THREE.BoxGeometry(3.6, 3.6, 1.1),
+          const jamb = new THREE.Mesh(
+            new THREE.BoxGeometry(frameT, holeTop - holeBottom + frameT, frameD),
             portalMat
           );
-          wing.position.set(sx * (TUNNEL_HALF + sideW + 1.7), 0.2, 0.9);
-          wing.rotation.y = sx * 0.35;
-          wing.castShadow = true;
-          group.add(wing);
+          jamb.position.set(
+            sx * (holeHalf + frameT / 2),
+            (holeTop + holeBottom) / 2,
+            frameZ
+          );
+          jamb.castShadow = true;
+          group.add(jamb);
         }
         const lintel = new THREE.Mesh(
-          new THREE.BoxGeometry(TUNNEL_HALF * 2 + sideW * 2, headH, sideD),
+          new THREE.BoxGeometry(holeHalf * 2, frameT, frameD),
           portalMat
         );
-        lintel.position.set(0, TUNNEL_HEIGHT + headH / 2, 0);
+        lintel.position.set(0, holeTop + frameT / 2, frameZ);
         lintel.castShadow = true;
         group.add(lintel);
+
         scene.add(group);
       };
 
-      addPortal(range.startT);
-      addPortal(range.endT);
+      addPortal(range.startT, -1);
+      addPortal(range.endT, 1);
     }
   })();
 
@@ -2397,6 +2624,7 @@ export function renderTrain3d(container, options = {}) {
   let speed = 0;
   let notch = 0;
   let travel = 0;
+  let reversing = false;             // 倒车方向：travel 随速度反向递减
   let isStopped = false;
   let currentTargetName = stations[0].name;
 
@@ -2432,6 +2660,8 @@ export function renderTrain3d(container, options = {}) {
   const notchTextEl = $('#notch-text');
   const notchHandleEl = $('#notch-handle');
   const notchSegs = $$('.notch-seg');
+  const reverseModeEl = $('#reverse-mode');
+  const touchReverseBtn = $('#touch-reverse');
   const camModeEl = $('#cam-mode');
   const autoModeEl = $('#auto-mode');
   const speedEl = $('#speedo');
@@ -2463,8 +2693,17 @@ export function renderTrain3d(container, options = {}) {
   updateAudioUi();
 
   let lastStatusText = '';
+  let statusFlashUntil = 0;
   function setStatus(text) {
+    if (performance.now() < statusFlashUntil) return;
     if (text !== lastStatusText) { lastStatusText = text; statusEl.textContent = text; }
+  }
+
+  /** 临时提示：行车状态每帧刷新，短时锁定避免提示被立刻覆盖 */
+  function flashStatus(text, ms = 1500) {
+    lastStatusText = text;
+    statusEl.textContent = text;
+    statusFlashUntil = performance.now() + ms;
   }
 
   function updateAudioUi() {
@@ -2724,6 +2963,31 @@ export function renderTrain3d(container, options = {}) {
     updateNotchUI();
   }
 
+  function updateReverseUi() {
+    if (reverseModeEl) reverseModeEl.hidden = !reversing;
+    if (touchReverseBtn) {
+      touchReverseBtn.classList.toggle('on', reversing);
+      touchReverseBtn.textContent = reversing ? '前进' : '倒车';
+    }
+  }
+
+  /** 切换前进/倒车方向：只能在列车基本停稳时操作，自动模式会先退出 */
+  function toggleReverse() {
+    if (speed > 0.5) {
+      flashStatus('⚠ 请先停稳列车，再切换前进/倒车');
+      return;
+    }
+    if (autoMode) toggleAuto();
+    reversing = !reversing;
+    notch = 0;
+    updateReverseUi();
+    updateNotchUI(true);
+    drawScreen();
+    setStatus(reversing
+      ? '⏪ 倒车模式 · 推牵引挡向后行驶'
+      : '▶ 前进模式 · 推牵引挡向前行驶');
+  }
+
   function updateHold() {
     if (autoMode) return;
     const now = performance.now();
@@ -2805,7 +3069,7 @@ export function renderTrain3d(container, options = {}) {
       value(`${notch > 0 ? '+' + notch : notch}`, 108,
         notch > 0 ? '#2ecc71' : (notch < 0 ? '#e74c3c' : '#ffd166'), 'bold 44px monospace');
       label('状态', 152);
-      value('手动', 152, '#ffffff', 'bold 38px monospace');
+      value(reversing ? '倒车' : '手动', 152, reversing ? '#ff8f80' : '#ffffff', 'bold 38px monospace');
       label('速度', 196);
       value(`${Math.round(speed * 3.6)}`, 196, '#9fe8ff', 'bold 36px monospace');
     }
@@ -2816,7 +3080,9 @@ export function renderTrain3d(container, options = {}) {
     screenCtx.fillStyle = '#ffffff';
     screenCtx.font = 'bold 28px sans-serif';
     screenCtx.textAlign = 'center';
-    const nextLabel = autoMode && autoInfo && autoInfo.phase === 'dwell' ? '停靠' : '下一站';
+    const nextLabel = autoMode && autoInfo && autoInfo.phase === 'dwell'
+      ? '停靠'
+      : (reversing ? '后方站' : '下一站');
     screenCtx.fillText(`${nextLabel}  ${currentTargetName}`, 256, 262);
 
     if (autoMode) {
@@ -2843,11 +3109,12 @@ export function renderTrain3d(container, options = {}) {
       speed = 0;
     } else {
       speed = stepTrain(speed, dt, appliedThrottle);
-      travel += speed * dt;
-      if (travel >= trackLength) travel -= trackLength;
+      // 倒车时沿轨道反向推进，取模保证 travel 始终落在 [0, trackLength)
+      travel += speed * dt * (reversing ? -1 : 1);
+      travel = ((travel % trackLength) + trackLength) % trackLength;
     }
 
-    const wheelDelta = (speed * dt) / 0.4;
+    const wheelDelta = ((speed * dt) / 0.4) * (reversing ? -1 : 1);
     for (let i = 0; i < wheelsArray.length; i++) wheelsArray[i].rotation.x += wheelDelta;
 
     if (throttleLever && brakeLever) {
@@ -2952,6 +3219,11 @@ export function renderTrain3d(container, options = {}) {
     holdState.down.active = false;
 
     if (autoMode) {
+      // 自动驾驶只按前进方向规划，接管时强制回到前进
+      if (reversing) {
+        reversing = false;
+        updateReverseUi();
+      }
       autopilot.reset({ travel, speed, stopped: isStopped });
       autoThrottle = 0;
       autoInfo = null;
@@ -3076,6 +3348,16 @@ export function renderTrain3d(container, options = {}) {
           currentTargetName = station.name;
           setStatus(`🤖 ${autoInfo.label} · 下一站 ${station.name}`);
         }
+      } else if (reversing) {
+        let minDist = Infinity, nextIdx = 0;
+        for (let i = 0; i < stations.length; i++) {
+          const d = signedDistToTarget(i);
+          if (d > 0) continue; // 倒车只关心轨道后方的站
+          if (-d < minDist) { minDist = -d; nextIdx = i; }
+        }
+        if (minDist === Infinity) { minDist = 0; nextIdx = 0; }
+        currentTargetName = stations[nextIdx].name;
+        setStatus(`⏪ 倒车中 · 后方 ${currentTargetName} · 距停车点 ${Math.round(minDist)} m`);
       } else {
         let minDist = Infinity, nextIdx = 0;
         for (let i = 0; i < stations.length; i++) {
@@ -3137,12 +3419,25 @@ export function renderTrain3d(container, options = {}) {
   let isDragging = false, lastInteractionTime = 0, previousMouseX = 0, previousMouseY = 0;
   let lookYaw = 0, lookPitch = -0.2, targetLookYaw = 0, targetLookPitch = -0.2;
 
+  // 临时调试（验证完删除）：train3d.debugPortal=<n> 把列车传送到第 n 个洞口外，拉近镜头
+  {
+    const raw = localStorage.getItem('train3d.debugPortal');
+    if (raw != null && tunnelPortalCuts.length) {
+      const portal = tunnelPortalCuts[Math.min(Number(raw) || 0, tunnelPortalCuts.length - 1)];
+      travel = portal.t * trackLength + portal.sign * 30;
+      phi = targetPhi = Math.PI / 2 - 0.12;
+      radius = targetRadius = 26;
+    }
+  }
+
   const _camTarget = new THREE.Vector3();
   const _tanV = new THREE.Vector3();
   const _driverPos = new THREE.Vector3(0, 2.1, 1.2);
   const _euler = new THREE.Euler(0, 0, 0, 'YXZ');
   const _quatFwd = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
   const _quatLook = new THREE.Quaternion();
+  const _camQuatTarget = new THREE.Quaternion();
+  let _camSmoothY = null;
   const _shakeQuat = new THREE.Quaternion();
   const _shakeRight = new THREE.Vector3();
   const _shakeUp = new THREE.Vector3();
@@ -3303,13 +3598,28 @@ export function renderTrain3d(container, options = {}) {
       lookYaw = THREE.MathUtils.damp(lookYaw, targetLookYaw, 15, dt);
       lookPitch = THREE.MathUtils.damp(lookPitch, targetLookPitch, 15, dt);
 
-      _bankQuat.setFromAxisAngle(_zAxis, cars[0].roll || 0);
+      // 隧道里把车体侧倾压小：管片包住视野，倾斜会变成地平线左右晃
+      const rollGain = inTunnel ? 0.35 : 1;
+      _bankQuat.setFromAxisAngle(_zAxis, (cars[0].roll || 0) * rollGain);
       _driverPos.set(0, 2.1, 1.2).applyQuaternion(_bankQuat).applyQuaternion(head.quaternion).add(head.position);
-      camera.position.copy(_driverPos);
 
       _euler.set(lookPitch, lookYaw, 0);
       _quatLook.setFromEuler(_euler);
-      camera.quaternion.copy(head.quaternion).multiply(_bankQuat).multiply(_quatFwd).multiply(_quatLook);
+      _camQuatTarget.copy(head.quaternion).multiply(_bankQuat).multiply(_quatFwd).multiply(_quatLook);
+
+      if (inTunnel && !snap && dt > 0) {
+        // 隧道内强制第一人称：车头随纵断面的一点点俯仰都会被管片放大成“上下抖”。
+        // 高度和朝向做一阶低通——车头照旧贴轨，画面不再硬跟随每一处起伏。
+        const kY = 1 - Math.exp(-dt * 9);
+        if (_camSmoothY === null) _camSmoothY = _driverPos.y;
+        _camSmoothY += (_driverPos.y - _camSmoothY) * kY;
+        camera.position.set(_driverPos.x, _camSmoothY, _driverPos.z);
+        camera.quaternion.slerp(_camQuatTarget, 1 - Math.exp(-dt * 12));
+      } else {
+        camera.position.copy(_driverPos);
+        camera.quaternion.copy(_camQuatTarget);
+        _camSmoothY = _driverPos.y;
+      }
     }
 
     // 起步震动：低频、轻微的车体下沉/回弹，不是高频抖动
@@ -3389,6 +3699,11 @@ export function renderTrain3d(container, options = {}) {
       return;
     }
 
+    if (e.code === 'KeyR') {
+      if (!e.repeat) toggleReverse();
+      return;
+    }
+
     if (e.repeat) return;
 
     if (e.code === 'KeyW' || e.code === 'ArrowUp') {
@@ -3446,6 +3761,8 @@ export function renderTrain3d(container, options = {}) {
       toggleCamera();
     } else if (action === 'night') {
       toggleDayNight();
+    } else if (action === 'reverse') {
+      toggleReverse();
     } else if (action === 'back') {
       go('games');
     }
@@ -3499,6 +3816,7 @@ export function renderTrain3d(container, options = {}) {
      21. 初始化 & 主循环
      ============================================================ */
   updateNotchUI();
+  updateReverseUi();
   updateTrainPosition(0);
   updateCamera(0, true);
   drawScreen();
@@ -3600,6 +3918,11 @@ export function renderTrain3d(container, options = {}) {
     // 此时清空会把刚渲染的大厅页面抹成空白
     if (root.isConnected && container.contains(root)) container.innerHTML = '';
   }
+
+  // 大厅面板里预选「自动驾驶」：进入后自动切到自动模式（只消费一次）
+  const presetMode = store.get('games.initMode');
+  store.set('games.initMode', null);
+  if (presetMode === 'auto') toggleAuto();
 
   // 路由离开时兜底销毁（router 不会调用视图返回的 cleanup）
   const offRoute = eventBus.on('route:change', (id) => {
