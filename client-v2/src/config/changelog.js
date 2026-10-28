@@ -3,10 +3,19 @@
  *
  * 生成命令：npm run changelog
  * 数据源：git 提交记录（遵循 .trae/rules/git-commit-message.md 提交规范）
- * 生成时间：2026-10-28T02:41:29.622Z
+ * 生成时间：2026-10-28T06:12:41.826Z
  */
 
 export const CHANGELOG = [
+  {
+    "tag": "Build 835",
+    "name": "新增 Git 自动更新功能与快捷键系统重构",
+    "type": "feat",
+    "scope": "全端",
+    "hash": "15605a9",
+    "publishedAt": "2026-10-28T10:41:53+08:00",
+    "body": "### 后端改动\n- 新增 GitUpdateManager 模块，支持基于 Git 仓库的自动更新\n- 在 UpdateManager 中添加更新后置回调钩子\n- 新增 Git 自动更新配置项，支持本地 Git 或 GitHub API 检查更新\n- 在服务端 API 中添加 Git 检查和应用更新接口\n- 在后台管理页面新增 Git 自动更新功能面板\n\n### 前端改动\n- 重构导航系统，统一游戏大厅入口并拆分独立游戏模块\n- 新增快捷键元数据文件，定义全局导航和游戏大厅操作快捷键\n- 更新 changelog 记录，添加最新构建版本信息"
+  },
   {
     "tag": "Build 832",
     "name": "优化列车3D隧道段逻辑与自动视角切换",

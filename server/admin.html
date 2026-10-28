@@ -10247,6 +10247,7 @@
         msg.textContent = data.reason || '';
       }
       if (data.mode === 'pkg') {
+        if (badge) { badge.textContent = '不可用（EXE 模式）'; badge.style.color = '#fbbf24'; }
         if (msg) {
           msg.style.color = '#fbbf24';
           msg.textContent = '当前为 EXE 打包运行，Git 自动更新不可用，请改用更新包上传';

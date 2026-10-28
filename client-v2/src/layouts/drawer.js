@@ -51,6 +51,13 @@ export function renderNavDrawer(container) {
     return user?.account?.account?.id || localStorage.getItem('currentAccountId') || null;
   }
 
+  /** 当前登录账号是否为管理员（与顶部导航取法保持一致） */
+  function isAdminAccount() {
+    const user = store.get('user');
+    const inner = user?.account?.account || user?.account || null;
+    return !!inner?.isAdmin;
+  }
+
   // ---- 把手 ----
   function renderHandle() {
     const userId = currentUserId();
@@ -107,11 +114,17 @@ export function renderNavDrawer(container) {
   // ---- 面板：主导航 ----
   function buildNav() {
     const items = [{ id: 'games', name: '游戏', icon: '🎮' }, ...FEATURES.filter((i) => !i.inProfile)];
+    // 后台入口：与顶部导航一致，仅管理员可见（窄屏顶部导航不展示该按钮）
+    if (isAdminAccount()) items.push({ id: 'admin', name: '后台管理', icon: '🛠️' });
     return items.map((item) => el('button', {
       class: `nav-drawer-item${isActive(item.id) ? ' active' : ''}`,
       'data-nav': item.id,
       type: 'button',
-      onClick: () => { setOpen(false); handleNavClick(item.id); },
+      onClick: () => {
+        setOpen(false);
+        if (item.id === 'admin') go('admin');
+        else handleNavClick(item.id);
+      },
     }, [
       el('span', { class: 'nav-drawer-item__icon' }, item.icon),
       el('span', { class: 'nav-drawer-item__name' }, item.name),

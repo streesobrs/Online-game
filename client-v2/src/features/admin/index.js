@@ -46,6 +46,7 @@ const TABS = [
   { id: 'mail', label: '邮件物品', icon: '✉️' },
   { id: 'games', label: '对局', icon: '🎮' },
   { id: 'feedback', label: '反馈', icon: '📝' },
+  { id: 'update', label: '更新', icon: '🔄' },
 ];
 
 /** 当前登录账号是否为管理员 */
@@ -210,6 +211,11 @@ export function renderAdmin(container) {
     userMails: [],
     userMailsUserId: '',
     userMailsLoaded: false,
+    gitInfo: null,
+    gitChecking: false,
+    updateStatus: null,
+    updateSnapshot: null,
+    updateLogs: [],
   };
 
   const refs = {};
@@ -325,6 +331,8 @@ export function renderAdmin(container) {
       state.adminName = acc.nickname || acc.username || '管理员';
       state.ready = true;
       state.error = '';
+      // 重连后清掉旧的更新状态，等 REST/推送回填，避免显示上一次残留的“更新进行中”
+      state.updateStatus = null;
       setStatus('后台已连接');
       page.querySelector('[data-identity]').textContent = state.adminName;
 
@@ -333,6 +341,7 @@ export function renderAdmin(container) {
       socket.emit('get_items_list');
       if (state.tab === 'accounts') socket.emit('get_all_accounts');
       if (state.tab === 'games' && !state.historyLoaded) socket.emit('get_game_history', { limit: 20 });
+      if (state.tab === 'update') { loadUpdateStatus(); checkGitUpdate(false); }
     });
 
     socket.on('admin_update', (data) => {
@@ -438,6 +447,19 @@ export function renderAdmin(container) {
       socket.emit('get_all_accounts');
     });
 
+    // ===== 更新流程（服务端 UpdateManager 推送到 admins 房间） =====
+    socket.on('update_status', (data) => {
+      state.updateStatus = data || null;
+      if (state.tab === 'update') syncUpdateStatus();
+    });
+
+    socket.on('update_log', (entry) => {
+      if (!entry) return;
+      state.updateLogs.push(entry);
+      if (state.updateLogs.length > 50) state.updateLogs.shift();
+      if (state.tab === 'update') appendUpdateLog(entry);
+    });
+
     socket.on('admin_action_result', (data) => {
       if (!data) return;
       const actionMessages = {
@@ -538,12 +560,14 @@ export function renderAdmin(container) {
     }
 
     if (id !== 'mail') refs.mail = null;
+    if (id !== 'update') refs.update = null;
 
     if (id === 'overview') renderOverview();
     else if (id === 'accounts') renderAccounts();
     else if (id === 'mail') renderMail();
     else if (id === 'games') renderGames();
     else if (id === 'feedback') renderFeedback();
+    else if (id === 'update') renderUpdate();
 
     if (session?.socket && state.ready) {
       if (id === 'accounts') session.socket.emit('get_all_accounts');
@@ -569,6 +593,10 @@ export function renderAdmin(container) {
       session.socket.emit('get_system_stats');
     }
     if (state.tab === 'feedback') loadFeedbacks();
+    if (state.tab === 'update') {
+      loadUpdateStatus();
+      checkGitUpdate(true);
+    }
     toast.info('已刷新');
   }
 
@@ -1994,6 +2022,235 @@ export function renderAdmin(container) {
     } catch (err) {
       toast.error(`更新失败：${err.message}`);
       renderFeedbackBody();
+    }
+  }
+
+  // ===== 系统更新（Git 自动更新） =====
+  function renderUpdate() {
+    content.innerHTML = '';
+    refs.overview = null;
+    refs.accounts = null;
+    refs.games = null;
+    refs.feedback = null;
+
+    const badgeEl = el('span', { class: 'admin-badge admin-badge--info' }, '未检查');
+    const localVersionEl = el('span', { class: 'admin-stat__value' }, '—');
+    const remoteVersionEl = el('span', { class: 'admin-stat__value' }, '—');
+    const commitHint = el('div', { class: 'admin-list-hint' }, '尚未检查');
+    const detailEl = el('div', { class: 'admin-list-hint' });
+    const messageEl = el('div', { class: 'admin-list-hint' }, '点击「检查更新」获取 Git 仓库最新提交');
+
+    const checkBtn = el('button', {
+      class: 'admin-btn admin-btn--ghost',
+      type: 'button',
+      onClick: () => checkGitUpdate(true),
+    }, '🔍 检查更新');
+    const applyBtn = el('button', {
+      class: 'admin-btn admin-btn--success',
+      type: 'button',
+      disabled: true,
+      onClick: () => applyGitUpdate(),
+    }, '⚡ 一键更新');
+
+    const statusTitle = el('div', { class: 'admin-maintenance-state' }, '当前没有进行中的更新');
+    const statusMsg = el('div', { class: 'admin-list-hint' });
+    const progressFill = el('div', {
+      style: { height: '100%', width: '0%', background: 'var(--theme-primary, #6366f1)', transition: 'width 0.3s' },
+    });
+    const logList = el('div', { class: 'admin-list' });
+
+    const versionCard = (label, valueEl) => el('div', { class: 'admin-stat' }, [
+      el('span', { class: 'admin-stat__label' }, label),
+      valueEl,
+    ]);
+
+    content.append(
+      section('Git 自动更新', '从远端仓库获取最新提交，自动生成更新包，并沿用现有的备份、重启与回滚流程', [
+        el('div', { class: 'admin-toolbar' }, [badgeEl, checkBtn, applyBtn]),
+        el('div', { class: 'admin-stat-grid' }, [
+          versionCard('当前部署版本', localVersionEl),
+          versionCard('远端最新版本', remoteVersionEl),
+        ]),
+        commitHint,
+        detailEl,
+        messageEl,
+      ]),
+      section('更新状态', '实时阶段与日志；更新完成后服务会自动重启，页面会自动重连', [
+        statusTitle,
+        statusMsg,
+        el('div', {
+          style: {
+            height: '6px',
+            borderRadius: '3px',
+            background: 'rgba(148, 163, 184, 0.25)',
+            overflow: 'hidden',
+            margin: '8px 0',
+          },
+        }, [progressFill]),
+        logList,
+      ]),
+    );
+
+    refs.update = {
+      badgeEl, localVersionEl, remoteVersionEl, commitHint, detailEl, messageEl,
+      checkBtn, applyBtn, statusTitle, statusMsg, progressFill, logList,
+    };
+
+    state.updateLogs.slice(-30).forEach((entry) => appendUpdateLog(entry));
+    syncUpdateStatus();
+    if (state.gitInfo) renderGitInfo(state.gitInfo);
+
+    if (state.ready) {
+      loadUpdateStatus();
+      checkGitUpdate(false);
+    }
+  }
+
+  function setGitApplyEnabled(enabled) {
+    if (!refs.update) return;
+    refs.update.applyBtn.disabled = !enabled;
+    refs.update.applyBtn.style.opacity = enabled ? '1' : '0.5';
+    refs.update.applyBtn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+  }
+
+  function renderGitInfo(data) {
+    if (!refs.update || !data) return;
+    const r = refs.update;
+    const local = data.local || {};
+    const remote = data.remote || {};
+
+    r.localVersionEl.textContent = local.version || '—';
+    r.remoteVersionEl.textContent = remote.version || '—';
+
+    const behind = (data.behind === null || data.behind === undefined) ? '' : `（落后 ${data.behind} 个提交）`;
+    r.commitHint.textContent = `已部署 ${local.appliedCommit || local.head || '—'} · 远端 ${remote.shortCommit || '—'}${behind}`;
+    r.detailEl.textContent = remote.message
+      ? `${remote.message} · ${remote.author || '未知作者'} · ${formatTime(remote.date)}`
+      : '';
+
+    const isPkg = data.mode === 'pkg';
+    r.badgeEl.className = `admin-badge ${isPkg ? 'admin-badge--warning' : (data.updateAvailable ? 'admin-badge--info' : 'admin-badge--online')}`;
+    r.badgeEl.textContent = isPkg ? '不可用（EXE 模式）' : (data.updateAvailable ? '有可用更新' : '已是最新');
+    r.messageEl.textContent = isPkg
+      ? '当前为 EXE 打包运行，Git 自动更新不可用，请改用旧版后台上传更新包。'
+      : (data.reason || '');
+
+    setGitApplyEnabled(!isPkg && !!data.updateAvailable);
+  }
+
+  async function checkGitUpdate(force) {
+    if (!refs.update || !session?.token || state.gitChecking) return;
+    state.gitChecking = true;
+    const r = refs.update;
+    r.checkBtn.disabled = true;
+    r.checkBtn.textContent = '⏳ 检查中…';
+    try {
+      const data = await adminFetch(`/api/update/git/check${force ? '?force=1' : ''}`, {}, session.token);
+      state.gitInfo = data;
+      renderGitInfo(data);
+    } catch (err) {
+      r.badgeEl.className = 'admin-badge admin-badge--danger';
+      r.badgeEl.textContent = '检查失败';
+      r.messageEl.textContent = err.message;
+      setGitApplyEnabled(false);
+    } finally {
+      state.gitChecking = false;
+      if (refs.update) {
+        r.checkBtn.disabled = false;
+        r.checkBtn.textContent = '🔍 检查更新';
+      }
+    }
+  }
+
+  function applyGitUpdate() {
+    const info = state.gitInfo;
+    if (!info?.remote || !session?.token) return;
+    const target = `版本 ${info.remote.version}（提交 ${info.remote.shortCommit}）`;
+    modal.show({
+      title: '确认自动更新',
+      content: `确定更新到 ${target}？更新会先自动备份，再应用文件并重启服务，在线玩家会被短暂断开。`,
+      confirmText: '开始更新',
+      onConfirm: async () => {
+        try {
+          const res = await adminFetch('/api/update/git/apply', { method: 'POST' }, session.token);
+          toast.success(`已开始更新到 ${res.version}（${res.shortCommit}）`);
+          setGitApplyEnabled(false);
+        } catch (err) {
+          toast.error(`启动更新失败：${err.message}`);
+        }
+      },
+    });
+  }
+
+  async function loadUpdateStatus() {
+    if (!session?.token) return;
+    try {
+      const res = await adminFetch('/api/update/status', {}, session.token);
+      state.updateSnapshot = res?.status || null;
+      syncUpdateStatus();
+    } catch { /* 状态拉取失败不影响更新操作 */ }
+  }
+
+  function syncUpdateStatus() {
+    if (!refs.update) return;
+    const r = refs.update;
+    const st = state.updateStatus;
+    const snap = state.updateSnapshot;
+
+    if (st && st.status && st.status !== 'idle') {
+      const labels = {
+        in_progress: '更新进行中',
+        rolling_back: '回滚中',
+        rolled_back: '已回滚',
+        rollback_failed: '回滚失败',
+        success: '更新成功',
+        failed: '更新失败',
+      };
+      const label = labels[st.status] || st.status;
+      const phase = st.currentPhase ? ` · ${st.currentPhase}` : '';
+      const phaseProgress = st.phases && st.currentPhase && st.phases[st.currentPhase]
+        ? Number(st.phases[st.currentPhase].progress) || 0
+        : 0;
+      const pct = Math.min(100, Math.max(0, Math.round(phaseProgress)));
+      r.statusTitle.textContent = `${label}${phase}${pct ? ` · ${pct}%` : ''}`;
+      r.statusMsg.textContent = st.error ? `错误：${st.error}` : (st.message || '');
+      r.progressFill.style.width = `${pct}%`;
+      return;
+    }
+
+    if (snap) {
+      const labels = {
+        idle: '当前没有进行中的更新',
+        updating: '更新进行中（或刚重启）',
+        uploaded: '更新包已上传，等待开始（旧版后台）',
+        success: '上次更新成功',
+        failed: '上次更新失败',
+      };
+      r.statusTitle.textContent = labels[snap.state] || '当前没有进行中的更新';
+      r.statusMsg.textContent = snap.lastError
+        ? `错误：${snap.lastError}`
+        : (snap.currentVersion ? `当前版本 ${snap.currentVersion}` : '');
+      r.progressFill.style.width = '0%';
+      return;
+    }
+
+    r.statusTitle.textContent = '当前没有进行中的更新';
+    r.statusMsg.textContent = '';
+    r.progressFill.style.width = '0%';
+  }
+
+  function appendUpdateLog(entry) {
+    if (!refs.update || !entry) return;
+    const color = entry.level === 'error'
+      ? 'var(--theme-stat-lose-color, #e53e3e)'
+      : (entry.level === 'warn' ? '#d69e2e' : '');
+    const node = el('div', {
+      class: 'admin-list-hint',
+      style: color ? { color } : null,
+    }, `[${formatTime(entry.timestamp)}] ${entry.message || ''}`);
+    refs.update.logList.append(node);
+    while (refs.update.logList.children.length > 50) {
+      refs.update.logList.firstElementChild.remove();
     }
   }
 

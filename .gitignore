@@ -19,6 +19,10 @@ data/
 # 例外：client-v2 的源码数据目录（供 Git 自动更新获取）
 !client-v2/src/data/
 
+# 更新系统运行时目录（备份/临时包/状态/锁）与重启标记
+/update/
+/restart.flag
+
 # 本地开发/设计文档（不入库）
 docs/
 

@@ -323,6 +323,21 @@ class UpdateManager {
     return paths;
   }
 
+  _readPackageVersion(extractDir) {
+    // 兼容两种打包结构：根目录 version.json（旧版/清单包）与 server/version.json（package.bat / Git 源码包）
+    for (const relPath of ['version.json', 'server/version.json']) {
+      const versionPath = path.join(extractDir, relPath);
+      if (!fs.existsSync(versionPath)) continue;
+      try {
+        const ver = JSON.parse(fs.readFileSync(versionPath, 'utf8'));
+        if (ver && ver.major !== undefined) {
+          return `${ver.major}.${ver.minor}.${ver.patch}.${ver.build}`;
+        }
+      } catch (e) { /* ignore */ }
+    }
+    return null;
+  }
+
   _isPathSafe(relativePath, whitelist) {
     const normalized = path.normalize(relativePath).replace(/^[/\\]+/, '');
     if (normalized.startsWith('..') || path.isAbsolute(normalized)) return false;
@@ -615,25 +630,17 @@ class UpdateManager {
             await Promise.all(fileWritePromises);
 
             if (manifest) {
-              const manifestPath = path.join(extractDir, 'version.json');
-              if (manifest.version && fs.existsSync(manifestPath)) {
-                try {
-                  const ver = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-                  this.status.version.to = `${ver.major}.${ver.minor}.${ver.patch}.${ver.build}`;
-                } catch (e) { /* ignore */ }
+              const pkgVersion = this._readPackageVersion(extractDir);
+              if (manifest.version && pkgVersion) {
+                this.status.version.to = pkgVersion;
               }
               if (!this.status.version.to && manifest.version) {
                 this.status.version.to = manifest.version;
               }
             } else {
               this._pushLog('warn', '未找到 update-manifest.json，将执行全量差异比对');
-              const rootVersionPath = path.join(extractDir, 'version.json');
-              if (fs.existsSync(rootVersionPath)) {
-                try {
-                  const ver = JSON.parse(fs.readFileSync(rootVersionPath, 'utf8'));
-                  this.status.version.to = `${ver.major}.${ver.minor}.${ver.patch}.${ver.build}`;
-                } catch (e) { /* ignore */ }
-              }
+              const pkgVersion = this._readPackageVersion(extractDir);
+              if (pkgVersion) this.status.version.to = pkgVersion;
             }
 
             this.manifest = manifest || { files: [] };
@@ -729,9 +736,9 @@ class UpdateManager {
           const exists = fs.existsSync(targetPath);
 
           if (exists) {
-            const sourceHash = this._hashFileSync(fullPath);
-            const targetHash = this._hashFileSync(targetPath);
-            if (sourceHash !== targetHash) {
+            // 忽略纯行尾差异（Git 归档/不同编辑器保存可能导致 CRLF 与 LF 混用），
+            // 否则 Git 更新会把所有文本文件都误判为“已修改”。
+            if (!this._isSameFileContent(fullPath, targetPath)) {
               operations.push({ op: 'update', relPath: relPathUnix, source: fullPath, target: targetPath });
             }
           } else {
@@ -803,6 +810,16 @@ class UpdateManager {
   _hashFileSync(filePath) {
     const content = fs.readFileSync(filePath);
     return crypto.createHash('sha256').update(content).digest('hex');
+  }
+
+  _isSameFileContent(sourcePath, targetPath) {
+    const source = fs.readFileSync(sourcePath);
+    const target = fs.readFileSync(targetPath);
+    if (source.equals(target)) return true;
+    // 含 NUL 字节视为二进制，按字节严格比较
+    if (source.includes(0) || target.includes(0)) return false;
+    // 文本文件忽略 CRLF/LF 差异
+    return source.toString('binary').replace(/\r\n/g, '\n') === target.toString('binary').replace(/\r\n/g, '\n');
   }
 
   async _createBackup() {
@@ -1175,6 +1192,16 @@ class UpdateManager {
       this._pushLog('error', `回滚失败: ${e.message}`);
       this.status.status = 'rollback_failed';
     }
+
+    // 回滚后通知外部（如 Git 自动更新需要清除“已部署提交”记录，避免回滚后仍显示已是最新）
+    if (typeof this.onRollback === 'function') {
+      try {
+        this.onRollback(this.status);
+      } catch (e) {
+        this._pushLog('warn', `回滚回调失败: ${e.message}`);
+      }
+    }
+
     this._saveStatus();
     this._saveHistory();
     this._broadcastStatus();

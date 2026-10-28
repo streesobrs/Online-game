@@ -16,6 +16,13 @@ class GitUpdateManager {
     this._cache = null;
     this._checkPromise = null;
     this._applying = false;
+    this._gitRetryAt = 0; // git 直连失败后的冷却截止时间，避免每次检查都卡满超时
+
+    // 回滚（手动或失败自动回滚）后清除已部署提交记录，下次检查会重新提示可更新
+    this.updateManager.onRollback = () => {
+      this._writeState({});
+      this._cache = null;
+    };
   }
 
   get cfg() {
@@ -31,7 +38,9 @@ class GitUpdateManager {
   _readState() {
     try {
       if (fs.existsSync(this.statePath)) {
-        const data = JSON.parse(fs.readFileSync(this.statePath, 'utf8'));
+        // 去掉 BOM（用记事本/PowerShell 手动保存会带上），否则 JSON.parse 失败会被当成“首次同步”
+        const raw = fs.readFileSync(this.statePath, 'utf8').replace(/^\uFEFF/, '');
+        const data = JSON.parse(raw);
         if (data && typeof data === 'object') return data;
       }
     } catch (e) {
@@ -59,7 +68,7 @@ class GitUpdateManager {
         windowsHide: true,
         maxBuffer: 20 * 1024 * 1024,
         encoding: 'utf8',
-        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never' }
       }, (err, stdout, stderr) => {
         if (err) {
           const detail = String(stderr || '').trim() || err.message;
@@ -177,11 +186,15 @@ class GitUpdateManager {
     const errors = [];
 
     let remote = null;
-    if (this._hasGitRepo()) {
+    if (this._hasGitRepo() && Date.now() >= this._gitRetryAt) {
       try {
         remote = await this._checkViaGit();
+        this._gitRetryAt = 0;
       } catch (e) {
         errors.push(`git: ${e.message}`);
+        // github.com 直连不通（国内网络常见）时，每次检查都会卡满超时，
+        // 失败后冷却一段时间直接走 GitHub API，避免管理页长时间等待
+        this._gitRetryAt = Date.now() + 5 * 60 * 1000;
         logger.warn('Git 方式检查更新失败，尝试 GitHub API', { error: e.message });
       }
     }
@@ -199,7 +212,10 @@ class GitUpdateManager {
     const remoteVersion = `${remote.versionData.major}.${remote.versionData.minor}.${remote.versionData.patch}.${remote.versionData.build}`;
     const remoteBuild = this._buildOf(remoteVersion);
 
-    const appliedCommit = state.commit || remote.head || null;
+    // 没有已部署记录时退回本地 HEAD：若本地代码就是远端最新提交，不必再触发一次更新/重启
+    const localHead = remote.head
+      || (this._hasGitRepo() ? await this._git(['rev-parse', 'HEAD'], this.cfg.checkTimeoutMs).catch(() => '') : '');
+    const appliedCommit = state.commit || localHead || null;
     let behind = null;
     let ahead = null;
     if (remote.source === 'git' && appliedCommit) {
@@ -240,7 +256,7 @@ class GitUpdateManager {
       local: {
         version: localVersion,
         build: localBuild,
-        head: remote.head ? remote.head.slice(0, 7) : null,
+        head: localHead ? localHead.slice(0, 7) : null,
         appliedCommit: appliedCommit ? appliedCommit.slice(0, 7) : null
       },
       remote: {
@@ -289,44 +305,67 @@ class GitUpdateManager {
 
   async _downloadPackage(info) {
     const cfg = this.cfg;
+    // 提交哈希来自远端响应，先校验格式再拼进 git 参数/下载地址，防止被当作选项或注入路径
+    if (!/^[0-9a-f]{40}$/.test(String(info.remote.commit || ''))) {
+      throw new Error(`非法的远端提交: ${info.remote.commit}`);
+    }
     const uploadDir = this.updateManager.paths.upload;
     fs.mkdirSync(uploadDir, { recursive: true });
 
     const filePath = path.join(uploadDir, `git_${Date.now()}_${info.remote.shortCommit}.zip`);
 
-    if (info.source === 'git') {
-      logger.info('使用 git archive 生成更新包', { commit: info.remote.commit });
-      await this._git(
-        ['archive', '--format=zip', `--output=${filePath}`, info.remote.commit],
-        cfg.downloadTimeoutMs
-      );
-    } else {
-      logger.info('从 GitHub 下载源码包', { commit: info.remote.commit });
-      const url = `https://codeload.github.com/${cfg.owner}/${cfg.repo}/zip/${info.remote.commit}`;
-      const buffer = await this._fetchBuffer(url, cfg.downloadTimeoutMs);
-      fs.writeFileSync(filePath, buffer);
-    }
-
-    const stat = fs.statSync(filePath);
-    if (stat.size > config.update.maxUploadSize) {
-      fs.unlinkSync(filePath);
-      throw new Error(`更新包过大: ${stat.size} > ${config.update.maxUploadSize}`);
-    }
-
-    const head = Buffer.alloc(4);
-    const fd = fs.openSync(filePath, 'r');
     try {
-      fs.readSync(fd, head, 0, 4, 0);
-    } finally {
-      fs.closeSync(fd);
-    }
-    if (head[0] !== 0x50 || head[1] !== 0x4B || head[2] !== 0x03 || head[3] !== 0x04) {
-      fs.unlinkSync(filePath);
-      throw new Error('生成的更新包不是有效的ZIP文件');
-    }
+      if (info.source === 'git') {
+        logger.info('使用 git archive 生成更新包', { commit: info.remote.commit });
+        await this._git(
+          ['archive', '--format=zip', `--output=${filePath}`, info.remote.commit],
+          cfg.downloadTimeoutMs
+        );
+      } else {
+        logger.info('从 GitHub 下载源码包', { commit: info.remote.commit });
+        // 配置了 token 时走 API zipball（私有仓库也可用），否则用公开的 codeload
+        const codeloadUrl = `https://codeload.github.com/${cfg.owner}/${cfg.repo}/zip/${info.remote.commit}`;
+        let buffer;
+        if (cfg.token) {
+          try {
+            buffer = await this._fetchBuffer(
+              `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/zipball/${info.remote.commit}`,
+              cfg.downloadTimeoutMs
+            );
+          } catch (e) {
+            // token 失效/权限不足时，公开仓库仍可通过 codeload 下载
+            logger.warn('API 下载更新包失败，回退 codeload', { error: e.message });
+            buffer = await this._fetchBuffer(codeloadUrl, cfg.downloadTimeoutMs);
+          }
+        } else {
+          buffer = await this._fetchBuffer(codeloadUrl, cfg.downloadTimeoutMs);
+        }
+        fs.writeFileSync(filePath, buffer);
+      }
 
-    this.updateManager.currentZipPath = filePath;
-    return filePath;
+      const stat = fs.statSync(filePath);
+      if (stat.size > config.update.maxUploadSize) {
+        throw new Error(`更新包过大: ${stat.size} > ${config.update.maxUploadSize}`);
+      }
+
+      const head = Buffer.alloc(4);
+      const fd = fs.openSync(filePath, 'r');
+      try {
+        fs.readSync(fd, head, 0, 4, 0);
+      } finally {
+        fs.closeSync(fd);
+      }
+      if (head[0] !== 0x50 || head[1] !== 0x4B || head[2] !== 0x03 || head[3] !== 0x04) {
+        throw new Error('生成的更新包不是有效的ZIP文件');
+      }
+
+      this.updateManager.currentZipPath = filePath;
+      return filePath;
+    } catch (err) {
+      // 失败时清理残留的半个包，避免 update/uploads 堆积
+      try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (e) { /* ignore */ }
+      throw err;
+    }
   }
 
   /**

@@ -61,14 +61,63 @@ const SUBJECT_RE = /^(\w+)(?:\(([^)]+)\))?[:：]\s*(.+)$/;
 const ROOT = path.resolve(__dirname, '..', '..');
 const OUT_FILE = path.join(ROOT, 'client-v2', 'src', 'config', 'changelog.js');
 
+/** Git 自动更新记录的“当前已部署提交”（见 server/config.js update.git.stateFile） */
+const STATE_FILE = path.join(ROOT, 'update', 'git-update-state.json');
+
+/**
+ * 服务通过 Git 自动更新后，本地 HEAD 可能仍停留在旧提交，
+ * 此时用“已部署提交”生成日志，避免重启后更新日志被旧 HEAD 覆盖。
+ * 仅当该提交存在且 HEAD 是它的祖先（即部署代码比本地 HEAD 新）时才使用。
+ */
+function resolveLogRef() {
+  try {
+    const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    const commit = state && state.commit;
+    if (!commit) return null;
+    execFileSync('git', ['cat-file', '-e', `${commit}^{commit}`], { cwd: ROOT, stdio: 'ignore' });
+    execFileSync('git', ['merge-base', '--is-ancestor', 'HEAD', commit], { cwd: ROOT, stdio: 'ignore' });
+    return commit;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * 已部署提交在本地仓库里不存在（例如通过 GitHub API 方式更新，本机连不上 github.com），
+ * 此时本地 HEAD 是旧提交，重新生成会把包内较新的更新日志覆盖成旧的。
+ * 这种情况直接保留现有 changelog.js，不重新生成。
+ */
+function deployedCommitMissing() {
+  try {
+    const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    const commit = state && state.commit;
+    if (!commit) return false;
+    try {
+      execFileSync('git', ['cat-file', '-e', `${commit}^{commit}`], { cwd: ROOT, stdio: 'ignore' });
+      return false;
+    } catch (e) {
+      return true;
+    }
+  } catch (e) {
+    return false;
+  }
+}
+
 /** 读取 git 提交记录（记录间用 \x1e 分隔，字段用 \x1f 分隔） */
 function readCommits() {
+  if (deployedCommitMissing()) {
+    console.warn('已部署提交不在本地仓库中，保留现有更新日志');
+    return null;
+  }
+
   const SEP = '\x1e';
   const FIELD = '\x1f';
   const format = [`%h`, `%aI`, `%s`, `%b`].join(FIELD);
 
   // 多取一倍，用于抵消被 SKIP_SUBJECT 跳过的生成提交
   const args = ['log'];
+  const ref = resolveLogRef();
+  if (ref) args.push(ref);
   if (LIMIT > 0) args.push(`-n${LIMIT * 2}`);
   args.push('--no-merges', `--pretty=format:${SEP}${format}`);
 
