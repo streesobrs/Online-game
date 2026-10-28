@@ -16,6 +16,8 @@ migrate-data.ps1
 # 运行时数据
 data/
 !data/.gitkeep
+# 例外：client-v2 的源码数据目录（供 Git 自动更新获取）
+!client-v2/src/data/
 
 # 本地开发/设计文档（不入库）
 docs/

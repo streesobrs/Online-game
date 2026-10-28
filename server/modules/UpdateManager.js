@@ -433,7 +433,7 @@ class UpdateManager {
     return { zipPath, size: stats.size, hash: await this._sha256File(zipPath) };
   }
 
-  async startUpdate(zipPath = null) {
+  async startUpdate(zipPath = null, options = {}) {
     if (this.status.status === 'in_progress') {
       throw new Error('已有更新正在进行中');
     }
@@ -465,6 +465,13 @@ class UpdateManager {
       await this._analyzeDiff();
       await this._createBackup();
       await this._applyFiles();
+      if (typeof options.onApplied === 'function') {
+        try {
+          await options.onApplied(this.status);
+        } catch (hookErr) {
+          this._pushLog('warn', `更新后置回调失败: ${hookErr.message}`);
+        }
+      }
       await this._triggerRestart();
     } catch (err) {
       this._failUpdate(err.message || String(err));

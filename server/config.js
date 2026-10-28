@@ -748,7 +748,21 @@ module.exports = {
     expectedTopFiles: ['package.json', 'start.bat', 'version.json'], // 更新包预期顶级文件
 
     // 校验进度
-    validateProgressDenominator: 50                 // 校验阶段进度计算基数（越大进度增长越慢）
+    validateProgressDenominator: 50,                // 校验阶段进度计算基数（越大进度增长越慢）
+
+    // ===== Git 自动更新（管理页一键检查/更新） =====
+    git: {
+      enabled: true,                                // 是否启用 Git 自动更新
+      remote: 'origin',                             // 本地仓库远端名
+      branch: 'main',                               // 跟踪分支
+      owner: 'streesobrs',                          // GitHub 仓库所有者（无本地 Git 时走 GitHub API）
+      repo: 'Online-game',                          // GitHub 仓库名
+      token: process.env.GITHUB_TOKEN || '',        // 私有仓库或提高 API 限流时配置
+      checkTimeoutMs: 20000,                        // git fetch / GitHub API 超时（毫秒）
+      downloadTimeoutMs: 120000,                    // 生成/下载更新包超时（毫秒）
+      cacheTtlMs: 60000,                            // 检查结果缓存时间（毫秒）
+      stateFile: 'update/git-update-state.json'     // 已部署提交记录（用于判断是否有新提交）
+    }
   },
 
   // ========== 数据存储配置 ==========

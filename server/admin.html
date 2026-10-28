@@ -3493,6 +3493,39 @@
 
         <!-- 系统更新 -->
         <section id="view-update" class="content-section">
+          <!-- Git 自动更新 -->
+          <div class="data-card" style="margin-bottom: 12px;">
+            <div class="card-header">
+              <span class="card-title">🌿 Git 自动更新</span>
+              <span id="git-update-badge" style="font-size:12px;color:#64748b;">未检查</span>
+            </div>
+            <div style="padding: 16px;">
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+                <div style="padding:12px; background:rgba(59,130,246,0.1); border-radius:8px; border-left:3px solid #3b82f6;">
+                  <div style="font-size:12px; color:#93c5fd; margin-bottom:4px;">当前部署</div>
+                  <div style="font-size:16px; font-weight:700; color:#fff;" id="git-local-version">-</div>
+                  <div style="font-size:12px; color:#94a3b8; margin-top:4px;" id="git-local-commit">-</div>
+                </div>
+                <div style="padding:12px; background:rgba(34,197,94,0.1); border-radius:8px; border-left:3px solid #22c55e;">
+                  <div style="font-size:12px; color:#86efac; margin-bottom:4px;">远端最新</div>
+                  <div style="font-size:16px; font-weight:700; color:#fff;" id="git-remote-version">-</div>
+                  <div style="font-size:12px; color:#94a3b8; margin-top:4px;" id="git-remote-commit">-</div>
+                </div>
+              </div>
+              <div id="git-remote-detail"
+                style="display:none; margin-bottom:12px; padding:10px 12px; background:#1e293b; border-radius:8px; font-size:12px; color:#cbd5e1; line-height:1.6;">
+              </div>
+              <div id="git-update-message" style="margin-bottom:12px; font-size:12px; color:#94a3b8;">
+                点击「检查更新」获取 Git 仓库最新提交
+              </div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button id="git-btn-check" class="action-btn btn-secondary" onclick="checkGitUpdate(true)">🔍 检查更新</button>
+                <button id="git-btn-apply" class="action-btn btn-success" onclick="applyGitUpdate()" disabled
+                  style="opacity:0.5; cursor:not-allowed;">⚡ 一键更新</button>
+              </div>
+            </div>
+          </div>
+
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
             <div class="data-card">
               <div class="card-header">
@@ -4785,7 +4818,7 @@
       if (view === 'chat') loadChatMessages();
       if (view === 'accounts') loadAccounts();
       if (view === 'system') { loadSystemStats(); loadSystemSettings(); }
-      if (view === 'update') { bindUpdateSocketEvents(); loadUpdateStatus(); }
+      if (view === 'update') { bindUpdateSocketEvents(); loadUpdateStatus(); checkGitUpdate(false); }
       if (view === 'matches') { loadLiveMatches(); loadMatchHistory(1); }
       if (view === 'logs') { loadOperationLogs(1); }
       if (view === 'realtime') openLogView();
@@ -10069,6 +10102,7 @@
       const msgEl = document.getElementById('update-current-message');
       if (msgEl) msgEl.textContent = '更新完成，服务已重启';
       setTimeout(() => loadBackupList(), 1000);
+      setTimeout(() => checkGitUpdate(true), 2000);
     }
     function _onUpdateFailed(data) {
       setUpdateStatusUI('failed');
@@ -10078,6 +10112,7 @@
       const msgEl = document.getElementById('update-current-message');
       if (msgEl) msgEl.textContent = '更新失败: ' + (data.error || '未知错误');
       setTimeout(() => loadUpdateStatus(), 2000);
+      setTimeout(() => checkGitUpdate(true), 2500);
     }
     function _onUpdateRollbackStart() {
       setUpdateStatusUI('rolling_back');
@@ -10127,6 +10162,126 @@
       socket.off('update_rollback_success', _onUpdateRollbackSuccess);
       socket.off('update_cancelled', _onUpdateCancelled);
       updateHandlersBound = false;
+    }
+
+    // ==================== Git 自动更新 ====================
+    let gitUpdateInfo = null;
+    let gitUpdateChecking = false;
+
+    function _gitUpdateHeaders() {
+      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+      return token ? { 'Authorization': 'Bearer ' + token } : {};
+    }
+
+    function _setGitApplyButton(enabled) {
+      const btn = document.getElementById('git-btn-apply');
+      if (!btn) return;
+      btn.disabled = !enabled;
+      btn.style.opacity = enabled ? '1' : '0.5';
+      btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+    }
+
+    async function checkGitUpdate(force = false) {
+      if (gitUpdateChecking) return;
+      gitUpdateChecking = true;
+      const btn = document.getElementById('git-btn-check');
+      const msg = document.getElementById('git-update-message');
+      if (btn) {
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+        btn.textContent = '⏳ 检查中...';
+      }
+      try {
+        const res = await fetch('/api/update/git/check' + (force ? '?force=1' : ''), { headers: _gitUpdateHeaders() });
+        const data = await res.json();
+        if (!data.success) {
+          if (msg) { msg.textContent = '检查失败: ' + (data.message || '未知错误'); msg.style.color = '#fca5a5'; }
+          const badge = document.getElementById('git-update-badge');
+          if (badge) { badge.textContent = '检查失败'; badge.style.color = '#f87171'; }
+          return;
+        }
+        renderGitUpdateInfo(data);
+      } catch (e) {
+        if (msg) { msg.textContent = '检查失败: ' + e.message; msg.style.color = '#fca5a5'; }
+      } finally {
+        gitUpdateChecking = false;
+        if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = '🔍 检查更新'; }
+      }
+    }
+
+    function renderGitUpdateInfo(data) {
+      gitUpdateInfo = data;
+      const localVer = document.getElementById('git-local-version');
+      const localCommit = document.getElementById('git-local-commit');
+      const remoteVer = document.getElementById('git-remote-version');
+      const remoteCommit = document.getElementById('git-remote-commit');
+      const detail = document.getElementById('git-remote-detail');
+      const msg = document.getElementById('git-update-message');
+      const badge = document.getElementById('git-update-badge');
+
+      if (localVer) localVer.textContent = data.local.version || '-';
+      if (localCommit) {
+        localCommit.textContent = data.local.appliedCommit
+          ? '已部署提交 ' + data.local.appliedCommit
+          : (data.local.head ? '仓库提交 ' + data.local.head : '未记录提交');
+      }
+      if (remoteVer) remoteVer.textContent = data.remote.version || '-';
+      if (remoteCommit) {
+        const behind = (data.behind !== null && data.behind !== undefined) ? ` · 落后 ${data.behind} 个提交` : '';
+        remoteCommit.textContent = '提交 ' + data.remote.shortCommit + behind;
+      }
+      if (detail) {
+        const timeText = data.remote.date ? new Date(data.remote.date).toLocaleString('zh-CN') : '-';
+        detail.innerHTML = `
+          <div>📝 ${escapeHtml(data.remote.message || '(无提交信息)')}</div>
+          <div style="margin-top:4px;color:#94a3b8;">作者 ${escapeHtml(data.remote.author || '-')} · ${escapeHtml(timeText)} · 来源 ${data.source === 'git' ? '本地 Git' : 'GitHub API'}</div>
+        `;
+        detail.style.display = 'block';
+      }
+      if (badge) {
+        badge.textContent = data.updateAvailable ? '● 有可用更新' : '✓ 已是最新';
+        badge.style.color = data.updateAvailable ? '#22d3ee' : '#22c55e';
+      }
+      if (msg) {
+        msg.style.color = data.updateAvailable ? '#86efac' : '#94a3b8';
+        msg.textContent = data.reason || '';
+      }
+      if (data.mode === 'pkg') {
+        if (msg) {
+          msg.style.color = '#fbbf24';
+          msg.textContent = '当前为 EXE 打包运行，Git 自动更新不可用，请改用更新包上传';
+        }
+        _setGitApplyButton(false);
+        return;
+      }
+      _setGitApplyButton(!!data.updateAvailable);
+    }
+
+    async function applyGitUpdate() {
+      if (!gitUpdateInfo || !gitUpdateInfo.updateAvailable) return;
+      const target = `版本 ${gitUpdateInfo.remote.version}（提交 ${gitUpdateInfo.remote.shortCommit}）`;
+      if (!confirm(`确定更新到 ${target}？\n更新会先自动备份，再应用文件并重启服务，在线用户会被短暂断开。`)) return;
+
+      const btn = document.getElementById('git-btn-apply');
+      if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.textContent = '⏳ 准备中...'; }
+      let started = false;
+      try {
+        addUpdateLog('========== Git 自动更新 ==========', 'info');
+        const res = await fetch('/api/update/git/apply', { method: 'POST', headers: _gitUpdateHeaders() });
+        const data = await res.json();
+        if (!data.success) {
+          addUpdateLog('Git 自动更新启动失败: ' + (data.message || '未知错误'), 'error');
+          return;
+        }
+        started = true;
+        addUpdateLog(`已生成更新包: ${data.version} (${data.shortCommit})，开始执行更新`, 'success');
+        setUpdateStatusUI('updating');
+      } catch (e) {
+        addUpdateLog('Git 自动更新请求失败: ' + e.message, 'error');
+      } finally {
+        if (btn) btn.textContent = '⚡ 一键更新';
+        _setGitApplyButton(!started && !!(gitUpdateInfo && gitUpdateInfo.updateAvailable));
+      }
     }
 
     function addUpdateLog(message, level = 'info') {

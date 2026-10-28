@@ -30,6 +30,7 @@ const ShopManager = require('./modules/ShopManager');
 const FriendsManager = require('./modules/FriendsManager');
 const OperationLogger = require('./modules/OperationLogger');
 const UpdateManager = require('./modules/UpdateManager');
+const GitUpdateManager = require('./modules/GitUpdateManager');
 
 // 初始化Express应用
 const app = express();
@@ -418,6 +419,42 @@ app.delete('/api/update/backup/:name', authenticateToken, (req, res) => {
     logAdminRest(req, 'update_delete_backup', { backupName: req.params.name }, { targetId: req.params.name, targetName: req.params.name });
     res.json({ success: true, message: '备份已删除' });
   } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+// Git 自动更新：检查远端最新提交
+app.get('/api/update/git/check', authenticateToken, async (req, res) => {
+  try {
+    if (!config.update.git.enabled) {
+      return res.status(403).json({ success: false, message: 'Git 自动更新未启用' });
+    }
+    const result = await gitUpdateManager.check(req.query.force === '1');
+    res.json({ success: true, ...result });
+  } catch (err) {
+    logger.error('Git 检查更新失败', { error: err.message });
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Git 自动更新：生成更新包并执行更新
+app.post('/api/update/git/apply', authenticateToken, async (req, res) => {
+  try {
+    if (!config.update.enabled || !config.update.git.enabled) {
+      return res.status(403).json({ success: false, message: 'Git 自动更新未启用' });
+    }
+    if (updateManager.status && updateManager.status.status === 'in_progress') {
+      return res.status(409).json({ success: false, message: '已有更新正在进行中' });
+    }
+    const result = await gitUpdateManager.apply();
+    logAdminRest(req, 'update_git_apply', {
+      version: result.version,
+      commit: result.shortCommit,
+      fromVersion: result.fromVersion
+    }, { targetId: result.shortCommit, targetName: result.version });
+    res.json({ success: true, message: '已开始自动更新', ...result });
+  } catch (err) {
+    logger.error('Git 自动更新启动失败', { error: err.message });
     res.status(400).json({ success: false, message: err.message });
   }
 });
@@ -2087,6 +2124,7 @@ const newVersion = versionManager.incrementBuild();
 logger.info(`服务器版本更新: ${newVersion}`);
 const themeManager = new ThemeManager();
 const updateManager = new UpdateManager(io);
+const gitUpdateManager = new GitUpdateManager(updateManager);
 
 // ========== FFmpeg 自动检测（用于 GIF 头像压缩） ==========
 (function initFfmpeg() {
