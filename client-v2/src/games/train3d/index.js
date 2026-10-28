@@ -842,28 +842,64 @@ export function renderTrain3d(container, options = {}) {
   const PORTAL_CUT_HALF = 13;     // 轨面中线两侧的平底半宽（m）
   const PORTAL_CUT_SLOPE = 24;    // 平底之外回填到自然地面的横向过渡宽度（m）
   const PORTAL_CUT_FLOOR = 1.75;  // 路堑底面比轨面低多少（m）
+  // 闭合环线的接缝在 t=0/1：隧道段允许 endT 超过 1（例如 [0.99, 1.02]），
+  // 所有取点统一走 wrapT，避免一条连续的山体隧道在接缝处被拆成两段。
+  const wrapT = (t) => ((t % 1) + 1) % 1;
   const tunnelRanges = [];
   {
     const samples = Math.max(500, Math.ceil(trackLength / 6));
-    let startT = -1;
-    for (let i = 0; i <= samples; i++) {
-      const t = i / samples;
-      const p = trackCurve.getPointAt(t % 1);
-      const depth = getTerrainHeight(p.x, p.z) - p.y;
-      const active = depth > TUNNEL_DEPTH;
-      if (active && startT < 0) startT = t;
-      if ((!active || i === samples) && startT >= 0) {
-        const endT = i === samples ? 1 : t;
-        if ((endT - startT) * trackLength >= TUNNEL_MIN_LENGTH) {
-          tunnelRanges.push({ startT, endT });
+    const active = new Uint8Array(samples);
+    let activeCount = 0;
+    for (let i = 0; i < samples; i++) {
+      const p = trackCurve.getPointAt(i / samples);
+      if (getTerrainHeight(p.x, p.z) - p.y > TUNNEL_DEPTH) {
+        active[i] = 1;
+        activeCount++;
+      }
+    }
+    if (activeCount === samples) {
+      tunnelRanges.push({ startT: 0, endT: 1 });
+    } else if (activeCount > 0) {
+      // 从一个“不在隧道里”的采样点开始绕一圈，跨接缝的 active 段会自然连成一段
+      let anchor = 0;
+      while (active[anchor]) anchor++;
+      let startK = -1;
+      for (let k = 1; k <= samples; k++) {
+        const i = (anchor + k) % samples;
+        if (active[i]) {
+          if (startK < 0) startK = k;
+        } else if (startK >= 0) {
+          const startT = ((anchor + startK) % samples) / samples;
+          let endT = ((anchor + k) % samples) / samples;
+          if (endT <= startT) endT += 1;
+          if ((endT - startT) * trackLength >= TUNNEL_MIN_LENGTH) {
+            tunnelRanges.push({ startT, endT });
+          }
+          startK = -1;
         }
-        startT = -1;
       }
     }
   }
+  // 隧道段长度不超过一圈，检查 t-1 / t / t+1 三个副本即可
+  function tunnelRangeContains(range, t) {
+    return (t >= range.startT && t <= range.endT)
+      || (t + 1 >= range.startT && t + 1 <= range.endT)
+      || (t - 1 >= range.startT && t - 1 <= range.endT);
+  }
   function isTunnelT(t) {
+    const u = wrapT(t);
     for (const range of tunnelRanges) {
-      if (t >= range.startT && t <= range.endT) return true;
+      if (tunnelRangeContains(range, u)) return true;
+    }
+    return false;
+  }
+  /** 站台等设施与隧道段（含洞口 90m 余量）的环形距离判定 */
+  function nearTunnelT(t, margin) {
+    const u = wrapT(t);
+    for (const range of tunnelRanges) {
+      for (const cand of [u, u + 1, u - 1]) {
+        if (cand >= range.startT - margin && cand <= range.endT + margin) return true;
+      }
     }
     return false;
   }
@@ -875,9 +911,9 @@ export function renderTrain3d(container, options = {}) {
     for (const range of tunnelRanges) {
       let s = range.startT;
       let moved = 0;
-      while (s > 0.005 && moved < 120) {
-        const prevT = (s - portalStep + 1) % 1;
-        const p = trackCurve.getPointAt(prevT);
+      while (moved < 120) {
+        const prevT = s - portalStep;
+        const p = trackCurve.getPointAt(wrapT(prevT));
         if (getTerrainHeight(p.x, p.z) - p.y < TUNNEL_PORTAL_DEPTH) break;
         s = prevT;
         moved += 4;
@@ -886,9 +922,9 @@ export function renderTrain3d(container, options = {}) {
 
       let e = range.endT;
       moved = 0;
-      while (e < 0.995 && moved < 120) {
-        const nextT = (e + portalStep) % 1;
-        const p = trackCurve.getPointAt(nextT);
+      while (moved < 120) {
+        const nextT = e + portalStep;
+        const p = trackCurve.getPointAt(wrapT(nextT));
         if (getTerrainHeight(p.x, p.z) - p.y < TUNNEL_PORTAL_DEPTH) break;
         e = nextT;
         moved += 4;
@@ -904,56 +940,78 @@ export function renderTrain3d(container, options = {}) {
   // 这样纵断面只有一条平顺曲线，不会跟着地形一坑一坑地起伏，
   // 同时保证管片不会拱出地表。
   if (tunnelRanges.length) {
-    const marginT = 30 / trackLength;
     const pointCount = finalTrackPoints.length;
-    const baseY = finalTrackPoints.map((p) => p.y);
     // 轨面允许的最高位置：地形再减去洞顶覆土厚度，超过就会把管片顶出地表
     const coverLimit = finalTrackPoints.map(
       (p) => getTerrainHeight(p.x, p.z) - TUNNEL_PORTAL_DEPTH
     );
-    const chordAt = (y0, y1, u) => y0 + (y1 - y0) * THREE.MathUtils.smoothstep(u, 0, 1);
+    // 隧道内纵断面用“直线弦”连接两端洞口，不再用 smoothstep：
+    // smoothstep 在两端坡度为 0，会让轨道在洞口突然变平，和洞外的坡度对不上。
+    const chordAt = (y0, y1, u) => y0 + (y1 - y0) * u;
+    // 控制点 i 位于曲线参数 u=i/pointCount，而 range.startT 是弧长参数。
+    // 必须先用 getUtoTmapping 把弧长 t 换回曲线参数，否则弦端点和覆土约束都会偏几个控制点。
+    const uAtT = (t) => trackCurve.getUtoTmapping(wrapT(t));
 
     for (const range of tunnelRanges) {
-      const span = Math.max(1e-6, range.endT - range.startT);
-      const spanMeters = Math.max(1, span * trackLength);
-      const y0 = baseY[Math.round(range.startT * pointCount) % pointCount];
-      const y1 = baseY[Math.round(range.endT * pointCount) % pointCount];
+      let uStart = uAtT(range.startT);
+      let uEnd = uAtT(range.endT);
+      for (let k = 0; k < 2 && uEnd <= uStart; k++) uEnd += 1;
+      if (uEnd <= uStart + 1e-9) uEnd = uStart + 1e-9;
+      const uSpan = uEnd - uStart;
+      const spanMeters = Math.max(1, (range.endT - range.startT) * trackLength);
+
+      // 弦的两端直接取旧轨面在洞门处的真实高程（不再用控制点下标近似）
+      const y0 = trackCurve.getPointAt(wrapT(range.startT)).y;
+      const y1 = trackCurve.getPointAt(wrapT(range.endT)).y;
 
       // 下压量沿隧道中段取满，靠近洞门（至少 24m）缓入缓出，避免洞口出现折角
       const ramp = THREE.MathUtils.clamp(24 / spanMeters, 0.04, 0.2);
       const sagWeight = (u) => THREE.MathUtils.smoothstep(u, 0, ramp) *
         THREE.MathUtils.smoothstep(1 - u, 0, ramp);
 
+      // 洞口内侧的过渡长度：先保持 24m 原纵断面（两个控制点），
+      // 保证洞口切线与洞外完全一致；再向洞内过渡到直线弦。
+      // 太短的隧道不拉弦，直接沿用原纵断面，避免过渡区侵入洞口。
+      if (spanMeters < 120) continue;
+      const holdMeters = 24;
+      const edgeMeters = Math.min(70, Math.max(holdMeters + 20, spanMeters * 0.3));
+      const holdU = holdMeters / spanMeters;
+      const edgeU = Math.min(0.45, edgeMeters / spanMeters);
+
+      // 控制点可能落在接缝另一侧：u、u±1 中取落在隧道区间内的那个
+      const localU = (i) => {
+        const u = i / pointCount;
+        if (u >= uStart && u <= uEnd) return u;
+        if (u + 1 >= uStart && u + 1 <= uEnd) return u + 1;
+        if (u - 1 >= uStart && u - 1 <= uEnd) return u - 1;
+        return null;
+      };
+
       // 一次算完整条隧道需要的最大下压量：只压“最深的那个坑”，
       // 其余位置也压同样的量，曲线因此是单峰缓坡而不是逐点贴合地形。
       let need = 0;
       for (let i = 0; i < pointCount; i++) {
-        const t = i / pointCount;
-        if (t < range.startT || t > range.endT) continue;
-        const u = (t - range.startT) / span;
-        const deficit = chordAt(y0, y1, u) - coverLimit[i];
+        const uu = localU(i);
+        if (uu === null) continue;
+        const deficit = chordAt(y0, y1, (uu - uStart) / uSpan) - coverLimit[i];
         if (deficit > need) need = deficit;
       }
 
-      const margin = Math.min(marginT, span * 0.5);
-      const extStart = range.startT - margin;
-      const extEnd = range.endT + margin;
       for (let i = 0; i < pointCount; i++) {
-        const t = i / pointCount;
-        if (t < extStart || t > extEnd) continue;
-        const u = THREE.MathUtils.clamp((t - range.startT) / span, 0, 1);
-        let y = chordAt(y0, y1, u) - need * sagWeight(u);
-        // 兜底：洞身范围内任何一点都不得拱出覆土（洞外过渡段不套这个约束）
-        if (t >= range.startT && t <= range.endT) y = Math.min(y, coverLimit[i]);
-        let weight;
-        if (t < range.startT) {
-          weight = THREE.MathUtils.smoothstep((t - extStart) / (range.startT - extStart), 0, 1);
-        } else if (t > range.endT) {
-          weight = 1 - THREE.MathUtils.smoothstep((t - range.endT) / (extEnd - range.endT), 0, 1);
-        } else {
-          weight = 1;
-        }
-        finalTrackPoints[i].y = finalTrackPoints[i].y * (1 - weight) + y * weight;
+        const uu = localU(i);
+        if (uu === null) continue;
+        const u = (uu - uStart) / uSpan;
+        // 0 = 洞口（保持原纵断面），1 = 完全进入弦线
+        const edge = Math.min(u, 1 - u);
+        const blendT = THREE.MathUtils.clamp(
+          (edge - holdU) / Math.max(1e-6, edgeU - holdU), 0, 1
+        );
+        const w = THREE.MathUtils.smoothstep(blendT, 0, 1);
+        const chordY = chordAt(y0, y1, u) - need * sagWeight(u);
+        let y = finalTrackPoints[i].y + (chordY - finalTrackPoints[i].y) * w;
+        // 兜底：洞身范围内任何一点都不得拱出覆土
+        y = Math.min(y, coverLimit[i]);
+        finalTrackPoints[i].y = y;
       }
     }
 
@@ -966,7 +1024,8 @@ export function renderTrain3d(container, options = {}) {
   // 洞门外侧的削坡切口：把草坡在洞口附近压下去，露出洞门和岩土面
   const tunnelPortalCuts = [];
   for (const range of tunnelRanges) {
-    for (const [t, outwardSign] of [[range.startT, -1], [range.endT, 1]]) {
+    for (const [rawT, outwardSign] of [[range.startT, -1], [range.endT, 1]]) {
+      const t = wrapT(rawT);
       const p = trackCurve.getPointAt(t);
       const tan = trackCurve.getTangentAt(t).normalize();
       const side = new THREE.Vector3().crossVectors(WORLD_UP, tan).normalize();
@@ -976,6 +1035,9 @@ export function renderTrain3d(container, options = {}) {
         oz: tan.z * outwardSign,
         px: side.x,
         pz: side.z,
+        // 路堑底面沿洞外方向跟着轨面坡度走（而不是一条水平槽），
+        // 否则轨面爬坡/下坡时洞口引道和隧道口会形成明显夹角。
+        slope: outwardSign * tan.y / Math.max(1e-6, tan.x * tan.x + tan.z * tan.z),
         t,
         sign: outwardSign,
         tunnelIndex: tunnelRanges.indexOf(range)
@@ -1004,7 +1066,7 @@ export function renderTrain3d(container, options = {}) {
       const w = wAlong * wLat;
       if (w > weight) {
         weight = w;
-        floorY = portal.y - PORTAL_CUT_FLOOR;
+        floorY = portal.y - PORTAL_CUT_FLOOR + portal.slope * along;
       }
     }
     _portalCutInfo.weight = weight;
@@ -1350,11 +1412,7 @@ for (int i = 0; i < ${PORTAL_CLIP_MAX}; i++) {
     const tan = trackCurve.getTangentAt(t).normalize();
     const side = new THREE.Vector3().crossVectors(WORLD_UP, tan).normalize();
     // 站台和雨棚不能压在隧道口/隧道段上
-    for (const range of tunnelRanges) {
-      if (t + STATION_TUNNEL_MARGIN > range.startT && t - STATION_TUNNEL_MARGIN < range.endT) {
-        return -1e9;
-      }
-    }
+    if (nearTunnelT(t, STATION_TUNNEL_MARGIN)) return -1e9;
     const naturalTrack = getTerrainHeight(p.x, p.z);
     const clearance = p.y - naturalTrack;
     if (naturalTrack < WATER_LEVEL + 1.5) return -1e9;
@@ -1786,8 +1844,9 @@ for (int i = 0; i < ${PORTAL_CLIP_MAX}; i++) {
     });
 
     const frameAt = (t) => {
-      const p = trackCurve.getPointAt(t);
-      const tan = trackCurve.getTangentAt(t).normalize();
+      const tc = wrapT(t);
+      const p = trackCurve.getPointAt(tc);
+      const tan = trackCurve.getTangentAt(tc).normalize();
       const side = new THREE.Vector3().crossVectors(WORLD_UP, tan).normalize();
       const up = new THREE.Vector3().crossVectors(tan, side).normalize();
       return { p, tan, side, up };
@@ -1905,8 +1964,9 @@ for (int i = 0; i < ${PORTAL_CLIP_MAX}; i++) {
       }
 
       const addPortal = (t, outwardSign) => {
-        const p = trackCurve.getPointAt(t);
-        const tan = trackCurve.getTangentAt(t).normalize();
+        const tc = wrapT(t);
+        const p = trackCurve.getPointAt(tc);
+        const tan = trackCurve.getTangentAt(tc).normalize();
         const side = new THREE.Vector3().crossVectors(WORLD_UP, tan).normalize();
         const up = new THREE.Vector3().crossVectors(tan, side).normalize();
         const outward = new THREE.Vector3(
@@ -3419,6 +3479,17 @@ for (int i = 0; i < ${PORTAL_CLIP_MAX}; i++) {
   let isDragging = false, lastInteractionTime = 0, previousMouseX = 0, previousMouseY = 0;
   let lookYaw = 0, lookPitch = -0.2, targetLookYaw = 0, targetLookPitch = -0.2;
 
+  /* 隧道自动视角：第三人称进洞时切换到“已有的第一人称模式”（模式、HUD、按键状态一致），
+     出洞且车后镜头已经离开山体后再自动切回；切换时做一次短镜头过渡。 */
+  let autoTunnelView = false;
+  let camBlend = 1;
+  let camRestoreSnap = false;
+  const CAM_BLEND_TIME = 0.45;
+  const _camBlendFromPos = new THREE.Vector3();
+  const _camBlendFromQuat = new THREE.Quaternion();
+  const _camBlendToPos = new THREE.Vector3();
+  const _camBlendToQuat = new THREE.Quaternion();
+
   // 临时调试（验证完删除）：train3d.debugPortal=<n> 把列车传送到第 n 个洞口外，拉近镜头
   {
     const raw = localStorage.getItem('train3d.debugPortal');
@@ -3482,7 +3553,7 @@ for (int i = 0; i < ${PORTAL_CLIP_MAX}; i++) {
 
     if (activePointers.size >= 2) {
       const dist = pointerDistance();
-      if (pinchStartDist > 0 && dist > 0 && cameraMode === 'third') {
+      if (pinchStartDist > 0 && dist > 0 && (cameraMode === 'third' || autoTunnelView)) {
         // 双指张开 = 拉近（半径变小），双指收拢 = 拉远
         targetRadius = THREE.MathUtils.clamp(pinchStartRadius * (pinchStartDist / dist), 20, 250);
         radius = targetRadius;
@@ -3537,7 +3608,7 @@ for (int i = 0; i < ${PORTAL_CLIP_MAX}; i++) {
   on(window, 'pointercancel', endPointer);
 
   on(renderer.domElement, 'wheel', (e) => {
-    if (cameraMode === 'third') {
+    if (cameraMode === 'third' || autoTunnelView) {
       targetRadius = THREE.MathUtils.clamp(targetRadius + e.deltaY * 0.03, 20, 250);
       if (!isDragging) radius = targetRadius;
     }
@@ -3551,18 +3622,82 @@ for (int i = 0; i < ${PORTAL_CLIP_MAX}; i++) {
     return a + diff * t;
   }
 
+  function headTrackT() {
+    return ((travel % trackLength) + trackLength) % trackLength / trackLength;
+  }
+
+  function headInTunnel() {
+    const headT = headTrackT();
+    // 隧道段可能跨过 t=0/1 接缝，isTunnelT 内部已做环形判断
+    return isTunnelT(headT - 0.0005) || isTunnelT(headT) || isTunnelT(headT + 0.0005);
+  }
+
+  /** 车头正在接近隧道或已在隧道内（不包含刚出洞后的 20m，避免切回第三人称又立刻切回） */
+  function headApproachingTunnel() {
+    const t = headTrackT();
+    const margin = 20 / trackLength;
+    for (const range of tunnelRanges) {
+      for (const cand of [t, t + 1, t - 1]) {
+        if (cand >= range.startT - margin && cand <= range.endT) return true;
+      }
+    }
+    return false;
+  }
+
+  function updateCameraModeUi() {
+    camModeEl.textContent = cameraMode === 'third'
+      ? '📷 第三人称跟随'
+      : (autoTunnelView ? '📷 第一人称驾驶室（隧道）' : '📷 第一人称驾驶室');
+    const camBtn = $('#touch-cam');
+    if (camBtn) camBtn.textContent = cameraMode === 'third' ? '视角·跟随' : '视角·驾驶室';
+  }
+
+  function beginCameraBlend() {
+    _camBlendFromPos.copy(camera.position);
+    _camBlendFromQuat.copy(camera.quaternion);
+    camBlend = 0;
+  }
+
+  /** 车后镜头是否会被山体/隧道管片埋住（决定出洞后何时恢复第三人称） */
+  function thirdPersonCameraBlocked() {
+    const head = cars[0].obj;
+    _tanV.set(0, 0, 1).applyQuaternion(head.quaternion);
+    _tanV.y = 0;
+    if (_tanV.lengthSq() < 1e-8) _tanV.set(0, 0, 1);
+    _tanV.normalize();
+    const tTheta = Math.atan2(-_tanV.x, -_tanV.z);
+    const r = targetRadius;
+    const p = targetPhi;
+    const x = head.position.x + r * Math.sin(p) * Math.sin(tTheta);
+    const z = head.position.z + r * Math.sin(p) * Math.cos(tTheta);
+    const y = head.position.y + 2.5 + r * Math.cos(p);
+    return y < getGroundY(x, z) + 1.5;
+  }
+
   function updateCamera(dt, snap = false) {
     const head = cars[0].obj;
-    const headT = ((travel % trackLength) + trackLength) % trackLength / trackLength;
-    const inTunnel = tunnelRanges.some(
-      (range) => headT >= range.startT - 0.0005 && headT <= range.endT + 0.0005
-    );
+    const inTunnel = headInTunnel();
     if (headlightSpot) {
       if (inTunnel) headlightSpot.intensity = Math.max(headlightSpot.intensity, 140);
       else if (!isNight) headlightSpot.intensity = 0;
     }
 
-    if (cameraMode === 'third' && !inTunnel) {
+    // 第三人称接近洞口（20m 内）：切到真正的第一人称模式（HUD/按键状态一起同步），
+    // 出洞后等车后镜头离开山体再切回，避免镜头被隧道/山体埋住。
+    if ((inTunnel || headApproachingTunnel()) && cameraMode === 'third') {
+      autoTunnelView = true;
+      cameraMode = 'first';
+      updateCameraModeUi();
+      if (!snap) beginCameraBlend();
+    } else if (!inTunnel && autoTunnelView && (snap || !thirdPersonCameraBlocked())) {
+      autoTunnelView = false;
+      cameraMode = 'third';
+      camRestoreSnap = true;
+      camBlend = 1;
+      updateCameraModeUi();
+    }
+
+    if (cameraMode === 'third') {
       _camTarget.copy(head.position);
       _camTarget.y += 2.5;
 
@@ -3573,8 +3708,9 @@ for (int i = 0; i < ${PORTAL_CLIP_MAX}; i++) {
       targetTheta = Math.atan2(-_tanV.x, -_tanV.z);
 
       const now = performance.now();
-      if (snap) {
+      if (snap || camRestoreSnap) {
         theta = targetTheta; phi = targetPhi; radius = targetRadius;
+        camRestoreSnap = false;
       } else if (!isDragging && now - lastInteractionTime > 2500) {
         theta = lerpAngle(theta, targetTheta, 1 - Math.exp(-dt * 3));
         phi = THREE.MathUtils.damp(phi, targetPhi, 3, dt);
@@ -3607,8 +3743,8 @@ for (int i = 0; i < ${PORTAL_CLIP_MAX}; i++) {
       _quatLook.setFromEuler(_euler);
       _camQuatTarget.copy(head.quaternion).multiply(_bankQuat).multiply(_quatFwd).multiply(_quatLook);
 
-      if (inTunnel && !snap && dt > 0) {
-        // 隧道内强制第一人称：车头随纵断面的一点点俯仰都会被管片放大成“上下抖”。
+      if (inTunnel && !snap && dt > 0 && camBlend >= 1) {
+        // 隧道内第一人称：车头随纵断面的一点点俯仰都会被管片放大成“上下抖”。
         // 高度和朝向做一阶低通——车头照旧贴轨，画面不再硬跟随每一处起伏。
         const kY = 1 - Math.exp(-dt * 9);
         if (_camSmoothY === null) _camSmoothY = _driverPos.y;
@@ -3620,6 +3756,16 @@ for (int i = 0; i < ${PORTAL_CLIP_MAX}; i++) {
         camera.quaternion.copy(_camQuatTarget);
         _camSmoothY = _driverPos.y;
       }
+    }
+
+    // 自动进/出隧道时的短镜头过渡：从切换瞬间的相机位姿平滑到目标位姿
+    if (camBlend < 1) {
+      camBlend = Math.min(1, camBlend + dt / CAM_BLEND_TIME);
+      const k = THREE.MathUtils.smoothstep(camBlend, 0, 1);
+      _camBlendToPos.copy(camera.position);
+      _camBlendToQuat.copy(camera.quaternion);
+      camera.position.lerpVectors(_camBlendFromPos, _camBlendToPos, k);
+      camera.quaternion.slerpQuaternions(_camBlendFromQuat, _camBlendToQuat, k);
     }
 
     // 起步震动：低频、轻微的车体下沉/回弹，不是高频抖动
@@ -3646,18 +3792,24 @@ for (int i = 0; i < ${PORTAL_CLIP_MAX}; i++) {
   }
 
   function toggleCamera() {
-    const camBtn = $('#touch-cam');
+    // 隧道内（以及刚出洞、车后镜头还没离开山体时）保持驾驶室视角：
+    // 把镜头放到车后 20~250m 会直接穿进山体/管片。
+    if (headInTunnel() || autoTunnelView) {
+      updateCameraModeUi();
+      return;
+    }
     if (cameraMode === 'third') {
       cameraMode = 'first';
-      camModeEl.textContent = '📷 第一人称驾驶室';
+      autoTunnelView = false;
       targetLookYaw = 0; targetLookPitch = -0.2;
       lookYaw = 0; lookPitch = -0.2;
     } else {
       cameraMode = 'third';
-      camModeEl.textContent = '📷 第三人称跟随';
+      autoTunnelView = false;
+      camBlend = 1;
       updateCamera(0, true);
     }
-    if (camBtn) camBtn.textContent = cameraMode === 'third' ? '视角·跟随' : '视角·驾驶室';
+    updateCameraModeUi();
   }
 
   /* ============================================================
