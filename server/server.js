@@ -2123,10 +2123,9 @@ logger.info('好友系统初始化完成');
 const newVersion = versionManager.incrementBuild();
 logger.info(`服务器版本更新: ${newVersion}`);
 
-// 启动时按“已部署提交”重新生成更新日志：
-// 仓库里的 changelog.js 是在提交前生成的，必然缺最新一条，
-// 经 Git 更新后只有在重启时重新生成才能补上最新记录。
-// （EXE 打包模式没有 git 仓库且文件只读，跳过）
+// 启动时生成一次更新日志（与打包时 package.bat 的做法一致）：
+// 有 git 仓库就按提交历史重算；没有 git 时从 GitHub API 拉一次再合并进现有日志。
+// generate() 内部已兜底，失败不会影响启动，这里不需要 await
 if (!process.pkg) {
   try {
     require('./scripts/gen-changelog').generate();

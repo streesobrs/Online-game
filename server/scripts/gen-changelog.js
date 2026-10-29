@@ -58,6 +58,13 @@ const ITEM_RE = /^\s*[-*+]\s+(.+)$/;
 /** 标题行：type(scope): 描述 */
 const SUBJECT_RE = /^(\w+)(?:\(([^)]+)\))?[:：]\s*(.+)$/;
 
+/** 转成 UTC+8 的 ISO 字符串（2026-10-29T16:32:05+08:00），git 的 %aI 本身就是本地时区 */
+function toUtc8(iso) {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return iso;
+  return new Date(t + 8 * 60 * 60 * 1000).toISOString().replace('Z', '+08:00');
+}
+
 const ROOT = path.resolve(__dirname, '..', '..');
 const OUT_FILE = path.join(ROOT, 'client-v2', 'src', 'config', 'changelog.js');
 
@@ -214,25 +221,31 @@ function parseBody(body) {
   return { build, body: markdown };
 }
 
+/** 单个提交 → 一条记录（脚本自身的生成提交返回 null） */
+function buildEntry(commit) {
+  if (SKIP_SUBJECT.test(commit.subject)) return null;
+
+  const { build, body } = parseBody(commit.body);
+  const sub = SUBJECT_RE.exec(commit.subject);
+
+  return {
+    tag: build ? `Build ${build}` : commit.hash,
+    name: sub ? sub[3].trim() : commit.subject,
+    type: sub ? sub[1] : '',
+    scope: sub && sub[2] ? sub[2] : '',
+    hash: commit.hash,
+    publishedAt: commit.date,
+    body,
+  };
+}
+
 function buildEntries(commits) {
   const entries = [];
 
   for (const commit of commits) {
     if (LIMIT > 0 && entries.length >= LIMIT) break;
-    if (SKIP_SUBJECT.test(commit.subject)) continue;
-
-    const { build, body } = parseBody(commit.body);
-    const sub = SUBJECT_RE.exec(commit.subject);
-
-    entries.push({
-      tag: build ? `Build ${build}` : commit.hash,
-      name: sub ? sub[3].trim() : commit.subject,
-      type: sub ? sub[1] : '',
-      scope: sub && sub[2] ? sub[2] : '',
-      hash: commit.hash,
-      publishedAt: commit.date,
-      body,
-    });
+    const entry = buildEntry(commit);
+    if (entry) entries.push(entry);
   }
 
   return entries;
@@ -245,7 +258,7 @@ function render(entries) {
     ' *',
     ' * 生成命令：npm run changelog',
     ' * 数据源：git 提交记录（遵循 .trae/rules/git-commit-message.md 提交规范）',
-    ` * 生成时间：${new Date().toISOString()}`,
+    ` * 生成时间：${toUtc8(new Date().toISOString())}`,
     ' */',
     '',
     'export const CHANGELOG = ',
@@ -254,33 +267,96 @@ function render(entries) {
   return `${header}${JSON.stringify(entries, null, 2)};\n`;
 }
 
-function main() {
-  const commits = readCommits();
+/** 现有产物里的记录（无 git 时用来和远端记录合并） */
+function readExistingEntries() {
+  try {
+    const raw = fs.readFileSync(OUT_FILE, 'utf8');
+    const list = JSON.parse(raw.slice(raw.indexOf('['), raw.lastIndexOf(']') + 1));
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    return [];
+  }
+}
 
-  // 拿不到 git 历史时不能中断启动/打包流程
-  if (!commits) {
-    if (fs.existsSync(OUT_FILE)) {
-      console.warn('已保留原有更新日志，本次跳过生成');
-    } else {
-      fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });
-      fs.writeFileSync(OUT_FILE, render([]), 'utf8');
-      console.warn('已生成空的更新日志（页面会显示"还没有更新记录"）');
+/**
+ * 没有 git 仓库（源码包部署），或已部署提交不在本地仓库时，
+ * 从 GitHub API 拉提交记录补日志。
+ * 每页 100 条，碰到现有记录里的提交或翻完就停（最多 5 页）。
+ */
+async function readRemoteCommits(existingHashes) {
+  const cfg = require('../config').update.git;
+  if (!cfg.enabled) throw new Error('Git 自动更新未启用');
+
+  const headers = { 'User-Agent': 'game-server-changelog', Accept: 'application/vnd.github+json' };
+  if (cfg.token) headers.Authorization = `Bearer ${cfg.token}`;
+
+  const commits = [];
+  for (let page = 1; page <= 5; page++) {
+    const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/commits`
+      + `?sha=${encodeURIComponent(cfg.branch)}&per_page=100&page=${page}`;
+    const res = await fetch(url, { headers, signal: AbortSignal.timeout(cfg.checkTimeoutMs) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const list = await res.json();
+    if (!Array.isArray(list) || !list.length) break;
+
+    let reachedKnown = false;
+    for (const item of list) {
+      const message = String((item.commit && item.commit.message) || '');
+      const hash = String(item.sha || '').slice(0, 7);
+      const [subject, ...rest] = message.split('\n');
+      commits.push({
+        hash,
+        date: toUtc8((item.commit && item.commit.author && item.commit.author.date) || ''),
+        subject: subject.trim(),
+        body: rest.join('\n'),
+      });
+      if (existingHashes.has(hash)) reachedKnown = true;
     }
-    return;
+
+    if (reachedKnown || list.length < 100) break;
   }
 
-  const entries = buildEntries(commits);
-  fs.writeFileSync(OUT_FILE, render(entries), 'utf8');
+  return commits;
+}
+
+/** 新记录在前，本次没拉到的旧记录接在后面 */
+function mergeEntries(fresh, existing) {
+  const seen = new Set(fresh.map((e) => e.hash));
+  return fresh.concat(existing.filter((e) => !seen.has(e.hash)));
+}
+
+function writeEntries(entries) {
+  fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });
+  // 启动后才生成时服务已经在跑，先写临时文件再改名，避免读到写了一半的文件
+  const tmp = `${OUT_FILE}.tmp`;
+  fs.writeFileSync(tmp, render(entries), 'utf8');
+  fs.renameSync(tmp, OUT_FILE);
   console.log(`已生成 ${path.relative(ROOT, OUT_FILE)}（${entries.length} 条记录）`);
 }
 
-function generate() {
-  try {
-    main();
-  } catch (err) {
-    // 生成失败绝不能阻断 npm start / 打包
-    console.warn(`生成更新日志失败，已跳过：${err.message}`);
+async function main() {
+  const commits = readCommits();
+
+  // 有 git 仓库：按本地提交历史完整重算
+  if (commits) {
+    writeEntries(buildEntries(commits));
+    return;
   }
+
+  // 没有 git：从 GitHub API 拉一次，再和现有日志合并
+  const existing = readExistingEntries();
+  const remote = await readRemoteCommits(new Set(existing.map((e) => e.hash)));
+  if (!remote.length) throw new Error('远端没有提交记录');
+
+  writeEntries(mergeEntries(buildEntries(remote), existing));
+}
+
+function generate() {
+  // 失败绝不能阻断 npm start / 打包，保留原文件即可
+  return main().catch((err) => {
+    console.warn(`生成更新日志失败，已保留原有文件：${err.message}`);
+  });
 }
 
 module.exports = { generate };
