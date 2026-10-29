@@ -189,9 +189,19 @@ export function getChessMoves(board, r, c) {
 
 /**
  * 判断 (r,c) 棋子能否走到 (toR,toC)
+ * 先看走法是否符合棋子规则，再模拟走子确认不会让自己的将/帅被将军
+ * （与服务端 isValidChessMove 一致，避免客户端允许走子、服务端却判非法导致对局卡住）
  */
 export function isValidMove(board, r, c, toR, toC) {
-  return getChessMoves(board, r, c).some((m) => m.r === toR && m.c === toC);
+  if (!getChessMoves(board, r, c).some((m) => m.r === toR && m.c === toC)) return false;
+  const piece = board[r][c];
+  const saved = board[toR][toC];
+  board[toR][toC] = piece;
+  board[r][c] = null;
+  const stillCheck = isInCheck(board, piece.color);
+  board[r][c] = piece;
+  board[toR][toC] = saved;
+  return !stillCheck;
 }
 
 /**
@@ -232,29 +242,41 @@ export function isInCheck(board, color) {
 }
 
 /**
- * 判断某方是否被将死（处于被将军状态且无任何合法走法能解除将军）
+ * 判断某方是否已无路可走（被将死或困毙）
+ * 象棋规则中「困毙」（未被将军但无任何合法走法）同样判负，
+ * 与服务端 GameManager.isCheckmate 保持一致。
  * @param {Array} board - 10×9 棋盘数据
  * @param {'red'|'black'} color - 被检查方
  * @returns {boolean}
  */
 export function isCheckmate(board, color) {
-  if (!isInCheck(board, color)) return false;
-  // 模拟己方每一枚棋子的每个合法走位，看能否解除将军
+  if (isInCheck(board, color)) {
+    // 被将军：模拟己方每一枚棋子的每个合法走位，看能否解将
+    for (let r = 0; r < BOARD_H; r++) {
+      for (let c = 0; c < BOARD_W; c++) {
+        const p = board[r][c];
+        if (p && p.color === color) {
+          const moves = getChessMoves(board, r, c);
+          for (const m of moves) {
+            const saved = board[m.r][m.c];
+            board[m.r][m.c] = p;
+            board[r][c] = null;
+            const stillCheck = isInCheck(board, color);
+            board[r][c] = p;
+            board[m.r][m.c] = saved;
+            if (!stillCheck) return false;
+          }
+        }
+      }
+    }
+    return true;
+  }
+  // 未被将军：只要还有任何合法走法就不是困毙
   for (let r = 0; r < BOARD_H; r++) {
     for (let c = 0; c < BOARD_W; c++) {
       const p = board[r][c];
-      if (p && p.color === color) {
-        const moves = getChessMoves(board, r, c);
-        for (const m of moves) {
-          // 模拟走子后检查是否仍被将军
-          const saved = board[m.r][m.c];
-          board[m.r][m.c] = p;
-          board[r][c] = null;
-          const stillCheck = isInCheck(board, color);
-          board[r][c] = p;
-          board[m.r][m.c] = saved;
-          if (!stillCheck) return false;
-        }
+      if (p && p.color === color && getChessMoves(board, r, c).length > 0) {
+        return false;
       }
     }
   }

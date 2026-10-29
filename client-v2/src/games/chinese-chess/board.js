@@ -54,8 +54,11 @@ export function createChessBoard(container, options = {}) {
     const NS = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(NS, 'svg');
     svg.setAttribute('class', 'chess-grid');
-    const W = BOARD_W * CELL;   // 360
-    const H = BOARD_H * CELL;   // 400
+    // 交叉点位置是 0 ~ (n-1)*CELL，网格两端也只到这里。
+    // 若用 n*CELL，横线会多伸出一格、两条边线会穿过底部多出一整格，
+    // 棋盘右下角就会出现一条空白带（格距越大越明显）
+    const W = (BOARD_W - 1) * CELL;   // 320
+    const H = (BOARD_H - 1) * CELL;   // 360
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     svg.setAttribute('preserveAspectRatio', 'none');
 

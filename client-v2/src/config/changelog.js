@@ -3,10 +3,19 @@
  *
  * 生成命令：npm run changelog
  * 数据源：git 提交记录（遵循 .trae/rules/git-commit-message.md 提交规范）
- * 生成时间：2026-10-28T06:12:41.826Z
+ * 生成时间：2026-10-29T08:07:12.396Z
  */
 
 export const CHANGELOG = [
+  {
+    "tag": "Build 836",
+    "name": "新增 Git 自动更新功能后台管理入口与相关逻辑",
+    "type": "feat",
+    "scope": "全端",
+    "hash": "1f3e1e6",
+    "publishedAt": "2026-10-28T14:12:49+08:00",
+    "body": "### 后端改动\n- 新增 _readPackageVersion 方法兼容多版本配置文件读取\n- 新增 _isSameFileContent 方法忽略 CRLF/LF 行尾差异判断文件是否相同\n- 新增 GitUpdateManager 回滚后清除已部署提交记录逻辑\n- 优化 Git 检查更新失败后的冷却重试机制\n- 新增更新包下载后的完整性校验与清理逻辑\n- 新增 UpdateManager 回滚回调钩子\n\n### 前端改动\n- 导航抽屉新增管理员可见的后台管理入口跳转\n- 后台管理页新增更新标签页与完整的 Git 自动更新 UI\n- 后台管理页新增更新状态、日志与操作按钮逻辑\n- 后台管理页新增更新相关数据与状态管理"
+  },
   {
     "tag": "Build 835",
     "name": "新增 Git 自动更新功能与快捷键系统重构",

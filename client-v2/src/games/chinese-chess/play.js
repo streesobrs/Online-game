@@ -191,17 +191,18 @@ export function startMatch(container, matchData) {
     const availableHeight = boardContainer.clientHeight || stage.clientHeight || container.clientHeight;
     if (availableWidth <= 0) return;
 
-    // 象棋 9列 x 10行，CSS total = cellSize*9 + 48 (padding 40 + border 8)，border-box
+    // 象棋 9列 x 10个交叉点 = 8 x 9 个格距，
+    // CSS total = cellSize*8 + 48（横向）/ cellSize*9 + 48（纵向），border-box
     const padding = 48;
-    const cellByWidth = Math.floor((availableWidth - padding) / 9);
-    const cellByHeight = Math.floor((availableHeight - padding) / 10);
+    const cellByWidth = Math.floor((availableWidth - padding) / 8);
+    const cellByHeight = Math.floor((availableHeight - padding) / 9);
     let cellSize = Math.min(cellByWidth, cellByHeight);
 
     cellSize = Math.max(12, Math.min(cellSize, 42));
     board.style.setProperty('--board-cell-size', cellSize + 'px');
     // 显式设置棋盘总尺寸（border-box）
-    board.style.width = `calc(9 * ${cellSize}px + 48px)`;
-    board.style.height = `calc(10 * ${cellSize}px + 48px)`;
+    board.style.width = `calc(8 * ${cellSize}px + 48px)`;
+    board.style.height = `calc(9 * ${cellSize}px + 48px)`;
   };
 
   // 初始计算 + 双重延迟计算（确保布局完成后再测量）

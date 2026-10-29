@@ -2448,6 +2448,12 @@ class GameManager {
       );
 
       if (!aiMove) {
+        // 象棋：AI 无合法走法 = 已被将死/困毙，直接判玩家胜，
+        // 否则回合会永远停在 AI 侧（玩家已经赢了却拿不到统计和成就）
+        if (aiGame.gameType === 'chinese-chess' && this.isCheckmate(aiGame.board, 'b')) {
+          await this.endAIGame(accountId, 'win', io);
+          return;
+        }
         logger.warn('AI 移动失败：无法生成有效移动', { accountId, gameType: aiGame.gameType });
         return;
       }
@@ -2628,15 +2634,9 @@ class GameManager {
       this.userManager.broadcastUserStatus(accountId, 'online', io);
     }
 
-    // 发送游戏结束信息
+    // 发送游戏结束信息：延迟到统计/成就写入后再发（见下方），
+    // 否则客户端收到结束事件立刻拉取成就时可能读到旧进度
     const userSocket = this.userManager.getSocketByAccountId(accountId);
-    if (userSocket) {
-      userSocket.emit('ai_game_end', {
-        result: result,
-        moves: aiGame.moves,
-        duration: aiGame.duration
-      });
-    }
 
     // 更新用户统计
     await this.userManager.updateUserStats(accountId, result, aiGame.gameType, true, aiGame.difficulty, aiGame.duration);
@@ -2737,6 +2737,15 @@ class GameManager {
           userSocket.emit('achievements_unlocked', { achievements: unlockedAchievements });
         }
       }
+    }
+
+    // 统计与成就已写入，此时再通知客户端结束（客户端会立即刷新成就，必须拿到最新数据）
+    if (userSocket) {
+      userSocket.emit('ai_game_end', {
+        result: result,
+        moves: aiGame.moves,
+        duration: aiGame.duration
+      });
     }
 
     logger.aiGameEvent(accountId, 'AI对战结束', {

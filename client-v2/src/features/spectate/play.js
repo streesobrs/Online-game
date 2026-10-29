@@ -98,7 +98,7 @@ export function startSpectate(container, game) {
     let cols = 20, rows = 20, padding = 8;
     if (gameType === 'gobang') { cols = 20; rows = 20; padding = 8; }
     else if (gameType === 'go') { cols = 22; rows = 22; padding = 8; }
-    else if (gameType === 'chinese-chess') { cols = 9; rows = 10; padding = 48; }
+    else if (gameType === 'chinese-chess') { cols = 8; rows = 9; padding = 48; }
 
     const cellByWidth = Math.floor((availableWidth - padding) / cols);
     const cellByHeight = Math.floor((availableHeight - padding) / rows);

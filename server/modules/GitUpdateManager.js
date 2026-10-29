@@ -212,9 +212,16 @@ class GitUpdateManager {
     const remoteVersion = `${remote.versionData.major}.${remote.versionData.minor}.${remote.versionData.patch}.${remote.versionData.build}`;
     const remoteBuild = this._buildOf(remoteVersion);
 
-    // 没有已部署记录时退回本地 HEAD：若本地代码就是远端最新提交，不必再触发一次更新/重启
-    const localHead = remote.head
-      || (this._hasGitRepo() ? await this._git(['rev-parse', 'HEAD'], this.cfg.checkTimeoutMs).catch(() => '') : '');
+    // 取本地 HEAD：有已部署记录时以记录为准，没有记录时用本地 HEAD 兜底
+    let localHead = remote.head;
+    if (!localHead && this._hasGitRepo()) {
+      try {
+        localHead = await this._git(['rev-parse', 'HEAD'], this.cfg.checkTimeoutMs);
+      } catch (e) {
+        localHead = '';
+        logger.warn('读取本地 Git HEAD 失败，改为只按版本号判断', { error: e.message });
+      }
+    }
     const appliedCommit = state.commit || localHead || null;
     let behind = null;
     let ahead = null;
@@ -225,14 +232,11 @@ class GitUpdateManager {
 
     let updateAvailable = false;
     let reason = '';
-    if (!appliedCommit) {
-      updateAvailable = true;
-      reason = '尚未记录已部署提交，将同步到远端最新';
-    } else if (appliedCommit === remote.sha) {
+    if (appliedCommit && appliedCommit === remote.sha) {
       reason = '已是最新提交';
     } else if (behind !== null) {
+      // Git 直连可用时以提交数判断（最准确）
       if (ahead !== null && ahead > 0) {
-        updateAvailable = false;
         reason = '本地提交领先或已分叉，暂不自动更新';
       } else if (behind > 0) {
         updateAvailable = true;
@@ -241,11 +245,13 @@ class GitUpdateManager {
         reason = '已是最新提交';
       }
     } else if (remoteBuild > localBuild) {
+      // 回退到 GitHub API 时只剩版本号可比，版本号更高才提示更新
       updateAvailable = true;
-      reason = '远端版本号更高';
+      reason = `远端版本更高（${remoteVersion} > ${localVersion}）`;
+    } else if (remoteBuild < localBuild) {
+      reason = `本地版本更高（${localVersion}），不自动更新`;
     } else {
-      updateAvailable = true;
-      reason = '远端提交与已部署提交不一致';
+      reason = '版本号一致，已是最新';
     }
 
     return {

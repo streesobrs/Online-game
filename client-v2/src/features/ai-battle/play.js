@@ -32,10 +32,14 @@ export function isBattleActive() {
   return !!activeBattle;
 }
 
-/** 后端象棋棋子类型 → 中文名（与 v1 chessPieceMap 一致） */
+/** 后端象棋棋子类型 → 中文名（红黑双方用字不同：相/象、仕/士、帅/将、兵/卒） */
 const CHESS_TYPE_MAP = {
-  ju: '车', ma: '马', xiang: '相', shi: '仕', shuai: '帅',
-  pao: '炮', bing: '兵', jiang: '将', zu: '卒',
+  red: {
+    ju: '车', ma: '马', xiang: '相', shi: '仕', shuai: '帅', pao: '炮', bing: '兵',
+  },
+  black: {
+    ju: '车', ma: '马', xiang: '象', shi: '士', jiang: '将', pao: '炮', zu: '卒',
+  },
 };
 
 /** 后端象棋棋盘（字符串 'r-ju'/'b-jiang'）→ v2 对象格式 {name, color} */
@@ -47,7 +51,8 @@ function convertBackendBoardToFrontend(board) {
       const cell = board[r] && board[r][c];
       if (cell && cell !== 0 && typeof cell === 'string') {
         const color = cell.startsWith('r-') ? 'red' : 'black';
-        const name = CHESS_TYPE_MAP[cell.substring(2)] || cell.substring(2);
+        const type = cell.substring(2);
+        const name = CHESS_TYPE_MAP[color][type] || type;
         out[r][c] = { name, color };
       }
     }
@@ -155,6 +160,11 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
             emit('ai_move', {
               position: { fromR, fromC, toR: r, toC: c, piece: pieceName },
             });
+            // 本地先判定将死黑方（含困毙）：赢了就主动上报结果，
+            // 避免服务端判定或回包异常时「赢了但统计/成就都没更新」
+            if (isCheckmate(board.board, 'black')) {
+              finishGame('win');
+            }
           }
           return;
         }
@@ -199,11 +209,12 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
     // 棋盘尺寸公式：
     //   五子棋: 19*cell + cell(两侧半格padding) + 8(边框) = 20*cell + 8
     //   围棋:  21*cell + cell + 8 = 22*cell + 8
-    //   象棋:  9*cell + 48 (padding 40 + border 8)，border-box
+    //   象棋:  8*cell + 48 / 9*cell + 48 (padding 40 + border 8)，border-box
+    //   （9 列 x 10 个交叉点 = 8 x 9 个格距）
     let cols = 20, rows = 20, padding = 8;
     if (gameType === 'gobang') { cols = 20; rows = 20; padding = 8; }
     else if (gameType === 'go') { cols = 22; rows = 22; padding = 8; }
-    else if (gameType === 'chinese-chess') { cols = 9; rows = 10; padding = 48; }
+    else if (gameType === 'chinese-chess') { cols = 8; rows = 9; padding = 48; }
 
     const cellByWidth = Math.floor((availableWidth - padding) / cols);
     const cellByHeight = Math.floor((availableHeight - padding) / rows);

@@ -136,9 +136,10 @@
 }
 
 .chess-board {
-  /* total width = cell*9 + 20*2(padding) + 4*2(border) = cell*9 + 48 */
-  width: calc(var(--board-cell-size, 16px) * 9 + 48px);
-  height: calc(var(--board-cell-size, 16px) * 10 + 48px);
+  /* 交叉点是 9 列 x 10 行 → 横向 8 个格距、纵向 9 个格距
+     total width = cell*8 + 20*2(padding) + 4*2(border) = cell*8 + 48 */
+  width: calc(var(--board-cell-size, 16px) * 8 + 48px);
+  height: calc(var(--board-cell-size, 16px) * 9 + 48px);
   background: var(--theme-board-chess, #d4a95c);
   padding: 20px;
   border-radius: 12px;
@@ -267,20 +268,21 @@
   position: absolute;
   top: 20px;
   left: 20px;
-  width: 320px;
-  height: 360px;
+  /* 河界区域必须与格距同步缩放，否则格距变化时楚河汉界会错位到棋子行上 */
+  width: calc(var(--board-cell-size, 16px) * 8);
+  height: calc(var(--board-cell-size, 16px) * 9);
   pointer-events: none;
   z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 40px;
+  padding: 0 calc(var(--board-cell-size, 16px) * 1);
   box-sizing: border-box;
 }
 
 .chess-river::before {
   content: '楚 河';
-  font-size: 20px;
+  font-size: calc(var(--board-cell-size, 16px) * 0.5);
   color: #2c3e50;
   opacity: 0.6;
   font-weight: bold;
@@ -289,7 +291,7 @@
 
 .chess-river::after {
   content: '汉 界';
-  font-size: 20px;
+  font-size: calc(var(--board-cell-size, 16px) * 0.5);
   color: #2c3e50;
   opacity: 0.6;
   font-weight: bold;
@@ -297,8 +299,8 @@
 }
 
 .chess-position {
-  width: 8px;
-  height: 8px;
+  width: calc(var(--board-cell-size, 16px) * 0.2);
+  height: calc(var(--board-cell-size, 16px) * 0.2);
   background: radial-gradient(circle at 30% 30%, #1a1a1a 0%, #000000 100%);
   border-radius: 50%;
   position: absolute;

@@ -222,6 +222,18 @@ function bindAchievementFeed() {
     achievementError = false;
     notifyAchievementSubs();
   });
+  // 对局结束 / 解锁成就后数据已变化：清缓存，让侧栏下次绘制时重新拉取
+  // （否则侧栏会一直显示开局前的旧进度，例如象棋赢了仍显示 0/4）
+  const invalidateAchievements = () => {
+    achievementCache = null;
+    achievementAccountId = '';
+    achievementLoading = false;
+    achievementError = false;
+    notifyAchievementSubs();
+  };
+  ['achievement:unlocked', 'ai:gameEnd', 'game:ended', 'snake:gameOver', 'match3:result'].forEach((evt) => {
+    eventBus.on(evt, invalidateAchievements);
+  });
   // 自动登录完成：socket 会话可能刚绑定，补一次拉取（否则首次请求会被服务端静默丢弃）
   ['user:loginResult', 'user:accountInfo'].forEach((evt) => {
     eventBus.on(evt, () => {
