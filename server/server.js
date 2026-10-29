@@ -2122,6 +2122,18 @@ logger.info('好友系统初始化完成');
 // 服务器启动时增加构建版本号
 const newVersion = versionManager.incrementBuild();
 logger.info(`服务器版本更新: ${newVersion}`);
+
+// 启动时按“已部署提交”重新生成更新日志：
+// 仓库里的 changelog.js 是在提交前生成的，必然缺最新一条，
+// 经 Git 更新后只有在重启时重新生成才能补上最新记录。
+// （EXE 打包模式没有 git 仓库且文件只读，跳过）
+if (!process.pkg) {
+  try {
+    require('./scripts/gen-changelog').generate();
+  } catch (e) {
+    logger.warn('更新日志生成跳过', { error: e.message });
+  }
+}
 const themeManager = new ThemeManager();
 const updateManager = new UpdateManager(io);
 const gitUpdateManager = new GitUpdateManager(updateManager);

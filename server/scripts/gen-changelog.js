@@ -274,9 +274,19 @@ function main() {
   console.log(`已生成 ${path.relative(ROOT, OUT_FILE)}（${entries.length} 条记录）`);
 }
 
-try {
-  main();
-} catch (err) {
-  // 生成失败绝不能阻断 npm start / 打包
-  console.warn(`生成更新日志失败，已跳过：${err.message}`);
+function generate() {
+  try {
+    main();
+  } catch (err) {
+    // 生成失败绝不能阻断 npm start / 打包
+    console.warn(`生成更新日志失败，已跳过：${err.message}`);
+  }
+}
+
+module.exports = { generate };
+
+// 直接运行（npm run changelog / npm start 的 prestart）时立即生成；
+// 被 server.js require 时由启动流程调用 generate()
+if (require.main === module) {
+  generate();
 }
