@@ -3,10 +3,19 @@
  *
  * 生成命令：npm run changelog
  * 数据源：git 提交记录（遵循 .trae/rules/git-commit-message.md 提交规范）
- * 生成时间：2026-10-29T16:52:28.684+08:00
+ * 生成时间：2026-10-29T17:13:25.291+08:00
  */
 
 export const CHANGELOG = [
+  {
+    "tag": "Build 844",
+    "name": "升级构建版本并优化更新日志生成逻辑",
+    "type": "chore",
+    "scope": "全端",
+    "hash": "36a09ff",
+    "publishedAt": "2026-10-29T16:52:59+08:00",
+    "body": "### 后端改动\n- 重构更新日志生成逻辑，新增buildEntry函数拆分逻辑\n- 新增toUtc8函数处理时区转换\n- 新增readRemoteCommits函数从GitHub API拉取提交记录\n- 新增readExistingEntries和mergeEntries函数合并日志记录\n- 修改generate函数支持无git时从远端拉取日志\n- 调整启动时生成日志的逻辑，适配新的生成方式\n\n### 前端改动\n- 更新changelog.js的生成时间戳"
+  },
   {
     "tag": "Build 841",
     "name": "更新构建版本并新增启动时自动生成更新日志逻辑",

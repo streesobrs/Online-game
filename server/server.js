@@ -2072,8 +2072,10 @@ logger.info('用户管理器初始化完成');
 
 const achievementManager = new AchievementManager(accountManager, userManager);
 achievementManager.operationLogger = operationLogger;
-// 启动时同步勋章数据
-achievementManager.syncAllBadges().catch(err => logger.warn('勋章数据同步失败', { error: err.message }));
+// 启动时同步勋章数据；随后迁移旧账号的棋种统计键（串行执行，避免同时写同一批账号文件）
+achievementManager.syncAllBadges()
+  .then(() => accountManager.migrateLegacyGameStats())
+  .catch(err => logger.warn('启动数据迁移失败', { error: err.message }));
 logger.info('勋章系统初始化完成');
 
 const aiManager = new AIManager();

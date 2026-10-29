@@ -1444,7 +1444,10 @@ class AccountManager {
       }
 
       // 初始化游戏统计数据
-      const games = account.games || {
+      // 老账号可能缺少后来新增的棋种键（如 chess 改名为 chinese-chess 后旧账号没有新键），
+      // 缺键时这里按默认结构补齐，否则该棋种的胜负永远不累计、对应成就进度一直是 0
+      const games = account.games || {};
+      const defaultGames = {
         gobang: {
           wins: 0,
           losses: 0,
@@ -1464,6 +1467,7 @@ class AccountManager {
           totalGames: 0,
           streak: 0,
           maxStreak: 0,
+          aiWins: 0,
           lastPlayedAt: null
         },
         go: {
@@ -1491,6 +1495,9 @@ class AccountManager {
           lastPlayedAt: null
         }
       };
+      for (const [key, entry] of Object.entries(defaultGames)) {
+        if (!games[key]) games[key] = { ...entry };
+      }
 
       // 初始化统计数据
       const stats = account.stats || {
@@ -1544,7 +1551,7 @@ class AccountManager {
             gameData.maxStreak = gameData.streak;
           }
           if (isAI) {
-            gameData.aiWins += 1;
+            gameData.aiWins = (gameData.aiWins || 0) + 1;
             gameData.aiDifficulty = aiDifficulty;
             gameData.aiResult = 'win';
           }
@@ -1639,6 +1646,88 @@ class AccountManager {
     catch (err) {
       logger.error('更新游戏统计失败', { id, error: err.message });
       return { success: false, message: '更新失败' };
+    }
+  }
+
+  // 迁移旧版棋种统计键：早期账号的 games 用 chess / xiangqi 作键名，
+  // 改名为 chinese-chess 后旧键既不会被新对局累计（updateGameStats 找不到新键就跳过），
+  // 成就页也读不到。这里把旧键并到新键，并从对局记录回填真实战绩（旧键里的计数从未累加过）
+  async migrateLegacyGameStats() {
+    try {
+      const accounts = await dataStore.find('accounts', {});
+      const legacyOwners = accounts.filter(a => a.games && (a.games.chess || a.games.xiangqi));
+      if (legacyOwners.length === 0) return;
+
+      // 先扫一遍象棋对局记录（新旧两种键名目录都可能有），按账号汇总胜负平
+      const countsByAccount = new Map();
+      for (const folder of ['chinese-chess', 'chess', 'xiangqi']) {
+        const dir = path.join(config.paths.games, folder);
+        let files;
+        try {
+          files = await fs.promises.readdir(dir);
+        } catch (err) {
+          if (err.code === 'ENOENT') continue;
+          throw err;
+        }
+        for (const file of files) {
+          if (!file.endsWith('.json')) continue;
+          try {
+            const record = JSON.parse(await fs.promises.readFile(path.join(dir, file), 'utf8'));
+            for (const playerId of [record.player1, record.player2]) {
+              if (!playerId || playerId === 'ai') continue;
+              const counts = countsByAccount.get(playerId) || {
+                wins: 0, losses: 0, draws: 0, totalGames: 0, aiWins: 0, lastPlayedAt: null
+              };
+              counts.totalGames += 1;
+              if (record.result === 'draw') {
+                counts.draws += 1;
+              } else if (record.winner === playerId) {
+                counts.wins += 1;
+                if (record.gameMode === 'ai') counts.aiWins += 1;
+              } else {
+                counts.losses += 1;
+              }
+              const playedAt = record.endTime || record.savedAt || null;
+              if (playedAt && (!counts.lastPlayedAt || playedAt > counts.lastPlayedAt)) {
+                counts.lastPlayedAt = playedAt;
+              }
+              countsByAccount.set(playerId, counts);
+            }
+          } catch (err) {
+            logger.warn('读取象棋对局记录失败', { folder, file, error: err.message });
+          }
+        }
+      }
+
+      for (const account of legacyOwners) {
+        const id = account.account?.id || account.id;
+        if (!id) continue;
+        const legacy = account.games.chess || account.games.xiangqi || {};
+        const existing = account.games['chinese-chess'] || {};
+        const counts = countsByAccount.get(id);
+        const games = { ...account.games };
+        delete games.chess;
+        delete games.xiangqi;
+        games['chinese-chess'] = {
+          wins: counts ? counts.wins : (existing.wins || legacy.wins || 0),
+          losses: counts ? counts.losses : (existing.losses || legacy.losses || 0),
+          draws: counts ? counts.draws : (existing.draws || legacy.draws || 0),
+          totalGames: counts ? counts.totalGames : (existing.totalGames || legacy.totalGames || 0),
+          streak: existing.streak || legacy.streak || 0,
+          maxStreak: existing.maxStreak || legacy.maxStreak || 0,
+          aiWins: counts ? counts.aiWins : (existing.aiWins || legacy.aiWins || 0),
+          lastPlayedAt: (counts && counts.lastPlayedAt) || existing.lastPlayedAt || legacy.lastPlayedAt || null
+        };
+        await dataStore.update('accounts', { 'account.id': id }, { games });
+        logger.info('迁移旧版象棋统计', {
+          id,
+          wins: games['chinese-chess'].wins,
+          losses: games['chinese-chess'].losses,
+          totalGames: games['chinese-chess'].totalGames
+        });
+      }
+    } catch (err) {
+      logger.error('迁移旧版棋种统计失败', { error: err.message });
     }
   }
 
