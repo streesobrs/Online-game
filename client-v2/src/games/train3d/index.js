@@ -969,15 +969,6 @@ export function renderTrain3d(container, options = {}) {
       const sagWeight = (u) => THREE.MathUtils.smoothstep(u, 0, ramp) *
         THREE.MathUtils.smoothstep(1 - u, 0, ramp);
 
-      // 洞口内侧的过渡长度：先保持 24m 原纵断面（两个控制点），
-      // 保证洞口切线与洞外完全一致；再向洞内过渡到直线弦。
-      // 太短的隧道不拉弦，直接沿用原纵断面，避免过渡区侵入洞口。
-      if (spanMeters < 120) continue;
-      const holdMeters = 24;
-      const edgeMeters = Math.min(70, Math.max(holdMeters + 20, spanMeters * 0.3));
-      const holdU = holdMeters / spanMeters;
-      const edgeU = Math.min(0.45, edgeMeters / spanMeters);
-
       // 控制点可能落在接缝另一侧：u、u±1 中取落在隧道区间内的那个
       const localU = (i) => {
         const u = i / pointCount;
@@ -987,31 +978,53 @@ export function renderTrain3d(container, options = {}) {
         return null;
       };
 
-      // 一次算完整条隧道需要的最大下压量：只压“最深的那个坑”，
-      // 其余位置也压同样的量，曲线因此是单峰缓坡而不是逐点贴合地形。
+      // 弦线与洞口外推线：洞外过渡和洞内坡度都基于这条线
+      const chordSlope = (y1 - y0) / uSpan;
+      const lineAt = (uu) => y0 + chordSlope * (uu - uStart);
+
+      // 洞内：弦线 + 一个平滑的排水竖曲线（sin² 单峰下凹）。
+      // sin² 在洞口的值和导数都是 0，所以洞口坡度仍等于弦线/洞外坡度，
+      // 洞内又不会是一条尺子画出来的直线，也没有跟着地形抖的小起伏。
+      const sagAmp = Math.min(0, Math.max(0, spanMeters * 0.005));
+      const dipAt = (v) => -sagAmp * Math.sin(Math.PI * v) ** 2;
+
+      // 下压量沿隧道中段取满，靠近洞门（至少 24m）缓入缓出，避免洞口出现折角
       let need = 0;
       for (let i = 0; i < pointCount; i++) {
         const uu = localU(i);
         if (uu === null) continue;
-        const deficit = chordAt(y0, y1, (uu - uStart) / uSpan) - coverLimit[i];
+        const v = (uu - uStart) / uSpan;
+        const deficit = chordAt(y0, y1, v) + dipAt(v) - coverLimit[i];
         if (deficit > need) need = deficit;
       }
 
       for (let i = 0; i < pointCount; i++) {
         const uu = localU(i);
         if (uu === null) continue;
-        const u = (uu - uStart) / uSpan;
-        // 0 = 洞口（保持原纵断面），1 = 完全进入弦线
-        const edge = Math.min(u, 1 - u);
-        const blendT = THREE.MathUtils.clamp(
-          (edge - holdU) / Math.max(1e-6, edgeU - holdU), 0, 1
-        );
-        const w = THREE.MathUtils.smoothstep(blendT, 0, 1);
-        const chordY = chordAt(y0, y1, u) - need * sagWeight(u);
-        let y = finalTrackPoints[i].y + (chordY - finalTrackPoints[i].y) * w;
+        const v = (uu - uStart) / uSpan;
+        let y = chordAt(y0, y1, v) + dipAt(v) - need * sagWeight(v);
         // 兜底：洞身范围内任何一点都不得拱出覆土
         y = Math.min(y, coverLimit[i]);
         finalTrackPoints[i].y = y;
+      }
+
+      // 洞外：从原地形纵断面平滑接到弦线延长线，洞口处坡度和洞内一致
+      const extMeters = Math.min(200, Math.max(40, spanMeters * 50));
+      const extU = extMeters * (uSpan / spanMeters);
+      const extStart = uStart - extU;
+      const extEnd = uEnd + extU;
+      for (let i = 0; i < pointCount; i++) {
+        const baseU = i / pointCount;
+        let uu = null;
+        for (const cand of [baseU, baseU + 1, baseU - 1]) {
+          if (cand >= extStart && cand <= extEnd) { uu = cand; break; }
+        }
+        if (uu === null) continue;
+        if (uu >= uStart && uu <= uEnd) continue;
+        const signed = uu < uStart ? uu - uStart : uu - uEnd;
+        const blend = THREE.MathUtils.smoothstep(Math.abs(signed) / extU, 0, 1);
+        const lineY = lineAt(uu);
+        finalTrackPoints[i].y = lineY + (finalTrackPoints[i].y - lineY) * blend;
       }
     }
 
@@ -3480,15 +3493,9 @@ for (int i = 0; i < ${PORTAL_CLIP_MAX}; i++) {
   let lookYaw = 0, lookPitch = -0.2, targetLookYaw = 0, targetLookPitch = -0.2;
 
   /* 隧道自动视角：第三人称进洞时切换到“已有的第一人称模式”（模式、HUD、按键状态一致），
-     出洞且车后镜头已经离开山体后再自动切回；切换时做一次短镜头过渡。 */
+     出洞且车后镜头已经离开山体后再自动切回。 */
   let autoTunnelView = false;
-  let camBlend = 1;
   let camRestoreSnap = false;
-  const CAM_BLEND_TIME = 0.45;
-  const _camBlendFromPos = new THREE.Vector3();
-  const _camBlendFromQuat = new THREE.Quaternion();
-  const _camBlendToPos = new THREE.Vector3();
-  const _camBlendToQuat = new THREE.Quaternion();
 
   // 临时调试（验证完删除）：train3d.debugPortal=<n> 把列车传送到第 n 个洞口外，拉近镜头
   {
@@ -3508,7 +3515,6 @@ for (int i = 0; i < ${PORTAL_CLIP_MAX}; i++) {
   const _quatFwd = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
   const _quatLook = new THREE.Quaternion();
   const _camQuatTarget = new THREE.Quaternion();
-  let _camSmoothY = null;
   const _shakeQuat = new THREE.Quaternion();
   const _shakeRight = new THREE.Vector3();
   const _shakeUp = new THREE.Vector3();
@@ -3647,15 +3653,9 @@ for (int i = 0; i < ${PORTAL_CLIP_MAX}; i++) {
   function updateCameraModeUi() {
     camModeEl.textContent = cameraMode === 'third'
       ? '📷 第三人称跟随'
-      : (autoTunnelView ? '📷 第一人称驾驶室（隧道）' : '📷 第一人称驾驶室');
+      : '📷 第一人称驾驶室';
     const camBtn = $('#touch-cam');
     if (camBtn) camBtn.textContent = cameraMode === 'third' ? '视角·跟随' : '视角·驾驶室';
-  }
-
-  function beginCameraBlend() {
-    _camBlendFromPos.copy(camera.position);
-    _camBlendFromQuat.copy(camera.quaternion);
-    camBlend = 0;
   }
 
   /** 车后镜头是否会被山体/隧道管片埋住（决定出洞后何时恢复第三人称） */
@@ -3687,13 +3687,14 @@ for (int i = 0; i < ${PORTAL_CLIP_MAX}; i++) {
     if ((inTunnel || headApproachingTunnel()) && cameraMode === 'third') {
       autoTunnelView = true;
       cameraMode = 'first';
+      // 和按 C 切第一人称保持完全一致：复位驾驶室默认视线
+      targetLookYaw = 0; targetLookPitch = -0.2;
+      lookYaw = 0; lookPitch = -0.2;
       updateCameraModeUi();
-      if (!snap) beginCameraBlend();
     } else if (!inTunnel && autoTunnelView && (snap || !thirdPersonCameraBlocked())) {
       autoTunnelView = false;
       cameraMode = 'third';
       camRestoreSnap = true;
-      camBlend = 1;
       updateCameraModeUi();
     }
 
@@ -3734,38 +3735,17 @@ for (int i = 0; i < ${PORTAL_CLIP_MAX}; i++) {
       lookYaw = THREE.MathUtils.damp(lookYaw, targetLookYaw, 15, dt);
       lookPitch = THREE.MathUtils.damp(lookPitch, targetLookPitch, 15, dt);
 
-      // 隧道里把车体侧倾压小：管片包住视野，倾斜会变成地平线左右晃
-      const rollGain = inTunnel ? 0.35 : 1;
-      _bankQuat.setFromAxisAngle(_zAxis, (cars[0].roll || 0) * rollGain);
+      // 第一人称：隧道内外都用同一套相机，不再做隧道专用的侧倾压制/低通。
+      // 之前隧道内的 rollGain=0.35 和高度低通会让“隧道里的第一人称”和玩家按 C 用的第一人称不一致。
+      _bankQuat.setFromAxisAngle(_zAxis, cars[0].roll || 0);
       _driverPos.set(0, 2.1, 1.2).applyQuaternion(_bankQuat).applyQuaternion(head.quaternion).add(head.position);
 
       _euler.set(lookPitch, lookYaw, 0);
       _quatLook.setFromEuler(_euler);
       _camQuatTarget.copy(head.quaternion).multiply(_bankQuat).multiply(_quatFwd).multiply(_quatLook);
 
-      if (inTunnel && !snap && dt > 0 && camBlend >= 1) {
-        // 隧道内第一人称：车头随纵断面的一点点俯仰都会被管片放大成“上下抖”。
-        // 高度和朝向做一阶低通——车头照旧贴轨，画面不再硬跟随每一处起伏。
-        const kY = 1 - Math.exp(-dt * 9);
-        if (_camSmoothY === null) _camSmoothY = _driverPos.y;
-        _camSmoothY += (_driverPos.y - _camSmoothY) * kY;
-        camera.position.set(_driverPos.x, _camSmoothY, _driverPos.z);
-        camera.quaternion.slerp(_camQuatTarget, 1 - Math.exp(-dt * 12));
-      } else {
-        camera.position.copy(_driverPos);
-        camera.quaternion.copy(_camQuatTarget);
-        _camSmoothY = _driverPos.y;
-      }
-    }
-
-    // 自动进/出隧道时的短镜头过渡：从切换瞬间的相机位姿平滑到目标位姿
-    if (camBlend < 1) {
-      camBlend = Math.min(1, camBlend + dt / CAM_BLEND_TIME);
-      const k = THREE.MathUtils.smoothstep(camBlend, 0, 1);
-      _camBlendToPos.copy(camera.position);
-      _camBlendToQuat.copy(camera.quaternion);
-      camera.position.lerpVectors(_camBlendFromPos, _camBlendToPos, k);
-      camera.quaternion.slerpQuaternions(_camBlendFromQuat, _camBlendToQuat, k);
+      camera.position.copy(_driverPos);
+      camera.quaternion.copy(_camQuatTarget);
     }
 
     // 起步震动：低频、轻微的车体下沉/回弹，不是高频抖动
@@ -3806,7 +3786,6 @@ for (int i = 0; i < ${PORTAL_CLIP_MAX}; i++) {
     } else {
       cameraMode = 'third';
       autoTunnelView = false;
-      camBlend = 1;
       updateCamera(0, true);
     }
     updateCameraModeUi();

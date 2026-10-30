@@ -3,10 +3,19 @@
  *
  * 生成命令：npm run changelog
  * 数据源：git 提交记录（遵循 .trae/rules/git-commit-message.md 提交规范）
- * 生成时间：2026-10-29T17:13:25.291+08:00
+ * 生成时间：2026-10-29T21:15:53.601+08:00
  */
 
 export const CHANGELOG = [
+  {
+    "tag": "Build 845",
+    "name": "修复启动时勋章数据同步与旧账号棋种统计迁移问题",
+    "type": "fix",
+    "scope": "后端-账号",
+    "hash": "a9c95fe",
+    "publishedAt": "2026-10-29T17:13:46+08:00",
+    "body": "### 后端改动\n- 调整勋章数据同步逻辑，同步完成后串行执行旧账号棋种统计迁移\n- 修复老账号缺少新增棋种键的问题，初始化时按默认结构补齐缺失键\n- 修复AI胜场计数未初始化的问题，避免出现undefined\n- 新增旧版棋种统计迁移方法，将chess/xiangqi键合并到chinese-chess键并回填真实战绩"
+  },
   {
     "tag": "Build 844",
     "name": "升级构建版本并优化更新日志生成逻辑",

@@ -61,6 +61,10 @@ client-v2/_deleteme.txt
 client-v2/tests/_tmp-train3d-sim.mjs
 client-v2/tests/_tmp-curvature.mjs
 
+# 测试用临时目录
+_scratch/
+.screenshots/
+
 # 测试覆盖率
 coverage/
 .nyc_output/
