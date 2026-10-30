@@ -4,6 +4,7 @@ const socketIo = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 // 加载配置
 const config = require('./config');
@@ -2092,6 +2093,18 @@ logger.info('聊天系统初始化完成');
 const adminManager = new AdminManager(userManager, gameManager, chatManager, accountManager, io, achievementManager);
 adminManager.operationLogger = operationLogger;
 logger.info('后台管理系统初始化完成');
+
+// 未配置 ADMIN_UPGRADE_KEY 时，每次启动生成一次性随机密钥并写入日志，便于本地自助提权
+(function ensureAdminUpgradeKey() {
+  if (config.admin.upgradeKey) {
+    logger.info('管理员升级密钥已通过 ADMIN_UPGRADE_KEY 配置');
+    return;
+  }
+  config.admin.upgradeKey = `adm-${crypto.randomBytes(16).toString('hex')}`;
+  logger.warn('未配置 ADMIN_UPGRADE_KEY，已生成本次启动的临时管理员升级密钥（每次启动都会变化）', {
+    upgradeKey: config.admin.upgradeKey
+  });
+})();
 
 // 安全提示：静态管理员 Token 必须显式配置且足够随机，未配置时只允许管理员账号登录
 (function checkAdminTokenConfig() {

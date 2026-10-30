@@ -24,6 +24,7 @@ import { buildPrivacyRows, mergePrivacy } from '../../components/privacyPanel.js
 import { buildShortcutEditor } from '../../components/shortcutEditor.js';
 import { setNavPrefs } from '../../layouts/mode.js';
 import { store } from '../../core/store.js';
+import { eventBus } from '../../core/eventBus.js';
 import {
   START_PAGE_OPTIONS, ANIM_SPEED_OPTIONS, DENSITY_OPTIONS,
   TOAST_POSITION_OPTIONS, TOAST_DIRECTION_OPTIONS, TOAST_DURATION_OPTIONS,
@@ -98,6 +99,38 @@ async function openPasswordModal() {
   show();
 }
 
+/** 管理员提权弹窗（凭升级密钥，仅非管理员显示入口） */
+function openAdminUpgradeModal() {
+  const user = store.get('user');
+  const accountId = localStorage.getItem('currentAccountId')
+    || user?.account?.account?.id
+    || user?.account?.id;
+  if (!accountId) { toast.warn('请先登录账号'); return; }
+
+  const keyEl = el('input', { type: 'password', class: 'input', placeholder: '请输入管理员升级密钥' });
+  keyEl.style.width = '100%';
+
+  const show = () => modal.show({
+    title: '👑 升级为管理员',
+    content: el('div', { style: 'padding:4px 0;' }, [
+      el('p', { style: 'margin:0 0 10px;font-size:12px;line-height:1.6;color:#718096;' },
+        '升级后可访问后台管理系统（用户 / 游戏管理等），请妥善保管管理员权限。'),
+      keyEl,
+    ]),
+    confirmText: '确认升级',
+    showCancel: true,
+    cancelText: '取消',
+    onConfirm: () => {
+      const key = keyEl.value.trim();
+      if (!key) { toast.warn('请输入管理员升级密钥'); show(); return; }
+      toast.info('正在升级...');
+      auth.upgradeToAdmin(accountId, key);
+    },
+  });
+  show();
+  setTimeout(() => keyEl.focus(), 50);
+}
+
 /**
  * 隐私设置内嵌分区：渲染后异步从服务端拉最新值
  * （服务端字段过滤依赖这些开关，所以每次进入都以服务端为准）
@@ -152,6 +185,21 @@ export function renderSettings(container) {
   }
   // 快捷键采集监听：切换分类时必须解绑，否则会拦下全站按键
   let editorCleanup = null;
+
+  // 提权成功：刷新当前分类（「升级为管理员」消失，「更多」里的后台入口变为可见），并询问是否前往
+  const offAdminUpgrade = eventBus.on('user:adminUpgradeResult', (data) => {
+    if (!data?.success) return;
+    render();
+    setTimeout(() => {
+      modal.show({
+        title: '🎉 升级成功',
+        content: '您现在可以访问后台管理系统了，是否立即前往？',
+        confirmText: '前往后台',
+        cancelText: '稍后',
+        onConfirm: () => go('admin'),
+      });
+    }, 300);
+  });
 
   /** 分类定义：每个分类返回自己的 section 列表 */
   const categories = [
@@ -300,6 +348,10 @@ export function renderSettings(container) {
         section('👤 账号与安全', null, [
           el('div', { class: 'settings-links' }, [
             linkButton('🔑', '修改 / 设置密码', () => { openPasswordModal(); }),
+            // 仅非管理员显示：凭升级密钥自助提权
+            isAdminAccount()
+              ? null
+              : linkButton('👑', '升级为管理员', openAdminUpgradeModal),
             el('button', {
               class: 'settings-link danger',
               onClick: () => {
@@ -393,8 +445,9 @@ export function renderSettings(container) {
   container.innerHTML = '';
   container.appendChild(el('div', { class: 'settings-page' }, body));
   return () => {
-    // 离开设置页时同样要解绑快捷键采集
+    // 离开设置页时同样要解绑快捷键采集与提权结果监听
     if (editorCleanup) { editorCleanup(); editorCleanup = null; }
+    offAdminUpgrade();
     body.innerHTML = '';
   };
 }

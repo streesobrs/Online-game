@@ -151,7 +151,7 @@ module.exports = {
     tokenBytes: 32,                                // 动态Token随机字节数（64位十六进制）
     defaultMuteMinutes: 10,                        // 管理员一键禁言默认时长（分钟）
     allowedUsernames: process.env.ADMIN_USERNAMES ? process.env.ADMIN_USERNAMES.split(',') : ['admin'],
-    upgradeKey: process.env.ADMIN_UPGRADE_KEY || null   // 未配置时禁用「凭密钥升级管理员」功能
+    upgradeKey: process.env.ADMIN_UPGRADE_KEY || null   // 未配置时由 server.js 每次启动生成临时密钥并写入日志
   },
 
   // ========== 系统运维配置 ==========

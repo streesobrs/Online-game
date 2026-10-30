@@ -94,6 +94,7 @@ const EVENT_MAP = {
   user_status: 'user:status',
   account_info: 'user:accountInfo',
   account_action_result: 'user:accountActionResult',
+  admin_upgrade_result: 'user:adminUpgradeResult',
   account_updated: 'user:accountUpdated',
   login_result: 'user:loginResult',
   exp_gained: 'user:expGained',

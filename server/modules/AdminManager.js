@@ -234,11 +234,11 @@ class AdminManager {
 
   // 升级账号为管理员（凭升级密钥自助提权）
   async upgradeWithKey(accountId, upgradeKey) {
-    // 未配置升级密钥时直接关闭该功能，避免使用内置默认值提权
+    // 升级密钥未注入时关闭该功能，避免使用内置默认值提权
     if (!config.admin.upgradeKey) {
       return {
         success: false,
-        message: '未配置管理员升级密钥，该功能已禁用'
+        message: '管理员升级密钥未初始化，该功能暂不可用'
       };
     }
 

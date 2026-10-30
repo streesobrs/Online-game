@@ -111,6 +111,22 @@ export function initAuth() {
     }
   });
 
+  // 管理员提权结果：成功后同步登录态里的 isAdmin，顶部导航 / 抽屉的后台入口随 store 更新出现
+  eventBus.on('user:adminUpgradeResult', (data) => {
+    if (!data) return;
+    if (data.success) {
+      const current = store.get('user');
+      const inner = current?.account?.account || current?.account;
+      if (inner) {
+        inner.isAdmin = true;
+        store.set('user', { ...current });
+      }
+      toast.success(data.message || '🎉 升级成功，您现在是管理员');
+    } else {
+      toast.error(data.message || '升级失败');
+    }
+  });
+
   // 注册/重置密码结果（服务端统一回 account_action_result；注册成功不自动登录，需补一步）
   eventBus.on('user:accountActionResult', (data) => {
     if (!data) return;
@@ -249,6 +265,15 @@ export function updateProfile(params) {
     privacy: params.privacy,
     shortcuts: params.shortcuts,
   });
+}
+
+/**
+ * 凭升级密钥提权为管理员（admin_upgrade_account → admin_upgrade_result）
+ * @param {string} accountId
+ * @param {string} upgradeKey
+ */
+export function upgradeToAdmin(accountId, upgradeKey) {
+  emit('admin_upgrade_account', { accountId, upgradeKey });
 }
 
 /** 退出登录 */
