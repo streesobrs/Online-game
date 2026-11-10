@@ -97,7 +97,7 @@ function leaderboardItem(player, gameType) {
   const totalForRate = (player.wins || 0) + (player.losses || 0) + (player.draws || 0);
 
   return el('div', {
-    class: `leaderboard-item ${isTop3 ? `top-${player.rank}` : ''} ${isMe ? 'is-me' : ''}`,
+    class: `leaderboard-item ${isTop3 ? `top-${player.rank}` : ''} ${isMe ? 'is-me' : ''} ${player.isVip ? 'is-vip' : ''}`,
   }, [
     el('div', { class: 'leaderboard-rank-col' },
       isTop3
@@ -105,7 +105,10 @@ function leaderboardItem(player, gameType) {
         : el('span', { class: 'leaderboard-rank-num' }, String(player.rank))
     ),
     el('div', { class: 'leaderboard-player-info' }, [
-      el('div', { class: 'leaderboard-player-name' }, player.name || player.username || '未知玩家'),
+      el('div', { class: 'leaderboard-player-name' }, [
+        player.name || player.username || '未知玩家',
+        player.isVip ? el('span', { class: 'leaderboard-vip-badge' }, '👑 VIP') : null,
+      ]),
       el('div', { class: 'leaderboard-player-meta' }, metaEls),
     ]),
     // is-score 标记：小屏没有胜率条，得分型榜单的明细必须保留
@@ -225,10 +228,11 @@ export function renderLeaderboard(container = viewRoot()) {
     }
     myRankEl.innerHTML = '';
     myRankEl.append(
-      el('div', { class: 'leaderboard-self-card' }, [
+      el('div', { class: 'leaderboard-self-card' + (player.isVip ? ' is-vip' : '') }, [
         el('span', { class: 'leaderboard-self-label' }, '我的排名'),
         el('span', { class: 'leaderboard-self-rank' }, `#${player.rank}`),
         el('span', { class: 'leaderboard-self-name' }, player.name || '未知'),
+        player.isVip ? el('span', { class: 'leaderboard-vip-badge' }, '👑 VIP') : null,
         el('span', { class: 'leaderboard-lv-badge' }, `Lv.${player.level || 1}`),
         el('span', { class: 'leaderboard-self-stats' }, statSummary(player, currentType())),
       ])

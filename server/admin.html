@@ -2845,6 +2845,10 @@
           <span class="nav-icon">📧</span>
           <span class="nav-text">邮件记录</span>
         </div>
+        <div class="nav-item" onclick="switchView('redeem')">
+          <span class="nav-icon">🎟️</span>
+          <span class="nav-text">兑换码</span>
+        </div>
 
         <!-- 系统运维 -->
         <div class="nav-group-label">系统运维</div>
@@ -4394,6 +4398,41 @@
             </div>
           </div>
         </section>
+
+        <!-- 兑换码管理 -->
+        <section id="view-redeem" class="content-section">
+          <div class="data-card">
+            <div class="card-header">
+              <span class="card-title">🎟️ 兑换码管理</span>
+              <div class="card-tools">
+                <button class="action-btn btn-primary" onclick="showRedeemCodeModal(null)">➕ 新建兑换码</button>
+                <button class="action-btn btn-secondary" onclick="loadRedeemCodes()"
+                  style="padding:8px 16px;font-size:13px;">🔄 刷新</button>
+              </div>
+            </div>
+            <div style="padding:12px 16px;font-size:13px;color:var(--text-secondary);">
+              玩家在个人资料页输入兑换码后，奖励会通过邮件发放，需要玩家自行在邮箱领取。
+            </div>
+            <div class="table-wrap">
+              <table style="table-layout:fixed;width:100%;">
+                <thead>
+                  <tr>
+                    <th style="width:180px;">兑换码</th>
+                    <th style="width:140px;">名称</th>
+                    <th>奖励内容</th>
+                    <th style="width:80px;">状态</th>
+                    <th style="width:150px;">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="redeem-body">
+                  <tr>
+                    <td colspan="5" style="text-align:center;color:var(--text-secondary);padding:40px;">加载中...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
       </div>
     </main>
   </div>
@@ -4563,6 +4602,11 @@
             renderMailCosmetics(mailCosmeticList);
             renderMailVip(mailVipList);
             renderGrantItems(mailItemList);
+            // 兑换码弹窗打开时同步刷新道具下拉
+            if (document.getElementById('redeem-item-select')) {
+              refreshRedeemItemOptions();
+              renderRedeemSelectedItems();
+            }
           }
         });
 
@@ -4632,6 +4676,11 @@
         // 邮件记录数据
         socket.on('admin_mail_records', (data) => {
           handleMailRecordsData(data);
+        });
+
+        // 兑换码列表
+        socket.on('redeem_codes_list', (data) => {
+          handleRedeemCodesData(data);
         });
 
         // 系统设置事件
@@ -4803,7 +4852,8 @@
         mail: '邮件系统',
         'exp-records': '经验值获取记录',
         'coin-records': '星钻获取记录',
-        'mail-records': '邮件发放记录'
+        'mail-records': '邮件发放记录',
+        redeem: '兑换码管理'
       };
       document.getElementById('page-title').textContent = titles[view];
 
@@ -4825,6 +4875,7 @@
       if (view === 'exp-records') loadExpRecords();
       if (view === 'coin-records') loadCoinRecords();
       if (view === 'mail-records') loadMailRecords();
+      if (view === 'redeem') loadRedeemCodes();
       if (view === 'mail') {
         loadItemList();
         socket.emit('get_mail_templates');
@@ -8689,10 +8740,286 @@
       }).join('');
     }
 
+    // ==================== 兑换码管理 ====================
+    let redeemCodesCache = [];
+
+    function loadRedeemCodes() {
+      if (!socket) return;
+      socket.emit('get_redeem_codes');
+    }
+
+    function handleRedeemCodesData(data) {
+      if (!data || data.success === false) {
+        if (currentView === 'redeem') {
+          const tbody = document.getElementById('redeem-body');
+          if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-secondary);padding:40px;">${escapeHtml(data?.message || '加载失败')}</td></tr>`;
+          }
+        }
+        return;
+      }
+      redeemCodesCache = Array.isArray(data.codes) ? data.codes : [];
+      renderRedeemCodes();
+    }
+
+    function redeemRewardText(rewards = {}) {
+      const parts = [];
+      if (Number(rewards.starCoins) > 0) parts.push(`💎 ${rewards.starCoins}`);
+      if (Number(rewards.exp) > 0) parts.push(`⭐ 经验 ${rewards.exp}`);
+      if (Number(rewards.tickets) > 0) parts.push(`🎫 抽奖券 ${rewards.tickets}`);
+      Object.entries(rewards.items || {}).forEach(([id, count]) => parts.push(`${id}×${count}`));
+      (rewards.cosmetics || []).forEach((id) => parts.push(id));
+      return parts.length ? parts.join('·') : '无奖励';
+    }
+
+    function renderRedeemCodes() {
+      const tbody = document.getElementById('redeem-body');
+      if (!tbody) return;
+      if (!redeemCodesCache.length) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-secondary);padding:40px;">暂无兑换码，点击「新建兑换码」添加</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = redeemCodesCache.map((item) => `
+        <tr>
+          <td style="font-family:monospace;font-weight:600;color:#fbbf24;">${escapeHtml(item.code)}</td>
+          <td>${escapeHtml(item.name || item.code)}</td>
+          <td style="font-size:13px;color:var(--text-secondary);word-break:break-all;">${escapeHtml(redeemRewardText(item.rewards))}</td>
+          <td>${item.enabled
+            ? '<span style="color:#4ade80;">✅ 启用</span>'
+            : '<span style="color:#f87171;">⛔ 停用</span>'}</td>
+          <td>
+            <div class="table-actions">
+              <button class="table-btn table-btn-info" onclick="showRedeemCodeModal('${escapeHtml(item.code)}')">编辑</button>
+              <button class="table-btn table-btn-danger" onclick="deleteRedeemCode('${escapeHtml(item.code)}')">删除</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    let redeemItemSelection = new Map();
+
+    // 可选道具 = 物品 + 礼包（按 id 去重）
+    function getRedeemPickerItems() {
+      const items = (typeof mailItemList !== 'undefined' && Array.isArray(mailItemList)) ? mailItemList : [];
+      const packs = (typeof mailPackList !== 'undefined' && Array.isArray(mailPackList)) ? mailPackList : [];
+      const map = new Map();
+      [...items, ...packs].forEach((it) => {
+        if (!it || !it.id || it.enabled === false || map.has(it.id)) return;
+        map.set(it.id, it);
+      });
+      return Array.from(map.values());
+    }
+
+    function refreshRedeemItemOptions() {
+      const select = document.getElementById('redeem-item-select');
+      if (!select) return;
+      const list = getRedeemPickerItems();
+      const current = select.value;
+      select.innerHTML = list.length
+        ? list.map((it) => `<option value="${escapeHtml(it.id)}">${escapeHtml(`${it.icon || '📦'} ${it.name || it.id}`)}</option>`).join('')
+        : '<option value="">暂无可选道具</option>';
+      if (current && list.some((it) => it.id === current)) select.value = current;
+    }
+
+    function renderRedeemSelectedItems() {
+      const box = document.getElementById('redeem-items-selected');
+      if (!box) return;
+      if (!redeemItemSelection.size) {
+        box.innerHTML = '<div style="color:var(--text-secondary);font-size:12px;padding:6px 0;">尚未添加道具</div>';
+        return;
+      }
+      box.innerHTML = Array.from(redeemItemSelection.values()).map((it) => `
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:rgba(255,255,255,0.04);border-radius:6px;margin-top:6px;">
+          <span>${escapeHtml(it.icon || '📦')}</span>
+          <span style="flex:1;font-size:13px;">${escapeHtml(it.name || it.id)}</span>
+          <input type="number" min="1" value="${it.count}" class="form-input" style="width:70px;"
+            onchange="updateRedeemItemCount('${escapeHtml(it.id)}', this.value)">
+          <button type="button" class="action-btn btn-danger" style="padding:4px 10px;font-size:12px;"
+            onclick="removeRedeemItem('${escapeHtml(it.id)}')">移除</button>
+        </div>
+      `).join('');
+    }
+
+    function addRedeemItem() {
+      const select = document.getElementById('redeem-item-select');
+      const countInput = document.getElementById('redeem-item-count');
+      const id = select?.value;
+      if (!id) {
+        showToast('请选择道具', 'error');
+        return;
+      }
+      const list = getRedeemPickerItems();
+      const found = list.find((it) => it && it.id === id) || {};
+      const count = Math.max(1, parseInt(countInput?.value, 10) || 1);
+      const existing = redeemItemSelection.get(id);
+      if (existing) {
+        existing.count += count;
+      } else {
+        redeemItemSelection.set(id, {
+          id,
+          name: found.name || id,
+          icon: found.icon || '📦',
+          count
+        });
+      }
+      if (countInput) countInput.value = '1';
+      renderRedeemSelectedItems();
+    }
+
+    function updateRedeemItemCount(id, value) {
+      const it = redeemItemSelection.get(id);
+      if (it) it.count = Math.max(1, parseInt(value, 10) || 1);
+      renderRedeemSelectedItems();
+    }
+
+    function removeRedeemItem(id) {
+      redeemItemSelection.delete(id);
+      renderRedeemSelectedItems();
+    }
+
+    function showRedeemCodeModal(code) {
+      const editing = !!code;
+      const item = editing ? redeemCodesCache.find((c) => c.code === code) : null;
+      if (editing && !item) {
+        showToast('兑换码不存在，请刷新后重试', 'error');
+        return;
+      }
+      const rewards = item?.rewards || {};
+      // 初始化已选道具（后续可在下拉框中增删）
+      redeemItemSelection = new Map();
+      Object.entries(rewards.items || {}).forEach(([id, count]) => {
+        const found = getRedeemPickerItems().find((it) => it && it.id === id) || {};
+        redeemItemSelection.set(id, {
+          id,
+          name: found.name || id,
+          icon: found.icon || '📦',
+          count: Math.max(1, parseInt(count, 10) || 1)
+        });
+      });
+
+      showModal(editing ? `编辑兑换码 ${item.code}` : '新建兑换码', `
+        <div class="form-group">
+          <label class="form-label">兑换码</label>
+          <input type="text" id="redeem-code-input" class="form-input" maxlength="32"
+            placeholder="如 WELCOME2026（3-32 位字母/数字/下划线/短横线）"
+            value="${editing ? escapeHtml(item.code) : ''}" ${editing ? 'readonly' : ''}>
+        </div>
+        <div class="form-group">
+          <label class="form-label">名称</label>
+          <input type="text" id="redeem-name-input" class="form-input" maxlength="40"
+            placeholder="兑换码名称" value="${editing ? escapeHtml(item.name || '') : ''}">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+          <div class="form-group">
+            <label class="form-label">💎 星钻</label>
+            <input type="number" id="redeem-coin-input" class="form-input" min="0" value="${Number(rewards.starCoins) || 0}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">⭐ 经验</label>
+            <input type="number" id="redeem-exp-input" class="form-input" min="0" value="${Number(rewards.exp) || 0}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">🎫 抽奖券</label>
+            <input type="number" id="redeem-ticket-input" class="form-input" min="0" value="${Number(rewards.tickets) || 0}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">道具奖励</label>
+          <div style="display:flex;gap:8px;">
+            <select id="redeem-item-select" class="form-input" style="flex:1;"></select>
+            <input type="number" id="redeem-item-count" class="form-input" min="1" value="1" style="width:80px;">
+            <button type="button" class="action-btn btn-secondary" style="padding:8px 14px;white-space:nowrap;"
+              onclick="addRedeemItem()">添加</button>
+          </div>
+          <div id="redeem-items-selected"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">外观 ID（逗号分隔）</label>
+          <input type="text" id="redeem-cosmetics-input" class="form-input"
+            placeholder="如 frame_gold,skin_ocean"
+            value="${editing ? escapeHtml((rewards.cosmetics || []).join(',')) : ''}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">邮件标题（可选）</label>
+          <input type="text" id="redeem-mail-title-input" class="form-input" maxlength="60"
+            placeholder="默认：兑换码奖励：名称" value="${editing ? escapeHtml(item.mailTitle || '') : ''}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">邮件正文（可选）</label>
+          <textarea id="redeem-mail-content-input" class="form-input" rows="3" maxlength="500"
+            placeholder="默认：兑换码 XXX 兑换成功，奖励已通过邮件发放，请查收。">${editing ? escapeHtml(item.mailContent || '') : ''}</textarea>
+        </div>
+        <div class="form-group">
+          <label class="toggle-switch">
+            <input type="checkbox" id="redeem-enabled-input" ${!editing || item.enabled !== false ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+            <span class="toggle-label-text">启用该兑换码</span>
+          </label>
+        </div>
+      `, [
+        { text: '取消', class: 'btn-secondary', action: closeModal },
+        {
+          text: '保存', class: 'btn-primary', action: () => {
+            const codeVal = (document.getElementById('redeem-code-input').value || '').trim().toUpperCase();
+            if (!/^[A-Z0-9_-]{3,32}$/.test(codeVal)) {
+              showToast('兑换码需为 3-32 位字母、数字、下划线或短横线', 'error');
+              return;
+            }
+            const items = {};
+            redeemItemSelection.forEach((it) => {
+              items[it.id] = Math.max(1, parseInt(it.count, 10) || 1);
+            });
+            const payload = {
+              code: codeVal,
+              name: document.getElementById('redeem-name-input').value.trim() || codeVal,
+              enabled: document.getElementById('redeem-enabled-input').checked,
+              oncePerAccount: true,
+              mailTitle: document.getElementById('redeem-mail-title-input').value.trim(),
+              mailContent: document.getElementById('redeem-mail-content-input').value.trim(),
+              rewards: {
+                starCoins: Number(document.getElementById('redeem-coin-input').value) || 0,
+                exp: Number(document.getElementById('redeem-exp-input').value) || 0,
+                tickets: Number(document.getElementById('redeem-ticket-input').value) || 0,
+                items,
+                cosmetics: document.getElementById('redeem-cosmetics-input').value
+                  .split(',').map((id) => id.trim()).filter(Boolean)
+              }
+            };
+            if (!socket) {
+              showToast('后台尚未连接', 'error');
+              return;
+            }
+            socket.once('admin_action_result', (res) => {
+              if (res && res.action === 'redeem_code' && res.success) closeModal();
+            });
+            socket.emit('save_redeem_code', payload);
+          }
+        }
+      ]);
+
+      // 渲染道具下拉与已选列表；物品列表未加载时主动请求一次
+      refreshRedeemItemOptions();
+      renderRedeemSelectedItems();
+      if ((typeof mailItemList === 'undefined' || !mailItemList.length) && socket) {
+        socket.emit('get_items_list');
+      }
+    }
+
+    function deleteRedeemCode(code) {
+      if (!confirm(`确定删除兑换码「${code}」吗？删除后玩家将无法继续使用。`)) return;
+      if (!socket) {
+        showToast('后台尚未连接', 'error');
+        return;
+      }
+      socket.emit('delete_redeem_code', code);
+    }
+
     // ==================== 模态框工具 ====================
     function showModal(title, content, buttons = []) {
       const container = document.getElementById('modal-container');
       const modalId = 'modal-' + Date.now();
+      const footerId = 'modal-footer-' + modalId;
 
       container.innerHTML = `
     <div id="${modalId}" class="modal-overlay" onclick="if(event.target===this)closeModal()">
@@ -8702,16 +9029,24 @@
           <button class="modal-close" onclick="closeModal()">&times;</button>
         </div>
         <div class="modal-body">${content}</div>
-        ${buttons.length > 0 ? `
-          <div class="modal-footer">
-            ${buttons.map(btn => `
-              <button class="action-btn ${btn.class}" onclick="(${btn.action.toString()})()">${btn.text}</button>
-            `).join('')}
-          </div>
-        ` : ''}
+        ${buttons.length > 0 ? `<div class="modal-footer" id="${footerId}"></div>` : ''}
       </div>
     </div>
   `;
+
+      // 用事件监听绑定按钮，避免把函数源码拼进 onclick 属性（含引号时会破坏 HTML）
+      if (buttons.length > 0) {
+        const footer = document.getElementById(footerId);
+        buttons.forEach(btn => {
+          const button = document.createElement('button');
+          button.className = `action-btn ${btn.class || ''}`.trim();
+          button.textContent = btn.text;
+          button.addEventListener('click', () => {
+            if (typeof btn.action === 'function') btn.action();
+          });
+          footer.appendChild(button);
+        });
+      }
     }
 
     function closeModal() {

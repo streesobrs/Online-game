@@ -92,6 +92,30 @@ class UserManager {
       let userSession;
       const isReconnect = accountId && this.onlineUsers.has(accountId);
 
+      // 通过 token 恢复的登录同样计入登录：更新最后登录时间与登录次数
+      // （socket 重连不算，避免网络抖动/多标签页重复累加）
+      if (accountId && !isReconnect && accountData?.account) {
+        try {
+          const now = Date.now();
+          const inner = accountData.account;
+          const lastLogin = Number(inner.lastLogin) || 0;
+          // 60 秒内已有登录记录（如密码登录、v1 的 get_account_by_token）时不重复累加次数
+          const recentLogin = lastLogin > 0 && now - lastLogin < 60 * 1000;
+          const loginCount = (inner.loginCount || 0) + (recentLogin ? 0 : 1);
+          await dataStore.update('accounts', { 'account.id': accountId }, {
+            'account.lastLogin': now,
+            'account.lastSeen': now,
+            'account.loginCount': loginCount,
+            'account.updatedAt': now
+          });
+          inner.lastLogin = now;
+          inner.lastSeen = now;
+          inner.loginCount = loginCount;
+        } catch (err) {
+          logger.error('更新恢复登录信息失败', { accountId, error: err.message });
+        }
+      }
+
       if (isReconnect) {
         // 重连：恢复已有会话，取消清理定时器
         const existingSession = this.onlineUsers.get(accountId);

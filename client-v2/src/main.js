@@ -18,6 +18,7 @@ import { initShortcuts } from './utils/shortcut.js';
 import * as shortcutManager from './core/shortcuts.js';
 import { NAV_ITEMS, GAMES, FEATURES, findItem } from './data/navItems.js';
 import * as themes from './features/themes/index.js';
+import { initAppearance } from './core/appearance.js';
 import { applyNavMode, getNavPrefs, setNavPrefs } from './layouts/mode.js';
 import { applyUiPrefs } from './core/prefs.js';
 import { viewRoot } from './utils/dom.js';
@@ -55,6 +56,9 @@ auth.initAuth();
 
 // 2. 初始化主题（应用 v1/v2 共享的 selectedTheme）
 themes.initThemes();
+
+// 2.05 应用已装备的皮肤 / 背景（与主题同级，全站生效）
+initAppearance();
 
 // 2.0 应用界面偏好（减少动效等，需在首屏渲染前落到 body 上）
 applyUiPrefs();
@@ -96,6 +100,7 @@ registerRoute('leaderboard', lazyView('./features/leaderboard/index.js', 'render
 registerRoute('spectate', lazyView('./features/spectate/index.js', 'renderSpectate'));
 registerRoute('feedback', lazyView('./features/feedback/index.js', 'renderFeedback'));
 registerRoute('profile', lazyView('./features/profile/index.js', 'renderProfile'));
+registerRoute('shop', lazyView('./features/shop/index.js', 'renderShop'));
 registerRoute('settings', lazyView('./features/settings/index.js', 'renderSettings'));
 registerRoute('admin', lazyView('./features/admin/index.js', 'renderAdmin'));
 registerRoute('player', lazyView('./features/player/index.js', 'renderPlayerProfile'));

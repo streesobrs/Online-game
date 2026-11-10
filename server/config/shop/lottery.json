@@ -1,0 +1,106 @@
+{
+  "version": "2.1.0",
+  "cost": {
+    "single": 1,
+    "ten": 10
+  },
+  "ticketPrice": {
+    "single": 60,
+    "ten": 540
+  },
+  "pity": {
+    "epic": 80,
+    "tenRare": 1
+  },
+  "dailyLimit": 0,
+  "recordLimit": 100,
+  "rewards": {
+    "shards": {
+      "weight": 77,
+      "amounts": [
+        { "amount": 1, "weight": 45 },
+        { "amount": 5, "weight": 30 },
+        { "amount": 10, "weight": 15 },
+        { "amount": 20, "weight": 7 },
+        { "amount": 50, "weight": 2.5 },
+        { "amount": 100, "weight": 0.5 }
+      ]
+    },
+    "item": {
+      "weight": 12,
+      "ids": [
+        "item_undo",
+        "item_snake_shrink",
+        "item_luck_boost",
+        "item_exp_potion",
+        "item_snake_speed",
+        "item_hint",
+        "item_snake_revive",
+        "item_double_exp",
+        "item_snake_double"
+      ]
+    },
+    "title": {
+      "weight": 3,
+      "ids": ["title_lucky_draw", "title_draw_master", "title_shard_collector"]
+    },
+    "cosmetic": {
+      "weight": 8
+    }
+  },
+  "duplicateShards": {
+    "common": 2,
+    "uncommon": 5,
+    "rare": 10,
+    "epic": 25,
+    "legendary": 50
+  },
+  "exchangeCost": {
+    "common": 5,
+    "uncommon": 12,
+    "rare": 30,
+    "epic": 60,
+    "legendary": 120
+  },
+  "pool": [
+    { "id": "avatar_cat", "rarity": "common", "weight": 1 },
+    { "id": "avatar_dog", "rarity": "common", "weight": 1 },
+    { "id": "avatar_smile", "rarity": "common", "weight": 1 },
+    { "id": "avatar_cool", "rarity": "common", "weight": 1 },
+    { "id": "frame_bronze", "rarity": "common", "weight": 1 },
+    { "id": "skin_mint", "rarity": "common", "weight": 1 },
+    { "id": "bg_dawn", "rarity": "common", "weight": 1 },
+
+    { "id": "avatar_fox", "rarity": "uncommon", "weight": 1 },
+    { "id": "avatar_panda", "rarity": "uncommon", "weight": 1 },
+    { "id": "avatar_ghost", "rarity": "uncommon", "weight": 1 },
+    { "id": "frame_silver", "rarity": "uncommon", "weight": 1 },
+    { "id": "frame_heart", "rarity": "uncommon", "weight": 1 },
+    { "id": "skin_sunset", "rarity": "uncommon", "weight": 1 },
+    { "id": "bg_forest", "rarity": "uncommon", "weight": 1 },
+
+    { "id": "avatar_lion", "rarity": "rare", "weight": 1 },
+    { "id": "avatar_tiger", "rarity": "rare", "weight": 1 },
+    { "id": "avatar_ninja", "rarity": "rare", "weight": 1 },
+    { "id": "avatar_wizard", "rarity": "rare", "weight": 1 },
+    { "id": "avatar_robot", "rarity": "rare", "weight": 1 },
+    { "id": "frame_newyear", "rarity": "rare", "weight": 1 },
+    { "id": "frame_star", "rarity": "rare", "weight": 1 },
+    { "id": "frame_gold", "rarity": "rare", "weight": 1 },
+    { "id": "skin_ocean", "rarity": "rare", "weight": 1 },
+    { "id": "bg_sakura", "rarity": "rare", "weight": 1 },
+    { "id": "bg_neon", "rarity": "rare", "weight": 1 },
+
+    { "id": "avatar_unicorn", "rarity": "epic", "weight": 1 },
+    { "id": "avatar_alien", "rarity": "epic", "weight": 1 },
+    { "id": "avatar_king", "rarity": "epic", "weight": 1 },
+    { "id": "avatar_queen", "rarity": "epic", "weight": 1 },
+    { "id": "frame_rainbow", "rarity": "epic", "weight": 1 },
+    { "id": "skin_cyber", "rarity": "epic", "weight": 1 },
+    { "id": "bg_starry", "rarity": "epic", "weight": 1 },
+
+    { "id": "avatar_dragon", "rarity": "legendary", "weight": 1 },
+    { "id": "frame_dragon", "rarity": "legendary", "weight": 1 },
+    { "id": "skin_gold", "rarity": "legendary", "weight": 1 }
+  ]
+}

@@ -46,6 +46,7 @@ const TABS = [
   { id: 'mail', label: '邮件物品', icon: '✉️' },
   { id: 'games', label: '对局', icon: '🎮' },
   { id: 'feedback', label: '反馈', icon: '📝' },
+  { id: 'redeem', label: '兑换码', icon: '🎟️' },
   { id: 'update', label: '更新', icon: '🔄' },
 ];
 
@@ -195,6 +196,8 @@ export function renderAdmin(container) {
     feedbacks: [],
     feedbackLoaded: false,
     feedbackLoading: false,
+    redeemCodes: [],
+    redeemLoaded: false,
     adminName: '',
     items: [],
     packs: [],
@@ -423,6 +426,12 @@ export function renderAdmin(container) {
       if (state.tab === 'mail') renderTemplateOptions();
     });
 
+    socket.on('redeem_codes_list', (data) => {
+      state.redeemCodes = Array.isArray(data?.codes) ? data.codes : [];
+      state.redeemLoaded = true;
+      if (state.tab === 'redeem') renderRedeemBody();
+    });
+
     socket.on('admin_scheduled_mails', (data) => {
       state.scheduledJobs = Array.isArray(data?.jobs) ? data.jobs : [];
       state.scheduledLoaded = true;
@@ -561,18 +570,21 @@ export function renderAdmin(container) {
 
     if (id !== 'mail') refs.mail = null;
     if (id !== 'update') refs.update = null;
+    if (id !== 'redeem') refs.redeem = null;
 
     if (id === 'overview') renderOverview();
     else if (id === 'accounts') renderAccounts();
     else if (id === 'mail') renderMail();
     else if (id === 'games') renderGames();
     else if (id === 'feedback') renderFeedback();
+    else if (id === 'redeem') renderRedeem();
     else if (id === 'update') renderUpdate();
 
     if (session?.socket && state.ready) {
       if (id === 'accounts') session.socket.emit('get_all_accounts');
       if (id === 'games' && !state.historyLoaded) session.socket.emit('get_game_history', { limit: 20 });
       if (id === 'feedback' && !state.feedbackLoaded) loadFeedbacks();
+      if (id === 'redeem') session.socket.emit('get_redeem_codes');
       if (id === 'mail') {
         if (!state.templatesLoaded) session.socket.emit('get_mail_templates');
         if (!state.scheduledLoaded) session.socket.emit('get_scheduled_mails');
@@ -593,6 +605,7 @@ export function renderAdmin(container) {
       session.socket.emit('get_system_stats');
     }
     if (state.tab === 'feedback') loadFeedbacks();
+    if (state.tab === 'redeem') session.socket.emit('get_redeem_codes');
     if (state.tab === 'update') {
       loadUpdateStatus();
       checkGitUpdate(true);
@@ -2023,6 +2036,209 @@ export function renderAdmin(container) {
       toast.error(`更新失败：${err.message}`);
       renderFeedbackBody();
     }
+  }
+
+  // ===== 兑换码 =====
+  function renderRedeem() {
+    content.innerHTML = '';
+    refs.overview = null;
+    refs.accounts = null;
+    refs.games = null;
+
+    const list = el('div', { class: 'admin-list', 'data-redeem-list': '' });
+    content.append(section('兑换码管理', '玩家在个人资料中使用兑换码，奖励通过邮件发放，需玩家自行领取', [
+      el('div', { class: 'admin-toolbar' }, [
+        el('button', {
+          class: 'admin-btn admin-btn--primary',
+          type: 'button',
+          onClick: () => openRedeemForm(null),
+        }, '➕ 新建兑换码'),
+        el('button', {
+          class: 'admin-btn',
+          type: 'button',
+          onClick: () => session?.socket?.emit('get_redeem_codes'),
+        }, '🔄 刷新'),
+      ]),
+      list,
+    ]));
+
+    refs.redeem = { list };
+    renderRedeemBody();
+  }
+
+  function redeemRewardText(rewards = {}) {
+    const parts = [];
+    if (Number(rewards.starCoins) > 0) parts.push(`💎${rewards.starCoins}`);
+    if (Number(rewards.exp) > 0) parts.push(`经验${rewards.exp}`);
+    if (Number(rewards.tickets) > 0) parts.push(`🎫${rewards.tickets}`);
+    Object.entries(rewards.items || {}).forEach(([id, count]) => parts.push(`${id}×${count}`));
+    (rewards.cosmetics || []).forEach((id) => parts.push(id));
+    return parts.length ? parts.join(' · ') : '无奖励';
+  }
+
+  function renderRedeemBody() {
+    if (!refs.redeem?.list) return;
+    const { list } = refs.redeem;
+    list.innerHTML = '';
+
+    if (!state.redeemLoaded) {
+      list.append(el('div', { class: 'admin-empty admin-empty--inline' }, [
+        el('div', { class: 'admin-empty__desc' }, '正在加载兑换码…'),
+      ]));
+      return;
+    }
+    if (!state.redeemCodes.length) {
+      list.append(el('div', { class: 'admin-empty admin-empty--inline' }, [
+        el('div', { class: 'admin-empty__icon' }, '🎟️'),
+        el('div', { class: 'admin-empty__desc' }, '暂无兑换码，点击「新建兑换码」添加'),
+      ]));
+      return;
+    }
+
+    state.redeemCodes.forEach((item) => {
+      list.append(el('div', { class: 'admin-mail-row' }, [
+        el('div', { class: 'admin-mail-row__main' }, [
+          el('div', { class: 'admin-mail-row__title' }, [
+            badge(item.enabled ? '启用' : '停用', item.enabled ? 'online' : 'danger'),
+            el('span', {}, `${item.code} · ${item.name}`),
+          ]),
+          el('div', { class: 'admin-mail-row__meta' }, redeemRewardText(item.rewards)),
+        ]),
+        el('div', { class: 'admin-mail-row__actions' }, [
+          el('button', {
+            class: 'admin-btn admin-btn--sm',
+            type: 'button',
+            onClick: () => openRedeemForm(item),
+          }, '编辑'),
+          el('button', {
+            class: 'admin-btn admin-btn--sm admin-btn--danger',
+            type: 'button',
+            onClick: () => confirmDeleteRedeem(item),
+          }, '删除'),
+        ]),
+      ]));
+    });
+  }
+
+  function openRedeemForm(item) {
+    const editing = !!item;
+    const rewards = item?.rewards || {};
+    const codeInput = el('input', {
+      class: 'admin-input', type: 'text', maxlength: '32', placeholder: '如 WELCOME2026',
+      value: editing ? item.code : '',
+    });
+    const nameInput = el('input', {
+      class: 'admin-input', type: 'text', maxlength: '40', placeholder: '兑换码名称',
+      value: editing ? item.name : '',
+    });
+    const coinInput = el('input', { class: 'admin-input', type: 'number', min: '0', value: String(rewards.starCoins || 0) });
+    const expInput = el('input', { class: 'admin-input', type: 'number', min: '0', value: String(rewards.exp || 0) });
+    const ticketInput = el('input', { class: 'admin-input', type: 'number', min: '0', value: String(rewards.tickets || 0) });
+    const itemPicker = buildItemPicker();
+    if (editing && rewards.items) {
+      itemPicker.setItems(
+        Object.entries(rewards.items).map(([id, count]) => ({ id, count: Number(count) || 1 }))
+      );
+    }
+    const cosmeticsInput = el('input', {
+      class: 'admin-input', type: 'text', placeholder: '逗号分隔，如 frame_gold,skin_ocean',
+      value: editing ? (rewards.cosmetics || []).join(',') : '',
+    });
+    const mailTitleInput = el('input', {
+      class: 'admin-input', type: 'text', maxlength: '60', placeholder: '邮件标题（可选）',
+      value: editing ? item.mailTitle || '' : '',
+    });
+    const mailContentInput = el('input', {
+      class: 'admin-input', type: 'text', maxlength: '500', placeholder: '邮件正文（可选）',
+      value: editing ? item.mailContent || '' : '',
+    });
+    const enabledInput = el('input', {
+      type: 'checkbox',
+      checked: !editing || item.enabled !== false,
+    });
+
+    modal.show({
+      title: editing ? `编辑兑换码 ${item.code}` : '新建兑换码',
+      content: el('div', { class: 'admin-form' }, [
+        el('label', { class: 'admin-field' }, [
+          el('span', { class: 'admin-field__label' }, '兑换码'),
+          codeInput,
+        ]),
+        el('label', { class: 'admin-field' }, [
+          el('span', { class: 'admin-field__label' }, '名称'),
+          nameInput,
+        ]),
+        el('div', { class: 'admin-form-row admin-form-row--wrap' }, [
+          el('label', { class: 'admin-field' }, [
+            el('span', { class: 'admin-field__label' }, '星钻'),
+            coinInput,
+          ]),
+          el('label', { class: 'admin-field' }, [
+            el('span', { class: 'admin-field__label' }, '经验'),
+            expInput,
+          ]),
+          el('label', { class: 'admin-field' }, [
+            el('span', { class: 'admin-field__label' }, '抽奖券'),
+            ticketInput,
+          ]),
+        ]),
+        el('div', { class: 'admin-field admin-field--stack' }, [
+          el('span', { class: 'admin-field__label' }, '道具奖励（点击添加，可改数量）'),
+          itemPicker.node,
+        ]),
+        el('label', { class: 'admin-field' }, [
+          el('span', { class: 'admin-field__label' }, '外观 ID'),
+          cosmeticsInput,
+        ]),
+        el('label', { class: 'admin-field' }, [
+          el('span', { class: 'admin-field__label' }, '邮件标题'),
+          mailTitleInput,
+        ]),
+        el('label', { class: 'admin-field' }, [
+          el('span', { class: 'admin-field__label' }, '邮件正文'),
+          mailContentInput,
+        ]),
+        el('label', { class: 'admin-field', style: { flexDirection: 'row', alignItems: 'center', gap: '8px' } }, [
+          enabledInput,
+          el('span', { class: 'admin-field__label' }, '启用该兑换码'),
+        ]),
+      ]),
+      confirmText: '保存',
+      onConfirm: () => {
+        const code = (editing ? item.code : codeInput.value).trim().toUpperCase();
+        if (!code) { toast.warn('请输入兑换码'); return; }
+        const items = {};
+        itemPicker.getItems().forEach((it) => { items[it.id] = it.count; });
+        if (!session?.socket) { toast.warn('后台尚未连接'); return; }
+        session.socket.emit('save_redeem_code', {
+          code,
+          name: nameInput.value.trim() || code,
+          enabled: enabledInput.checked,
+          oncePerAccount: true,
+          mailTitle: mailTitleInput.value.trim(),
+          mailContent: mailContentInput.value.trim(),
+          rewards: {
+            starCoins: Number(coinInput.value) || 0,
+            exp: Number(expInput.value) || 0,
+            tickets: Number(ticketInput.value) || 0,
+            items,
+            cosmetics: cosmeticsInput.value.split(',').map((id) => id.trim()).filter(Boolean),
+          },
+        });
+      },
+    });
+  }
+
+  function confirmDeleteRedeem(item) {
+    modal.show({
+      title: '删除兑换码',
+      content: el('div', {}, `确定删除「${item.code}」吗？删除后玩家将无法继续使用。`),
+      confirmText: '删除',
+      onConfirm: () => {
+        if (!session?.socket) { toast.warn('后台尚未连接'); return; }
+        session.socket.emit('delete_redeem_code', item.code);
+      },
+    });
   }
 
   // ===== 系统更新（Git 自动更新） =====

@@ -103,6 +103,7 @@ export const NAV_ITEMS = [
     order: 12.5,
   },
   {
+    // 消费中心：商城 / 抽奖 / 背包 / 我的装扮，独立导航项，不再挂在个人资料页
     id: 'shop',
     type: 'feature',
     name: '商城',
@@ -110,7 +111,6 @@ export const NAV_ITEMS = [
     shortcut: 'S',
     category: '辅助',
     order: 14,
-    inProfile: true, // 已迁移进个人资料页，导航栏不再单独展示
   },
   {
     id: 'profile',
@@ -199,7 +199,6 @@ export const ROUTE_ALIASES = {
   'ai-battle': { mode: 'ai' },
   'lobby': { mode: 'online' },
   'achievements': { tab: 'achievements' },
-  'shop': { tab: 'shop' },
   'themes': { tab: 'themes' },
   'shortcuts': { settingsTab: 'shortcuts' },
 };

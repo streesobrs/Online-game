@@ -28,6 +28,7 @@ const AIManager = require('./modules/AIManager');
 const ThemeManager = require('./modules/ThemeManager');
 const FeedbackManager = require('./modules/FeedbackManager');
 const ShopManager = require('./modules/ShopManager');
+const LotteryManager = require('./modules/LotteryManager');
 const FriendsManager = require('./modules/FriendsManager');
 const OperationLogger = require('./modules/OperationLogger');
 const UpdateManager = require('./modules/UpdateManager');
@@ -657,6 +658,98 @@ app.post('/api/shop/use-item', authenticateUser, requireSelf(req => req.body.use
   } catch (err) {
     logger.error('使用道具失败', { error: err.message });
     res.status(500).json({ success: false, message: '使用失败' });
+  }
+});
+
+// ========== 抽奖API（二期） ==========
+
+// 抽奖信息（费用 / 保底 / 碎片 / 兑换价 / 奖池 / 记录）
+app.get('/api/shop/lottery/info', authenticateUser, requireSelf(req => req.query.userId), async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: '参数错误' });
+    }
+    const result = await lotteryManager.getInfo(userId, accountManager);
+    res.json(result);
+  } catch (err) {
+    logger.error('获取抽奖信息失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取失败' });
+  }
+});
+
+// 抽奖（单抽 / 十连）
+app.post('/api/shop/lottery/draw', authenticateUser, requireSelf(req => req.body.userId), async (req, res) => {
+  try {
+    const { userId, count = 1 } = req.body;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: '参数错误' });
+    }
+    const result = await lotteryManager.draw(userId, count, accountManager);
+    res.json(result);
+  } catch (err) {
+    logger.error('抽奖失败', { error: err.message });
+    res.status(500).json({ success: false, message: '抽奖失败' });
+  }
+});
+
+// 兑换码（个人资料内使用）
+app.post('/api/redeem-code', authenticateUser, requireSelf(req => req.body.userId), async (req, res) => {
+  try {
+    const { userId, code } = req.body;
+    if (!userId || !code) {
+      return res.status(400).json({ success: false, message: '请输入兑换码' });
+    }
+    const result = await accountManager.redeemCode(userId, code);
+    res.json(result);
+  } catch (err) {
+    logger.error('兑换码失败', { error: err.message });
+    res.status(500).json({ success: false, message: '兑换失败' });
+  }
+});
+
+// 星钻兑换抽奖券（1 张 / 10 张）
+app.post('/api/shop/lottery/tickets', authenticateUser, requireSelf(req => req.body.userId), async (req, res) => {
+  try {
+    const { userId, count = 1 } = req.body;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: '参数错误' });
+    }
+    const result = await lotteryManager.buyTickets(userId, count, accountManager);
+    res.json(result);
+  } catch (err) {
+    logger.error('兑换抽奖券失败', { error: err.message });
+    res.status(500).json({ success: false, message: '兑换失败' });
+  }
+});
+
+// 外观碎片兑换
+app.post('/api/shop/lottery/exchange', authenticateUser, requireSelf(req => req.body.userId), async (req, res) => {
+  try {
+    const { userId, cosmeticId } = req.body;
+    if (!userId || !cosmeticId) {
+      return res.status(400).json({ success: false, message: '参数错误' });
+    }
+    const result = await lotteryManager.exchange(userId, cosmeticId, accountManager);
+    res.json(result);
+  } catch (err) {
+    logger.error('碎片兑换失败', { error: err.message });
+    res.status(500).json({ success: false, message: '兑换失败' });
+  }
+});
+
+// 抽奖记录
+app.get('/api/shop/lottery/records', authenticateUser, requireSelf(req => req.query.userId), async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: '参数错误' });
+    }
+    const result = await lotteryManager.getRecords(userId, accountManager);
+    res.json(result);
+  } catch (err) {
+    logger.error('获取抽奖记录失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取失败' });
   }
 });
 
@@ -1952,6 +2045,8 @@ app.get('/api/profile/:accountId', optionalUser, async (req, res) => {
         stats: statsOut,
         games,
         activeBuffs: account.activeBuffs || {},
+        // 称号 / 背景 / 皮肤等公开展示数据（不返回 owned，避免泄露他人资产）
+        cosmetics: { equipped: account.cosmetics?.equipped || {} },
         inventory: isOwner ? {
           undoCount: account.inventory?.undoCount || 0,
           hintCount: account.inventory?.hintCount || 0
@@ -2124,6 +2219,7 @@ const feedbackManager = FeedbackManager;
 logger.info('反馈系统初始化完成');
 const shopManager = new ShopManager();
 shopManager.operationLogger = operationLogger;
+const lotteryManager = new LotteryManager();
 // 注入accountManager到FeedbackManager用于实时查询昵称
 feedbackManager.accountManager = accountManager;
 feedbackManager.operationLogger = operationLogger;
@@ -5050,6 +5146,23 @@ adminNamespace.on('connection', (socket) => {
   socket.on('reset_game', (data) => {
     const { gameId } = data;
     adminManager.resetGame(socket, gameId);
+  });
+
+  // ========== 兑换码管理 ==========
+
+  // 获取兑换码列表
+  socket.on('get_redeem_codes', () => {
+    adminManager.getRedeemCodes(socket);
+  });
+
+  // 新建 / 编辑兑换码
+  socket.on('save_redeem_code', (data) => {
+    adminManager.saveRedeemCode(socket, data || {});
+  });
+
+  // 删除兑换码
+  socket.on('delete_redeem_code', (code) => {
+    adminManager.deleteRedeemCode(socket, code);
   });
 
   // ========== 账号管理 ==========

@@ -1289,7 +1289,8 @@ class AdminManager {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const todayUsers = users.filter(u => {
-        const lastLogin = u.lastLogin || u.lastSeen;
+        const acc = u.account || u;
+        const lastLogin = acc.lastLogin || acc.lastSeen;
         return lastLogin && new Date(lastLogin) >= today;
       }).length;
 
@@ -3365,6 +3366,161 @@ class AdminManager {
         pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 }
       });
     }
+  }
+
+  // ==================== 兑换码管理 ====================
+
+  _redeemCodesPath() {
+    return path.join(__dirname, '..', 'config', 'redeemCodes.json');
+  }
+
+  _readRedeemCodes() {
+    try {
+      const data = JSON.parse(fs.readFileSync(this._redeemCodesPath(), 'utf8'));
+      if (data && typeof data === 'object' && data.codes) return data;
+      return { codes: {} };
+    } catch (err) {
+      logger.warn('读取兑换码配置失败', { error: err.message });
+      return { codes: {} };
+    }
+  }
+
+  _writeRedeemCodes(data) {
+    fs.writeFileSync(this._redeemCodesPath(), JSON.stringify(data, null, 2) + '\n', 'utf8');
+  }
+
+  // 获取兑换码列表
+  getRedeemCodes(socket) {
+    const adminInfo = this.adminSockets.get(socket.id);
+    if (!adminInfo) {
+      socket.emit('redeem_codes_list', { success: false, message: '未认证', codes: [] });
+      return;
+    }
+    const data = this._readRedeemCodes();
+    const codes = Object.entries(data.codes || {}).map(([code, item]) => ({
+      code,
+      name: item.name || code,
+      enabled: item.enabled !== false,
+      oncePerAccount: item.oncePerAccount !== false,
+      mailTitle: item.mailTitle || '',
+      mailContent: item.mailContent || '',
+      rewards: {
+        starCoins: Number(item.rewards?.starCoins) || 0,
+        exp: Number(item.rewards?.exp) || 0,
+        tickets: Number(item.rewards?.tickets) || 0,
+        items: item.rewards?.items || {},
+        cosmetics: Array.isArray(item.rewards?.cosmetics) ? item.rewards.cosmetics : [],
+      },
+    })).sort((a, b) => a.code.localeCompare(b.code));
+
+    socket.emit('redeem_codes_list', { success: true, codes });
+  }
+
+  // 新建 / 编辑兑换码
+  saveRedeemCode(socket, payload = {}) {
+    const adminInfo = this.adminSockets.get(socket.id);
+    if (!adminInfo) {
+      socket.emit('admin_action_result', { action: 'redeem_code', success: false, message: '未认证' });
+      return;
+    }
+
+    const code = String(payload.code || '').trim().toUpperCase();
+    if (!/^[A-Z0-9_-]{3,32}$/.test(code)) {
+      socket.emit('admin_action_result', {
+        action: 'redeem_code',
+        success: false,
+        message: '兑换码需为 3-32 位字母、数字、下划线或短横线',
+      });
+      return;
+    }
+
+    const rewardsIn = payload.rewards || {};
+    const rewards = {
+      starCoins: Math.max(0, parseInt(rewardsIn.starCoins, 10) || 0),
+      exp: Math.max(0, parseInt(rewardsIn.exp, 10) || 0),
+      tickets: Math.max(0, parseInt(rewardsIn.tickets, 10) || 0),
+      items: {},
+      cosmetics: [],
+    };
+    if (rewardsIn.items && typeof rewardsIn.items === 'object' && !Array.isArray(rewardsIn.items)) {
+      for (const [itemId, count] of Object.entries(rewardsIn.items)) {
+        const quantity = Math.max(0, parseInt(count, 10) || 0);
+        if (itemId && quantity > 0) rewards.items[String(itemId).trim()] = quantity;
+      }
+    }
+    if (Array.isArray(rewardsIn.cosmetics)) {
+      rewards.cosmetics = rewardsIn.cosmetics.map((id) => String(id).trim()).filter(Boolean);
+    }
+
+    try {
+      const data = this._readRedeemCodes();
+      if (!data.codes) data.codes = {};
+      const previous = data.codes[code] || {};
+      data.codes[code] = {
+        name: String(payload.name || previous.name || code).slice(0, 40),
+        enabled: payload.enabled !== false,
+        oncePerAccount: payload.oncePerAccount !== false,
+        mailTitle: String(payload.mailTitle || previous.mailTitle || '').slice(0, 60),
+        mailContent: String(payload.mailContent || previous.mailContent || '').slice(0, 500),
+        rewards,
+      };
+      this._writeRedeemCodes(data);
+    } catch (err) {
+      logger.error('保存兑换码失败', { code, error: err.message });
+      socket.emit('admin_action_result', { action: 'redeem_code', success: false, message: '保存失败: ' + err.message });
+      return;
+    }
+
+    if (this.operationLogger && adminInfo) {
+      this.operationLogger.getAdminAction(
+        adminInfo.accountId || '',
+        adminInfo.username || '管理员',
+        'redeem_code_save',
+        code,
+        code,
+        { rewards, enabled: payload.enabled !== false }
+      );
+    }
+
+    socket.emit('admin_action_result', { action: 'redeem_code', success: true, message: `兑换码 ${code} 已保存` });
+    this.getRedeemCodes(socket);
+  }
+
+  // 删除兑换码
+  deleteRedeemCode(socket, code) {
+    const adminInfo = this.adminSockets.get(socket.id);
+    if (!adminInfo) {
+      socket.emit('admin_action_result', { action: 'redeem_code', success: false, message: '未认证' });
+      return;
+    }
+    const normalized = String(code || '').trim().toUpperCase();
+    try {
+      const data = this._readRedeemCodes();
+      if (!data.codes?.[normalized]) {
+        socket.emit('admin_action_result', { action: 'redeem_code', success: false, message: '兑换码不存在' });
+        return;
+      }
+      delete data.codes[normalized];
+      this._writeRedeemCodes(data);
+    } catch (err) {
+      logger.error('删除兑换码失败', { code: normalized, error: err.message });
+      socket.emit('admin_action_result', { action: 'redeem_code', success: false, message: '删除失败: ' + err.message });
+      return;
+    }
+
+    if (this.operationLogger && adminInfo) {
+      this.operationLogger.getAdminAction(
+        adminInfo.accountId || '',
+        adminInfo.username || '管理员',
+        'redeem_code_delete',
+        normalized,
+        normalized,
+        {}
+      );
+    }
+
+    socket.emit('admin_action_result', { action: 'redeem_code', success: true, message: `兑换码 ${normalized} 已删除` });
+    this.getRedeemCodes(socket);
   }
 }
 

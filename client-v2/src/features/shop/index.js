@@ -17,6 +17,9 @@ import { el } from '../../utils/dom.js';
 import { toast } from '../../components/toast.js';
 import { modal } from '../../components/modal.js';
 import { store } from '../../core/store.js';
+import { avatarEl } from '../../utils/avatar.js';
+import { titleBadge, applyGlobalAppearance } from '../../utils/cosmetics.js';
+import { isTestMode } from '../../utils/features.js';
 
 /** 商城商品分类（对应 /api/shop/data 返回的键；delisted 为"下架"聚合分类） */
 const CATEGORIES = [
@@ -28,14 +31,29 @@ const CATEGORIES = [
   { key: 'titles', label: '🏷 称号', cosmetic: true, equipCat: 'title' },
   { key: 'packs', label: '🎁 礼包', cosmetic: false },
   { key: 'vip', label: '👑 VIP', cosmetic: false },
+  { key: 'vipshop', label: '👑 会员限定', vipShop: true },
   { key: 'delisted', label: '🚫 下架', delisted: true },
 ];
 
-/** 商城一级视图：购买 / 背包 */
+/** 商城一级视图：商店 / 抽奖 / 我的装扮 / 背包 */
 const SHOP_VIEWS = [
-  { key: 'shop', label: '🛒 商城' },
+  { key: 'shop', label: '🛍 商店' },
+  { key: 'lottery', label: '🎰 抽奖' },
+  { key: 'cosmetics', label: '🧩 我的装扮' },
   { key: 'inventory', label: '🎒 背包' },
 ];
+
+/** 装扮视图分组（config 键 → equipped 字段） */
+const COSMETIC_GROUPS = [
+  { bucket: 'avatars', equipCat: 'avatar', title: '😀 头像' },
+  { bucket: 'frames', equipCat: 'frame', title: '⭕ 头像框' },
+  { bucket: 'skins', equipCat: 'skin', title: '🎨 皮肤' },
+  { bucket: 'backgrounds', equipCat: 'background', title: '🖼 背景' },
+  { bucket: 'titles', equipCat: 'title', title: '🏷 称号' },
+];
+
+/** 稀有度顺序（抽奖概率公示用） */
+const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 
 /** 稀有度 → 颜色 */
 const RARITY_COLORS = {
@@ -45,6 +63,19 @@ const RARITY_COLORS = {
   epic: '#805ad5',
   legendary: '#d69e2e',
 };
+
+/** 稀有度 → 中文名称（界面展示统一用中文） */
+const RARITY_LABELS = {
+  common: '普通',
+  uncommon: '精良',
+  rare: '稀有',
+  epic: '史诗',
+  legendary: '传说',
+};
+
+function rarityLabel(rarity) {
+  return RARITY_LABELS[rarity] || rarity || '';
+}
 
 /** 当前用户 ID（与 v1 商城接口对齐：currentAccountId） */
 function currentUserId() {
@@ -167,7 +198,12 @@ function drawPriceChart(canvas, item, discount = 0) {
  * @returns {Function} cleanup 函数
  */
 export function renderShop(container) {
-  let activeView = 'shop';          // 'shop' | 'inventory'
+  // 支持从资料页等入口直接落到指定视图
+  const initView = store.get('shop.initView');
+  store.set('shop.initView', null);
+  let activeView = ['shop', 'lottery', 'cosmetics', 'inventory'].includes(initView) ? initView : 'shop';
+  // 抽奖暂未正式开放：仅「测试功能」开启时可见
+  if (activeView === 'lottery' && !isTestMode()) activeView = 'shop';
   let activeCat = CATEGORIES[0].key;
   let shopData = null;      // /api/shop/data 返回的 data
   let inventory = {};       // {itemId: count}
@@ -175,6 +211,9 @@ export function renderShop(container) {
   let vipInfo = null;       // {isActive, remainingDays, ...}
   let cosmetics = null;     // {owned, equipped}
   let cosmeticConfig = null; // cosmetics.json 配置
+  let cosmeticUnlocks = {};  // 条件解锁进度（称号）：{ id: {unlocked, progress, target, label} }
+  let lotteryInfo = null;    // 抽奖信息（费用 / 保底 / 碎片 / 奖池 / 记录）
+  let lotteryTab = 'draw';   // 抽奖页内部标签：draw / exchange / records
 
   const balanceEl = el('span', { class: 'shop-balance' }, '💎 --');
   const vipEl = el('span', { class: 'shop-vip-badge' }, '');
@@ -182,6 +221,8 @@ export function renderShop(container) {
   const gridEl = el('div', { class: 'shop-grid' });
   const vipCompareEl = el('div', { class: 'shop-vip-compare' });
   const inventoryEl = el('div', { class: 'shop-inventory' });
+  const cosmeticsEl = el('div', { class: 'shop-cosmetics' });
+  const lotteryEl = el('div', { class: 'shop-lottery' });
   const tabsEl = el('div', { class: 'shop-tabs' });
   const loadingEl = el('div', { class: 'text-muted', style: 'text-align:center;padding:40px;' }, '⏳ 加载中...');
 
@@ -226,6 +267,7 @@ export function renderShop(container) {
       balance = balRes.balance ?? 0;
       vipInfo = vipRes.vip || null;
       cosmetics = cosRes.cosmetics || null;
+      cosmeticUnlocks = cosRes.unlocks || {};
       cosmeticConfig = cfgRes.cosmetics || null;
     } catch (err) {
       toast.error(err.message || '加载商城失败');
@@ -235,14 +277,20 @@ export function renderShop(container) {
     renderViewTabs();
     renderTabs();
     renderGrid();
+    renderCosmetics();
     renderInventory();
     syncViewVisibility();
+    // 全站皮肤 / 背景与主题同级，进入商城时同步一次
+    applyGlobalAppearance(cosmetics, cosmeticConfig);
+    // 抽奖数据独立加载，失败不影响商店主体；未开启测试功能时不请求
+    if (isTestMode()) loadLottery();
   }
 
   // ---- 一级视图（商城 / 背包） ----
   function renderViewTabs() {
     viewTabsEl.innerHTML = '';
-    SHOP_VIEWS.forEach((v) => {
+    // 抽奖入口受「测试功能」开关控制
+    SHOP_VIEWS.filter((v) => v.key !== 'lottery' || isTestMode()).forEach((v) => {
       const btn = el('button', {
         class: 'shop-view-tab' + (v.key === activeView ? ' active' : ''),
         onClick: () => {
@@ -256,11 +304,17 @@ export function renderShop(container) {
   }
 
   function syncViewVisibility() {
+    if (activeView === 'lottery' && !isTestMode()) activeView = 'shop';
     const isShop = activeView === 'shop';
+    const isCosmetics = activeView === 'cosmetics';
+    const isInventory = activeView === 'inventory';
+    const isLottery = activeView === 'lottery';
     tabsEl.style.display = isShop ? '' : 'none';
     gridEl.style.display = isShop ? '' : 'none';
     vipCompareEl.style.display = isShop ? '' : 'none';
-    inventoryEl.style.display = isShop ? 'none' : '';
+    cosmeticsEl.style.display = isCosmetics ? '' : 'none';
+    inventoryEl.style.display = isInventory ? '' : 'none';
+    lotteryEl.style.display = isLottery ? '' : 'none';
   }
 
   // ---- 头部：余额 + VIP ----
@@ -295,6 +349,10 @@ export function renderShop(container) {
   function renderGrid() {
     gridEl.innerHTML = '';
     vipCompareEl.innerHTML = '';
+    if (activeCat === 'vipshop') {
+      renderVipShopGrid();
+      return;
+    }
     if (activeCat === 'delisted') {
       renderDelistedGrid();
       return;
@@ -314,6 +372,15 @@ export function renderShop(container) {
   /** 当前分类定义 */
   function currentCat() {
     return CATEGORIES.find((c) => c.key === activeCat);
+  }
+
+  /** 当前会员是否可使用某件 VIP 限定商品（含档位限制） */
+  function vipCanUse(item) {
+    if (!item?.vipOnly) return true;
+    if (!vipInfo?.isActive) return false;
+    if (item.vipTier === 'vip_year') return vipInfo.type === 'vip_year';
+    if (item.vipTier === 'vip_season') return ['vip_season', 'vip_year'].includes(vipInfo.type);
+    return true;
   }
 
   /** 下架分类：展示玩家已拥有的下架商品（道具/礼包/外观），供使用与装备 */
@@ -345,6 +412,36 @@ export function renderShop(container) {
     return (inventory[item.id] || 0) > 0;
   }
 
+  /** 会员限定商店：聚合所有 vipOnly 商品 */
+  function renderVipShopGrid() {
+    const entries = [];
+    CATEGORIES.forEach((cat) => {
+      if (cat.delisted || cat.vipShop || cat.key === 'vip') return;
+      Object.values((shopData && shopData[cat.key]) || {}).forEach((item) => {
+        if (item.vipOnly === true && item.enabled !== false) entries.push({ cat, item });
+      });
+    });
+
+    if (!vipInfo?.isActive) {
+      gridEl.append(el('div', { class: 'shop-vipshop-banner' }, [
+        el('div', { class: 'shop-vipshop-banner-text' }, [
+          el('strong', {}, '👑 会员限定商店'),
+          el('span', {}, '开通 VIP 后解锁专属头像框、称号、限定皮肤、背景与会员礼包。'),
+        ]),
+        el('button', {
+          class: 'btn shop-buy-btn',
+          onClick: () => openCategory('vip'),
+        }, '开通 VIP'),
+      ]));
+    }
+
+    if (entries.length === 0) {
+      gridEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:40px;' }, '暂无会员限定商品'));
+      return;
+    }
+    entries.forEach(({ cat, item }) => gridEl.append(itemCard(item, cat)));
+  }
+
   // ---- 单个商品卡片（cat 可指定所属分类，下架分类中传入原分类） ----
   function itemCard(item, cat = currentCat(), detailOpts = {}) {
     const isItem = !cat.cosmetic && item.category !== 'pack' && item.category !== 'vip';
@@ -353,23 +450,49 @@ export function renderShop(container) {
     const rarity = item.rarity || 'common';
 
     const isDisabled = item.enabled === false;
+    const vipLocked = item.vipOnly === true && !vipCanUse(item);
+
+    // 条件解锁（称号）：达成条件后自动免费获得，未达成不可购买
+    const unlock = cat.key === 'titles' ? cosmeticUnlocks?.[item.id] : null;
+    const unlockLocked = Boolean(unlock && !unlock.unlocked);
+    // 条件称号直接用「解锁条件」做描述，避免与底部进度重复
+    const descText = unlock ? (item.unlock?.label || item.description || '') : (item.description || '');
+    const isFree = Number(item.price) === 0;
 
     // VIP 折扣价：下架商品只做展示，不标折扣
-    const showDiscount = !isDisabled && hasVipDiscount(item, cat);
-    const priceEl = showDiscount
-      ? el('span', { class: 'shop-price' }, [
-        el('span', { class: 'shop-price-original' }, `💎 ${item.price}`),
-        el('span', { class: 'shop-price-final' }, `💎 ${effectivePrice(item, cat)}`),
-      ])
-      : el('span', { class: 'shop-price' }, `💎 ${item.price ?? 0}`);
+    const showDiscount = !isDisabled && !vipLocked && hasVipDiscount(item, cat);
+    const priceEl = unlock
+      ? el('span', { class: 'shop-price' + (unlockLocked ? ' shop-price-locked' : '') },
+        unlockLocked
+          ? `🔒 进度 ${Math.min(unlock.progress || 0, unlock.target || 0)}/${unlock.target || 0}`
+          : '🎁 免费获取')
+      : item.vipOnly && isFree
+        ? el('span', { class: 'shop-price' }, '👑 VIP 专享')
+        : showDiscount
+          ? el('span', { class: 'shop-price' }, [
+            el('span', { class: 'shop-price-original' }, `💎 ${item.price}`),
+            el('span', { class: 'shop-price-final' }, `💎 ${effectivePrice(item, cat)}`),
+          ])
+          : el('span', { class: 'shop-price' }, `💎 ${item.price ?? 0}`);
 
-    // 购买按钮（已下架商品禁用）
+    // 购买按钮（已下架商品禁用；VIP 限定未开通时引导开通；免费/条件称号不可购买）
     const buyBtn = isDisabled
       ? el('button', { class: 'btn shop-buy-btn', disabled: true }, '🚫 已下架')
-      : el('button', {
-        class: 'btn shop-buy-btn',
-        onClick: (e) => { e.stopPropagation(); buyItem(item); },
-      }, '购买');
+      : vipLocked
+        ? el('button', {
+          class: 'btn shop-buy-btn',
+          onClick: (e) => { e.stopPropagation(); openCategory('vip'); },
+        }, '👑 开通 VIP')
+        : unlock
+          ? (unlockLocked
+            ? el('button', { class: 'btn shop-buy-btn', disabled: true }, '🔒 未解锁')
+            : null)
+          : isFree
+            ? null
+            : el('button', {
+              class: 'btn shop-buy-btn',
+              onClick: (e) => { e.stopPropagation(); buyItem(item); },
+            }, '购买');
 
     // 外观卡片：已拥有/已装备状态 + 装备按钮
     let statusEl = null;
@@ -378,10 +501,15 @@ export function renderShop(container) {
       const ownedList = cosmetics?.owned?.[cat.key] || [];
       const isOwned = ownedList.includes(item.id);
       const isEquipped = cosmetics?.equipped?.[cat.equipCat] === item.id;
-      statusEl = el('span', {
-        class: 'shop-owned' + (isOwned ? ' owned' : ''),
-      }, isOwned ? '✅ 已拥有' : '未拥有');
-      if (isOwned) {
+      // 条件称号的进度已在上方价格行展示，这里不再重复
+      statusEl = unlock
+        ? null
+        : el('span', {
+          class: 'shop-owned' + (isOwned ? ' owned' : ''),
+        }, item.vipOnly && vipLocked
+          ? '🔒 VIP专享'
+          : (isOwned ? '✅ 已拥有' : '未拥有'));
+      if (isOwned && !vipLocked) {
         equipBtn = el('button', {
           class: 'btn shop-equip-btn' + (isEquipped ? ' equipped' : ''),
           onClick: (e) => { e.stopPropagation(); equipItem(cat.equipCat, item.id); },
@@ -403,7 +531,7 @@ export function renderShop(container) {
     }
 
     return el('div', {
-      class: 'shop-card shop-card--clickable',
+      class: 'shop-card shop-card--clickable' + (vipLocked ? ' shop-card--vip-locked' : ''),
       style: `border-top:3px solid ${RARITY_COLORS[rarity] || '#718096'};`,
       onClick: () => showItemDetail(item, cat, detailOpts),
     }, [
@@ -419,11 +547,11 @@ export function renderShop(container) {
           el('span', { class: 'shop-card-name-tags' }, [
             // VIP 折扣标记，与服务端实收价对应
             showDiscount ? el('span', { class: 'shop-discount-tag' }, `-${vipDiscountPercent()}%`) : null,
-            el('span', { class: 'shop-rarity', style: `color:${RARITY_COLORS[rarity] || '#718096'};` }, rarity),
+            el('span', { class: 'shop-rarity', style: `color:${RARITY_COLORS[rarity] || '#718096'};` }, rarityLabel(rarity)),
           ]),
         ]),
         // 描述限高三行，超出部分用 title 兜底查看
-        el('div', { class: 'shop-card-desc', title: item.description || '' }, item.description || ''),
+        el('div', { class: 'shop-card-desc', title: descText }, descText),
         el('div', { class: 'shop-card-foot' }, [
           priceEl,
           statusEl || countEl,
@@ -468,7 +596,7 @@ export function renderShop(container) {
         el('div', { class: 'shop-card-body' }, [
           el('div', { class: 'shop-card-name' }, [
             it.name,
-            el('span', { class: 'shop-rarity', style: `color:${RARITY_COLORS[rarity] || '#718096'};` }, rarity),
+            el('span', { class: 'shop-rarity', style: `color:${RARITY_COLORS[rarity] || '#718096'};` }, rarityLabel(rarity)),
           ]),
           el('div', { class: 'shop-card-desc' }, it.description || ''),
           el('div', { class: 'shop-card-foot' }, [
@@ -503,7 +631,7 @@ export function renderShop(container) {
         el('div', { class: 'shop-card-body' }, [
           el('div', { class: 'shop-card-name' }, [
             it.name,
-            el('span', { class: 'shop-rarity', style: `color:${RARITY_COLORS[rarity] || '#718096'};` }, rarity),
+            el('span', { class: 'shop-rarity', style: `color:${RARITY_COLORS[rarity] || '#718096'};` }, rarityLabel(rarity)),
           ]),
           el('div', { class: 'shop-card-desc' }, it.description || ''),
           el('div', { class: 'shop-card-foot' }, [
@@ -550,6 +678,290 @@ export function renderShop(container) {
     });
   }
 
+  // ---- 我的装扮视图（头像 / 头像框 / 皮肤 / 背景 / 称号） ----
+  function renderCosmetics() {
+    cosmeticsEl.innerHTML = '';
+    const owned = cosmetics?.owned || {};
+    const equipped = cosmetics?.equipped || {};
+
+    const skinCfg = cosmeticConfig?.skins?.[equipped.skin];
+    const bgCfg = cosmeticConfig?.backgrounds?.[equipped.background];
+    const preview = el('div', { class: 'panel shop-cosmetic-preview' }, [
+      avatarEl(cosmetics, cosmeticConfig, 88),
+      el('div', { class: 'shop-cosmetic-preview-info' }, [
+        el('div', { class: 'shop-cosmetic-preview-title' }, [
+          '当前形象',
+          titleBadge(cosmetics, cosmeticConfig),
+        ]),
+        el('div', { class: 'shop-cosmetic-preview-meta' },
+          `皮肤：${skinCfg?.name || '默认'} · 背景：${bgCfg?.name || '默认'}`),
+      ]),
+    ]);
+    cosmeticsEl.append(preview);
+
+    COSMETIC_GROUPS.forEach((group) => {
+      const cfg = cosmeticConfig?.[group.bucket] || {};
+      const ownedIds = owned[group.bucket] || [];
+      const cards = [];
+
+      // 皮肤 / 背景 / 称号支持「不装备」
+      if (['skin', 'background', 'title'].includes(group.equipCat)) {
+        cards.push(el('div', {
+          class: 'profile-cosmetic-card' + (!equipped[group.equipCat] ? ' equipped' : ''),
+        }, [
+          el('div', { class: 'profile-cosmetic-icon' }, '🚫'),
+          el('div', { class: 'profile-cosmetic-name' }, '不使用'),
+          el('button', {
+            class: 'btn profile-cosmetic-btn' + (!equipped[group.equipCat] ? ' active' : ''),
+            onClick: () => equipItem(group.equipCat, null),
+          }, !equipped[group.equipCat] ? '✔ 使用中' : '使用'),
+        ]));
+      }
+
+      Object.values(cfg)
+        .filter((it) => it.enabled !== false)
+        .forEach((it) => cards.push(cosmeticCard(it, group, ownedIds, equipped)));
+
+      const section = el('div', { class: 'panel shop-cosmetic-section' }, [
+        el('div', { class: 'profile-section-title' }, group.title),
+        el('div', { class: 'profile-cosmetic-grid' }, [
+          ...cards,
+          ...(group.bucket === 'avatars' ? customAvatarCards(equipped) : []),
+        ]),
+      ]);
+      cosmeticsEl.append(section);
+    });
+  }
+
+  /** 单个外观卡片 */
+  function cosmeticCard(item, group, ownedIds, equipped) {
+    const isOwned = ownedIds.includes(item.id)
+      || (group.bucket === 'avatars' && item.id === 'avatar_default')
+      || (group.bucket === 'frames' && item.id === 'frame_default');
+    const isEquipped = equipped[group.equipCat] === item.id;
+    const vipLocked = item.vipOnly === true && !vipCanUse(item);
+    const unlock = group.bucket === 'titles' ? cosmeticUnlocks?.[item.id] : null;
+    const unlockLocked = Boolean(unlock && !unlock.unlocked);
+
+    let previewEl;
+    if (group.bucket === 'backgrounds' && item.background) {
+      previewEl = el('div', { class: 'profile-cosmetic-icon shop-cosmetic-swatch', style: `background:${item.background};` });
+    } else if (group.bucket === 'skins' && item.skin?.['--theme-primary']) {
+      previewEl = el('div', {
+        class: 'profile-cosmetic-icon shop-cosmetic-swatch',
+        style: `background:${item.skin['--theme-primary']};`,
+      }, item.icon || '🎨');
+    } else {
+      previewEl = el('div', {
+        class: 'profile-cosmetic-icon',
+        style: item.titleColor ? `color:${item.titleColor};` : (item.color ? `color:${item.color};` : ''),
+      }, item.icon || (group.bucket === 'titles' ? '🏷' : '🎨'));
+    }
+
+    const effectText = group.bucket === 'titles'
+      ? (unlock
+        ? (unlockLocked
+          ? `🔒 ${unlock.label || '未达成条件'}（${Math.min(unlock.progress || 0, unlock.target || 0)}/${unlock.target || 0}）`
+          : `✅ ${unlock.label || '条件已达成'}`)
+        : (item.titleText || item.name))
+      : (item.description || '');
+
+    return el('div', { class: 'profile-cosmetic-card' + (isEquipped ? ' equipped' : '') + (vipLocked ? ' vip-locked' : '') }, [
+      previewEl,
+      el('div', { class: 'profile-cosmetic-name' }, item.name),
+      el('div', { class: 'shop-cosmetic-effect' + (unlockLocked ? ' shop-cosmetic-effect--locked' : '') }, effectText),
+      unlockLocked
+        ? el('button', { class: 'btn profile-cosmetic-btn', disabled: true }, '🔒 未达成')
+        : vipLocked
+        ? el('button', {
+          class: 'btn profile-cosmetic-btn',
+          onClick: () => openCategory('vip'),
+        }, '👑 VIP专享')
+        : isOwned
+          ? el('button', {
+            class: 'btn profile-cosmetic-btn' + (isEquipped ? ' active' : ''),
+            disabled: isEquipped,
+            onClick: () => equipItem(group.equipCat, item.id),
+          }, isEquipped ? '✔ 使用中' : '使用')
+          : el('button', {
+            class: 'btn profile-cosmetic-btn',
+            onClick: () => openCategory(group.bucket),
+          }, '去购买'),
+    ]);
+  }
+
+  /** 自定义头像卡片（上传 / 替换 / 改名 / 删除） */
+  function customAvatarCards(equipped) {
+    const customAvatars = cosmetics?.owned?.customAvatars || [];
+    const uploadCard = el('div', { class: 'profile-cosmetic-card upload', onClick: () => pickUpload(-1) }, [
+      el('div', { class: 'profile-cosmetic-icon' }, '➕'),
+      el('div', { class: 'profile-cosmetic-name' }, '上传新头像'),
+    ]);
+    const items = customAvatars.map((c, idx) => {
+      const isEquipped = equipped.avatarCustom === `${currentUserId()}/${c.file}`;
+      return el('div', { class: 'profile-cosmetic-card custom' + (isEquipped ? ' equipped' : '') }, [
+        el('div', { class: 'profile-cosmetic-icon' },
+          el('img', {
+            class: 'profile-custom-avatar',
+            src: `/data/cosmetics/avatars/${currentUserId()}/${c.file}`,
+            alt: c.name,
+          })),
+        el('div', { class: 'profile-cosmetic-name' }, c.name || c.file),
+        el('div', { class: 'profile-custom-actions' }, [
+          el('button', {
+            class: 'btn profile-cosmetic-btn' + (isEquipped ? ' active' : ''),
+            onClick: () => equipCustom(c.file),
+          }, isEquipped ? '✔ 使用中' : '使用'),
+          el('button', { class: 'btn profile-mini-btn', title: '替换', onClick: () => pickUpload(idx) }, '📷'),
+          el('button', { class: 'btn profile-mini-btn', title: '改名', onClick: () => renameAvatar(c) }, '✏️'),
+          el('button', { class: 'btn profile-mini-btn danger', title: '删除', onClick: () => removeAvatar(c) }, '🗑️'),
+        ]),
+      ]);
+    });
+    return [uploadCard, ...items];
+  }
+
+  /** 切到商店的指定分类 */
+  function openCategory(bucket) {
+    activeView = 'shop';
+    activeCat = CATEGORIES.some((c) => c.key === bucket) ? bucket : 'items';
+    renderViewTabs();
+    renderTabs();
+    renderGrid();
+    syncViewVisibility();
+  }
+
+  async function refreshCosmetics() {
+    const cosRes = await api.shop.getCosmetics(currentUserId());
+    cosmetics = cosRes.cosmetics || cosmetics;
+    cosmeticUnlocks = cosRes.unlocks || cosmeticUnlocks;
+    applyGlobalAppearance(cosmetics, cosmeticConfig);
+    renderGrid();
+    renderCosmetics();
+    renderInventory();
+  }
+
+  async function equipCustom(file) {
+    try {
+      const res = await api.shop.equipCosmetic(currentUserId(), 'avatarCustom', file);
+      if (!res.success) { toast.error(res.message || '装备失败'); return; }
+      toast.success(res.message || '装备成功！');
+      await refreshCosmetics();
+    } catch (err) {
+      toast.error(err.message || '装备失败');
+    }
+  }
+
+  // 触发文件选择（-1 新增，>=0 替换指定槽位）
+  function pickUpload(replaceIndex) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (file) handleUpload(file, replaceIndex);
+    };
+    input.click();
+  }
+
+  /** 上传前处理：GIF 直传；非 GIF 超过 2MB 压缩；总大小上限 10MB */
+  async function handleUpload(file, replaceIndex) {
+    const MAX_RAW = 10 * 1024 * 1024;
+    if (file.size > MAX_RAW) { toast.error('图片过大（>10MB）'); return; }
+    try {
+      let dataUrl;
+      if (file.type === 'image/gif' || file.size <= 2 * 1024 * 1024) {
+        dataUrl = await readAsDataURL(file);
+      } else {
+        dataUrl = await compressImage(file, 2000);
+      }
+      const res = await api.avatar.upload(currentUserId(), dataUrl, replaceIndex >= 0 ? replaceIndex : undefined);
+      if (!res.success) { toast.error(res.message || '上传失败'); return; }
+      toast.success(res.message || '上传成功！');
+      await refreshCosmetics();
+    } catch (err) {
+      toast.error(err.message || '上传失败');
+    }
+  }
+
+  function renameAvatar(item) {
+    const nameInput = el('input', {
+      type: 'text',
+      class: 'profile-rename-input',
+      value: item.name || item.file,
+      maxlength: 30,
+    });
+    modal.show({
+      title: '重命名头像',
+      content: el('div', { class: 'shop-buy-modal' }, [
+        el('div', {}, `为「${item.name || item.file}」输入新名称`),
+        nameInput,
+      ]),
+      confirmText: '保存',
+      showCancel: true,
+      onConfirm: async () => {
+        const name = nameInput.value.trim();
+        if (!name) { toast.warn('名称不能为空'); return; }
+        try {
+          const res = await api.avatar.rename(currentUserId(), item.file, name);
+          if (!res.success) { toast.error(res.message || '改名失败'); return; }
+          toast.success('改名成功');
+          await refreshCosmetics();
+        } catch (err) {
+          toast.error(err.message || '改名失败');
+        }
+      },
+    });
+  }
+
+  function removeAvatar(item) {
+    modal.show({
+      title: '删除头像',
+      content: `确定删除自定义头像「${item.name || item.file}」吗？`,
+      confirmText: '删除',
+      showCancel: true,
+      onConfirm: async () => {
+        try {
+          const res = await api.avatar.remove(currentUserId(), item.file);
+          if (!res.success) { toast.error(res.message || '删除失败'); return; }
+          toast.success('删除成功');
+          await refreshCosmetics();
+        } catch (err) {
+          toast.error(err.message || '删除失败');
+        }
+      },
+    });
+  }
+
+  function readAsDataURL(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /** canvas 压缩图片到指定最大边长，输出 JPEG dataURL */
+  function compressImage(file, maxSide) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        const scale = Math.min(1, maxSide / Math.max(width, height));
+        width = Math.max(1, Math.round(width * scale));
+        height = Math.max(1, Math.round(height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = () => reject(new Error('图片解析失败'));
+      img.src = URL.createObjectURL(file);
+    });
+  }
+
   // ---- 会员特权横向对比表（对齐 v1 商城） ----
   function renderVipCompare() {
     const vips = shopData?.vip || {};
@@ -591,10 +1003,10 @@ export function renderShop(container) {
           }).join(' ');
         }),
       },
-      { label: '🎨 专属头像框', values: tiers.map((t) => (t.vip?.id === 'vip_year' ? '🏆 传说' : t.vip ? '🔒 敬请期待' : '❌')) },
-      { label: '👑 专属称号', values: tiers.map((t) => (t.id === 'vip_season' || t.id === 'vip_year' ? '🔒 敬请期待' : '❌')) },
-      { label: '🛍️ 限定商店', values: tiers.map((t) => (t.id === 'vip_year' ? '✅ 解锁' : t.id === 'vip_season' ? '🔒 敬请期待' : '❌')) },
-      { label: '🏅 排行榜高亮', values: tiers.map((t) => (t.id === 'vip_year' ? '🏆 金色' : '❌')) },
+      { label: '🎨 专属头像框', values: tiers.map((t) => (t.vip ? '✅ 已解锁' : '❌')) },
+      { label: '👑 专属称号', values: tiers.map((t) => (t.vip ? (t.id === 'vip_year' ? '✅ 年度尊享' : '✅ 尊贵会员') : '❌')) },
+      { label: '🛍️ 限定商店', values: tiers.map((t) => (t.vip ? '✅ 解锁' : '❌')) },
+      { label: '🏅 排行榜高亮', values: tiers.map((t) => (t.vip ? '🌟 金色' : '❌')) },
     ];
 
     const rows = rowDefs.map((rd) => el('div', { class: 'vip-compare-row' }, [
@@ -617,8 +1029,9 @@ export function renderShop(container) {
     const ownedCount = inventory[item.id] || 0;
     const ownedCosmetic = cat.cosmetic && (cosmetics?.owned?.[cat.key] || []).includes(item.id);
     const isDisabled = item.enabled === false;
+    const vipLocked = item.vipOnly === true && !vipCanUse(item);
     // 与卡片一致：下架商品不展示折扣
-    const discount = !isDisabled && hasVipDiscount(item, cat) ? vipDiscountPercent() : 0;
+    const discount = !isDisabled && !vipLocked && hasVipDiscount(item, cat) ? vipDiscountPercent() : 0;
 
     const section = (title, ...nodes) => el('div', { class: 'shop-detail-section' }, [
       el('h4', {}, title),
@@ -637,7 +1050,7 @@ export function renderShop(container) {
       el('div', {}, [
         el('div', { class: 'shop-detail-name', style: `color:${rarityColor};` }, item.name),
         el('div', { class: 'shop-detail-badges' }, [
-          el('span', { class: 'shop-detail-rarity', style: `color:${rarityColor};` }, rarity.toUpperCase()),
+          el('span', { class: 'shop-detail-rarity', style: `color:${rarityColor};` }, rarityLabel(rarity)),
           ownedCount > 0 ? el('span', { class: 'shop-detail-badge' }, `持有 ×${ownedCount}`) : null,
           ownedCosmetic ? el('span', { class: 'shop-detail-badge' }, '✅ 已拥有') : null,
           isDisabled ? el('span', { class: 'shop-detail-badge' }, '🚫 已下架') : null,
@@ -657,6 +1070,18 @@ export function renderShop(container) {
       ]));
     }
     body.append(descSection);
+
+    // 条件称号：展示解锁条件与当前进度
+    if (item.unlock) {
+      const u = cosmeticUnlocks?.[item.id];
+      body.append(section('🔓 解锁条件',
+        el('div', { class: 'shop-detail-note' }, [
+          el('div', { class: 'shop-detail-note-title' },
+            u?.unlocked ? '✅ 条件已达成，已免费获得' : `进度 ${Math.min(u?.progress || 0, u?.target || 0)} / ${u?.target || 0}`),
+          el('div', {}, `· ${item.unlock.label || ''}`),
+          el('div', {}, '· 达成条件后自动发放，无需购买'),
+        ])));
+    }
 
     // 价格曲线 + 完整价格表（动态定价道具）
     let chartCanvas = null;
@@ -726,8 +1151,10 @@ export function renderShop(container) {
     // 信息
     const periodMap = { monthly: '每月', weekly: '每周', daily: '每日', total: '累计' };
     const infoItems = [
-      ['价格', discount > 0
-        ? el('span', {}, [
+      ['价格', item.unlock
+        ? '🎁 免费（达成条件）'
+        : discount > 0
+          ? el('span', {}, [
           el('span', { class: 'shop-detail-price-original' }, `💎 ${item.price}`),
           el('span', { class: 'shop-detail-price-final' }, `💎 ${effectivePrice(item, cat)}`),
           el('span', { class: 'shop-detail-discount' }, `-${discount}%`),
@@ -749,7 +1176,15 @@ export function renderShop(container) {
 
     // 底部操作：背包里以使用/装备为主，商城里以购买为主
     let primary = null;
-    if (fromInventory && cat.cosmetic) {
+    const unlockState = item.unlock ? cosmeticUnlocks?.[item.id] : null;
+    if (vipLocked) {
+      primary = { text: '👑 开通 VIP', run: () => { modal.close(); openCategory('vip'); } };
+    } else if (item.unlock) {
+      // 条件称号：未达成为只读展示，达成后可直接装备
+      if (unlockState?.unlocked && cosmetics?.equipped?.[cat.equipCat] !== item.id) {
+        primary = { text: '✨ 装备', run: () => equipItem(cat.equipCat, item.id) };
+      }
+    } else if (fromInventory && cat.cosmetic) {
       const equipped = cosmetics?.equipped?.[cat.equipCat] === item.id;
       if (!equipped) primary = { text: '✨ 装备', run: () => equipItem(cat.equipCat, item.id) };
     } else if (fromInventory && (item.usable || isPack)) {
@@ -776,6 +1211,11 @@ export function renderShop(container) {
     const userId = currentUserId();
     if (!userId) { toast.warn('请先登录'); return; }
     if (!store.get('socketConnected')) { toast.error('未连接服务器'); return; }
+    if (item.vipOnly && !vipCanUse(item)) {
+      toast.warn('该商品为 VIP 专享，请先开通对应会员');
+      openCategory('vip');
+      return;
+    }
 
     // 外观/礼包/会员只买 1 个；道具可多买
     const cat = CATEGORIES.find((c) => c.key === activeCat);
@@ -832,6 +1272,12 @@ export function renderShop(container) {
       ]);
       balance = balRes.balance ?? balance;
       inventory = invRes.inventory?.items || inventory;
+      // 外观类商品购买后刷新拥有列表
+      if (['frame', 'avatar', 'skin', 'background', 'title'].includes(item.category)) {
+        const cosRes = await api.shop.getCosmetics(userId);
+        cosmetics = cosRes.cosmetics || cosmetics;
+        renderCosmetics();
+      }
       renderHeader();
       renderGrid();
       renderInventory();
@@ -868,11 +1314,378 @@ export function renderShop(container) {
       // 刷新用户外观
       const cosRes = await api.shop.getCosmetics(userId);
       cosmetics = cosRes.cosmetics || cosmetics;
+      cosmeticUnlocks = cosRes.unlocks || cosmeticUnlocks;
+      applyGlobalAppearance(cosmetics, cosmeticConfig);
       renderGrid();
+      renderCosmetics();
       renderInventory();
     } catch (err) {
       toast.error(err.message || '装备失败');
     }
+  }
+
+  // ---- 抽奖视图 ----
+  async function loadLottery() {
+    const userId = currentUserId();
+    if (!userId) { renderLottery(); return; }
+    try {
+      lotteryInfo = await api.shop.getLotteryInfo(userId);
+      if (lotteryInfo?.success && typeof lotteryInfo.balance === 'number') {
+        balance = lotteryInfo.balance;
+        renderHeader();
+      }
+    } catch (err) {
+      lotteryInfo = null;
+    }
+    renderLottery();
+  }
+
+  function renderLottery() {
+    lotteryEl.innerHTML = '';
+    if (!lotteryInfo || lotteryInfo.success === false) {
+      lotteryEl.append(el('div', { class: 'panel shop-lottery-panel' },
+        el('div', { class: 'text-muted', style: 'text-align:center;padding:40px;' }, '抽奖暂不可用，请稍后再试')));
+      return;
+    }
+
+    const info = lotteryInfo;
+    const pityTarget = Number(info.pity?.epic) || 80;
+    const pityCurrent = Math.min(Number(info.pity?.current) || 0, pityTarget);
+    const categoryWeights = info.categoryWeights || {};
+    const shardAmounts = info.shardAmounts || [];
+    const duplicateShards = info.duplicateShards || {};
+    const exchangeCost = info.exchangeCost || {};
+    const cost = info.cost || { single: 1, ten: 10 };      // 抽奖消耗的票券数
+    const ticketPrice = info.ticketPrice || { single: 60, ten: 540 }; // 星钻兑换价
+    const tickets = Number(info.tickets) || 0;
+    const starCoins = typeof info.balance === 'number' ? info.balance : balance;
+
+    const stat = (label, value, hint) => el('div', { class: 'shop-lottery-stat' }, [
+      el('div', { class: 'shop-lottery-stat-label' }, label),
+      el('div', { class: 'shop-lottery-stat-value' }, value),
+      hint ? el('div', { class: 'shop-lottery-stat-hint' }, hint) : null,
+    ]);
+
+    const hero = el('div', { class: 'shop-lottery-hero' }, [
+      el('div', { class: 'shop-lottery-hero-icon' }, '🎰'),
+      el('div', { class: 'shop-lottery-hero-body' }, [
+        el('div', { class: 'shop-lottery-hero-title' }, '星钻抽奖'),
+        el('div', { class: 'shop-lottery-hero-desc' }, '用星钻兑换抽奖券后抽取：外观碎片、消耗道具、限定称号与外观，重复自动转为碎片'),
+      ]),
+    ]);
+
+    const stats = el('div', { class: 'shop-lottery-stats' }, [
+      stat('🎫 抽奖券', String(tickets), '抽奖只消耗票券'),
+      stat('🧩 外观碎片', String(info.shards ?? 0), '重复外观自动转化'),
+      stat('🎯 史诗保底', `${pityCurrent}/${pityTarget}`, `每 ${pityTarget} 抽必出史诗+`),
+    ]);
+
+    const pityBar = el('div', { class: 'shop-lottery-pity' }, [
+      el('div', { class: 'shop-lottery-pity-text' }, `距离史诗保底还需 ${Math.max(0, pityTarget - pityCurrent)} 抽`),
+      el('div', { class: 'shop-lottery-pity-track' },
+        el('div', { class: 'shop-lottery-pity-fill', style: `width:${Math.min(100, (pityCurrent / pityTarget) * 100)}%;` })),
+    ]);
+
+    const actions = el('div', { class: 'shop-lottery-actions' }, [
+      el('button', {
+        class: 'btn shop-lottery-draw-btn',
+        disabled: tickets < cost.single,
+        onClick: () => drawLottery(1),
+      }, [
+        el('span', { class: 'shop-lottery-draw-title' }, '🎲 单抽'),
+        el('span', { class: 'shop-lottery-draw-cost' }, `🎫 ${cost.single} 张`),
+      ]),
+      el('button', {
+        class: 'btn shop-lottery-draw-btn ten',
+        disabled: tickets < cost.ten,
+        onClick: () => drawLottery(10),
+      }, [
+        el('span', { class: 'shop-lottery-draw-title' }, '🎁 十连抽'),
+        el('span', { class: 'shop-lottery-draw-cost' }, `🎫 ${cost.ten} 张 · 必出非碎片`),
+      ]),
+    ]);
+
+    // 星钻 → 抽奖券兑换
+    const ticketBar = el('div', { class: 'shop-lottery-ticket-bar' }, [
+      el('div', { class: 'shop-lottery-ticket-info' }, [
+        el('div', { class: 'shop-lottery-ticket-title' }, '🎫 兑换抽奖券'),
+        el('div', { class: 'text-muted shop-lottery-ticket-hint' }, `当前 ${tickets} 张 · 抽奖只消耗票券`),
+      ]),
+      el('div', { class: 'shop-lottery-ticket-actions' }, [
+        el('button', {
+          class: 'btn shop-lottery-ticket-btn',
+          disabled: starCoins < ticketPrice.single,
+          onClick: () => buyLotteryTickets(1),
+        }, `💎 ${ticketPrice.single} → 1 张`),
+        el('button', {
+          class: 'btn shop-lottery-ticket-btn hot',
+          disabled: starCoins < ticketPrice.ten,
+          onClick: () => buyLotteryTickets(10),
+        }, `💎 ${ticketPrice.ten} → 10 张`),
+      ]),
+    ]);
+
+    const categoryRows = [
+      ['🧩 外观碎片', categoryWeights.shards, '重复外观/称号自动转碎片'],
+      ['🎁 消耗道具', categoryWeights.item, '直接进入背包'],
+      ['🏷 限定称号', categoryWeights.title, '抽奖限定，不可购买'],
+      ['✨ 外观', categoryWeights.cosmetic, '头像 / 头像框 / 皮肤 / 背景'],
+    ].map(([label, weight, hint]) => el('div', { class: 'shop-lottery-prob-row' }, [
+      el('span', {}, label),
+      el('span', { class: 'shop-lottery-prob-rate' }, `${weight || 0}%`),
+      el('span', { class: 'text-muted' }, hint),
+    ]));
+
+    const shardTiers = el('div', { class: 'shop-lottery-shard-tiers' }, [
+      el('span', { class: 'text-muted' }, '碎片档位'),
+      ...shardAmounts.map((a) => el('span', { class: 'shop-lottery-shard-tier' }, `🧩 ${a.amount} · ${a.weight}%`)),
+    ]);
+
+    const probability = el('div', { class: 'panel shop-lottery-panel' }, [
+      el('div', { class: 'shop-lottery-section-title' }, '📊 概率公示'),
+      el('div', { class: 'shop-lottery-prob-grid' }, categoryRows),
+      shardTiers,
+      el('div', { class: 'shop-lottery-note' },
+        `· 重复外观 / 称号转化为碎片：${RARITY_ORDER.map((r) => `${rarityLabel(r)} ${duplicateShards[r] || 0}`).join(' / ')}`),
+      el('div', { class: 'shop-lottery-note' },
+        `· 十连必出 1 件非碎片奖励；每 ${pityTarget} 抽必出史诗及以上外观（计数跨抽继承）`),
+      el('div', { class: 'shop-lottery-note' },
+        '· 抽奖结果由服务端生成，概率、保底与扣券均在服务端结算'),
+    ]);
+
+    // 抽奖页内部：抽奖 / 碎片兑换 / 抽奖记录，一屏只展示一个模块
+    const contents = {
+      draw: [el('div', { class: 'panel shop-lottery-panel main' }, [hero, stats, pityBar, actions, ticketBar]), probability],
+      exchange: renderLotteryExchange(exchangeCost),
+      records: renderLotteryRecords(),
+    };
+    const tabDefs = [
+      ['draw', '🎰 抽奖'],
+      ['exchange', '🧩 碎片兑换'],
+      ['records', '📜 抽奖记录'],
+    ];
+    const currentTab = contents[lotteryTab] ? lotteryTab : 'draw';
+
+    lotteryEl.append(el('div', { class: 'shop-view-tabs shop-lottery-tabs' }, tabDefs.map(([key, label]) => el('button', {
+      class: 'shop-view-tab' + (key === currentTab ? ' active' : ''),
+      onClick: () => { lotteryTab = key; renderLottery(); },
+    }, label))));
+    lotteryEl.append(el('div', { class: 'shop-lottery-tab-body' }, contents[currentTab]));
+  }
+
+  /** 碎片兑换区（按外观类别分组，避免不同品类混排） */
+  function renderLotteryExchange(exchangeCost) {
+    const pool = lotteryInfo?.pool || [];
+    const shards = Number(lotteryInfo?.shards) || 0;
+    const groups = [
+      ['frame', '⭕ 头像框'],
+      ['avatar', '😀 头像'],
+      ['skin', '🎨 皮肤'],
+      ['background', '🖼 背景'],
+    ];
+
+    const card = (item) => {
+      const cost = exchangeCost[item.rarity] || 0;
+      return el('div', {
+        class: 'shop-lottery-exchange-card' + (item.owned ? ' owned' : ''),
+        style: `border-top:3px solid ${RARITY_COLORS[item.rarity] || '#718096'};`,
+      }, [
+        el('div', { class: 'shop-lottery-exchange-icon' }, item.icon || '🎁'),
+        el('div', { class: 'shop-lottery-exchange-name' }, item.name),
+        el('div', { class: 'shop-rarity', style: `color:${RARITY_COLORS[item.rarity] || '#718096'};` }, rarityLabel(item.rarity)),
+        item.owned
+          ? el('div', { class: 'shop-lottery-exchange-owned' }, '✅ 已拥有')
+          : el('button', {
+            class: 'btn shop-lottery-exchange-btn',
+            disabled: shards < cost,
+            onClick: () => exchangeLottery(item),
+          }, `🧩 ${cost}`),
+      ]);
+    };
+
+    const sections = groups.map(([key, label]) => {
+      const items = pool
+        .filter((item) => item.category === key)
+        .sort((a, b) => {
+          const rank = RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity);
+          return rank !== 0 ? rank : String(a.name).localeCompare(String(b.name), 'zh');
+        });
+      if (!items.length) return null;
+      return el('div', { class: 'shop-lottery-exchange-group' }, [
+        el('div', { class: 'shop-lottery-exchange-group-title' }, `${label} · ${items.length} 件`),
+        el('div', { class: 'shop-lottery-exchange-grid' }, items.map(card)),
+      ]);
+    }).filter(Boolean);
+
+    return el('div', { class: 'panel shop-lottery-panel' }, [
+      el('div', { class: 'shop-lottery-section-title' }, '🧩 碎片兑换'),
+      el('div', { class: 'text-muted shop-lottery-sub' }, '用重复外观转化的碎片指定兑换奖池外观'),
+      sections.length
+        ? el('div', { class: 'shop-lottery-exchange-groups' }, sections)
+        : el('div', { class: 'text-muted', style: 'text-align:center;padding:20px;' }, '暂无可兑换外观'),
+    ]);
+  }
+
+  /** 最近抽奖记录 */
+  function renderLotteryRecords() {
+    const records = lotteryInfo?.records || [];
+    const list = records.slice(0, 10).map((rec) => el('div', { class: 'shop-lottery-record' }, [
+      el('div', { class: 'shop-lottery-record-head' }, [
+        el('span', {}, `${new Date(rec.at).toLocaleString('zh-CN', { hour12: false })} · ${rec.count} 抽`),
+        el('span', { class: 'shop-lottery-record-cost' }, `-${rec.cost}${rec.unit === 'ticket' ? '🎫' : '💎'}`),
+      ]),
+      el('div', { class: 'shop-lottery-record-items' },
+        summarizeLotteryResults(rec.results).map((r) => el('span', {
+          class: 'shop-lottery-record-item',
+          style: `color:${RARITY_COLORS[r.rarity] || '#718096'};`,
+        }, lotteryRecordText(r)))),
+    ]));
+
+    return el('div', { class: 'panel shop-lottery-panel' }, [
+      el('div', { class: 'shop-lottery-section-title' }, '📜 抽奖记录'),
+      list.length
+        ? el('div', { class: 'shop-lottery-records' }, list)
+        : el('div', { class: 'text-muted', style: 'text-align:center;padding:20px;' }, '暂无抽奖记录'),
+    ]);
+  }
+
+  // 十连/多次抽奖结果聚合：碎片合计、道具按 id 合并，外观与称号单独展示
+  function summarizeLotteryResults(results) {
+    let shardTotal = 0;
+    let shardCount = 0;
+    const items = new Map();
+    const others = [];
+
+    (results || []).forEach((r) => {
+      const type = r.type || 'cosmetic';
+      if (type === 'shard') {
+        shardTotal += Number(r.amount) || 0;
+        shardCount += 1;
+        return;
+      }
+      if (type === 'item') {
+        const cur = items.get(r.id) || { ...r, type: 'item', quantity: 0, count: 0 };
+        cur.quantity += Number(r.quantity) || 1;
+        cur.count += 1;
+        items.set(r.id, cur);
+        return;
+      }
+      others.push({ ...r, type });
+    });
+
+    const summary = [];
+    if (shardTotal > 0) {
+      summary.push({ type: 'shard', name: '外观碎片', icon: '🧩', amount: shardTotal, count: shardCount, rarity: 'rare' });
+    }
+    summary.push(...items.values());
+    summary.push(...others);
+    return summary;
+  }
+
+  // 抽奖结果文案（碎片 / 道具 / 称号 / 外观）
+  function lotteryResultIcon(r) {
+    return r.type === 'shard' ? '🧩' : (r.icon || '🎁');
+  }
+
+  function lotteryResultTitle(r) {
+    if (r.type === 'shard') return `外观碎片 ×${r.amount}`;
+    if (r.type === 'item') return `${r.name} ×${r.quantity || 1}`;
+    return r.name;
+  }
+
+  function lotteryResultTag(r) {
+    if (r.type === 'shard') return r.count > 1 ? `共 ${r.count} 次 · 已入账` : '碎片 · 已入账';
+    if (r.type === 'item') return `道具 ×${r.quantity || 1} · 已入背包`;
+    if (r.type === 'title') return r.duplicate ? `重复称号 · +${r.shards}🧩` : '限定称号 · 新获得';
+    return r.duplicate ? `重复外观 · +${r.shards}🧩` : `${rarityLabel(r.rarity)} · 新外观`;
+  }
+
+  function lotteryRecordText(r) {
+    if (r.type === 'shard') return `🧩 ×${r.amount}`;
+    if (r.type === 'item') return `${r.icon || '🎁'} ${r.name}×${r.quantity || 1}`;
+    return `${r.icon || '🎁'} ${r.name}${r.duplicate ? `（+${r.shards}🧩）` : ''}`;
+  }
+
+  /** 星钻兑换抽奖券 */
+  async function buyLotteryTickets(count) {
+    const userId = currentUserId();
+    if (!userId) { toast.warn('请先登录'); return; }
+    try {
+      const res = await api.shop.buyLotteryTickets(userId, count);
+      if (!res.success) { toast.error(res.message || '兑换失败'); return; }
+      toast.success(res.message || '兑换成功');
+      await loadLottery();
+    } catch (err) {
+      toast.error(err.message || '兑换失败');
+    }
+  }
+
+  async function drawLottery(count) {
+    const userId = currentUserId();
+    if (!userId) { toast.warn('请先登录'); return; }
+    const need = count === 10 ? (Number(lotteryInfo?.cost?.ten) || 10) : (Number(lotteryInfo?.cost?.single) || 1);
+    if ((Number(lotteryInfo?.tickets) || 0) < need) {
+      toast.warn(`抽奖券不足，需要 ${need} 张，请先兑换`);
+      return;
+    }
+    try {
+      const res = await api.shop.drawLottery(userId, count);
+      if (!res.success) { toast.error(res.message || '抽奖失败'); return; }
+      if (typeof res.balance === 'number') {
+        balance = res.balance;
+        renderHeader();
+      }
+      showLotteryResult(res);
+      await Promise.all([loadLottery(), refreshCosmetics()]);
+    } catch (err) {
+      toast.error(err.message || '抽奖失败');
+    }
+  }
+
+  function showLotteryResult(res) {
+    const pityTarget = Number(lotteryInfo?.pity?.epic) || 80;
+    const cards = summarizeLotteryResults(res.results).map((r) => el('div', {
+      class: 'shop-lottery-result-card' + (r.duplicate ? ' duplicate' : ''),
+      style: `border-color:${RARITY_COLORS[r.rarity] || '#718096'};`,
+    }, [
+      el('div', { class: 'shop-lottery-result-icon' }, lotteryResultIcon(r)),
+      el('div', { class: 'shop-lottery-result-name', style: `color:${RARITY_COLORS[r.rarity] || '#718096'};` }, lotteryResultTitle(r)),
+      el('div', { class: 'shop-lottery-result-tag' }, lotteryResultTag(r)),
+    ]));
+
+    modal.show({
+      title: `🎰 抽奖结果（${res.results?.length || 0} 抽）`,
+      content: el('div', {}, [
+        el('div', { class: 'shop-lottery-result-grid' }, cards),
+        el('div', { class: 'shop-lottery-result-foot' },
+          `🎫 剩余 ${res.tickets} 张 · 💎 余额 ${res.balance} · 🧩 碎片 ${res.shards} · 史诗保底 ${res.pityEpic}/${pityTarget}`),
+      ]),
+      confirmText: '知道了',
+      showCancel: false,
+    });
+  }
+
+  function exchangeLottery(item) {
+    const cost = Number(lotteryInfo?.exchangeCost?.[item.rarity]) || 0;
+    const shards = Number(lotteryInfo?.shards) || 0;
+    if (cost <= 0) { toast.warn('该外观暂不可兑换'); return; }
+    if (shards < cost) { toast.warn(`外观碎片不足，需要 ${cost} 个，当前 ${shards} 个`); return; }
+    modal.show({
+      title: '碎片兑换',
+      content: `确定用 ${cost} 个外观碎片兑换「${item.icon || '🎁'} ${item.name}」吗？\n\n当前碎片：${shards} → ${shards - cost}`,
+      confirmText: '确认兑换',
+      showCancel: true,
+      onConfirm: async () => {
+        try {
+          const res = await api.shop.exchangeLottery(currentUserId(), item.id);
+          if (!res.success) { toast.error(res.message || '兑换失败'); return; }
+          toast.success(res.message || '兑换成功！');
+          await Promise.all([loadLottery(), refreshCosmetics()]);
+        } catch (err) {
+          toast.error(err.message || '兑换失败');
+        }
+      },
+    });
   }
 
   // ---- 组装视图 ----
@@ -884,6 +1697,8 @@ export function renderShop(container) {
     tabsEl,
     gridEl,
     vipCompareEl,
+    lotteryEl,
+    cosmeticsEl,
     inventoryEl,
   ]));
   gridEl.append(loadingEl);

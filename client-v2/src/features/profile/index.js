@@ -3,13 +3,13 @@
  *
  * 布局优化（PC 宽屏双栏）：
  * - 左侧固定信息栏（sticky）：头像/昵称/等级/经验条/资产概览/快捷入口，所有 Tab 下常驻可见
- * - 右侧主区：Tab（资料概览 / 头像装扮 / 对战历史）+ 内容
+ * - 右侧主区：Tab（资料概览 / 对战历史 / 邮箱 / 资产 / 等级奖励 / 成就 / 主题 / 倍率日历）
  * - 资料概览 Tab 内：账号信息 + 战绩统计 双栏并排，各棋种统计通栏网格
  *
  * 信息层级：
  * - 一级：头像、昵称、等级、经验、星钻/成就/悔棋/提示（常驻左侧）
  * - 二级：账号信息、战绩统计、各棋种统计（资料 Tab 双栏）
- * - 三级：头像装扮、对战历史（Tab 切换，按需加载）
+ * - 三级：对战历史、邮箱、资产明细等（Tab 切换，按需加载）；商城与装扮已迁至独立「商城」
  *
  * 响应式：≤1000px 收起为单栏（信息栏变顶部摘要），≤768px 进一步堆叠
  */
@@ -21,8 +21,10 @@ import { store } from '../../core/store.js';
 import { eventBus } from '../../core/eventBus.js';
 import * as auth from '../../core/auth.js';
 import { requestReplay, showReplay } from '../replay/index.js';
-import { resetOnboarding, resetAllTours, startOnboarding, startMailTour, startAssetsTour, startShopTour } from '../../components/onboarding.js';
+import { resetOnboarding, resetAllTours, startOnboarding, startMailTour, startAssetsTour } from '../../components/onboarding.js';
 import { buildPrivacyRows, mergePrivacy } from '../../components/privacyPanel.js';
+import { titleBadge, applyGlobalAppearance } from '../../utils/cosmetics.js';
+import { isTestMode, setTestMode } from '../../utils/features.js';
 import { go } from '../../core/router.js';
 
 /** 游戏类型展示元数据 */
@@ -209,12 +211,53 @@ async function openPrivacyModal() {
 }
 
 /**
+ * 兑换码弹窗
+ * @param {Function} [onSuccess] - 兑换成功后的回调（用于刷新资料数据）
+ */
+function openRedeemModal(onSuccess) {
+  const input = el('input', {
+    type: 'text',
+    maxlength: 32,
+    placeholder: '请输入兑换码',
+    style: 'width:100%;padding:10px 12px;border:1px solid var(--border-color,#dfe3e8);border-radius:8px;font-size:14px;background:var(--surface,#fff);color:var(--text,#212529);text-transform:uppercase;',
+  });
+  modal.show({
+    title: '🎟️ 兑换码',
+    content: el('div', { style: 'padding:4px 0;' }, [
+      el('div', { style: 'font-size:12px;color:var(--text-secondary,#718096);margin-bottom:8px;' },
+        '输入活动或测试兑换码领取奖励，兑换码不区分大小写'),
+      input,
+      el('div', { style: 'font-size:12px;color:var(--text-muted,#adb5bd);margin-top:8px;' },
+        '每个账号对同一兑换码只能使用一次'),
+    ]),
+    confirmText: '立即兑换',
+    cancelText: '取消',
+    showCancel: true,
+    onConfirm: async () => {
+      const code = (input.value || '').trim();
+      if (!code) { toast.warn('请输入兑换码'); return; }
+      const userId = currentUserId();
+      if (!userId) { toast.warn('请先登录'); return; }
+      try {
+        const res = await api.account.redeemCode(userId, code);
+        if (!res.success) { toast.error(res.message || '兑换失败'); return; }
+        toast.success(res.message || '兑换成功');
+        if (typeof onSuccess === 'function') onSuccess();
+      } catch (err) {
+        toast.error(err.message || '兑换失败');
+      }
+    },
+  });
+  setTimeout(() => input.focus(), 60);
+}
+
+/**
  * 渲染个人资料视图
  * @param {HTMLElement} container - 内容容器（#view-root）
  * @returns {Function} cleanup 函数
  */
 export function renderProfile(container) {
-  const PROFILE_TAB_KEYS = ['info', 'avatar', 'history', 'mail', 'assets', 'rewards', 'achievements', 'shop', 'themes', 'calendar'];
+  const PROFILE_TAB_KEYS = ['info', 'history', 'mail', 'assets', 'rewards', 'achievements', 'themes', 'calendar'];
   const INIT_TAB = store.get('profile.initTab');
   let activeTab = PROFILE_TAB_KEYS.includes(INIT_TAB) ? INIT_TAB : 'info';
   store.set('profile.initTab', null); // 初始 Tab 已消费，避免下次进入仍停留在上次 Tab
@@ -229,7 +272,7 @@ export function renderProfile(container) {
   let historyView = localStorage.getItem('profileHistoryView') === 'grid' ? 'grid' : 'list';
   let historyPage = 1; // 当前页码（前端分页）
   const HISTORY_PAGE_SIZE = 20;
-  let embeddedCleanup = null; // 嵌入视图（成就/商城/主题）的清理函数
+  let embeddedCleanup = null; // 嵌入视图（成就/主题）的清理函数
   // 邮箱 / 资产明细
   let mails = null; // null = 尚未加载
   let mailFilter = 'unread'; // 'unread' | 'all'
@@ -242,6 +285,7 @@ export function renderProfile(container) {
   const tabsEl = el('div', { class: 'profile-tabs' });
   const contentEl = el('div', { class: 'profile-content' });
   const mainEl = el('div', { class: 'profile-main' }, [tabsEl, contentEl]);
+  const pageEl = el('div', { class: 'profile-page' }, [asideEl, mainEl]);
 
   // ---- 数据加载 ----
   async function loadAll() {
@@ -272,13 +316,21 @@ export function renderProfile(container) {
     renderAside();
     renderTabs();
     renderContent();
+    // 皮肤 / 背景与主题同级，全站生效
+    applyGlobalAppearance(cosmetics, cosmeticConfig);
   }
 
   /** 切换 Tab（Tab 栏 / 快捷按钮复用） */
   function switchTab(key) {
-    activeTab = key;
+    activeTab = PROFILE_TAB_KEYS.includes(key) ? key : 'info';
     renderTabs();
     renderContent();
+  }
+
+  /** 跳转到商城并指定初始视图（shop / cosmetics / inventory） */
+  function openShop(view) {
+    store.set('shop.initView', view);
+    go('shop');
   }
 
   // ---- 左侧信息栏（sticky，常驻） ----
@@ -299,7 +351,10 @@ export function renderProfile(container) {
       // 头像 + 身份
       el('div', { class: 'profile-aside-head' }, [
         avatarPreview(88),
-        el('div', { class: 'profile-aside-name', title: account.nickname || account.username }, account.nickname || account.username || '未命名'),
+        el('div', { class: 'profile-aside-name', title: account.nickname || account.username }, [
+          account.nickname || account.username || '未命名',
+          titleBadge(cosmetics, cosmeticConfig),
+        ]),
         el('div', { class: 'profile-aside-meta' }, [
           el('span', { class: 'profile-aside-id' }, `ID ${account.id || '-'}`),
           el('span', { class: 'profile-aside-tag' }, accountTag),
@@ -325,9 +380,9 @@ export function renderProfile(container) {
       ]),
       // 快捷入口（统一在个人资料页内切换，减少跳转往返）
       el('div', { class: 'profile-aside-actions' }, [
-        el('button', { class: 'profile-aside-btn primary', onClick: () => switchTab('avatar') }, '✏️ 编辑头像'),
+        el('button', { class: 'profile-aside-btn primary', onClick: () => openShop('cosmetics') }, '✏️ 编辑装扮'),
         el('button', { class: 'profile-aside-btn', onClick: () => switchTab('achievements') }, '🏆 我的成就'),
-        el('button', { class: 'profile-aside-btn', onClick: () => switchTab('shop') }, '🛒 我的商城'),
+        el('button', { class: 'profile-aside-btn', onClick: () => openShop('shop') }, '🛒 我的商城'),
         el('button', { class: 'profile-aside-btn', onClick: () => switchTab('themes') }, '🎨 主题设置'),
         el('button', { class: 'profile-aside-btn', onClick: () => go('settings') }, '⚙️ 设置'),
         el('button', {
@@ -361,13 +416,11 @@ export function renderProfile(container) {
     const claimableRewards = (profileData?.levelRewards?.available || []).length;
     const tabs = [
       { key: 'info', label: '📄 资料概览' },
-      { key: 'avatar', label: '🖼 头像装扮' },
       { key: 'history', label: '📜 对战历史' },
       { key: 'mail', label: `📬 邮箱${unreadMail > 0 ? ` (${unreadMail})` : ''}` },
       { key: 'assets', label: '💰 资产明细' },
       { key: 'rewards', label: '🎁 等级奖励', dot: claimableRewards > 0 },
       { key: 'achievements', label: '🏆 我的成就' },
-      { key: 'shop', label: '🛒 商城' },
       { key: 'themes', label: '🎨 主题' },
       { key: 'calendar', label: '📅 倍率日历' },
     ];
@@ -385,35 +438,32 @@ export function renderProfile(container) {
 
   // ---- 内容分发 ----
   async function renderContent() {
-    // 切换前先清理上一个嵌入视图的监听/订阅（成就/商城/主题）
+    // 切换前先清理上一个嵌入视图的监听/订阅（成就/主题）
     if (embeddedCleanup) { embeddedCleanup(); embeddedCleanup = null; }
     contentEl.innerHTML = '';
-    const needsProfile = activeTab === 'info' || activeTab === 'avatar' || activeTab === 'assets' || activeTab === 'rewards';
+    const needsProfile = activeTab === 'info' || activeTab === 'assets' || activeTab === 'rewards';
     if (!profileData && needsProfile) {
       contentEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:40px;' }, '⏳ 加载中...'));
       return;
     }
     if (activeTab === 'info') contentEl.append(renderInfoTab());
-    else if (activeTab === 'avatar') contentEl.append(renderAvatarTab());
     else if (activeTab === 'history') await renderHistoryTab();
     else if (activeTab === 'mail') await renderMailTab();
     else if (activeTab === 'assets') contentEl.append(renderAssetsTab());
     else if (activeTab === 'rewards') contentEl.append(renderLevelRewardsTab());
     else if (activeTab === 'achievements') await renderEmbedded('../achievements/index.js', 'renderAchievements');
-    else if (activeTab === 'shop') await renderEmbedded('../shop/index.js', 'renderShop');
     else if (activeTab === 'themes') await renderEmbedded('../themes/index.js', 'renderThemePanel');
     else if (activeTab === 'calendar') await renderCalendarTab(contentEl);
 
-    // 场景引导：首次进入邮件/资产/商城 Tab 时触发（内部带完成标记，不重复打扰）
+    // 场景引导：首次进入邮件/资产时触发（内部带完成标记，不重复打扰）
     if (activeTab === 'mail') startMailTour();
     else if (activeTab === 'assets') startAssetsTour();
-    else if (activeTab === 'shop') startShopTour();
 
     flashContent();
   }
 
   /**
-   * 渲染嵌入模块（成就/商城/主题）到内容区
+   * 渲染嵌入模块（成就/主题）到内容区
    * 子模块 render 会自行清空容器并挂载，返回的 cleanup 函数由本页统一管理
    */
   async function renderEmbedded(modulePath, exportName) {
@@ -743,6 +793,25 @@ export function renderProfile(container) {
               style: 'padding:6px 14px;font-size:12px;',
               onClick: () => openPasswordModal(!!account.hasPassword),
             }, account.hasPassword ? '🔑 修改密码' : '🔑 设置密码'),
+            el('button', {
+              class: 'btn btn-secondary',
+              style: 'padding:6px 14px;font-size:12px;',
+              onClick: () => openRedeemModal(async () => {
+                mails = null;
+                await refreshProfileData();
+                renderAll();
+              }),
+            }, '🎟️ 兑换码'),
+            el('button', {
+              class: 'btn btn-secondary',
+              style: 'padding:6px 14px;font-size:12px;',
+              onClick: (e) => {
+                const next = !isTestMode();
+                setTestMode(next);
+                e.currentTarget.textContent = next ? '🧪 测试功能：已开启' : '🧪 测试功能：已关闭';
+                toast[next ? 'success' : 'info'](next ? '测试功能已开启，商城将显示抽奖入口' : '测试功能已关闭');
+              },
+            }, isTestMode() ? '🧪 测试功能：已开启' : '🧪 测试功能：已关闭'),
           ]),
         ]),
         el('div', { class: 'panel profile-card' }, [
@@ -1069,6 +1138,7 @@ export function renderProfile(container) {
   function mailHasRewards(m) {
     return (m.starCoins && m.starCoins > 0) ||
       (m.exp && m.exp > 0) ||
+      (m.tickets && m.tickets > 0) ||
       (m.items && m.items.length > 0) ||
       (m.cosmetics && m.cosmetics.length > 0) ||
       !!m.vip;
@@ -1183,6 +1253,7 @@ export function renderProfile(container) {
     const currencyTags = [];
     if (mail.starCoins > 0) currencyTags.push(el('span', { class: 'profile-mail-tag' }, `💎 ${mail.starCoins} 星钻`));
     if (mail.exp > 0) currencyTags.push(el('span', { class: 'profile-mail-tag' }, `⭐ ${mail.exp} 经验`));
+    if (mail.tickets > 0) currencyTags.push(el('span', { class: 'profile-mail-tag' }, `🎫 ${mail.tickets} 抽奖券`));
     if (currencyTags.length) sections.push(mailRewardRow('货币', currencyTags));
 
     const regular = [];
@@ -1286,90 +1357,6 @@ export function renderProfile(container) {
       if (res?.data) profileData = res.data;
       if (res?.privacy) profilePrivacy = res.privacy;
     } catch (err) { /* 保留旧数据 */ }
-  }
-
-  // ============ 头像装扮 Tab ============
-  function renderAvatarTab() {
-    const owned = cosmetics?.owned || {};
-    const equipped = cosmetics?.equipped || {};
-    const customAvatars = owned.customAvatars || [];
-    const avatarsCfg = cosmeticConfig?.avatars || {};
-    const framesCfg = cosmeticConfig?.frames || {};
-
-    // 预设头像网格
-    const avatarItems = Object.values(avatarsCfg).map((a) => {
-      const isOwned = (owned.avatars || []).includes(a.id) || a.id === 'avatar_default';
-      const isEquipped = equipped.avatar === a.id;
-      return el('div', { class: 'profile-cosmetic-card' + (isEquipped ? ' equipped' : '') }, [
-        el('div', { class: 'profile-cosmetic-icon' }, a.emoji || a.icon || '🎭'),
-        el('div', { class: 'profile-cosmetic-name' }, a.name),
-        el('button', {
-          class: 'btn profile-cosmetic-btn' + (isEquipped ? ' active' : ''),
-          disabled: !isOwned,
-          onClick: () => equip('avatar', a.id),
-        }, isEquipped ? '✔ 使用中' : (isOwned ? '使用' : '未拥有')),
-      ]);
-    });
-
-    // 头像框网格
-    const frameItems = Object.values(framesCfg).map((f) => {
-      const isOwned = (owned.frames || []).includes(f.id) || f.id === 'frame_default';
-      const isEquipped = equipped.frame === f.id;
-      return el('div', { class: 'profile-cosmetic-card' + (isEquipped ? ' equipped' : '') }, [
-        el('div', { class: 'profile-cosmetic-icon', style: `color:${f.color || '#e2e8f0'};` }, f.icon || '⭕'),
-        el('div', { class: 'profile-cosmetic-name' }, f.name),
-        el('button', {
-          class: 'btn profile-cosmetic-btn' + (isEquipped ? ' active' : ''),
-          disabled: !isOwned,
-          onClick: () => equip('frame', f.id),
-        }, isEquipped ? '✔ 使用中' : (isOwned ? '使用' : '未拥有')),
-      ]);
-    });
-
-    // 自定义头像网格
-    const customItems = customAvatars.map((c, idx) => {
-      const isEquipped = equipped.avatarCustom === `${currentUserId()}/${c.file}`;
-      return el('div', { class: 'profile-cosmetic-card custom' + (isEquipped ? ' equipped' : '') }, [
-        el('div', { class: 'profile-cosmetic-icon' },
-          el('img', { class: 'profile-custom-avatar', src: `/data/cosmetics/avatars/${currentUserId()}/${c.file}`, alt: c.name })),
-        el('div', { class: 'profile-cosmetic-name' }, c.name || c.file),
-        el('div', { class: 'profile-custom-actions' }, [
-          el('button', {
-            class: 'btn profile-cosmetic-btn' + (isEquipped ? ' active' : ''),
-            onClick: () => equipCustom(c.file),
-          }, isEquipped ? '✔ 使用中' : '使用'),
-          el('button', { class: 'btn profile-mini-btn', title: '替换', onClick: () => pickUpload(idx) }, '📷'),
-          el('button', { class: 'btn profile-mini-btn', title: '改名', onClick: () => renameAvatar(c) }, '✏️'),
-          el('button', { class: 'btn profile-mini-btn danger', title: '删除', onClick: () => removeAvatar(c) }, '🗑️'),
-        ]),
-      ]);
-    });
-
-    return el('div', { class: 'profile-stack' }, [
-      el('div', { class: 'panel profile-card' }, [
-        el('div', { class: 'profile-section-title' }, '当前形象'),
-        el('div', { class: 'profile-avatar-preview' }, avatarPreview(72)),
-      ]),
-      el('div', { class: 'panel profile-card' }, [
-        el('div', { class: 'profile-section-title' }, '😀 预设头像'),
-        el('div', { class: 'profile-cosmetic-grid' }, avatarItems),
-      ]),
-      el('div', { class: 'panel profile-card' }, [
-        el('div', { class: 'profile-section-title' }, '⭕ 头像框'),
-        el('div', { class: 'profile-cosmetic-grid' }, frameItems),
-      ]),
-      el('div', { class: 'panel profile-card' }, [
-        el('div', { class: 'profile-section-title' }, '📷 自定义头像'),
-        el('div', { class: 'profile-upload-tip' }, '支持 PNG/JPG/GIF，超过 2MB 的图片将自动压缩'),
-        el('div', { class: 'profile-cosmetic-grid' }, [
-          el('div', { class: 'profile-cosmetic-card upload', onClick: () => pickUpload(-1) }, [
-            el('div', { class: 'profile-cosmetic-icon' }, '➕'),
-            el('div', { class: 'profile-cosmetic-name' }, '上传新头像'),
-          ]),
-          ...customItems,
-        ]),
-      ]),
-    ]);
   }
 
   // ============ 对战历史 Tab ============
@@ -1629,161 +1616,9 @@ export function renderProfile(container) {
     }, inner);
   }
 
-  // ============ 交互：装备 / 上传 / 改名 / 删除 ============
-  async function equip(category, cosmeticId) {
-    const userId = currentUserId();
-    try {
-      const res = await api.shop.equipCosmetic(userId, category, cosmeticId);
-      if (!res.success) { toast.error(res.message || '装备失败'); return; }
-      toast.success(res.message || '装备成功！');
-      const cosRes = await api.shop.getCosmetics(userId);
-      cosmetics = cosRes.cosmetics || cosmetics;
-      renderAll();
-    } catch (err) {
-      toast.error(err.message || '装备失败');
-    }
-  }
-
-  async function equipCustom(file) {
-    const userId = currentUserId();
-    try {
-      const res = await api.shop.equipCosmetic(userId, 'avatarCustom', file);
-      if (!res.success) { toast.error(res.message || '装备失败'); return; }
-      toast.success(res.message || '装备成功！');
-      const cosRes = await api.shop.getCosmetics(userId);
-      cosmetics = cosRes.cosmetics || cosmetics;
-      renderAll();
-    } catch (err) {
-      toast.error(err.message || '装备失败');
-    }
-  }
-
-  // 触发文件选择（-1 新增，>=0 替换指定槽位）
-  function pickUpload(replaceIndex) {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = () => {
-      const file = input.files?.[0];
-      if (file) handleUpload(file, replaceIndex);
-    };
-    input.click();
-  }
-
-  /** 上传前处理：GIF 直传；非 GIF 超过 2MB 压缩；总大小上限 10MB */
-  async function handleUpload(file, replaceIndex) {
-    const MAX_RAW = 10 * 1024 * 1024;
-    if (file.size > MAX_RAW) { toast.error('图片过大（>10MB）'); return; }
-    try {
-      let dataUrl;
-      if (file.type === 'image/gif' || file.size <= 2 * 1024 * 1024) {
-        dataUrl = await readAsDataURL(file);
-      } else {
-        dataUrl = await compressImage(file, 2000);
-      }
-      const res = await api.avatar.upload(currentUserId(), dataUrl, replaceIndex >= 0 ? replaceIndex : undefined);
-      if (!res.success) { toast.error(res.message || '上传失败'); return; }
-      toast.success(res.message || '上传成功！');
-      const cosRes = await api.shop.getCosmetics(currentUserId());
-      cosmetics = cosRes.cosmetics || cosmetics;
-      renderAll();
-    } catch (err) {
-      toast.error(err.message || '上传失败');
-    }
-  }
-
-  function renameAvatar(item) {
-    const nameInput = el('input', {
-      type: 'text',
-      class: 'profile-rename-input',
-      value: item.name || item.file,
-      maxlength: 30,
-    });
-    modal.show({
-      title: '重命名头像',
-      content: el('div', { class: 'shop-buy-modal' }, [
-        el('div', {}, `为「${item.name || item.file}」输入新名称`),
-        nameInput,
-      ]),
-      confirmText: '保存',
-      showCancel: true,
-      onConfirm: () => {
-        const name = nameInput.value.trim();
-        if (!name) { toast.warn('名称不能为空'); return; }
-        doRename(item.file, name);
-      },
-    });
-  }
-
-  async function doRename(file, name) {
-    try {
-      const res = await api.avatar.rename(currentUserId(), file, name);
-      if (!res.success) { toast.error(res.message || '改名失败'); return; }
-      toast.success('改名成功');
-      const cosRes = await api.shop.getCosmetics(currentUserId());
-      cosmetics = cosRes.cosmetics || cosmetics;
-      renderAll();
-    } catch (err) {
-      toast.error(err.message || '改名失败');
-    }
-  }
-
-  function removeAvatar(item) {
-    modal.show({
-      title: '删除头像',
-      content: `确定删除自定义头像「${item.name || item.file}」吗？`,
-      confirmText: '删除',
-      showCancel: true,
-      onConfirm: () => doRemove(item.file),
-    });
-  }
-
-  async function doRemove(file) {
-    try {
-      const res = await api.avatar.remove(currentUserId(), file);
-      if (!res.success) { toast.error(res.message || '删除失败'); return; }
-      toast.success('删除成功');
-      const cosRes = await api.shop.getCosmetics(currentUserId());
-      cosmetics = cosRes.cosmetics || cosmetics;
-      renderAll();
-    } catch (err) {
-      toast.error(err.message || '删除失败');
-    }
-  }
-
-  // ============ 工具函数 ============
-  function readAsDataURL(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }
-
-  /** canvas 压缩图片到指定最大边长，输出 JPEG dataURL */
-  function compressImage(file, maxSide) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        const scale = Math.min(1, maxSide / Math.max(width, height));
-        width = Math.max(1, Math.round(width * scale));
-        height = Math.max(1, Math.round(height * scale));
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.85));
-      };
-      img.onerror = () => reject(new Error('图片解析失败'));
-      img.src = URL.createObjectURL(file);
-    });
-  }
-
   // ---- 组装视图 ----
   container.innerHTML = '';
-  container.append(el('div', { class: 'profile-page' }, [asideEl, mainEl]));
+  container.append(pageEl);
   loadAll();
 
   // 已迁移模块的旧路由入口：已在个人资料页时直接切 Tab（见 router.go）

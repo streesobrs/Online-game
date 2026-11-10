@@ -40,6 +40,7 @@ docs/
 *.swo
 *~
 .DS_Store
+.trae/
 
 # 构建输出
 dist/

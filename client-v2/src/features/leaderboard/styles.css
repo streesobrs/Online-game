@@ -126,6 +126,17 @@
   box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.25);
 }
 
+/* VIP 金色高亮 */
+.leaderboard-item.is-vip {
+  border-color: #d69e2e;
+  background: linear-gradient(135deg, #fffdf5 0%, var(--surface, #fff) 60%, #fff8e1 100%);
+  box-shadow: inset 3px 0 0 #d69e2e;
+}
+
+.leaderboard-item.is-vip.is-me {
+  box-shadow: inset 3px 0 0 #d69e2e, 0 0 0 2px rgba(214, 158, 46, 0.28);
+}
+
 /* 名次 */
 .leaderboard-rank-col {
   width: 44px;
@@ -150,12 +161,26 @@
 }
 
 .leaderboard-player-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 14px;
   font-weight: 600;
   color: var(--text, #2d3748);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.leaderboard-vip-badge {
+  flex-shrink: 0;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+  color: #7b341e;
+  background: linear-gradient(135deg, #f6e05e, #d69e2e);
+  border-radius: 6px;
 }
 
 .leaderboard-item.is-me .leaderboard-player-name {
@@ -264,6 +289,12 @@
   border: 1px dashed var(--theme-primary, #38bdf8);
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.leaderboard-self-card.is-vip {
+  border-color: #d69e2e;
+  background: linear-gradient(135deg, #fffdf5 0%, #fff8e1 100%);
+  box-shadow: 0 4px 12px rgba(214, 158, 46, 0.18);
 }
 
 .leaderboard-self-label {

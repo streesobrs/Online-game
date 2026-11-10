@@ -283,5 +283,36 @@
       "item_snake_speed": 5,
       "item_snake_shrink": 5
     }
+  },
+  "pack_vip_elite": {
+    "id": "pack_vip_elite",
+    "name": "VIP 尊爵礼包",
+    "description": "会员专属超值礼包，双倍经验卡×12 + 幸运符×12 + 提示卡×5 + 悔棋卡×5，每日限购 2 个",
+    "icon": "👑",
+    "price": 520,
+    "category": "pack",
+    "type": "bundle",
+    "rarity": "epic",
+    "usable": true,
+    "tradable": false,
+    "tags": [
+      "VIP",
+      "会员",
+      "礼包",
+      "限购"
+    ],
+    "vipOnly": true,
+    "enabled": true,
+    "rollout": 100,
+    "purchaseLimit": {
+      "period": "daily",
+      "max": 2
+    },
+    "content": {
+      "item_double_exp": 12,
+      "item_luck_boost": 12,
+      "item_hint": 5,
+      "item_undo": 5
+    }
   }
 }

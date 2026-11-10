@@ -7,6 +7,7 @@ import { modal } from './modal.js';
 import { el } from '../utils/dom.js';
 import { api } from '../core/api.js';
 import { avatarEl, fetchAvatarData } from '../utils/avatar.js';
+import { titleBadge, applyCosmetics } from '../utils/cosmetics.js';
 import { goPlayer } from '../features/player/index.js';
 
 /**
@@ -40,6 +41,12 @@ export function showUserCard(userId) {
         ? el('div', { class: 'user-card-bio' }, bioText)
         : null;
 
+      // 外观：本人可读到完整数据；他人只拿到公开的 equipped（称号/背景/皮肤）
+      const avatarData = avData?.cosmetics || null;
+      const equipped = { ...(avatarData?.equipped || {}), ...(data.cosmetics?.equipped || {}) };
+      const userCosmetics = { ...(avatarData || {}), equipped };
+      const cosmeticConfig = avData?.cosmeticConfig || null;
+
       // 等级行：如果等级被隐藏，显示占位
       const levelMeta = levelHidden
         ? '🔒 等级私密'
@@ -59,8 +66,11 @@ export function showUserCard(userId) {
       }
 
       body.append(
-        avatarEl(avData?.cosmetics, avData?.cosmeticConfig, 64),
-        el('div', { class: 'user-card-name' }, nickname),
+        avatarEl(userCosmetics, cosmeticConfig, 64),
+        el('div', { class: 'user-card-name' }, [
+          nickname,
+          titleBadge(userCosmetics, cosmeticConfig),
+        ]),
         el('div', { class: 'user-card-meta' }, levelMeta),
         ...(bioEl ? [bioEl] : []),
         el('div', { class: 'user-card-stats' }, statsChildren),
@@ -69,6 +79,7 @@ export function showUserCard(userId) {
           el('button', { class: 'user-card-profile-btn', onClick: () => { modal.close(); goPlayer(userId); } }, '查看主页 ›'),
         ]),
       );
+      applyCosmetics(body, userCosmetics, cosmeticConfig);
     })
     .catch(() => { body.textContent = '加载失败'; });
 }

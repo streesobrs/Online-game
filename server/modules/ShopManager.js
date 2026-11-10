@@ -269,6 +269,25 @@ class ShopManager {
     if (!item.enabled) {
       return { success: false, message: '该商品暂未上线' };
     }
+    // 条件解锁类商品（如称号）：达成条件后自动免费获得，不支持购买
+    if (item.unlock) {
+      return { success: false, message: `「${item.name}」需达成条件后免费获得，无法购买` };
+    }
+    // VIP 限定商品：仅生效中的会员可购买
+    let vipSnapshot = null;
+    if (item.vipOnly) {
+      vipSnapshot = await accountManager.getVip(userId);
+      const vipCheck = vipSnapshot;
+      if (!vipCheck?.vip?.isActive) {
+        return { success: false, message: '该商品为 VIP 专享，请先开通会员' };
+      }
+      if (item.vipTier === 'vip_year' && vipCheck.vip.type !== 'vip_year') {
+        return { success: false, message: '该商品仅限年卡会员购买' };
+      }
+      if (item.vipTier === 'vip_season' && !['vip_season', 'vip_year'].includes(vipCheck.vip.type)) {
+        return { success: false, message: '该商品仅限季卡及以上会员购买' };
+      }
+    }
 
     // 动态价格商品：根据用户当前等级算价
     let lockedExp = 0;
@@ -285,7 +304,7 @@ class ShopManager {
     // 检查VIP折扣 - 根据VIP类型（周卡/月卡/季卡/年卡）取对应的折扣率
     let discount = 0;
     try {
-      const vipInfo = await accountManager.getVip(userId);
+      const vipInfo = vipSnapshot || await accountManager.getVip(userId);
       if (vipInfo?.vip?.expireAt > Date.now()) {
         discount = vipInfo.vip.discountPercent || 0;
       }

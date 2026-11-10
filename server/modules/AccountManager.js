@@ -678,7 +678,10 @@ class AccountManager {
             totalStars: stats.totalStars || 0,
             maxFloor: stats.maxFloor || 0,
             winrate: `${winrateNum}%`,
-            winrateNum: winrateNum
+            winrateNum: winrateNum,
+            // 排行榜 VIP 金色高亮（会员生效中）
+            isVip: this._vipActive(account),
+            vipType: this._vipActive(account) ? (account.vip?.type || null) : null
           };
         });
     } catch (err) {
@@ -2802,6 +2805,104 @@ class AccountManager {
     }
   }
 
+  // 读取兑换码配置（带 mtime 缓存，改文件后无需重启）
+  _getRedeemConfig() {
+    const filePath = path.join(__dirname, '..', 'config', 'redeemCodes.json');
+    try {
+      const stat = fs.statSync(filePath);
+      if (this._redeemConfig && this._redeemConfig.mtime === stat.mtimeMs) {
+        return this._redeemConfig.data;
+      }
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      this._redeemConfig = { mtime: stat.mtimeMs, data };
+      return data;
+    } catch (err) {
+      logger.warn('读取兑换码配置失败', { error: err.message });
+      return { codes: {} };
+    }
+  }
+
+  /**
+   * 使用兑换码：校验有效期 / 每账号限用一次，发放星钻、经验、道具、抽奖券
+   * @param {string} accountId
+   * @param {string} rawCode
+   */
+  async redeemCode(accountId, rawCode) {
+    const code = String(rawCode || '').trim().toUpperCase();
+    if (!code) return { success: false, message: '请输入兑换码' };
+
+    const entry = this._getRedeemConfig().codes?.[code];
+    if (!entry || entry.enabled === false) {
+      return { success: false, message: '兑换码无效或已过期' };
+    }
+
+    // 同一账号的兑换串行执行，避免连点重复发放
+    const release = await dataStore.acquireLock(`redeem:${accountId}`);
+    try {
+      const account = await dataStore.findOne('accounts', { 'account.id': accountId });
+      if (!account) return { success: false, message: '账号不存在' };
+
+      const used = Array.isArray(account.account?.redeemedCodes) ? account.account.redeemedCodes : [];
+      if (entry.oncePerAccount !== false && used.some((item) => item.code === code)) {
+        return { success: false, message: '该兑换码已使用过' };
+      }
+
+      const rewards = entry.rewards || {};
+      const coins = Math.max(0, Number(rewards.starCoins) || 0);
+      const exp = Math.max(0, Number(rewards.exp) || 0);
+      const tickets = Math.max(0, Number(rewards.tickets) || 0);
+      const items = Object.entries(rewards.items || {})
+        .map(([id, count]) => ({ id, count: Math.max(1, Number(count) || 1) }))
+        .filter((item) => item.id);
+      const categoryOf = (id) => {
+        if (id.startsWith('frame_')) return 'frame';
+        if (id.startsWith('avatar_')) return 'avatar';
+        if (id.startsWith('skin_')) return 'skin';
+        if (id.startsWith('bg_')) return 'background';
+        if (id.startsWith('title_')) return 'title';
+        return '';
+      };
+      const cosmetics = (Array.isArray(rewards.cosmetics) ? rewards.cosmetics : [])
+        .map((id) => ({ id: String(id), category: categoryOf(String(id)) }))
+        .filter((item) => item.category);
+
+      const granted = [];
+      if (coins > 0) granted.push(`💎${coins}`);
+      if (exp > 0) granted.push(`经验${exp}`);
+      if (tickets > 0) granted.push(`🎫${tickets}`);
+      items.forEach((item) => granted.push(`${item.id}×${item.count}`));
+      cosmetics.forEach((item) => granted.push(item.id));
+
+      // 奖励统一通过邮件发放，由玩家自行领取
+      const sent = await this.sendMail(accountId, {
+        title: entry.mailTitle || `兑换码奖励：${entry.name || code}`,
+        content: entry.mailContent || `兑换码 ${code} 兑换成功，奖励已通过邮件发放，请查收。`,
+        starCoins: coins,
+        exp,
+        tickets,
+        items,
+        cosmetics,
+        from: '兑换中心',
+      });
+      if (!sent || sent.success === false) {
+        return { success: false, message: '奖励邮件发放失败，请稍后重试' };
+      }
+
+      await dataStore.update('accounts', { 'account.id': accountId }, {
+        'account.redeemedCodes': [...used, { code, at: Date.now() }],
+        'account.updatedAt': Date.now(),
+      });
+
+      logger.info('兑换码使用成功', { accountId, code, granted });
+      return { success: true, granted, message: '兑换成功，奖励已发送到邮箱，请前往领取' };
+    } catch (err) {
+      logger.error('兑换码使用失败', { accountId, error: err.message });
+      return { success: false, message: '兑换失败' };
+    } finally {
+      release();
+    }
+  }
+
   // 获取星钻交易记录
   async getCurrencyTransactions(accountId, limit = config.validation.defaultTransactionQueryLimit) {
     try {
@@ -4441,10 +4542,8 @@ class AccountManager {
       account.account.profile.level = calculatedLevel;
       const newLevel = calculatedLevel;
 
-      let currencyReward = Math.max(1, Math.floor(expToAdd / config.exp.expToCoinRatio));
-      if (currencyReward > 0) {
-        await this.addCurrency(userId, currencyReward, `获得${expToAdd}经验值奖励`, 'exp_reward');
-      }
+      // 道具经验不再折算星钻：避免「星钻 → 经验药水 → 经验 → 星钻」套利闭环
+      // 仅对局结算经验走 exp_reward 返币
 
       if (newLevel > oldLevel) {
         const levelUpCurrency = (newLevel - oldLevel) * config.exp.levelUpCoinReward;
@@ -4501,6 +4600,82 @@ class AccountManager {
   /**
    * 获取用户外观
    */
+  /** 会员是否生效 */
+  _vipActive(account) {
+    return (account?.vip?.expireAt || 0) > Date.now();
+  }
+
+  /**
+   * 是否可使用某个 VIP 限定外观
+   * - vipOnly 且会员未生效 → 不可用
+   * - vipTier 限定档位（如 vip_year）→ 需对应档位
+   */
+  _canUseVipCosmetic(account, item) {
+    if (!item?.vipOnly) return true;
+    if (!this._vipActive(account)) return false;
+    if (item.vipTier === 'vip_year') return account.vip?.type === 'vip_year';
+    if (item.vipTier === 'vip_season') return ['vip_season', 'vip_year'].includes(account.vip?.type);
+    return true;
+  }
+
+  /**
+   * 计算称号等外观的解锁进度（服务端权威）
+   * unlock: { type, value, label }
+   * 支持类型：level / pvpWins / cosmetics / balance / match3Level / achievements / vip
+   */
+  _cosmeticUnlockState(account, unlock) {
+    if (!unlock || !unlock.type) {
+      return { type: null, target: 0, progress: 0, unlocked: true, label: '' };
+    }
+    const games = account?.games || {};
+    const owned = account?.cosmetics?.owned || {};
+    let progress = 0;
+    switch (unlock.type) {
+      case 'level':
+        progress = account?.account?.profile?.level || 1;
+        break;
+      case 'pvpWins':
+        progress = Object.values(games).reduce((sum, g) => sum + (Number(g?.wins) || 0), 0);
+        break;
+      case 'totalGames':
+        progress = Object.values(games).reduce((sum, g) => sum + (Number(g?.totalGames) || 0), 0);
+        break;
+      case 'maxStreak':
+        progress = Object.values(games).reduce((best, g) => Math.max(best, Number(g?.maxStreak) || 0), 0);
+        break;
+      case 'cosmetics':
+        progress = ['frames', 'avatars', 'customAvatars', 'skins', 'backgrounds', 'titles']
+          .reduce((sum, key) => sum + (Array.isArray(owned[key]) ? owned[key].length : 0), 0);
+        break;
+      case 'balance':
+        progress = account?.currency?.starCoins || 0;
+        break;
+      case 'match3Level':
+        progress = games?.match3?.maxLevel || 0;
+        break;
+      case 'match3Stars':
+        progress = games?.match3?.totalStars || 0;
+        break;
+      case 'achievements':
+        progress = this._normalizeAchievements(account?.achievements || []).length;
+        break;
+      case 'vip':
+        progress = this._vipActive(account) ? 1 : 0;
+        break;
+      default:
+        return { type: unlock.type, target: 0, progress: 0, unlocked: true, label: unlock.label || '' };
+    }
+    const target = Number(unlock.value) || 0;
+    const unlocked = unlock.type === 'vip' ? progress >= 1 : progress >= target;
+    return { type: unlock.type, target, progress, unlocked, label: unlock.label || '' };
+  }
+
+  /** 对外：查询某个外观（称号）当前解锁状态 */
+  async getCosmeticUnlockState(userId, item) {
+    const account = await this._getAccount(userId);
+    return this._cosmeticUnlockState(account, item?.unlock);
+  }
+
   async getCosmetics(userId) {
     const account = await this._getAccount(userId);
     const cosmetics = account?.cosmetics || {
@@ -4511,6 +4686,9 @@ class AccountManager {
     if (cosmetics.slots === undefined || cosmetics.slots === null) cosmetics.slots = 0;
     if (!cosmetics.owned.avatars) cosmetics.owned.avatars = [];
     if (!cosmetics.owned.customAvatars) cosmetics.owned.customAvatars = [];
+    ['frames', 'skins', 'backgrounds', 'titles'].forEach((key) => {
+      if (!Array.isArray(cosmetics.owned[key])) cosmetics.owned[key] = [];
+    });
     // 确保用户有默认头像和默认头像框
     if (!cosmetics.owned.avatars.includes('avatar_default')) cosmetics.owned.avatars.push('avatar_default');
     if (!cosmetics.owned.frames.includes('frame_default')) cosmetics.owned.frames.push('frame_default');
@@ -4518,7 +4696,54 @@ class AccountManager {
     if (!cosmetics.equipped.avatar && !cosmetics.equipped.avatarCustom) cosmetics.equipped.avatar = 'avatar_default';
     // 如果没有装备任何头像框，装备默认头像框
     if (!cosmetics.equipped.frame) cosmetics.equipped.frame = 'frame_default';
-    return { success: true, cosmetics };
+
+    // VIP 限定外观：会员生效时自动拥有，失效时从返回结果中移除并卸下
+    const cosmeticCfg = this._getShopConfig('cosmetics.json') || {};
+    const bucketEq = { frames: 'frame', skins: 'skin', backgrounds: 'background', titles: 'title' };
+    Object.entries(bucketEq).forEach(([bucket, eqKey]) => {
+      const cfgBucket = cosmeticCfg[bucket] || {};
+      const vipIds = new Set(Object.values(cfgBucket).filter((i) => i.vipOnly).map((i) => i.id));
+      if (vipIds.size === 0) return;
+      const usableIds = new Set(Object.values(cfgBucket)
+        .filter((i) => i.vipOnly && this._canUseVipCosmetic(account, i))
+        .map((i) => i.id));
+      // 免费 VIP 外观自动拥有；付费限定外观需走购买流程
+      const grantIds = new Set(Object.values(cfgBucket)
+        .filter((i) => i.vipOnly && !(Number(i.price) > 0) && this._canUseVipCosmetic(account, i))
+        .map((i) => i.id));
+      grantIds.forEach((id) => {
+        if (!cosmetics.owned[bucket].includes(id)) cosmetics.owned[bucket].push(id);
+      });
+      cosmetics.owned[bucket] = cosmetics.owned[bucket].filter((id) => !vipIds.has(id) || usableIds.has(id));
+      if (vipIds.has(cosmetics.equipped[eqKey]) && !usableIds.has(cosmetics.equipped[eqKey])) {
+        cosmetics.equipped[eqKey] = bucket === 'frames' ? 'frame_default' : null;
+      }
+    });
+
+    // 条件称号：达成条件后自动免费获得，同时把当前进度返回给客户端展示
+    const unlocks = {};
+    if (account) {
+      if (!account.cosmetics) account.cosmetics = cosmetics;
+      let unlockChanged = false;
+      Object.values(cosmeticCfg.titles || {}).forEach((item) => {
+        if (!item.unlock) return;
+        const state = this._cosmeticUnlockState(account, item.unlock);
+        // VIP 限定称号以会员可用性为准（含档位要求）
+        if (item.vipOnly) {
+          const usable = this._canUseVipCosmetic(account, item);
+          unlocks[item.id] = { ...state, unlocked: usable, progress: usable ? 1 : 0, target: 1 };
+          return;
+        }
+        unlocks[item.id] = state;
+        if (state.unlocked && !cosmetics.owned.titles.includes(item.id)) {
+          cosmetics.owned.titles.push(item.id);
+          unlockChanged = true;
+        }
+      });
+      if (unlockChanged) await this._saveAccount(userId, account);
+    }
+
+    return { success: true, cosmetics, unlocks };
   }
 
   /**
@@ -4537,6 +4762,9 @@ class AccountManager {
     }
     if (!account.cosmetics.owned.avatars) account.cosmetics.owned.avatars = [];
     if (!account.cosmetics.owned.customAvatars) account.cosmetics.owned.customAvatars = [];
+    ['frames', 'skins', 'backgrounds', 'titles'].forEach((key) => {
+      if (!Array.isArray(account.cosmetics.owned[key])) account.cosmetics.owned[key] = [];
+    });
 
     const categoryMap = {
       frame: 'frames',
@@ -4575,6 +4803,9 @@ class AccountManager {
     }
     if (!account.cosmetics.owned.avatars) account.cosmetics.owned.avatars = [];
     if (!account.cosmetics.owned.customAvatars) account.cosmetics.owned.customAvatars = [];
+    ['frames', 'skins', 'backgrounds', 'titles'].forEach((key) => {
+      if (!Array.isArray(account.cosmetics.owned[key])) account.cosmetics.owned[key] = [];
+    });
 
     if (category === 'avatar') {
       if (cosmeticId === 'custom') {
@@ -4608,7 +4839,14 @@ class AccountManager {
       if (!ownedKey) {
         return { success: false, message: '类型错误' };
       }
-      if (cosmeticId && ownedKey && !account.cosmetics.owned[ownedKey].includes(cosmeticId) && cosmeticId !== 'frame_default') {
+      // VIP 限定外观：校验会员档位，会员失效则不可装备
+      const cosmeticCfg = this._getShopConfig('cosmetics.json') || {};
+      const itemCfg = cosmeticCfg[ownedKey]?.[cosmeticId];
+      const isVipItem = itemCfg?.vipOnly === true;
+      if (isVipItem && !this._canUseVipCosmetic(account, itemCfg)) {
+        return { success: false, message: '该外观为 VIP 专属，请先开通会员' };
+      }
+      if (cosmeticId && !isVipItem && !account.cosmetics.owned[ownedKey].includes(cosmeticId) && cosmeticId !== 'frame_default') {
         return { success: false, message: '未拥有该外观' };
       }
       account.cosmetics.equipped[category] = cosmeticId || null;
@@ -5419,6 +5657,7 @@ class AccountManager {
         slots: Math.max(0, parseInt(mailData.slots, 10) || 0),
         starCoins: mailData.starCoins || 0,
         exp: mailData.exp || 0,
+        tickets: Math.max(0, parseInt(mailData.tickets, 10) || 0),
         from: mailData.from || '系统',
         // 生效时间区间：validUntil 为 0 表示长期有效
         validFrom,
@@ -5501,6 +5740,7 @@ class AccountManager {
       || mail.slots > 0
       || mail.starCoins > 0
       || mail.exp > 0
+      || mail.tickets > 0
     );
   }
 
@@ -5565,7 +5805,7 @@ class AccountManager {
         return { success: false, message: `未满足领取条件：${conditionCheck.missing.join('、')}` };
       }
 
-      const rewards = { items: [], cosmetics: [], vip: null, starCoins: 0, exp: 0, slots: 0 };
+      const rewards = { items: [], cosmetics: [], vip: null, starCoins: 0, exp: 0, slots: 0, tickets: 0 };
 
       // 发放物品和礼包（使用独立背包存储）
       if (mail.items && mail.items.length > 0) {
@@ -5685,14 +5925,19 @@ class AccountManager {
           logger.warn('记录邮件经验奖励失败', { userId, error: recErr.message });
         }
 
-        // 邮件经验也按「经验兑换星钻」折算（与 addExp / 经验道具同口径，旧版漏了）
-        const expCoinReward = Math.max(1, Math.floor(mail.exp / config.exp.expToCoinRatio));
-        await this._creditCoinsInMemory(userId, account, expCoinReward, 'exp_reward', `获得${mail.exp}经验值奖励`);
-        rewards.currencyReward = expCoinReward;
+        // 邮件经验不再折算星钻：与道具经验同口径，避免产出闭环
+        // 仅对局结算经验走 exp_reward 返币
 
         // 邮件经验同样会升级，所以升级奖励也要发（旧版漏了，见 _applyLevelUpRewards）
         const levelUpCurrency = await this._applyLevelUpRewards(userId, account, oldLevel, newLevel);
         if (levelUpCurrency > 0) rewards.levelUpCurrency = levelUpCurrency;
+      }
+
+      // 发放抽奖券
+      if (mail.tickets && mail.tickets > 0) {
+        if (!account.lottery) account.lottery = {};
+        account.lottery.tickets = (Number(account.lottery.tickets) || 0) + mail.tickets;
+        rewards.tickets = mail.tickets;
       }
 
       // 标记邮件为已领取（使用独立邮件存储）
@@ -5738,7 +5983,7 @@ class AccountManager {
         return { success: true, claimedCount: 0, rewards: { items: [], cosmetics: [], vip: null, starCoins: 0, exp: 0 } };
       }
 
-      const totalRewards = { items: [], cosmetics: [], vip: null, starCoins: 0, exp: 0 };
+      const totalRewards = { items: [], cosmetics: [], vip: null, starCoins: 0, exp: 0, tickets: 0 };
       const itemMap = new Map();
       const cosmeticSet = new Set();
       let vipDaysToAdd = 0;
@@ -5747,6 +5992,7 @@ class AccountManager {
       let starCoinsToAdd = 0;
       let expToAdd = 0;
       let slotsToAdd = 0;
+      let ticketsToAdd = 0;
 
       for (let i = 0; i < mailStore.mails.length; i++) {
         const mail = mailStore.mails[i];
@@ -5794,6 +6040,10 @@ class AccountManager {
           slotsToAdd += mail.slots;
         }
 
+        if (mail.tickets && mail.tickets > 0) {
+          ticketsToAdd += mail.tickets;
+        }
+
         mailStore.mails[i].claimed = true;
         mailStore.mails[i].read = true;
         mailStore.mails[i].claimedAt = Date.now();
@@ -5838,6 +6088,13 @@ class AccountManager {
         if (!account.cosmetics) account.cosmetics = { slots: 0 };
         account.cosmetics.slots = (account.cosmetics.slots || 0) + slotsToAdd;
         totalRewards.slots = slotsToAdd;
+      }
+
+      // 应用抽奖券奖励
+      if (ticketsToAdd > 0) {
+        if (!account.lottery) account.lottery = {};
+        account.lottery.tickets = (Number(account.lottery.tickets) || 0) + ticketsToAdd;
+        totalRewards.tickets = ticketsToAdd;
       }
 
       // 应用会员奖励
@@ -5912,10 +6169,8 @@ class AccountManager {
           logger.warn('记录批量邮件经验奖励失败', { userId, error: recErr.message });
         }
 
-        // 邮件经验也按「经验兑换星钻」折算（与 addExp / 经验道具同口径，旧版漏了）
-        const expCoinReward = Math.max(1, Math.floor(expToAdd / config.exp.expToCoinRatio));
-        await this._creditCoinsInMemory(userId, account, expCoinReward, 'exp_reward', `获得${expToAdd}经验值奖励`);
-        totalRewards.currencyReward = expCoinReward;
+        // 邮件经验不再折算星钻：与道具经验同口径，避免产出闭环
+        // 仅对局结算经验走 exp_reward 返币
 
         // 批量领邮件升级同样要发升级奖励（旧版漏了，见 _applyLevelUpRewards）
         const levelUpCurrency = await this._applyLevelUpRewards(userId, account, oldLevel, newLevel);

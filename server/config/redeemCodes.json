@@ -1,0 +1,26 @@
+{
+  "codes": {
+    "WELCOME2026": {
+      "name": "新手礼包",
+      "enabled": true,
+      "oncePerAccount": true,
+      "rewards": {
+        "starCoins": 200,
+        "exp": 100,
+        "items": {
+          "item_undo": 2,
+          "item_hint": 2
+        }
+      }
+    },
+    "BETATEST": {
+      "name": "测试福利",
+      "enabled": true,
+      "oncePerAccount": true,
+      "rewards": {
+        "starCoins": 600,
+        "tickets": 10
+      }
+    }
+  }
+}

@@ -47,7 +47,11 @@ export function fetchAvatarData(userId) {
   if (!userId) return Promise.resolve(null);
   if (cache.has(userId)) return Promise.resolve(cache.get(userId));
   if (loading.has(userId)) return loading.get(userId);
-  const p = Promise.all([api.shop.getCosmetics(userId), api.shop.getCosmeticsConfig()])
+  const p = Promise.all([
+    // 他人外观接口是 requireSelf，会 403；失败时不影响公开的配置读取
+    api.shop.getCosmetics(userId).catch(() => null),
+    api.shop.getCosmeticsConfig().catch(() => null),
+  ])
     .then(([cosRes, cfgRes]) => {
       const data = { cosmetics: cosRes?.cosmetics || null, cosmeticConfig: cfgRes?.cosmetics || null };
       cache.set(userId, data);

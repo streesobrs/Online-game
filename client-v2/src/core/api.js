@@ -56,6 +56,11 @@ export const api = {
     verify: (token) => api.post('/api/auth/verify', { token }),
   },
 
+  account: {
+    /** 使用兑换码 @param {string} code */
+    redeemCode: (userId, code) => api.post('/api/redeem-code', { userId, code }),
+  },
+
   shop: {
     /** 商城数据（商品列表，可传 userId 获取动态价格） */
     getData: (userId) => api.get(`/api/shop/data?userId=${encodeURIComponent(userId || '')}`),
@@ -75,6 +80,16 @@ export const api = {
     getCosmeticsConfig: () => api.get('/api/shop/cosmetics/config'),
     /** 装备外观 */
     equipCosmetic: (userId, category, cosmeticId) => api.post('/api/shop/cosmetics/equip', { userId, category, cosmeticId }),
+    /** 抽奖信息（费用 / 保底 / 碎片 / 奖池 / 记录） */
+    getLotteryInfo: (userId) => api.get(`/api/shop/lottery/info?userId=${encodeURIComponent(userId || '')}`),
+    /** 抽奖 @param {1|10} count */
+    drawLottery: (userId, count = 1) => api.post('/api/shop/lottery/draw', { userId, count }),
+    /** 星钻兑换抽奖券 @param {1|10} count */
+    buyLotteryTickets: (userId, count = 1) => api.post('/api/shop/lottery/tickets', { userId, count }),
+    /** 外观碎片兑换指定外观 */
+    exchangeLottery: (userId, cosmeticId) => api.post('/api/shop/lottery/exchange', { userId, cosmeticId }),
+    /** 抽奖记录 */
+    getLotteryRecords: (userId) => api.get(`/api/shop/lottery/records?userId=${encodeURIComponent(userId || '')}`),
   },
 
   leaderboard: {
