@@ -758,6 +758,7 @@ module.exports = {
       owner: 'streesobrs',                          // GitHub 仓库所有者（无本地 Git 时走 GitHub API）
       repo: 'Online-game',                          // GitHub 仓库名
       token: process.env.GITHUB_TOKEN || '',        // 私有仓库或提高 API 限流时配置
+      proxyPrefix: process.env.GITHUB_PROXY || 'https://gh-proxy.org/', // GitHub 直连失败时的加速代理前缀（留空禁用）
       checkTimeoutMs: 20000,                        // git fetch / GitHub API 超时（毫秒）
       downloadTimeoutMs: 120000,                    // 生成/下载更新包超时（毫秒）
       cacheTtlMs: 60000,                            // 检查结果缓存时间（毫秒）

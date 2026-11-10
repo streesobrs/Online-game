@@ -290,14 +290,32 @@ async function readRemoteCommits(existingHashes) {
   const headers = { 'User-Agent': 'game-server-changelog', Accept: 'application/vnd.github+json' };
   if (cfg.token) headers.Authorization = `Bearer ${cfg.token}`;
 
+  const proxyPrefix = String(cfg.proxyPrefix || '').trim();
+  const proxyOf = (url) => {
+    if (!proxyPrefix) return '';
+    const base = proxyPrefix.endsWith('/') ? proxyPrefix : `${proxyPrefix}/`;
+    return `${base}${url}`;
+  };
+  const fetchJsonWithFallback = async (url) => {
+    const attempt = async (target) => {
+      const res = await fetch(target, { headers, signal: AbortSignal.timeout(cfg.checkTimeoutMs) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    };
+    try {
+      return await attempt(url);
+    } catch (err) {
+      const proxied = proxyOf(url);
+      if (!proxied) throw err;
+      return attempt(proxied);
+    }
+  };
+
   const commits = [];
   for (let page = 1; page <= 5; page++) {
     const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/commits`
       + `?sha=${encodeURIComponent(cfg.branch)}&per_page=100&page=${page}`;
-    const res = await fetch(url, { headers, signal: AbortSignal.timeout(cfg.checkTimeoutMs) });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-    const list = await res.json();
+    const list = await fetchJsonWithFallback(url);
     if (!Array.isArray(list) || !list.length) break;
 
     let reachedKnown = false;

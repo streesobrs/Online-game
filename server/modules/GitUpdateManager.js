@@ -102,7 +102,17 @@ class GitUpdateManager {
     return headers;
   }
 
-  async _fetchJson(url, timeoutMs) {
+  /**
+   * 生成加速代理地址：https://gh-proxy.org/https://github.com/...
+   * 未配置 proxyPrefix 时返回空串（禁用代理回退）。
+   */
+  _proxyUrl(url) {
+    const prefix = String(this.cfg.proxyPrefix || '').trim();
+    if (!prefix) return '';
+    return prefix.endsWith('/') ? `${prefix}${url}` : `${prefix}/${url}`;
+  }
+
+  async _fetchJsonOnce(url, timeoutMs) {
     const res = await fetch(url, {
       headers: this._httpHeaders(),
       signal: AbortSignal.timeout(timeoutMs)
@@ -111,7 +121,19 @@ class GitUpdateManager {
     return res.json();
   }
 
-  async _fetchBuffer(url, timeoutMs) {
+  /** 先直连，失败后自动改用 GitHub 加速代理重试 */
+  async _fetchJson(url, timeoutMs) {
+    const proxy = this._proxyUrl(url);
+    try {
+      return await this._fetchJsonOnce(url, timeoutMs);
+    } catch (err) {
+      if (!proxy) throw err;
+      logger.warn('GitHub 直连失败，改用加速代理', { url, error: err.message });
+      return this._fetchJsonOnce(proxy, timeoutMs);
+    }
+  }
+
+  async _fetchBufferOnce(url, timeoutMs) {
     const res = await fetch(url, {
       headers: this._httpHeaders(false),
       signal: AbortSignal.timeout(timeoutMs)
@@ -329,23 +351,38 @@ class GitUpdateManager {
         );
       } else {
         logger.info('从 GitHub 下载源码包', { commit: info.remote.commit });
-        // 配置了 token 时走 API zipball（私有仓库也可用），否则用公开的 codeload
-        const codeloadUrl = `https://codeload.github.com/${cfg.owner}/${cfg.repo}/zip/${info.remote.commit}`;
-        let buffer;
+        const commit = info.remote.commit;
+        const codeloadUrl = `https://codeload.github.com/${cfg.owner}/${cfg.repo}/zip/${commit}`;
+        const archiveUrl = `https://github.com/${cfg.owner}/${cfg.repo}/archive/${commit}.zip`;
+        const candidates = [];
+
+        // 配置了 token 时优先走 API zipball（私有仓库也可用）
         if (cfg.token) {
-          try {
-            buffer = await this._fetchBuffer(
-              `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/zipball/${info.remote.commit}`,
-              cfg.downloadTimeoutMs
-            );
-          } catch (e) {
-            // token 失效/权限不足时，公开仓库仍可通过 codeload 下载
-            logger.warn('API 下载更新包失败，回退 codeload', { error: e.message });
-            buffer = await this._fetchBuffer(codeloadUrl, cfg.downloadTimeoutMs);
-          }
-        } else {
-          buffer = await this._fetchBuffer(codeloadUrl, cfg.downloadTimeoutMs);
+          const apiZipUrl = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/zipball/${commit}`;
+          candidates.push(apiZipUrl);
+          const proxiedApi = this._proxyUrl(apiZipUrl);
+          if (proxiedApi) candidates.push(proxiedApi);
         }
+        candidates.push(codeloadUrl);
+        // 直连失败后走加速代理（gh-proxy 明确支持 github.com 归档与 api.github.com）
+        [codeloadUrl, archiveUrl].forEach((url) => {
+          const proxied = this._proxyUrl(url);
+          if (proxied) candidates.push(proxied);
+        });
+
+        let buffer = null;
+        let lastError = null;
+        for (const url of candidates) {
+          try {
+            buffer = await this._fetchBufferOnce(url, cfg.downloadTimeoutMs);
+            lastError = null;
+            break;
+          } catch (e) {
+            lastError = e;
+            logger.warn('更新包下载失败，尝试下一个地址', { url, error: e.message });
+          }
+        }
+        if (!buffer) throw lastError || new Error('更新包下载失败');
         fs.writeFileSync(filePath, buffer);
       }
 
