@@ -1994,6 +1994,24 @@ class GameManager {
     return game.player1 === accountId || game.player2 === accountId;
   }
 
+  // 获取账号当前进行中的对局 ID（PvP 或 AI），供好友列表直接观战
+  getLiveGameIdForAccount(accountId) {
+    if (!accountId) return null;
+
+    for (const [gameId, game] of this.games) {
+      if (game.status === 'playing' && this.isGameParticipant(game, accountId)) {
+        return gameId;
+      }
+    }
+
+    const aiGame = this.aiGames.get(accountId);
+    if (aiGame && aiGame.status === 'playing') {
+      return aiGame.gameId;
+    }
+
+    return null;
+  }
+
   // 把游戏记录转成历史项：各玩法保留自己的字段结构，不互相填充无意义字段
   toHistoryItem(game, accountId) {
     const base = {

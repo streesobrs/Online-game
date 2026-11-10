@@ -123,6 +123,22 @@ export function renderSpectate(container) {
     startSpectate(container, game);
   });
 
+  // 从好友列表点击「观战」跳转过来：自动加入对方当前对局（按 accountId 由服务端解析）
+  const autoJoin = store.get('spectate.autoJoin');
+  if (autoJoin) store.set('spectate.autoJoin', null);
+  let offAutoError = null;
+  if (autoJoin && autoJoin.accountId) {
+    offAutoError = eventBus.on('system:error', (data) => {
+      const msg = String(data?.message || '');
+      if (msg && /观战|对局|游戏不存在/.test(msg)) toast.error(msg);
+    });
+    if (store.get('socketConnected')) {
+      emit('spectate_join', { accountId: autoJoin.accountId });
+    } else {
+      toast.error('未连接服务器，请稍后重试');
+    }
+  }
+
   loadList();
 
   return () => {
@@ -131,6 +147,7 @@ export function renderSpectate(container) {
     offList();
     offConnect();
     offJoined();
+    if (offAutoError) offAutoError();
     container.innerHTML = '';
   };
 }

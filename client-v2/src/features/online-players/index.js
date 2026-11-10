@@ -15,6 +15,7 @@ import { avatarNode } from '../../utils/avatar.js';
 import { showUserCard } from '../../components/userCard.js';
 import { GAMES } from '../../data/navItems.js';
 import { api } from '../../core/api.js';
+import { go } from '../../core/router.js';
 
 // ===== 模块级状态（常驻，跨视图保留）=====
 const users = new Map(); // String(accountId) -> {accountId, nickname, status, gameType, level}
@@ -156,6 +157,31 @@ eventBus.on('lobby:challengeAccepted', (data) => {
 eventBus.on('lobby:challengeRejected', (data) => {
   const name = data.fromNickname || data.toNickname || '对方';
   toast.error(`❌ ${name} 拒绝了你的挑战`);
+});
+
+// 挑战相关错误（对方离线/正在游戏中/重复挑战等）统一提示，避免点击后没有反馈
+eventBus.on('system:error', (data) => {
+  const msg = String(data?.message || '');
+  if (!msg) return;
+  if (msg.includes('挑战') || msg.includes('响应失败')) toast.error(msg);
+});
+
+// 在好友/聊天等非游戏大厅页面接受挑战或匹配成功时，自动进入游戏大厅并开始对局
+// （大厅内由 games 视图自己的监听处理，这里不重复接管；贪吃蛇走 snake:matchFound）
+eventBus.on('lobby:matchSuccess', (data) => {
+  if (!data || !data.game) return;
+  if (store.get('currentView') === 'games') return;
+  store.set('pendingMatch', data);
+  store.set('games.initGame', data.game);
+  go('games');
+});
+
+eventBus.on('snake:matchFound', (data) => {
+  if (!data) return;
+  if (store.get('currentView') === 'games') return;
+  store.set('pendingMatch', { ...data, game: 'snake' });
+  store.set('games.initGame', 'snake');
+  go('games');
 });
 
 // ===== 浮动面板已合并进悬浮坞（见 features/chat/index.js initFloatingChat）=====

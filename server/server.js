@@ -4687,7 +4687,7 @@ io.on('connection', (socket) => {
 
   // ========== 观战相关事件 ==========
 
-  // 开始观战
+  // 开始观战（支持 gameId 直连，或从好友列表按 accountId 解析当前对局）
   socket.on('spectate_join', (data) => {
     const user = userManager.getUserBySocketId(socket.id);
     if (!user) {
@@ -4695,8 +4695,15 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const { gameId } = data;
-    const result = gameManager.addSpectator(gameId, user.accountId, io);
+    const { gameId, accountId } = data || {};
+    const targetGameId = gameId || (accountId ? gameManager.getLiveGameIdForAccount(accountId) : null);
+
+    if (!targetGameId) {
+      socket.emit('error', { message: '该玩家当前没有可观看的对局' });
+      return;
+    }
+
+    const result = gameManager.addSpectator(targetGameId, user.accountId, io);
 
     if (result.success) {
       socket.emit('spectate_joined', result.game);

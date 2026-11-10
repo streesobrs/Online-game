@@ -130,12 +130,32 @@ function openChat(targetId, nickname) {
   go('chat');
 }
 
+/** 游戏类型中文名 */
+const GAME_NAMES = {
+  gobang: '五子棋',
+  go: '围棋',
+  'chinese-chess': '象棋',
+  snake: '贪吃蛇',
+  match3: '消消乐',
+};
+
+/** 支持观战的游戏类型（与观战页保持一致） */
+const SPECTATEABLE = new Set(['gobang', 'go', 'chinese-chess']);
+
 /** 在线状态标签 */
 function statusText(onlineUser) {
   if (!onlineUser) return '离线';
-  if (onlineUser.status === 'playing') return '游戏中';
-  if (onlineUser.status === 'waiting') return '等待中';
+  const gameName = GAME_NAMES[onlineUser.gameType];
+  if (onlineUser.status === 'playing') return gameName ? `游戏中 · ${gameName}` : '游戏中';
+  if (onlineUser.status === 'waiting') return gameName ? `等待中 · ${gameName}` : '等待中';
+  if (onlineUser.status === 'spectating') return '观战中';
   return '在线';
+}
+
+/** 从好友列表直接观战：跳转观战页并自动加入对方当前对局 */
+function spectateFriend(accountId) {
+  store.set('spectate.autoJoin', { accountId: String(accountId) });
+  go('spectate');
 }
 
 /**
@@ -208,6 +228,9 @@ export function renderFriends(container = viewRoot()) {
         el('div', { class: 'friends-actions' }, [
           el('button', { class: 'friends-btn primary', onClick: () => openChat(f.accountId, name) }, '💬 私信'),
           onlineUser ? el('button', { class: 'friends-btn primary', onClick: () => sendChallenge(f.accountId) }, '⚔️ 挑战') : null,
+          onlineUser && onlineUser.status === 'playing' && SPECTATEABLE.has(onlineUser.gameType)
+            ? el('button', { class: 'friends-btn primary', onClick: () => spectateFriend(f.accountId) }, '👁️ 观战')
+            : null,
           el('button', { class: 'friends-btn danger', onClick: () => removeFriend(f.accountId) }, '✕ 删除'),
         ]),
       ]));

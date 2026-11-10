@@ -917,12 +917,15 @@ export function renderGames(container) {
 
   // ---- 事件订阅 ----
   const offMatchSuccess = eventBus.on('lobby:matchSuccess', (data) => {
-    if (data.game !== state.selectedGame) return;
+    if (!data || !data.game || !GAME_MAP[data.game]) return;
     state.isMatching = false;
+    // 挑战可能来自其他游戏：切到实际对局的棋种再启动
+    state.selectedGame = data.game;
     // 已开始新对局，清除可能残留的重连快照
     state.reconnectGame = null;
     store.set('reconnectGame', null);
     store.set('pendingMatch', data);
+    renderPicker();
     startOnlineGame();
   });
 
@@ -934,7 +937,10 @@ export function renderGames(container) {
 
   const offSnakeFound = eventBus.on('snake:matchFound', (data) => {
     state.isMatching = false;
-    if (state.selectedGame !== 'snake') return;
+    if (state.selectedGame !== 'snake') {
+      state.selectedGame = 'snake';
+      renderPicker();
+    }
     store.set('pendingMatch', { ...data, game: 'snake' });
     startOnlineGame();
   });
@@ -1088,9 +1094,18 @@ export function renderGames(container) {
   renderPicker();
   renderMain();
 
-  // 主动查询服务端当前进行中的对局（双保险：事件可能在懒加载挂载前到达，
-  // 或客户端手动放弃了本地的 reconnectGame 但服务端仍处于 playing 状态）
-  if (store.get('socketConnected')) {
+  // 从好友/聊天等页面接受挑战后跳转过来：直接进入对应联机对局
+  const pendingEntry = store.get('pendingMatch');
+  if (pendingEntry && pendingEntry.game && GAME_MAP[pendingEntry.game]) {
+    state.selectedGame = pendingEntry.game;
+    state.isMatching = false;
+    state.reconnectGame = null;
+    store.set('reconnectGame', null);
+    renderPicker();
+    startOnlineGame();
+  } else if (store.get('socketConnected')) {
+    // 主动查询服务端当前进行中的对局（双保险：事件可能在懒加载挂载前到达，
+    // 或客户端手动放弃了本地的 reconnectGame 但服务端仍处于 playing 状态）
     emit('get_current_game');
   }
 

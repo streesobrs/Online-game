@@ -3,10 +3,19 @@
  *
  * 生成命令：npm run changelog
  * 数据源：git 提交记录（遵循 .trae/rules/git-commit-message.md 提交规范）
- * 生成时间：2026-11-10T22:55:12.020+08:00
+ * 生成时间：2026-11-11T00:28:54.251+08:00
  */
 
 export const CHANGELOG = [
+  {
+    "tag": "Build 865",
+    "name": "新增 GitHub 加速代理配置并优化更新下载逻辑",
+    "type": "chore",
+    "scope": "全端",
+    "hash": "2f995c1",
+    "publishedAt": "2026-11-10T22:57:29+08:00",
+    "body": "### 后端改动\n- 在 config.js 中新增 GitHub 代理前缀配置项\n- 重构 GitUpdateManager 的 fetch 方法，增加直连失败自动切换代理的回退逻辑\n- 新增代理地址生成方法，支持多种 GitHub 资源的代理转换"
+  },
   {
     "tag": "Build 863",
     "name": "新增兑换码系统、抽奖功能与会员外观权益",
