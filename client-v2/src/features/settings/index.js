@@ -22,6 +22,7 @@ import { api } from '../../core/api.js';
 import { buildNavPrefsPanel, switchRow, selectRow } from '../../components/navPrefs.js';
 import { buildPrivacyRows, mergePrivacy } from '../../components/privacyPanel.js';
 import { buildShortcutEditor } from '../../components/shortcutEditor.js';
+import { FEATURES } from '../../data/navItems.js';
 import { setNavPrefs } from '../../layouts/mode.js';
 import { store } from '../../core/store.js';
 import { eventBus } from '../../core/eventBus.js';
@@ -172,6 +173,41 @@ function isAdminAccount() {
 }
 
 /**
+ * 侧边栏（全局抽屉）菜单项开关
+ * 勾选 = 在右侧抽屉里显示；关闭即从抽屉移除，顶部导航不受影响
+ */
+function buildDrawerNavPanel() {
+  const hidden = new Set(getUiPrefs().drawerHidden);
+  const items = [
+    { id: 'games', name: '🎮 游戏' },
+    ...FEATURES.filter((i) => !i.inProfile).map((i) => ({ id: i.id, name: `${i.icon} ${i.name}` })),
+  ];
+  const toggle = (id, visible) => {
+    const next = new Set(getUiPrefs().drawerHidden);
+    if (visible) next.delete(id);
+    else next.add(id);
+    setUiPrefs({ drawerHidden: [...next] });
+  };
+  return el('div', { class: 'nav-prefs' }, items.map((item) => {
+    // 设置入口固定保留：全部隐藏后仍需能回到设置页
+    if (item.id === 'settings') {
+      return switchRow({
+        name: item.name,
+        hint: '固定显示，避免隐藏后无法回到设置',
+        checked: true,
+        disabled: true,
+        onChange: () => { /* 固定项，不响应 */ },
+      });
+    }
+    return switchRow({
+      name: item.name,
+      checked: !hidden.has(item.id),
+      onChange: (v) => toggle(item.id, v),
+    });
+  }));
+}
+
+/**
  * 渲染设置页
  * @param {HTMLElement} container - #view-root
  */
@@ -275,6 +311,9 @@ export function renderSettings(container) {
       build: (prefs) => [
         section('🧩 导航与入口', '导航栏与账号入口的显示方式，拨动即时生效。',
           [buildNavPrefsPanel()]),
+        section('🧭 侧边栏菜单', '右侧抽屉里显示哪些入口；关闭后仍可从对应大类页进入。', [
+          buildDrawerNavPanel(),
+        ]),
         section('🚪 启动页', '直接打开站点（没有 #/xxx）时落在哪一页。', [
           el('div', { class: 'settings-choices' },
             START_PAGE_OPTIONS.map((opt) => choiceCard({
@@ -288,25 +327,33 @@ export function renderSettings(container) {
               },
             }))),
         ]),
-        section('💬 悬浮与提醒', '页面角落的常驻组件，按需保留。', [
-          switchRow({
-            name: '悬浮聊天坞',
-            hint: '右下角的聊天 / 在线按钮；关闭后仍可从导航栏「聊天」进入',
-            checked: prefs.floatChat,
-            onChange: (v) => setUiPrefs({ floatChat: v }),
-          }),
-          switchRow({
-            name: '好友申请红点',
-            hint: '导航栏「好友」上的待处理申请数字角标',
-            checked: prefs.friendBadge,
-            onChange: (v) => setUiPrefs({ friendBadge: v }),
-          }),
-          switchRow({
-            name: '好友申请弹窗提示',
-            hint: '收到好友申请时在右下角弹出提示条',
-            checked: prefs.friendToast,
-            onChange: (v) => setUiPrefs({ friendToast: v }),
-          }),
+        section('💬 悬浮与提醒', '页面角落的常驻组件与提示，按需保留。', [
+          el('div', { class: 'nav-prefs' }, [
+            switchRow({
+              name: '悬浮聊天坞',
+              hint: '右下角的聊天 / 在线按钮；关闭后仍可从导航栏「聊天」进入',
+              checked: prefs.floatChat,
+              onChange: (v) => setUiPrefs({ floatChat: v }),
+            }),
+            switchRow({
+              name: '好友申请红点',
+              hint: '导航栏「好友」上的待处理申请数字角标',
+              checked: prefs.friendBadge,
+              onChange: (v) => setUiPrefs({ friendBadge: v }),
+            }),
+            switchRow({
+              name: '好友申请弹窗提示',
+              hint: '收到好友申请时在右下角弹出提示条',
+              checked: prefs.friendToast,
+              onChange: (v) => setUiPrefs({ friendToast: v }),
+            }),
+            switchRow({
+              name: '好友上线提醒',
+              hint: '好友上线时弹出提示；也可在好友页顶部按钮开关',
+              checked: prefs.friendOnline,
+              onChange: (v) => setUiPrefs({ friendOnline: v }),
+            }),
+          ]),
         ]),
       ],
     },

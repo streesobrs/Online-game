@@ -1994,6 +1994,15 @@ class GameManager {
     return game.player1 === accountId || game.player2 === accountId;
   }
 
+  // 获取该账号正在观战的对局 id（无则返回 null）
+  getSpectatedGameId(accountId) {
+    if (!accountId) return null;
+    for (const [gameId, spectators] of this.spectators) {
+      if (spectators && spectators.has(accountId)) return gameId;
+    }
+    return null;
+  }
+
   // 获取账号当前进行中的对局 ID（PvP 或 AI），供好友列表直接观战
   getLiveGameIdForAccount(accountId) {
     if (!accountId) return null;

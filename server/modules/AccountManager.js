@@ -25,6 +25,22 @@ const ROGUE_META_KNOWN_KEYS = new Set([
   'charStats', 'ascension', 'hardcore'
 ]);
 
+// ---- 活动周期键（按本地时区，用于日/周/月计数重置） ----
+function dayKeyOf(ts) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+function weekKeyOf(ts) {
+  const d = new Date(ts);
+  const offset = (d.getDay() + 6) % 7; // 周一为一周起点
+  const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - offset);
+  return `${monday.getFullYear()}-${monday.getMonth() + 1}-${monday.getDate()}`;
+}
+function monthKeyOf(ts) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${d.getMonth() + 1}`;
+}
+
 class AccountManager {
   constructor(io = null) {
     // 密码哈希迭代次数 - 可根据需要调整
@@ -290,6 +306,371 @@ class AccountManager {
     return sessionToken.verifySessionToken(token);
   }
 
+  // 追加一条登录历史（最多保留最近 10 条），返回新数组供 dataStore.update 使用
+  buildLoginHistory(account, ip, type, time = Date.now()) {
+    const history = Array.isArray(account?.account?.loginHistory)
+      ? account.account.loginHistory
+      : [];
+    return [...history, { ip: ip || '未知', time, type: type || 'login' }].slice(-10);
+  }
+
+  // 每日任务配置（进度来自 activity 里的当日计数，奖励通过邮件发放）
+  static DAILY_TASKS = [
+    { id: 'games3', name: '完成 3 局对局', metric: 'dailyGames', target: 3, reward: { exp: 300, starCoins: 30 } },
+    { id: 'win1', name: '赢得 1 局对局', metric: 'dailyWins', target: 1, reward: { exp: 200, starCoins: 20 } },
+    { id: 'chat5', name: '发送 5 条聊天', metric: 'dailyChatMessages', target: 5, reward: { exp: 150, starCoins: 15 } },
+  ];
+
+  /**
+   * 归一化活动计数：跨自然日/周/月时把周期计数清零。
+   * @returns {{activity: object, changed: boolean}} changed 为 true 时调用方应把 activity 写回
+   */
+  normalizeActivity(rawActivity, now = Date.now()) {
+    const activity = { ...(rawActivity || {}) };
+    let changed = false;
+
+    const dailyKey = dayKeyOf(now);
+    if (!activity.lastDailyReset || dayKeyOf(activity.lastDailyReset) !== dailyKey) {
+      activity.dailyGames = 0;
+      activity.dailyWins = 0;
+      activity.dailyChatMessages = 0;
+      activity.lastDailyReset = now;
+      changed = true;
+    }
+    if (!activity.lastWeeklyReset || weekKeyOf(activity.lastWeeklyReset) !== weekKeyOf(now)) {
+      activity.weeklyGames = 0;
+      activity.lastWeeklyReset = now;
+      changed = true;
+    }
+    if (!activity.lastMonthlyReset || monthKeyOf(activity.lastMonthlyReset) !== monthKeyOf(now)) {
+      activity.monthlyGames = 0;
+      activity.lastMonthlyReset = now;
+      changed = true;
+    }
+    if (!activity.dailyTaskClaims || activity.dailyTaskClaims.date !== dailyKey) {
+      activity.dailyTaskClaims = { date: dailyKey, ids: [] };
+      changed = true;
+    }
+    return { activity, changed };
+  }
+
+  // 签到奖励：连续天数越高奖励越多，第 7 天额外送 1 张抽奖券
+  _dailySignInReward(streak) {
+    const s = Math.max(1, Math.min(Number(streak) || 1, 7));
+    return {
+      starCoins: 20 + s * 5,
+      exp: 100 + s * 20,
+      tickets: s === 7 ? 1 : 0,
+    };
+  }
+
+  // 每日签到 / 任务状态
+  async getDailyStatus(accountId) {
+    try {
+      const account = await dataStore.findOne('accounts', { 'account.id': accountId });
+      if (!account) return { success: false, message: '账号不存在' };
+
+      const now = Date.now();
+      const { activity } = this.normalizeActivity(account.account?.activity || {}, now);
+      const today = dayKeyOf(now);
+      const signedToday = Number(activity.lastSignIn) > 0 && dayKeyOf(activity.lastSignIn) === today;
+      const streak = Number(activity.signInStreak) || 0;
+      const claimedIds = activity.dailyTaskClaims?.date === today
+        ? (activity.dailyTaskClaims.ids || [])
+        : [];
+
+      const tasks = AccountManager.DAILY_TASKS.map((t) => {
+        const progress = Math.min(t.target, Number(activity[t.metric]) || 0);
+        return {
+          id: t.id,
+          name: t.name,
+          target: t.target,
+          progress,
+          reward: t.reward,
+          done: progress >= t.target,
+          claimed: claimedIds.includes(t.id),
+        };
+      });
+
+      return {
+        success: true,
+        data: {
+          signedToday,
+          streak,
+          // 未签到时展示「今天签到可得」
+          signInReward: this._dailySignInReward(signedToday ? streak : streak + 1),
+          tasks,
+        },
+      };
+    } catch (err) {
+      logger.error('获取每日状态失败', { accountId, error: err.message });
+      return { success: false, message: '获取每日状态失败' };
+    }
+  }
+
+  // 每日签到：连续签到天数累加，奖励通过邮件发放
+  async dailyCheckIn(accountId) {
+    try {
+      const account = await dataStore.findOne('accounts', { 'account.id': accountId });
+      if (!account) return { success: false, message: '账号不存在' };
+
+      const now = Date.now();
+      const { activity } = this.normalizeActivity(account.account?.activity || {}, now);
+      const today = dayKeyOf(now);
+
+      if (Number(activity.lastSignIn) > 0 && dayKeyOf(activity.lastSignIn) === today) {
+        return { success: false, message: '今天已经签到过了' };
+      }
+
+      const yesterday = dayKeyOf(now - 24 * 60 * 60 * 1000);
+      const continued = Number(activity.lastSignIn) > 0
+        && dayKeyOf(activity.lastSignIn) === yesterday;
+      const streak = continued ? (Number(activity.signInStreak) || 0) + 1 : 1;
+
+      activity.signInStreak = streak;
+      activity.lastSignIn = now;
+
+      await dataStore.update('accounts', { 'account.id': accountId }, {
+        'account.activity': activity,
+        'account.updatedAt': now
+      });
+
+      const reward = this._dailySignInReward(streak);
+      await this.sendMail(accountId, {
+        title: `每日签到 · 连续 ${streak} 天`,
+        content: `连续签到第 ${streak} 天，感谢你的坚持，奖励已附上。`,
+        starCoins: reward.starCoins,
+        exp: reward.exp,
+        tickets: reward.tickets,
+        from: '每日签到',
+      });
+
+      logger.info('每日签到成功', { accountId, streak });
+      return { success: true, message: `签到成功，连续 ${streak} 天`, data: { streak, reward } };
+    } catch (err) {
+      logger.error('每日签到失败', { accountId, error: err.message });
+      return { success: false, message: '签到失败，请稍后重试' };
+    }
+  }
+
+  // 领取每日任务奖励（奖励通过邮件发放）
+  async claimDailyTask(accountId, taskId) {
+    const task = AccountManager.DAILY_TASKS.find((t) => t.id === taskId);
+    if (!task) return { success: false, message: '任务不存在' };
+
+    try {
+      const account = await dataStore.findOne('accounts', { 'account.id': accountId });
+      if (!account) return { success: false, message: '账号不存在' };
+
+      const now = Date.now();
+      const { activity } = this.normalizeActivity(account.account?.activity || {}, now);
+      const today = dayKeyOf(now);
+      const claims = activity.dailyTaskClaims?.date === today
+        ? activity.dailyTaskClaims
+        : { date: today, ids: [] };
+
+      if (claims.ids.includes(task.id)) {
+        return { success: false, message: '该任务今日已领取' };
+      }
+      if ((Number(activity[task.metric]) || 0) < task.target) {
+        return { success: false, message: '任务尚未完成' };
+      }
+
+      claims.ids.push(task.id);
+      activity.dailyTaskClaims = claims;
+
+      await dataStore.update('accounts', { 'account.id': accountId }, {
+        'account.activity': activity,
+        'account.updatedAt': now
+      });
+
+      await this.sendMail(accountId, {
+        title: `每日任务 · ${task.name}`,
+        content: '任务奖励已发放，继续加油！',
+        starCoins: task.reward.starCoins || 0,
+        exp: task.reward.exp || 0,
+        tickets: task.reward.tickets || 0,
+        from: '每日任务',
+      });
+
+      logger.info('每日任务奖励领取', { accountId, taskId: task.id });
+      return { success: true, message: '领取成功，奖励已发送到邮箱', data: { taskId: task.id, reward: task.reward } };
+    } catch (err) {
+      logger.error('领取每日任务失败', { accountId, taskId, error: err.message });
+      return { success: false, message: '领取失败，请稍后重试' };
+    }
+  }
+
+  // ---- 每日一题：五子棋残局（黑先，一步连成五子）----
+  // 题目按自然日轮换（同一天全服同一题），答案由服务端校验，客户端拿不到 solutions
+  static PUZZLE_SIZE = 19;
+  static PUZZLE_REWARD = { starCoins: 60, exp: 300 };
+  static DAILY_PUZZLES = [
+    {
+      id: 'p1',
+      title: '横向收官',
+      tip: '黑棋右侧被堵，找出另一端的制胜点。',
+      black: [[9, 5], [9, 6], [9, 7], [9, 8], [7, 7], [11, 7], [8, 9]],
+      white: [[9, 9], [8, 8], [10, 8], [7, 9], [11, 9], [6, 6]],
+      solutions: [[9, 4]],
+    },
+    {
+      id: 'p2',
+      title: '纵向突破',
+      tip: '四子竖排，上方已封，落子何处？',
+      black: [[4, 9], [5, 9], [6, 9], [7, 9], [4, 6], [6, 6], [8, 11]],
+      white: [[3, 9], [5, 8], [7, 8], [9, 9], [5, 11], [7, 11]],
+      solutions: [[8, 9]],
+    },
+    {
+      id: 'p3',
+      title: '斜线一击',
+      tip: '顺着对角线看，答案就在延长线尽头。',
+      black: [[5, 5], [6, 6], [7, 7], [8, 8], [6, 4], [8, 10]],
+      white: [[4, 4], [7, 5], [5, 7], [9, 6], [4, 8]],
+      solutions: [[9, 9]],
+    },
+    {
+      id: 'p4',
+      title: '反斜连线',
+      tip: '另一条对角线同样致命。',
+      black: [[4, 10], [5, 9], [6, 8], [7, 7], [6, 10], [4, 6]],
+      white: [[3, 11], [5, 5], [7, 11], [3, 7], [9, 10]],
+      solutions: [[8, 6]],
+    },
+    {
+      id: 'p5',
+      title: '补中制胜',
+      tip: '中间留了一个空位，填上就是五连。',
+      black: [[9, 4], [9, 5], [9, 7], [9, 8], [7, 5], [11, 7]],
+      white: [[9, 3], [9, 9], [8, 6], [10, 6], [7, 8]],
+      solutions: [[9, 6]],
+    },
+    {
+      id: 'p6',
+      title: '竖缝补刀',
+      tip: '竖线上的缺口，就是唯一的胜点。',
+      black: [[5, 4], [6, 4], [8, 4], [9, 4], [6, 3], [8, 5]],
+      white: [[4, 4], [10, 4], [6, 5], [8, 6], [7, 6]],
+      solutions: [[7, 4]],
+    },
+  ];
+
+  /** 本地日期对应的天序号（同一天全服同一题） */
+  static puzzleDayIndex(now = Date.now()) {
+    const d = new Date(now);
+    const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    return Math.floor(dayStart / 86400000);
+  }
+
+  /** 取当天题目（含答案，仅供服务端内部使用） */
+  static puzzleOfDay(now = Date.now()) {
+    const list = AccountManager.DAILY_PUZZLES;
+    return list[AccountManager.puzzleDayIndex(now) % list.length];
+  }
+
+  // 获取每日一题状态（不返回答案）
+  async getDailyPuzzle(accountId) {
+    try {
+      const account = await dataStore.findOne('accounts', { 'account.id': accountId });
+      if (!account) return { success: false, message: '账号不存在' };
+
+      const now = Date.now();
+      const today = dayKeyOf(now);
+      const puzzle = AccountManager.puzzleOfDay(now);
+      const progress = account.account?.activity?.puzzle;
+      const isToday = progress && progress.date === today;
+
+      return {
+        success: true,
+        data: {
+          date: today,
+          puzzleId: puzzle.id,
+          title: puzzle.title,
+          tip: puzzle.tip,
+          size: AccountManager.PUZZLE_SIZE,
+          black: puzzle.black,
+          white: puzzle.white,
+          reward: AccountManager.PUZZLE_REWARD,
+          solved: !!(isToday && progress.solved),
+          attempts: isToday ? (Number(progress.attempts) || 0) : 0,
+        },
+      };
+    } catch (err) {
+      logger.error('获取每日一题失败', { accountId, error: err.message });
+      return { success: false, message: '获取每日一题失败' };
+    }
+  }
+
+  // 提交每日一题答案（服务端校验，答对后奖励通过邮件发放，每日仅一次）
+  async submitDailyPuzzle(accountId, r, c) {
+    const row = Number(r);
+    const col = Number(c);
+    const size = AccountManager.PUZZLE_SIZE;
+    if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || col < 0 || row >= size || col >= size) {
+      return { success: false, message: '落点无效' };
+    }
+
+    try {
+      const account = await dataStore.findOne('accounts', { 'account.id': accountId });
+      if (!account) return { success: false, message: '账号不存在' };
+
+      const now = Date.now();
+      const today = dayKeyOf(now);
+      const puzzle = AccountManager.puzzleOfDay(now);
+      const { activity } = this.normalizeActivity(account.account?.activity || {}, now);
+      const prev = activity.puzzle && activity.puzzle.date === today
+        ? activity.puzzle
+        : { date: today, solved: false, attempts: 0 };
+
+      const occupied = [...puzzle.black, ...puzzle.white]
+        .some(([rr, cc]) => rr === row && cc === col);
+      if (occupied) return { success: false, message: '该位置已有棋子' };
+
+      const correct = puzzle.solutions.some(([rr, cc]) => rr === row && cc === col);
+
+      if (!correct) {
+        activity.puzzle = { ...prev, attempts: (Number(prev.attempts) || 0) + 1 };
+        await dataStore.update('accounts', { 'account.id': accountId }, {
+          'account.activity': activity,
+          'account.updatedAt': now
+        });
+        return {
+          success: true,
+          data: { correct: false, attempts: activity.puzzle.attempts, message: '这一步没能连成五子，再想想' },
+        };
+      }
+
+      if (prev.solved) return { success: false, message: '今日残局已经通关' };
+
+      activity.puzzle = {
+        date: today,
+        solved: true,
+        attempts: (Number(prev.attempts) || 0) + 1,
+        solvedAt: now,
+      };
+      await dataStore.update('accounts', { 'account.id': accountId }, {
+        'account.activity': activity,
+        'account.updatedAt': now
+      });
+
+      const reward = AccountManager.PUZZLE_REWARD;
+      await this.sendMail(accountId, {
+        title: `每日一题 · ${puzzle.title}`,
+        content: '残局挑战成功！奖励已附上，明天再来挑战新题目。',
+        starCoins: reward.starCoins,
+        exp: reward.exp,
+        from: '每日一题',
+      });
+
+      logger.info('每日一题通关', { accountId, puzzleId: puzzle.id });
+      return { success: true, data: { correct: true, solved: true, reward } };
+    } catch (err) {
+      logger.error('提交每日一题失败', { accountId, error: err.message });
+      return { success: false, message: '提交失败，请稍后重试' };
+    }
+  }
+
   // 检查用户名是否已存在
   async usernameExists(username) {
     try {
@@ -402,12 +783,15 @@ class AccountManager {
       const returnPlayer = daysSinceLastLogin >= 7;
       const longReturnPlayer = daysSinceLastLogin >= 30;
 
-      // 更新最后登录时间、登录次数与登录 IP
+      // 更新最后登录时间、登录次数、登录 IP 与登录历史
       const loginCount = (account.account?.loginCount || 0) + 1;
+      const lastLoginIp = ip || account.account?.lastLoginIp || null;
+      const loginHistory = this.buildLoginHistory(account, ip, 'password', now);
       await dataStore.update('accounts', { 'account.id': account.account.id }, {
         'account.lastLogin': now,
         'account.lastSeen': now,
-        'account.lastLoginIp': ip || account.account?.lastLoginIp || null,
+        'account.lastLoginIp': lastLoginIp,
+        'account.loginHistory': loginHistory,
         'account.activity.returnPlayer': returnPlayer,
         'account.activity.longReturnPlayer': longReturnPlayer,
         'account.loginCount': loginCount,
@@ -423,6 +807,8 @@ class AccountManager {
         ...account,
         account: {
           ...account.account,
+          lastLoginIp,
+          loginHistory,
           security: undefined
         }
       };
@@ -752,6 +1138,7 @@ class AccountManager {
         lastSeen: now,
         lastLogin: now,
         lastLoginIp: ip || null,
+        loginHistory: ip ? [{ ip, time: now, type: 'guest' }] : [],
         loginCount: 1,
         profile: {
           avatar: null,
@@ -892,7 +1279,7 @@ class AccountManager {
   }
 
   // 通过token获取账号信息
-  async getAccountByToken(token) {
+  async getAccountByToken(token, ip = '') {
     try {
       // 验证token并获取账号ID
       const accountId = this.verifySessionToken(token);
@@ -912,12 +1299,16 @@ class AccountManager {
         };
       }
 
-      // 更新最后登录时间和登录次数
+      // 更新最后登录时间、登录次数、登录 IP 与登录历史
       const now = Date.now();
       const loginCount = (account.account?.loginCount || 0) + 1;
+      const lastLoginIp = ip || account.account?.lastLoginIp || null;
+      const loginHistory = this.buildLoginHistory(account, ip, 'token', now);
       await dataStore.update('accounts', { 'account.id': account.account.id }, {
         'account.lastLogin': now,
         'account.lastSeen': now,
+        'account.lastLoginIp': lastLoginIp,
+        'account.loginHistory': loginHistory,
         'account.loginCount': loginCount,
         'account.updatedAt': now
       });
@@ -1026,6 +1417,7 @@ class AccountManager {
           nickname: this.normalizeNickname(nickname, username),
           updatedAt: now,
           lastLoginIp: ip || guestAccount.account.lastLoginIp || null,
+          loginHistory: this.buildLoginHistory(guestAccount, ip, 'register', now),
           security: {
             passwordSalt: salt,
             passwordHash: passwordHash,
@@ -1080,6 +1472,7 @@ class AccountManager {
           lastSeen: now,
           lastLogin: now,
           lastLoginIp: ip || null,
+          loginHistory: ip ? [{ ip, time: now, type: 'register' }] : [],
           loginCount: 1,
           profile: {
             avatar: null,
@@ -1237,12 +1630,15 @@ class AccountManager {
       const returnPlayer = daysSinceLastLogin >= 7;
       const longReturnPlayer = daysSinceLastLogin >= 30;
 
-      // 更新最后登录时间、登录次数与登录 IP
+      // 更新最后登录时间、登录次数、登录 IP 与登录历史
       const loginCount = (account.account?.loginCount || 0) + 1;
+      const lastLoginIp = ip || account.account?.lastLoginIp || null;
+      const loginHistory = this.buildLoginHistory(account, ip, 'password', now);
       await dataStore.update('accounts', { 'account.id': account.account.id }, {
         'account.lastLogin': now,
         'account.lastSeen': now,
-        'account.lastLoginIp': ip || account.account?.lastLoginIp || null,
+        'account.lastLoginIp': lastLoginIp,
+        'account.loginHistory': loginHistory,
         'account.activity.returnPlayer': returnPlayer,
         'account.activity.longReturnPlayer': longReturnPlayer,
         'account.loginCount': loginCount,
@@ -1261,6 +1657,8 @@ class AccountManager {
         hasPassword,
         account: {
           ...account.account,
+          lastLoginIp,
+          loginHistory,
           security: undefined
         }
       };
@@ -1430,11 +1828,14 @@ class AccountManager {
         return { success: false, message: '账号不存在' };
       }
 
-      const activity = account.account?.activity || { chatMessages: 0 };
+      const now = Date.now();
+      // 先归一化，保证跨天后当日聊天计数从 0 开始
+      const { activity } = this.normalizeActivity(account.account?.activity || { chatMessages: 0 }, now);
       activity.chatMessages = (activity.chatMessages || 0) + 1;
+      activity.dailyChatMessages = (activity.dailyChatMessages || 0) + 1;
 
-      await dataStore.update('accounts', { 'account.id': id }, { 'account.activity': activity, 'account.updatedAt': Date.now() });
-      logger.info('聊天消息统计更新', { id, total: activity.chatMessages });
+      await dataStore.update('accounts', { 'account.id': id }, { 'account.activity': activity, 'account.updatedAt': now });
+      logger.info('聊天消息统计更新', { id, total: activity.chatMessages, daily: activity.dailyChatMessages });
 
       return { success: true };
     } catch (err) {
@@ -1531,20 +1932,9 @@ class AccountManager {
         }
       };
 
-      // 初始化活动数据
-      const activity = account.account?.activity || {
-        chatMessages: 0,
-        signInStreak: 0,
-        returnPlayer: false,
-        longReturnPlayer: false,
-        dailyGames: 0,
-        weeklyGames: 0,
-        monthlyGames: 0,
-        lastDailyReset: Date.now(),
-        lastWeeklyReset: Date.now(),
-        lastMonthlyReset: Date.now()
-      };
+      // 初始化活动数据（先归一化：跨天/周/月时清零周期计数）
       const now = Date.now();
+      const { activity } = this.normalizeActivity(account.account?.activity || {}, now);
 
       // 处理游戏结果
       if (gameType && games[gameType]) {
@@ -1618,9 +2008,12 @@ class AccountManager {
       }
 
       // 更新活动数据
-      activity.dailyGames += 1;
-      activity.weeklyGames += 1;
-      activity.monthlyGames += 1;
+      activity.dailyGames = (activity.dailyGames || 0) + 1;
+      activity.weeklyGames = (activity.weeklyGames || 0) + 1;
+      activity.monthlyGames = (activity.monthlyGames || 0) + 1;
+      if (result === 'win') {
+        activity.dailyWins = (activity.dailyWins || 0) + 1;
+      }
 
       // 检查是否是首次游戏
       if (stats.totalGames === 1) {

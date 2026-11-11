@@ -288,6 +288,27 @@ a.nav-btn.nav-btn--admin.hidden {
     margin-left: 2px;
 }
 
+/* ---- 内页返回按钮（从大类页进入的二级页面共用）---- */
+.page-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    color: var(--text-secondary, #718096);
+    background: transparent;
+    border: 1px solid var(--theme-border-color, #e2e8f0);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.page-back-btn:hover {
+    color: var(--theme-accent, #6366f1);
+    border-color: var(--theme-accent, #6366f1);
+}
+
 /* ---- 好友申请红点（顶部导航 / 全局抽屉共用）---- */
 .nav-btn__badge {
     position: absolute;
@@ -671,6 +692,16 @@ select:focus {
 
 .nav-pref-switch input:checked+.nav-pref-slider::before {
     transform: translateX(18px);
+}
+
+/* 固定项（如「设置」入口）不可关闭 */
+.nav-pref-switch input:disabled+.nav-pref-slider {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.nav-pref-row:has(input:disabled) {
+    cursor: default;
 }
 
 #drawer-root {

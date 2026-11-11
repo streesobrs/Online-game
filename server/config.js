@@ -124,6 +124,9 @@ module.exports = {
     port: process.env.PORT || 8080,
     host: process.env.HOST || '0.0.0.0',
     env: process.env.NODE_ENV || 'development',
+    // 是否信任反向代理转发来的客户端 IP（X-Forwarded-For / X-Real-IP）。
+    // 仅当服务部署在 Nginx/CDN 等可信代理之后才可开启，直连时开启会允许客户端伪造 IP。
+    trustProxy: String(process.env.TRUST_PROXY || '').toLowerCase() === 'true',
     // Socket.IO 实时通信配置
     socket: {
       pingTimeout: 120000,        // ping超时时间（毫秒），超过此时间无响应判定为断开（2分钟）

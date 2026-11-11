@@ -27,6 +27,31 @@
   flex-wrap: wrap;
 }
 
+/* 游戏大类下的二级入口（排行榜 / 观战 / 每日一题） */
+.games-hero-links {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.games-hero-link {
+  padding: 8px 14px;
+  border: 1px solid var(--theme-border-color, #e2e8f0);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  color: var(--text-primary, #1a202c);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.games-hero-link:hover {
+  border-color: var(--theme-accent, #6366f1);
+  color: var(--theme-accent, #6366f1);
+  transform: translateY(-1px);
+}
+
 .games-hero-text h1 {
   font-size: 26px;
   font-weight: 800;

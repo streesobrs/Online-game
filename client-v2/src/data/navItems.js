@@ -73,6 +73,7 @@ export const NAV_ITEMS = [
     shortcut: 'L',
     category: '辅助',
     order: 11,
+    parent: 'games', // 归入「游戏」大类，顶部导航不再单独展示
   },
   {
     id: 'spectate',
@@ -82,6 +83,17 @@ export const NAV_ITEMS = [
     shortcut: 'V',
     category: '辅助',
     order: 13,
+    parent: 'games', // 归入「游戏」大类
+  },
+  {
+    // 每日一题：五子棋残局挑战（独立页 #/puzzle）
+    id: 'puzzle',
+    type: 'feature',
+    name: '每日一题',
+    icon: '🧩',
+    category: '辅助',
+    order: 12.6,
+    parent: 'games', // 归入「游戏」大类
   },
   {
     id: 'feedback',
@@ -91,6 +103,7 @@ export const NAV_ITEMS = [
     shortcut: 'F',
     category: '辅助',
     order: 12,
+    parent: 'profile', // 归入「个人资料」大类
   },
   {
     // 肉鸽图鉴 / 养成：不只在消消乐里能看，做成站点级整页入口（#/codex），
@@ -101,6 +114,7 @@ export const NAV_ITEMS = [
     icon: '📖',
     category: '辅助',
     order: 12.5,
+    parent: 'profile', // 归入「个人资料」大类
   },
   {
     // 消费中心：商城 / 抽奖 / 背包 / 我的装扮，独立导航项，不再挂在个人资料页

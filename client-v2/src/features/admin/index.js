@@ -895,6 +895,11 @@ export function renderAdmin(container) {
     ];
 
     const ops = el('div', { class: 'admin-account-ops' }, [
+      el('button', {
+        class: 'admin-btn admin-btn--sm admin-btn--ghost',
+        type: 'button',
+        onClick: () => openLoginHistory(inner),
+      }, '登录记录'),
       inner.isBanned
         ? el('button', {
           class: 'admin-btn admin-btn--sm admin-btn--success',
@@ -979,6 +984,23 @@ export function renderAdmin(container) {
       ]),
       ops,
     ]);
+  }
+
+  function openLoginHistory(inner) {
+    const TYPE_NAMES = { password: '密码登录', token: '令牌登录', guest: '游客登录', register: '注册' };
+    const history = Array.isArray(inner.loginHistory) ? [...inner.loginHistory].reverse() : [];
+    const rows = history.length
+      ? history.map((h) => el('div', { class: 'admin-login-row' }, [
+        el('span', {}, h.ip || '—'),
+        el('span', {}, `${formatTime(h.time)} · ${TYPE_NAMES[h.type] || '登录'}`),
+      ]))
+      : [el('div', { class: 'admin-list-hint' }, '暂无登录记录')];
+    modal.show({
+      title: `登录记录 · ${inner.nickname || inner.username || inner.id}`,
+      content: el('div', { class: 'admin-login-list' }, rows),
+      confirmText: '关闭',
+      showCancel: false,
+    });
   }
 
   function openBanModal(inner) {

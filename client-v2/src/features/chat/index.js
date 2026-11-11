@@ -131,6 +131,52 @@ function pushPrivateMessage(conv, msg, partnerId) {
   pageViews.forEach((v) => v.onPrivateMessage(conv, partnerId));
 }
 
+// ===== 撤回 / 快捷短语 =====
+const RECALL_WINDOW = 2 * 60 * 1000;
+const QUICK_PHRASES = ['你好呀～', '来一局？', '稍等，马上来', '这步厉害！', '哈哈，承让了', '666', 'GG', '有事先走啦'];
+
+/** 是否可撤回（本人消息、2 分钟内、未撤回） */
+function canRecall(msg) {
+  if (!msg || !msg.messageId || msg.recalled) return false;
+  if (msg.userId == null || myId == null || String(msg.userId) !== String(myId)) return false;
+  return Date.now() - (Number(msg.timestamp) || 0) <= RECALL_WINDOW;
+}
+
+/** 发起撤回（scope: global / private），结果由 message_recalled 广播回来 */
+function requestRecall(msg, scope, targetUserId) {
+  emit('recall_message', { messageId: msg.messageId, scope, targetUserId });
+}
+
+/** 消息正文节点（撤回后显示占位文案） */
+function messageTextNode(msg) {
+  return el('div', {
+    class: 'chat-text' + (msg.recalled ? ' recalled' : ''),
+  }, msg.recalled ? '该消息已撤回' : msg.message);
+}
+
+/** 快捷短语选择器：点开选择后填入输入框 */
+function quickPhraseWidget(inputEl) {
+  const popup = el('div', { class: 'chat-quick-popup' }, QUICK_PHRASES.map((p) => el('button', {
+    class: 'chat-quick-item',
+    type: 'button',
+    onClick: () => {
+      inputEl.value = p;
+      popup.classList.remove('open');
+      inputEl.focus();
+    },
+  }, p)));
+  const toggle = el('button', {
+    class: 'chat-quick-btn',
+    type: 'button',
+    title: '快捷短语',
+    onClick: (e) => {
+      e.stopPropagation();
+      popup.classList.toggle('open');
+    },
+  }, '⚡');
+  return el('div', { class: 'chat-quick' }, [toggle, popup]);
+}
+
 /** 收到私聊消息 */
 eventBus.on('chat:privateMessage', (data) => {
   const conv = getPrivateConv(data.fromUserId, data.fromNickname);
@@ -187,6 +233,7 @@ eventBus.on('chat:privateHistory', (data) => {
       userId: m.fromUserId,
       nickname: m.fromNickname || '玩家',
       message: m.message,
+      recalled: !!m.recalled,
       timestamp: m.timestamp || Date.now(),
     };
   });
@@ -198,6 +245,30 @@ eventBus.on('chat:privateHistory', (data) => {
   conv.messages = merged;
   if (conv.messages.length > MAX_HISTORY) conv.messages.splice(0, conv.messages.length - MAX_HISTORY);
   pageViews.forEach((v) => v.onPrivateHistory(conv, data.targetUserId));
+});
+
+/** 消息被撤回：更新本地历史并通知视图 */
+eventBus.on('chat:messageRecalled', (data) => {
+  if (!data || !data.messageId) return;
+  if (data.scope === 'private') {
+    const conv = privateHistory.get(String(data.partnerId));
+    const msg = conv?.messages.find((m) => m.messageId === data.messageId);
+    if (msg) {
+      msg.recalled = true;
+      msg.message = '';
+    }
+    pageViews.forEach((v) => v.onRecalled && v.onRecalled(data.partnerId));
+    return;
+  }
+  ['global', 'game'].forEach((scope) => {
+    const msg = history[scope]?.find((m) => m.messageId === data.messageId);
+    if (msg) {
+      msg.recalled = true;
+      msg.message = '';
+    }
+  });
+  floatViews.forEach((v) => v.renderHistory());
+  pageViews.forEach((v) => v.onRecalled && v.onRecalled());
 });
 
 /** 全局常驻：聊天错误提示（禁言/频繁/维护/对方不在线等） */
@@ -238,20 +309,25 @@ function createChatView() {
   // ---- 渲染 ----
   function addMessage(msg) {
     const isSelf = msg.userId != null && String(msg.userId) === String(myId);
+    const senderRow = el('div', { class: 'chat-sender' }, [
+      el('span', { class: `chat-scope chat-scope--${channel}` }, channel === 'global' ? '大厅' : '局内'),
+      el('button', {
+        class: 'chat-nickname',
+        onClick: () => showUserCard(msg.userId),
+      }, msg.nickname),
+      el('span', { class: 'chat-time' }, formatMsgTime(msg.timestamp)),
+    ]);
+    // 局内消息暂不支持撤回，仅大厅消息可撤回
+    if (channel === 'global' && canRecall(msg)) {
+      senderRow.append(el('button', {
+        class: 'chat-recall-btn',
+        onClick: () => requestRecall(msg, 'global'),
+      }, '撤回'));
+    }
     messagesEl.append(
       el('div', { class: `chat-message ${isSelf ? 'self' : 'other'}` }, [
         el('div', { class: 'chat-message-avatar' }, avatarNode(msg.userId, 28)),
-        el('div', { class: 'chat-message-body' }, [
-          el('div', { class: 'chat-sender' }, [
-            el('span', { class: `chat-scope chat-scope--${channel}` }, channel === 'global' ? '大厅' : '局内'),
-            el('button', {
-              class: 'chat-nickname',
-              onClick: () => showUserCard(msg.userId),
-            }, msg.nickname),
-            el('span', { class: 'chat-time' }, formatMsgTime(msg.timestamp)),
-          ]),
-          el('div', { class: 'chat-text' }, msg.message),
-        ]),
+        el('div', { class: 'chat-message-body' }, [senderRow, messageTextNode(msg)]),
       ])
     );
     messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -296,7 +372,7 @@ function createChatView() {
     el('div', { class: 'chat-title' }, '💬 聊天'),
     selector,
     messagesEl,
-    el('div', { class: 'chat-input-container' }, [inputEl, sendBtn]),
+    el('div', { class: 'chat-input-container' }, [quickPhraseWidget(inputEl), inputEl, sendBtn]),
   ]);
   renderHistory();
   updateChannel();
@@ -352,7 +428,7 @@ export function renderChat(container = viewRoot()) {
   const panel = el('div', { class: 'chat-panel' }, [
     el('div', { class: 'chat-page-header' }, [backBtn, titleEl]),
     messagesEl,
-    el('div', { class: 'chat-input-container' }, [inputEl, sendBtn]),
+    el('div', { class: 'chat-input-container' }, [quickPhraseWidget(inputEl), inputEl, sendBtn]),
   ]);
   const main = el('div', { class: 'chat-main' }, [panel]);
   container.append(el('div', { class: 'chat-page' }, [sidebar, main]));
@@ -360,15 +436,20 @@ export function renderChat(container = viewRoot()) {
   // ---- 渲染 ----
   function messageNode(msg) {
     const isSelf = msg.userId != null && String(msg.userId) === String(myId);
+    const scope = currentTarget === null ? 'global' : 'private';
+    const senderRow = el('div', { class: 'chat-sender' }, [
+      el('button', { class: 'chat-nickname', onClick: () => showUserCard(msg.userId) }, msg.nickname),
+      el('span', { class: 'chat-time' }, formatMsgTime(msg.timestamp)),
+    ]);
+    if (canRecall(msg)) {
+      senderRow.append(el('button', {
+        class: 'chat-recall-btn',
+        onClick: () => requestRecall(msg, scope, currentTarget),
+      }, '撤回'));
+    }
     return el('div', { class: `chat-message ${isSelf ? 'self' : 'other'}` }, [
       el('div', { class: 'chat-message-avatar' }, avatarNode(msg.userId, 28)),
-      el('div', { class: 'chat-message-body' }, [
-        el('div', { class: 'chat-sender' }, [
-          el('button', { class: 'chat-nickname', onClick: () => showUserCard(msg.userId) }, msg.nickname),
-          el('span', { class: 'chat-time' }, formatMsgTime(msg.timestamp)),
-        ]),
-        el('div', { class: 'chat-text' }, msg.message),
-      ]),
+      el('div', { class: 'chat-message-body' }, [senderRow, messageTextNode(msg)]),
     ]);
   }
 
@@ -391,7 +472,9 @@ export function renderChat(container = viewRoot()) {
         onClick: () => openPrivate(conv.rawId, conv.nickname),
       }, [
         el('div', { class: 'chat-conv-name' }, conv.nickname || `玩家${String(conv.rawId).slice(0, 4)}`),
-        el('div', { class: 'chat-conv-preview' }, lastMsg ? lastMsg.message : '暂无消息'),
+        el('div', { class: 'chat-conv-preview' }, lastMsg
+          ? (lastMsg.recalled ? '已撤回一条消息' : lastMsg.message)
+          : '暂无消息'),
       ]));
     });
   }
@@ -474,6 +557,17 @@ export function renderChat(container = viewRoot()) {
       if (currentTarget !== null && String(currentTarget) === String(partnerId)) renderMessages(conv.messages);
     },
     onConversations: () => renderConvList(),
+    onRecalled: (partnerId) => {
+      renderConvList();
+      if (partnerId != null) {
+        if (currentTarget !== null && String(currentTarget) === String(partnerId)) {
+          const conv = privateHistory.get(String(partnerId));
+          renderMessages(conv ? conv.messages : []);
+        }
+      } else if (currentTarget === null) {
+        renderMessages(history.global);
+      }
+    },
     onPrivateHistory: (conv, partnerId) => {
       renderConvList();
       if (currentTarget !== null && String(currentTarget) === String(partnerId)) renderMessages(conv.messages);

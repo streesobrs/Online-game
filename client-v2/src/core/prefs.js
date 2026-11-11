@@ -11,7 +11,9 @@
  * - floatChat：右下角悬浮聊天坞
  * - friendBadge：好友申请红点
  * - friendToast：好友申请弹窗提示
+ * - friendOnline：好友上线提醒
  * - lastMove：棋盘最后一步标记
+ * - drawerHidden：侧边栏（全局抽屉）中隐藏的导航项 id 列表
  */
 
 const ANIM_ENABLED_KEY = 'ui-anim-enabled';
@@ -24,7 +26,9 @@ const START_PAGE_KEY = 'ui-start-page';
 const FLOAT_CHAT_KEY = 'ui-float-chat';
 const FRIEND_BADGE_KEY = 'ui-friend-badge';
 const FRIEND_TOAST_KEY = 'ui-friend-toast';
+const FRIEND_ONLINE_KEY = 'ui-friend-online';
 const LAST_MOVE_KEY = 'ui-last-move';
+const DRAWER_HIDDEN_KEY = 'ui-drawer-hidden';
 
 // 旧版偏好，读取时迁移
 const LEGACY_MOTION_KEY = 'ui-motion';
@@ -111,6 +115,16 @@ function readChoice(key, options, fallback) {
   return options.some((o) => o.id === saved) ? saved : fallback;
 }
 
+/** 读取侧边栏隐藏项（损坏数据按空数组处理） */
+function readDrawerHidden() {
+  try {
+    const list = JSON.parse(localStorage.getItem(DRAWER_HIDDEN_KEY) || '[]');
+    return Array.isArray(list) ? list.filter((id) => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 /** 读取当前界面偏好 */
 export function getUiPrefs() {
   const { enabled, speed } = readAnim();
@@ -126,13 +140,15 @@ export function getUiPrefs() {
     floatChat: localStorage.getItem(FLOAT_CHAT_KEY) !== '0',
     friendBadge: localStorage.getItem(FRIEND_BADGE_KEY) !== '0',
     friendToast: localStorage.getItem(FRIEND_TOAST_KEY) !== '0',
+    friendOnline: localStorage.getItem(FRIEND_ONLINE_KEY) !== '0',
     lastMove: localStorage.getItem(LAST_MOVE_KEY) !== '0',
+    drawerHidden: readDrawerHidden(),
   };
 }
 
 /**
  * 写入偏好并立即生效（只传要改的项）
- * @param {{animEnabled?: boolean, animSpeed?: number, toastPosition?: string, toastDuration?: number, startPage?: string, floatChat?: boolean, friendBadge?: boolean, friendToast?: boolean, lastMove?: boolean}} patch
+ * @param {{animEnabled?: boolean, animSpeed?: number, toastPosition?: string, toastDuration?: number, startPage?: string, floatChat?: boolean, friendBadge?: boolean, friendToast?: boolean, friendOnline?: boolean, lastMove?: boolean, drawerHidden?: string[]}} patch
  */
 export function setUiPrefs(patch) {
   if (patch.animEnabled !== undefined) {
@@ -150,11 +166,15 @@ export function setUiPrefs(patch) {
   if (patch.toastDirection !== undefined) localStorage.setItem(TOAST_DIR_KEY, patch.toastDirection);
   if (patch.toastDuration !== undefined) localStorage.setItem(TOAST_DURATION_KEY, String(patch.toastDuration));
   if (patch.startPage !== undefined) localStorage.setItem(START_PAGE_KEY, patch.startPage);
+  if (patch.drawerHidden !== undefined) {
+    localStorage.setItem(DRAWER_HIDDEN_KEY, JSON.stringify(patch.drawerHidden || []));
+  }
 
   const boolKeys = {
     floatChat: FLOAT_CHAT_KEY,
     friendBadge: FRIEND_BADGE_KEY,
     friendToast: FRIEND_TOAST_KEY,
+    friendOnline: FRIEND_ONLINE_KEY,
     lastMove: LAST_MOVE_KEY,
   };
   Object.entries(boolKeys).forEach(([field, key]) => {
@@ -167,7 +187,7 @@ export function setUiPrefs(patch) {
 export function resetUiPrefs() {
   [
     ANIM_ENABLED_KEY, ANIM_SPEED_KEY, DENSITY_KEY, TOAST_POS_KEY, TOAST_DIR_KEY, TOAST_DURATION_KEY, START_PAGE_KEY,
-    FLOAT_CHAT_KEY, FRIEND_BADGE_KEY, FRIEND_TOAST_KEY, LAST_MOVE_KEY,
+    FLOAT_CHAT_KEY, FRIEND_BADGE_KEY, FRIEND_TOAST_KEY, FRIEND_ONLINE_KEY, LAST_MOVE_KEY, DRAWER_HIDDEN_KEY,
     LEGACY_MOTION_KEY, LEGACY_REDUCE_MOTION_KEY,
   ].forEach((key) => localStorage.removeItem(key));
   applyUiPrefs();

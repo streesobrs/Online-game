@@ -9,8 +9,9 @@ import { getNavPrefs, setNavPrefs } from '../layouts/mode.js';
  * 单个开关行：左侧名称+说明，右侧拨动开关（整行可点）
  * 设置页的其它开关（如「减少动效」）也复用它
  */
-export function switchRow({ name, hint, checked, onChange }) {
+export function switchRow({ name, hint, checked, onChange, disabled = false }) {
   const input = el('input', { type: 'checkbox', checked: !!checked });
+  if (disabled) input.disabled = true;
   input.addEventListener('change', () => onChange(input.checked));
   return el('label', { class: 'nav-pref-row' }, [
     el('div', { class: 'nav-pref-label' }, [
@@ -53,7 +54,7 @@ export function buildNavPrefsPanel(onChange) {
   return el('div', { class: 'nav-prefs' }, [
     switchRow({
       name: '顶部导航栏',
-      hint: '游戏 / 好友 / 聊天 / 排行榜等导航按钮',
+      hint: '游戏 / 好友 / 聊天 / 商城等大类按钮',
       checked: prefs.topbar,
       onChange: (v) => { setNavPrefs({ topbar: v }); done(); },
     }),

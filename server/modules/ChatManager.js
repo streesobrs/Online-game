@@ -456,6 +456,102 @@ class ChatManager {
     return { success: true, offline: !targetOnline };
   }
 
+  // 观战弹幕：只允许观战者发言，且只广播给同一局的观战者（玩家看不到）
+  handleSpectateChat(socketId, data, io) {
+    const user = this.userManager.getUserBySocketId(socketId);
+    if (!user) return { success: false, message: '用户不存在' };
+
+    const gameId = this.gameManager.getSpectatedGameId(user.accountId);
+    if (!gameId) return { success: false, message: '你当前不在观战中' };
+
+    const raw = data && data.message;
+    const message = typeof raw === 'string' ? raw.trim() : '';
+    if (!message) return { success: false, message: '消息不能为空' };
+    if (message.length > config.chat.maxMessageLength) {
+      return { success: false, message: `消息不能超过 ${config.chat.maxMessageLength} 字` };
+    }
+    if (!this.checkRateLimit(user.accountId)) {
+      return { success: false, message: '发送过于频繁，请稍后再试' };
+    }
+
+    this.gameManager.broadcastToSpectators(gameId, 'spectate_message', {
+      gameId,
+      userId: user.accountId,
+      nickname: user.nickname || '观众',
+      message: this.sanitizeMessage(message),
+      timestamp: Date.now(),
+    }, io);
+
+    return { success: true };
+  }
+
+  // 撤回消息：仅本人可撤回，限发送后 2 分钟内；私聊会同时通知双方
+  recallMessage(socketId, data, io) {
+    const user = this.userManager.getUserBySocketId(socketId);
+    if (!user) return { success: false, message: '用户不存在' };
+
+    const { messageId, targetUserId } = data || {};
+    const scope = data?.scope === 'private' ? 'private' : 'global';
+    if (!messageId) return { success: false, message: '消息不存在' };
+
+    const RECALL_WINDOW = 2 * 60 * 1000;
+
+    if (scope === 'global') {
+      const msg = this.globalChatHistory.find((m) => m.messageId === messageId);
+      if (!msg) return { success: false, message: '消息不存在或已过期' };
+      if (String(msg.userId) !== String(user.accountId)) {
+        return { success: false, message: '只能撤回自己的消息' };
+      }
+      if (Date.now() - msg.timestamp > RECALL_WINDOW) {
+        return { success: false, message: '超过 2 分钟，无法撤回' };
+      }
+      msg.recalled = true;
+      msg.message = '';
+      this.saveChatHistory();
+      io.emit('message_recalled', { scope: 'global', messageId });
+      return { success: true };
+    }
+
+    if (!targetUserId) return { success: false, message: '会话不存在' };
+    const pairKey = this.privateKey(user.accountId, targetUserId);
+    const pairHistory = this.privateChatHistory.get(pairKey);
+    const msg = pairHistory ? pairHistory.find((m) => m.messageId === messageId) : null;
+    if (!msg) return { success: false, message: '消息不存在或已过期' };
+    if (String(msg.fromUserId) !== String(user.accountId)) {
+      return { success: false, message: '只能撤回自己的消息' };
+    }
+    if (Date.now() - msg.timestamp > RECALL_WINDOW) {
+      return { success: false, message: '超过 2 分钟，无法撤回' };
+    }
+
+    msg.recalled = true;
+    msg.message = '';
+
+    // 落盘防抖（与发送路径一致）
+    const pendingTimer = this.privateWriteTimers.get(pairKey);
+    if (pendingTimer) clearTimeout(pendingTimer);
+    this.privateWriteTimers.set(pairKey, setTimeout(async () => {
+      this.privateWriteTimers.delete(pairKey);
+      try {
+        await this.savePrivateConversation(pairKey);
+        await this.savePrivateIndex();
+      } catch (err) {
+        logger.error('保存私聊会话失败', { pairKey, error: err.message });
+      }
+    }, 200));
+
+    // 通知双方更新消息状态
+    const senderSocket = this.userManager.getSocketByAccountId(user.accountId);
+    if (senderSocket) {
+      senderSocket.emit('message_recalled', { scope: 'private', messageId, partnerId: targetUserId });
+    }
+    const targetSocket = this.userManager.getSocketByAccountId(targetUserId);
+    if (targetSocket) {
+      targetSocket.emit('message_recalled', { scope: 'private', messageId, partnerId: user.accountId });
+    }
+    return { success: true };
+  }
+
   // 获取全局聊天记录
   getGlobalChatHistory(limit = config.chat.defaultHistoryLimit) {
     return this.globalChatHistory.slice(-limit);

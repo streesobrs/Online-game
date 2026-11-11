@@ -33,7 +33,7 @@ class FriendsManager {
     return [String(a), String(b)].sort().join('|');
   }
 
-  // 批量获取玩家公开信息（accountId -> {accountId, nickname, level, lastLogin}）
+  // 批量获取玩家公开信息（accountId -> {accountId, nickname, level, lastLogin, lastSeen}）
   async _batchInfo(ids) {
     const map = {};
     const set = new Set(ids.map(String));
@@ -49,6 +49,7 @@ class FriendsManager {
           nickname: acc.account.nickname || acc.username || `玩家${String(accId).slice(0, 4)}`,
           level,
           lastLogin: acc.account.lastLogin || null,
+          lastSeen: acc.account.lastSeen || null,
         };
       }
     }

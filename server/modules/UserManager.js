@@ -104,16 +104,21 @@ class UserManager {
           // 60 秒内已有登录记录（如密码登录、v1 的 get_account_by_token）时不重复累加次数
           const recentLogin = lastLogin > 0 && now - lastLogin < 60 * 1000;
           const loginCount = (inner.loginCount || 0) + (recentLogin ? 0 : 1);
+          // 与密码登录间隔 60 秒内视为同一次登录，不重复写历史
+          const history = Array.isArray(inner.loginHistory) ? inner.loginHistory : [];
+          const loginHistory = recentLogin ? history : [...history, { ip, time: now, type: 'token' }].slice(-10);
           await dataStore.update('accounts', { 'account.id': accountId }, {
             'account.lastLogin': now,
             'account.lastSeen': now,
             'account.lastLoginIp': ip,
+            'account.loginHistory': loginHistory,
             'account.loginCount': loginCount,
             'account.updatedAt': now
           });
           inner.lastLogin = now;
           inner.lastSeen = now;
           inner.lastLoginIp = ip;
+          inner.loginHistory = loginHistory;
           inner.loginCount = loginCount;
         } catch (err) {
           logger.error('更新恢复登录信息失败', { accountId, error: err.message });

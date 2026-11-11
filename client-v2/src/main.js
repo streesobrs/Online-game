@@ -98,6 +98,7 @@ registerRoute('train3d', lazyView('./games/train3d/index.js', 'renderTrain3d'));
 registerRoute('codex', lazyView('./games/match3/codex-page.js', 'renderCodexPageView'));
 registerRoute('leaderboard', lazyView('./features/leaderboard/index.js', 'renderLeaderboard'));
 registerRoute('spectate', lazyView('./features/spectate/index.js', 'renderSpectate'));
+registerRoute('puzzle', lazyView('./features/puzzle/index.js', 'renderPuzzle'));
 registerRoute('feedback', lazyView('./features/feedback/index.js', 'renderFeedback'));
 registerRoute('profile', lazyView('./features/profile/index.js', 'renderProfile'));
 registerRoute('shop', lazyView('./features/shop/index.js', 'renderShop'));

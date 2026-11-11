@@ -211,3 +211,27 @@
     border-radius: 6px;
   }
 }
+/* 好友上线提醒开关 */
+.friends-page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.friends-notify-toggle {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, rgba(148, 163, 184, 0.2));
+  background: transparent;
+  color: var(--text-muted, #94a3b8);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.friends-notify-toggle.on {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.1);
+}

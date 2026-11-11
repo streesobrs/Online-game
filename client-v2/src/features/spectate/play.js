@@ -78,10 +78,37 @@ export function startSpectate(container, game) {
   }
   replayMoves(moves);
 
+  // ---- 观战弹幕 ----
+  const barrageLayer = el('div', { class: 'spectate-barrage-layer' });
+  const boardWrap = el('div', { class: 'spectate-board-wrap' }, [boardEl, barrageLayer]);
+  const barrageInput = el('input', { class: 'spectate-chat-input', placeholder: '发条弹幕为双方加油...' });
+  const barrageSend = el('button', { class: 'spectate-chat-send' }, '发送');
+  const sendBarrage = () => {
+    const message = barrageInput.value.trim();
+    if (!message) return;
+    emit('spectate_chat', { gameId, message });
+    barrageInput.value = '';
+  };
+  barrageSend.addEventListener('click', sendBarrage);
+  barrageInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendBarrage(); });
+
+  const BARRAGE_COLORS = ['#f87171', '#fbbf24', '#34d399', '#60a5fa', '#c084fc', '#f472b6'];
+  function pushBarrage(data) {
+    if (!data || !data.message) return;
+    const item = el('div', {
+      class: 'spectate-barrage-item',
+      style: `top:${4 + Math.floor(Math.random() * 72)}%;color:${BARRAGE_COLORS[Math.floor(Math.random() * BARRAGE_COLORS.length)]}`,
+    }, `${data.nickname || '观众'}：${data.message}`);
+    barrageLayer.append(item);
+    while (barrageLayer.children.length > 20) barrageLayer.firstElementChild.remove();
+    setTimeout(() => item.remove(), 6000);
+  }
+
   container.innerHTML = '';
   container.append(
     el('div', { class: 'spectate-match-info', style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;max-width:724px;width:100%;' }, [turnEl, leaveBtn]),
-    boardEl
+    boardWrap,
+    el('div', { class: 'spectate-chat-bar' }, [barrageInput, barrageSend])
   );
   updateStatus();
 
@@ -131,6 +158,12 @@ export function startSpectate(container, game) {
     } else if (data.r != null) {
       board.place(data.r, data.c, data.color || 1);
     }
+  }));
+
+  // 观战弹幕（只广播给同局观战者）
+  offs.push(eventBus.on('spectate:message', (data) => {
+    if (!data || (data.gameId && data.gameId !== gameId)) return;
+    pushBarrage(data);
   }));
 
   // 游戏结束（broadcastToSpectators 广播 game_ended）

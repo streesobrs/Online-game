@@ -1956,6 +1956,8 @@ class AdminManager {
         createdAt: account.account?.createdAt,
         lastSeen: account.account?.lastSeen,
         lastLogin: account.account?.lastLogin,
+        lastLoginIp: account.account?.lastLoginIp || null,
+        loginHistory: Array.isArray(account.account?.loginHistory) ? account.account.loginHistory : [],
         stats: account.stats || account.account?.stats,
         profile: account.account?.profile || account.profile,
         achievements: account.achievements || account.account?.achievements,
@@ -3386,7 +3388,16 @@ class AdminManager {
   }
 
   _writeRedeemCodes(data) {
-    fs.writeFileSync(this._redeemCodesPath(), JSON.stringify(data, null, 2) + '\n', 'utf8');
+    const filePath = this._redeemCodesPath();
+    // 先写临时文件再 rename，避免写入中途崩溃留下半截 JSON
+    const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+    fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2) + '\n', 'utf8');
+    try {
+      fs.renameSync(tmpPath, filePath);
+    } catch (err) {
+      try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+      throw err;
+    }
   }
 
   // 获取兑换码列表
@@ -3417,7 +3428,7 @@ class AdminManager {
   }
 
   // 新建 / 编辑兑换码
-  saveRedeemCode(socket, payload = {}) {
+  async saveRedeemCode(socket, payload = {}) {
     const adminInfo = this.adminSockets.get(socket.id);
     if (!adminInfo) {
       socket.emit('admin_action_result', { action: 'redeem_code', success: false, message: '未认证' });
@@ -3452,7 +3463,9 @@ class AdminManager {
       rewards.cosmetics = rewardsIn.cosmetics.map((id) => String(id).trim()).filter(Boolean);
     }
 
+    let release = null;
     try {
+      release = await dataStore.acquireLock('redeem-codes');
       const data = this._readRedeemCodes();
       if (!data.codes) data.codes = {};
       const previous = data.codes[code] || {};
@@ -3469,6 +3482,8 @@ class AdminManager {
       logger.error('保存兑换码失败', { code, error: err.message });
       socket.emit('admin_action_result', { action: 'redeem_code', success: false, message: '保存失败: ' + err.message });
       return;
+    } finally {
+      if (release) release();
     }
 
     if (this.operationLogger && adminInfo) {
@@ -3487,14 +3502,16 @@ class AdminManager {
   }
 
   // 删除兑换码
-  deleteRedeemCode(socket, code) {
+  async deleteRedeemCode(socket, code) {
     const adminInfo = this.adminSockets.get(socket.id);
     if (!adminInfo) {
       socket.emit('admin_action_result', { action: 'redeem_code', success: false, message: '未认证' });
       return;
     }
     const normalized = String(code || '').trim().toUpperCase();
+    let release = null;
     try {
+      release = await dataStore.acquireLock('redeem-codes');
       const data = this._readRedeemCodes();
       if (!data.codes?.[normalized]) {
         socket.emit('admin_action_result', { action: 'redeem_code', success: false, message: '兑换码不存在' });
@@ -3506,6 +3523,8 @@ class AdminManager {
       logger.error('删除兑换码失败', { code: normalized, error: err.message });
       socket.emit('admin_action_result', { action: 'redeem_code', success: false, message: '删除失败: ' + err.message });
       return;
+    } finally {
+      if (release) release();
     }
 
     if (this.operationLogger && adminInfo) {

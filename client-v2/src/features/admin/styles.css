@@ -920,3 +920,23 @@
     align-self: flex-start;
   }
 }
+
+/* 登录记录弹窗 */
+.admin-login-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.admin-login-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-muted, #94a3b8);
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--surface-2, rgba(148, 163, 184, 0.08));
+}

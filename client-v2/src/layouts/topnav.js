@@ -282,6 +282,9 @@ export function renderTopNav(container) {
   // 使用 FEATURES 中的第一个导航项 'games' 作为入口
   const gamesNav = { id: 'games', name: '游戏', icon: '🎮', shortcut: 'G' };
 
+  // 顶部导航只放大类入口：inProfile（并入个人资料）与 parent（归入某大类）的项不单独展示
+  const navFeatures = FEATURES.filter((i) => !i.inProfile && !i.parent);
+
   // 后台入口：默认隐藏，登录账号是管理员时才出现
   const adminBtn = el('a', {
     class: 'nav-btn nav-btn--admin hidden',
@@ -295,8 +298,8 @@ export function renderTopNav(container) {
   container.append(
     el('div', { class: 'nav-group nav-group--games' }, navButton(gamesNav)),
     el('div', { class: 'nav-divider' }),
-    // 已迁移进个人资料页 / 设置页的模块（成就/商城/主题/快捷键）不再出现在导航栏
-    el('div', { class: 'nav-group nav-group--features' }, FEATURES.filter((i) => !i.inProfile).map(navButton)),
+    // 已迁移进个人资料页 / 设置页 / 游戏页的二级模块不再出现在导航栏
+    el('div', { class: 'nav-group nav-group--features' }, navFeatures.map(navButton)),
     el('div', { class: 'nav-group nav-group--admin' }, adminBtn),
     el('div', { class: 'nav-divider' }),
     el('a', { class: 'nav-btn nav-btn--legacy', href: '/', title: '切换回旧版客户端' }, [

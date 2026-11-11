@@ -16,6 +16,21 @@
   text-align: center;
 }
 
+/* 标题行：返回按钮 + 标题 */
+.leaderboard-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+}
+
+.leaderboard-head .leaderboard-title {
+  flex: 1;
+  padding: 0;
+  text-align: left;
+}
+
 /* ===== 类型筛选 ===== */
 .leaderboard-controls {
   display: flex;

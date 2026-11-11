@@ -709,6 +709,60 @@ app.post('/api/redeem-code', authenticateUser, requireSelf(req => req.body.userI
   }
 });
 
+// 每日签到 / 每日任务
+app.get('/api/daily/status', authenticateUser, async (req, res) => {
+  try {
+    const result = await accountManager.getDailyStatus(req.authAccountId);
+    res.json(result);
+  } catch (err) {
+    logger.error('获取每日状态失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取每日状态失败' });
+  }
+});
+
+app.post('/api/daily/check-in', authenticateUser, async (req, res) => {
+  try {
+    const result = await accountManager.dailyCheckIn(req.authAccountId);
+    res.json(result);
+  } catch (err) {
+    logger.error('每日签到失败', { error: err.message });
+    res.status(500).json({ success: false, message: '签到失败' });
+  }
+});
+
+app.post('/api/daily/claim', authenticateUser, async (req, res) => {
+  try {
+    const { taskId } = req.body || {};
+    const result = await accountManager.claimDailyTask(req.authAccountId, taskId);
+    res.json(result);
+  } catch (err) {
+    logger.error('领取每日任务失败', { error: err.message });
+    res.status(500).json({ success: false, message: '领取失败' });
+  }
+});
+
+// 每日一题（五子棋残局）
+app.get('/api/puzzle/daily', authenticateUser, async (req, res) => {
+  try {
+    const result = await accountManager.getDailyPuzzle(req.authAccountId);
+    res.json(result);
+  } catch (err) {
+    logger.error('获取每日一题失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取每日一题失败' });
+  }
+});
+
+app.post('/api/puzzle/submit', authenticateUser, async (req, res) => {
+  try {
+    const { r, c } = req.body || {};
+    const result = await accountManager.submitDailyPuzzle(req.authAccountId, r, c);
+    res.json(result);
+  } catch (err) {
+    logger.error('提交每日一题失败', { error: err.message });
+    res.status(500).json({ success: false, message: '提交失败' });
+  }
+});
+
 // 星钻兑换抽奖券（1 张 / 10 张）
 app.post('/api/shop/lottery/tickets', authenticateUser, requireSelf(req => req.body.userId), async (req, res) => {
   try {
@@ -3137,7 +3191,7 @@ io.on('connection', (socket) => {
   // 通过token获取账号信息
   socket.on('get_account_by_token', async (data) => {
     const { token } = data;
-    const result = await accountManager.getAccountByToken(token);
+    const result = await accountManager.getAccountByToken(token, getClientIp(socket));
 
     // 创建用户会话，确保后续操作（如转正）能拿到 accountId
     if (result.success && result.data) {
@@ -3414,7 +3468,8 @@ io.on('connection', (socket) => {
       if (!account) return;
 
       const stats = account?.stats || {};
-      const activity = account?.account?.activity || {};
+      // 展示前先归一化，跨天/周/月后周期成就不再显示旧进度
+      const activity = accountManager.normalizeActivity(account?.account?.activity || {}).activity;
       const level = account?.account?.profile?.level || 1;
 
       // 聚合所有游戏类型的统计（胜利 / 最高分 / 消消乐各玩法进度），供 game_type 类成就使用
@@ -4811,6 +4866,22 @@ io.on('connection', (socket) => {
       return;
     }
     const result = chatManager.handlePrivateChat(socket.id, data, io);
+    if (!result.success) {
+      socket.emit('chat_error', { message: result.message });
+    }
+  });
+
+  // 观战弹幕（仅观战者，只发给同局观战者）
+  socket.on('spectate_chat', (data) => {
+    const result = chatManager.handleSpectateChat(socket.id, data || {}, io);
+    if (!result.success) {
+      socket.emit('chat_error', { message: result.message });
+    }
+  });
+
+  // 撤回消息（本人 + 2 分钟内）
+  socket.on('recall_message', (data) => {
+    const result = chatManager.recallMessage(socket.id, data || {}, io);
     if (!result.success) {
       socket.emit('chat_error', { message: result.message });
     }

@@ -114,6 +114,22 @@ export const api = {
     levelExp: () => api.get('/api/config/levelExp'),
   },
 
+  daily: {
+    /** 每日签到与任务状态 */
+    status: () => api.get('/api/daily/status'),
+    /** 每日签到 */
+    checkIn: () => api.post('/api/daily/check-in', {}),
+    /** 领取每日任务奖励 @param {string} taskId */
+    claim: (taskId) => api.post('/api/daily/claim', { taskId }),
+  },
+
+  puzzle: {
+    /** 每日一题（残局）状态与题目 */
+    daily: () => api.get('/api/puzzle/daily'),
+    /** 提交落点 @param {number} r @param {number} c */
+    submit: (r, c) => api.post('/api/puzzle/submit', { r, c }),
+  },
+
   mails: {
     /** 邮件列表 @param {string} accountId */
     get: (accountId) => api.get(`/api/mails/${encodeURIComponent(accountId)}`),

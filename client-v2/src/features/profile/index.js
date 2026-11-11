@@ -257,7 +257,7 @@ function openRedeemModal(onSuccess) {
  * @returns {Function} cleanup 函数
  */
 export function renderProfile(container) {
-  const PROFILE_TAB_KEYS = ['info', 'history', 'mail', 'assets', 'rewards', 'achievements', 'themes', 'calendar'];
+  const PROFILE_TAB_KEYS = ['info', 'daily', 'history', 'mail', 'assets', 'rewards', 'achievements', 'themes', 'calendar'];
   const INIT_TAB = store.get('profile.initTab');
   let activeTab = PROFILE_TAB_KEYS.includes(INIT_TAB) ? INIT_TAB : 'info';
   store.set('profile.initTab', null); // 初始 Tab 已消费，避免下次进入仍停留在上次 Tab
@@ -384,6 +384,8 @@ export function renderProfile(container) {
         el('button', { class: 'profile-aside-btn', onClick: () => switchTab('achievements') }, '🏆 我的成就'),
         el('button', { class: 'profile-aside-btn', onClick: () => openShop('shop') }, '🛒 我的商城'),
         el('button', { class: 'profile-aside-btn', onClick: () => switchTab('themes') }, '🎨 主题设置'),
+        el('button', { class: 'profile-aside-btn', onClick: () => go('codex') }, '📖 图鉴'),
+        el('button', { class: 'profile-aside-btn', onClick: () => go('feedback') }, '📝 帮助/反馈'),
         el('button', { class: 'profile-aside-btn', onClick: () => go('settings') }, '⚙️ 设置'),
         el('button', {
           class: 'profile-aside-btn',
@@ -416,6 +418,7 @@ export function renderProfile(container) {
     const claimableRewards = (profileData?.levelRewards?.available || []).length;
     const tabs = [
       { key: 'info', label: '📄 资料概览' },
+      { key: 'daily', label: '🎯 每日' },
       { key: 'history', label: '📜 对战历史' },
       { key: 'mail', label: `📬 邮箱${unreadMail > 0 ? ` (${unreadMail})` : ''}` },
       { key: 'assets', label: '💰 资产明细' },
@@ -447,6 +450,7 @@ export function renderProfile(container) {
       return;
     }
     if (activeTab === 'info') contentEl.append(renderInfoTab());
+    else if (activeTab === 'daily') await renderDailyTab();
     else if (activeTab === 'history') await renderHistoryTab();
     else if (activeTab === 'mail') await renderMailTab();
     else if (activeTab === 'assets') contentEl.append(renderAssetsTab());
@@ -1017,6 +1021,117 @@ export function renderProfile(container) {
     if (bonus > 0) detail += ` + 额外 ${bonus}`;
     if (eventLabel) detail += `（含${eventLabel}）`;
     return detail;
+  }
+
+  // ============ 每日签到 / 每日任务 Tab ============
+  let dailyStatus = null;
+  let dailyLoading = false;
+
+  async function renderDailyTab() {
+    if (!dailyStatus && !dailyLoading) {
+      dailyLoading = true;
+      contentEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:40px;' }, '⏳ 加载中...'));
+      try {
+        const res = await api.daily.status();
+        dailyStatus = res.data || null;
+      } catch (err) {
+        toast.error(err.message || '加载每日任务失败');
+      } finally {
+        dailyLoading = false;
+        contentEl.innerHTML = '';
+      }
+    }
+    if (!dailyStatus) {
+      contentEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:40px;' }, '加载失败，请稍后重试'));
+      return;
+    }
+    contentEl.append(renderDailyView());
+  }
+
+  function dailyRewardText(reward = {}) {
+    const parts = [];
+    if (reward.starCoins) parts.push(`💎 ${reward.starCoins}`);
+    if (reward.exp) parts.push(`✨ ${reward.exp} 经验`);
+    if (reward.tickets) parts.push(`🎫 ${reward.tickets}`);
+    return parts.join(' · ') || '—';
+  }
+
+  async function refreshDailyTab() {
+    dailyStatus = null;
+    if (activeTab === 'daily') {
+      contentEl.innerHTML = '';
+      await renderDailyTab();
+    }
+  }
+
+  async function doDailyCheckIn() {
+    try {
+      const res = await api.daily.checkIn();
+      if (!res.success) {
+        toast.warn(res.message || '签到失败');
+        return;
+      }
+      toast.success(res.message || '签到成功');
+      await refreshDailyTab();
+    } catch (err) {
+      toast.error(err.message || '签到失败');
+    }
+  }
+
+  async function claimDailyTask(task) {
+    try {
+      const res = await api.daily.claim(task.id);
+      if (!res.success) {
+        toast.warn(res.message || '领取失败');
+        return;
+      }
+      toast.success(res.message || '领取成功');
+      await refreshDailyTab();
+    } catch (err) {
+      toast.error(err.message || '领取失败');
+    }
+  }
+
+  function renderDailyView() {
+    const d = dailyStatus;
+    const signBtn = el('button', {
+      class: 'daily-checkin-btn' + (d.signedToday ? ' done' : ''),
+      disabled: d.signedToday ? true : undefined,
+      onClick: d.signedToday ? undefined : doDailyCheckIn,
+    }, d.signedToday ? '✓ 今日已签到' : '立即签到');
+
+    const taskRows = (d.tasks || []).map((t) => {
+      const percent = t.target > 0 ? Math.min(100, Math.round((t.progress / t.target) * 100)) : 0;
+      let badge;
+      if (t.claimed) badge = el('span', { class: 'daily-task-badge claimed' }, '✓ 已领取');
+      else if (t.done) badge = el('button', { class: 'daily-task-badge grab', onClick: () => claimDailyTask(t) }, '领取');
+      else badge = el('span', { class: 'daily-task-badge locked' }, `${t.progress}/${t.target}`);
+      return el('div', { class: 'daily-task-row' }, [
+        el('div', { class: 'daily-task-main' }, [
+          el('div', { class: 'daily-task-name' }, t.name),
+          el('div', { class: 'daily-task-progress' }, [
+            el('div', { class: 'daily-task-progress-fill', style: `width:${percent}%` }),
+          ]),
+          el('div', { class: 'daily-task-reward' }, dailyRewardText(t.reward)),
+        ]),
+        badge,
+      ]);
+    });
+
+    return el('div', { class: 'daily-tab' }, [
+      el('div', { class: 'daily-hero' }, [
+        el('div', { class: 'daily-hero-info' }, [
+          el('div', { class: 'daily-hero-title' }, '📅 每日签到'),
+          el('div', { class: 'daily-hero-sub' }, `已连续签到 ${d.streak || 0} 天 · 今日可得 ${dailyRewardText(d.signInReward)}`),
+        ]),
+        signBtn,
+      ]),
+      el('div', { class: 'daily-section-title' }, '🎯 每日任务'),
+      el('div', { class: 'daily-task-list' }, taskRows.length
+        ? taskRows
+        : [el('div', { class: 'friends-empty' }, '暂无任务')]),
+      el('div', { class: 'daily-note' }, '奖励将通过邮件发放，请到「📬 邮箱」领取'),
+    ]);
   }
 
   // ============ 等级奖励 Tab ============

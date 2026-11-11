@@ -413,6 +413,12 @@ export function renderGames(container) {
         el('h1', {}, '游戏大厅'),
         el('p', {}, '全部游戏一屏浏览，选择游戏后直接开局'),
       ]),
+      // 游戏大类下的二级入口（排行榜 / 观战 / 每日一题）
+      el('div', { class: 'games-hero-links' }, [
+        el('button', { class: 'games-hero-link', type: 'button', onClick: () => go('leaderboard') }, '📊 排行榜'),
+        el('button', { class: 'games-hero-link', type: 'button', onClick: () => go('spectate') }, '👁 观战'),
+        el('button', { class: 'games-hero-link', type: 'button', onClick: () => go('puzzle') }, '🧩 每日一题'),
+      ]),
     ]),
     el('section', { class: 'games-pick' }, [
       el('div', { class: 'games-pick-head' }, [

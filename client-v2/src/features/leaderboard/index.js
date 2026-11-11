@@ -8,6 +8,7 @@
  */
 import { eventBus } from '../../core/eventBus.js';
 import { emit } from '../../core/socket.js';
+import { go } from '../../core/router.js';
 import { el, viewRoot } from '../../utils/dom.js';
 
 const GAME_TYPES = [
@@ -146,7 +147,10 @@ export function renderLeaderboard(container = viewRoot()) {
   container.innerHTML = '';
   container.append(
     el('div', { class: 'leaderboard-page' }, [
-      el('div', { class: 'leaderboard-title' }, '🏆 排行榜'),
+      el('div', { class: 'leaderboard-head' }, [
+        el('button', { class: 'page-back-btn', type: 'button', onClick: () => go('games') }, '← 返回游戏'),
+        el('div', { class: 'leaderboard-title' }, '🏆 排行榜'),
+      ]),
       typeBtnsEl,
       subTypeBtnsEl,
       listEl,

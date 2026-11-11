@@ -161,6 +161,8 @@ const EVENT_MAP = {
   private_message_sent: 'chat:privateMessageSent',
   private_history: 'chat:privateHistory',
   private_conversations: 'chat:privateConversations',
+  message_recalled: 'chat:messageRecalled',
+  spectate_message: 'spectate:message',
 
   // 好友
   friend_request_received: 'friend:request',

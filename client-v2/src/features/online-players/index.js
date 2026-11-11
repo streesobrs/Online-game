@@ -33,7 +33,7 @@ eventBus.on('user:onlineUsers', (list) => {
   users.clear();
   (Array.isArray(list) ? list : []).forEach((u) => users.set(String(u.accountId), u));
   myId = myAccountId();
-  refresh();
+  refresh({ type: 'full' });
 });
 
 // 增量状态（上线/下线/状态变化广播）
@@ -42,11 +42,12 @@ eventBus.on('user:status', (data) => {
   const key = String(data.accountId);
   if (data.status === 'offline') users.delete(key);
   else users.set(key, { ...users.get(key), ...data });
-  refresh();
+  // 带上变化对象，订阅方可只更新对应行（type=status）
+  refresh({ type: 'status', accountId: key, status: data.status });
 });
 
-function refresh() {
-  views.forEach((fn) => fn());
+function refresh(patch) {
+  views.forEach((fn) => fn(patch));
 }
 
 /**

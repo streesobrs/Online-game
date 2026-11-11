@@ -95,6 +95,7 @@ export function renderSpectate(container) {
 
   container.innerHTML = '';
   container.append(el('div', { class: 'spectate-container panel', style: 'max-width:none;width:100%;' }, [
+    el('button', { class: 'page-back-btn', type: 'button', onClick: () => go('games') }, '← 返回游戏'),
     el('h2', { class: 'panel-title' }, '👁️ 观战'),
     el('div', { class: 'text-muted', style: 'text-align:center;margin-bottom:16px;' },
       '观看其他玩家的实时对局，学习高手操作！'),

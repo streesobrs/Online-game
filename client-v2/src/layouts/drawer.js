@@ -7,6 +7,7 @@ import { FEATURES } from '../data/navItems.js';
 import { handleNavClick, isActive, go } from '../core/router.js';
 import { registerScopeHandler } from '../core/shortcuts.js';
 import { store } from '../core/store.js';
+import { getUiPrefs } from '../core/prefs.js';
 import { el } from '../utils/dom.js';
 import { api } from '../core/api.js';
 import * as auth from '../core/auth.js';
@@ -113,7 +114,10 @@ export function renderNavDrawer(container) {
 
   // ---- 面板：主导航 ----
   function buildNav() {
-    const items = [{ id: 'games', name: '游戏', icon: '🎮' }, ...FEATURES.filter((i) => !i.inProfile)];
+    // 侧边栏显示哪些入口由设置页「侧边栏菜单」决定（ui-drawer-hidden 记录被隐藏的 id）
+    const hidden = new Set(getUiPrefs().drawerHidden);
+    const items = [{ id: 'games', name: '游戏', icon: '🎮' }, ...FEATURES.filter((i) => !i.inProfile)]
+      .filter((i) => !hidden.has(i.id));
     // 后台入口：与顶部导航一致，仅管理员可见（窄屏顶部导航不展示该按钮）
     if (isAdminAccount()) items.push({ id: 'admin', name: '后台管理', icon: '🛠️' });
     return items.map((item) => el('button', {
@@ -258,10 +262,15 @@ export function renderNavDrawer(container) {
   // 好友申请红点：有待处理申请时亮起，处理完自动消失
   const unsubscribeBadge = store.subscribe('friendRequestCount', updateFriendBadge);
 
+  // 设置页调整「侧边栏菜单」后即时重建（prefs.js 统一广播 ui:prefs-changed）
+  const onPrefsChanged = () => renderPanel();
+  window.addEventListener('ui:prefs-changed', onPrefsChanged);
+
   return () => {
     unsubscribeUser();
     unsubscribeView();
     unsubscribeBadge();
+    window.removeEventListener('ui:prefs-changed', onPrefsChanged);
     offGlobalShortcut();
     handle.removeEventListener('pointerdown', onPointerDown);
     handle.removeEventListener('pointermove', onPointerMove);
