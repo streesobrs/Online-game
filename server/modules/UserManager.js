@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const config = require('../config');
 const logger = require('../utils/logger');
 const dataStore = require('../utils/dataStore');
+const { getClientIp } = require('../utils/clientIp');
 
 class UserManager {
   constructor(accountManager = null) {
@@ -97,6 +98,7 @@ class UserManager {
       if (accountId && !isReconnect && accountData?.account) {
         try {
           const now = Date.now();
+          const ip = getClientIp(socket);
           const inner = accountData.account;
           const lastLogin = Number(inner.lastLogin) || 0;
           // 60 秒内已有登录记录（如密码登录、v1 的 get_account_by_token）时不重复累加次数
@@ -105,11 +107,13 @@ class UserManager {
           await dataStore.update('accounts', { 'account.id': accountId }, {
             'account.lastLogin': now,
             'account.lastSeen': now,
+            'account.lastLoginIp': ip,
             'account.loginCount': loginCount,
             'account.updatedAt': now
           });
           inner.lastLogin = now;
           inner.lastSeen = now;
+          inner.lastLoginIp = ip;
           inner.loginCount = loginCount;
         } catch (err) {
           logger.error('更新恢复登录信息失败', { accountId, error: err.message });
@@ -548,7 +552,7 @@ class UserManager {
         return { success: false, message: 'AccountManager不可用' };
       }
 
-      const guestResult = await this.accountManager.createGuestUser();
+      const guestResult = await this.accountManager.createGuestUser(null, getClientIp(socket));
       if (!guestResult) {
         return { success: false, message: '创建游客账号失败' };
       }
@@ -598,7 +602,7 @@ class UserManager {
         return { success: false, message: 'AccountManager不可用' };
       }
 
-      const result = await this.accountManager.login(username, password);
+      const result = await this.accountManager.login(username, password, getClientIp(socket));
       if (!result.success) {
         return result;
       }

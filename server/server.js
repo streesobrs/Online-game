@@ -12,6 +12,7 @@ const logger = require('./utils/logger');
 const dataStore = require('./utils/dataStore');
 const sessionTokenUtil = require('./utils/sessionToken');
 const runtimeConfig = require('./modules/runtimeConfig');
+const { getClientIp } = require('./utils/clientIp');
 
 // 初始化运行时配置（从磁盘加载覆盖值，必须在使用config之前调用）
 runtimeConfig.init(config);
@@ -2736,7 +2737,7 @@ io.on('connection', (socket) => {
       username
     });
 
-    const result = await accountManager.register(username, password, nickname, guestAccountId);
+    const result = await accountManager.register(username, password, nickname, guestAccountId, getClientIp(socket));
 
     // 如果注册成功且是游客升级，更新用户会话
     if (result.success && guestAccountId && userSession) {
@@ -2831,7 +2832,7 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const result = await accountManager.accountLogin(username, password);
+    const result = await accountManager.accountLogin(username, password, getClientIp(socket));
 
     if (result.success) {
       clearLoginFailures(loginKey);

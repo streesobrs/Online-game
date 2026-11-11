@@ -423,6 +423,19 @@
   text-decoration: underline;
 }
 
+/* 消息发送时间 */
+.chat-time {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted, #9aa5b1);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.chat-message.self .chat-time {
+  color: var(--text-muted, #9aa5b1);
+}
+
 .chat-text {
   color: #374151;
   white-space: pre-wrap;

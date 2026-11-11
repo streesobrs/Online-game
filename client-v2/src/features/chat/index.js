@@ -21,6 +21,26 @@ import { isFriend, isRequested, requestFriend, loadFriends, subscribeFriends } f
 const MAX_HISTORY = 100; // 每会话保留上限
 const myId = localStorage.getItem('currentAccountId');
 
+/** 消息时间格式化：今天只显示时分，昨天带“昨天”，更早带日期 */
+function formatMsgTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const now = new Date();
+  const sameDay = d.getFullYear() === now.getFullYear()
+    && d.getMonth() === now.getMonth()
+    && d.getDate() === now.getDate();
+  if (sameDay) return hm;
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const isYesterday = d.getFullYear() === yesterday.getFullYear()
+    && d.getMonth() === yesterday.getMonth()
+    && d.getDate() === yesterday.getDate();
+  if (isYesterday) return `昨天 ${hm}`;
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${hm}`;
+}
+
 // ===== 模块级状态（常驻，跨视图保留）=====
 const history = { global: [], game: [] };        // 按频道存 { userId, nickname, message, scope, timestamp }
 const privateHistory = new Map();                // String(userId) -> { rawId, nickname, messages: [] }
@@ -228,6 +248,7 @@ function createChatView() {
               class: 'chat-nickname',
               onClick: () => showUserCard(msg.userId),
             }, msg.nickname),
+            el('span', { class: 'chat-time' }, formatMsgTime(msg.timestamp)),
           ]),
           el('div', { class: 'chat-text' }, msg.message),
         ]),
@@ -344,6 +365,7 @@ export function renderChat(container = viewRoot()) {
       el('div', { class: 'chat-message-body' }, [
         el('div', { class: 'chat-sender' }, [
           el('button', { class: 'chat-nickname', onClick: () => showUserCard(msg.userId) }, msg.nickname),
+          el('span', { class: 'chat-time' }, formatMsgTime(msg.timestamp)),
         ]),
         el('div', { class: 'chat-text' }, msg.message),
       ]),

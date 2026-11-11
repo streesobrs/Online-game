@@ -975,6 +975,7 @@ export function renderAdmin(container) {
         el('span', {}, `平 ${totals.totalDraws}`),
         el('span', {}, `登录 ${inner.loginCount || 0}`),
         el('span', {}, `最后登录 ${formatTime(inner.lastLogin || inner.lastSeen)}`),
+        el('span', {}, `IP ${inner.lastLoginIp || '—'}`),
       ]),
       ops,
     ]);

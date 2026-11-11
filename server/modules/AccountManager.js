@@ -338,7 +338,7 @@ class AccountManager {
   }
 
   // 账号密码登录
-  async accountLogin(username, password) {
+  async accountLogin(username, password, ip = '') {
     try {
       logger.info('开始账号登录验证', { username });
 
@@ -402,11 +402,12 @@ class AccountManager {
       const returnPlayer = daysSinceLastLogin >= 7;
       const longReturnPlayer = daysSinceLastLogin >= 30;
 
-      // 更新最后登录时间和登录次数
+      // 更新最后登录时间、登录次数与登录 IP
       const loginCount = (account.account?.loginCount || 0) + 1;
       await dataStore.update('accounts', { 'account.id': account.account.id }, {
         'account.lastLogin': now,
         'account.lastSeen': now,
+        'account.lastLoginIp': ip || account.account?.lastLoginIp || null,
         'account.activity.returnPlayer': returnPlayer,
         'account.activity.longReturnPlayer': longReturnPlayer,
         'account.loginCount': loginCount,
@@ -736,7 +737,7 @@ class AccountManager {
   }
 
   // 创建游客用户
-  async createGuestUser(nickname = null) {
+  async createGuestUser(nickname = null, ip = '') {
     const guestId = this.generateUserId();
     const now = Date.now();
     const guestUser = {
@@ -750,6 +751,7 @@ class AccountManager {
         updatedAt: now,
         lastSeen: now,
         lastLogin: now,
+        lastLoginIp: ip || null,
         loginCount: 1,
         profile: {
           avatar: null,
@@ -973,7 +975,7 @@ class AccountManager {
   }
 
   // 注册新账号（支持游客升级）
-  async register(username, password, nickname = null, guestAccountId = null) {
+  async register(username, password, nickname = null, guestAccountId = null, ip = '') {
     // 验证用户名
     if (!this.validateUsername(username)) {
       return {
@@ -1023,6 +1025,7 @@ class AccountManager {
           username: username.toLowerCase(),
           nickname: this.normalizeNickname(nickname, username),
           updatedAt: now,
+          lastLoginIp: ip || guestAccount.account.lastLoginIp || null,
           security: {
             passwordSalt: salt,
             passwordHash: passwordHash,
@@ -1076,6 +1079,7 @@ class AccountManager {
           updatedAt: now,
           lastSeen: now,
           lastLogin: now,
+          lastLoginIp: ip || null,
           loginCount: 1,
           profile: {
             avatar: null,
@@ -1205,7 +1209,7 @@ class AccountManager {
   }
 
   // 登录
-  async login(username, password) {
+  async login(username, password, ip = '') {
     try {
       const account = await dataStore.findOne('accounts', { 'account.username': username.toLowerCase() });
 
@@ -1233,11 +1237,12 @@ class AccountManager {
       const returnPlayer = daysSinceLastLogin >= 7;
       const longReturnPlayer = daysSinceLastLogin >= 30;
 
-      // 更新最后登录时间和登录次数
+      // 更新最后登录时间、登录次数与登录 IP
       const loginCount = (account.account?.loginCount || 0) + 1;
       await dataStore.update('accounts', { 'account.id': account.account.id }, {
         'account.lastLogin': now,
         'account.lastSeen': now,
+        'account.lastLoginIp': ip || account.account?.lastLoginIp || null,
         'account.activity.returnPlayer': returnPlayer,
         'account.activity.longReturnPlayer': longReturnPlayer,
         'account.loginCount': loginCount,
