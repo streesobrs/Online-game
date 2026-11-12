@@ -24,7 +24,7 @@ import { requestReplay, showReplay } from '../replay/index.js';
 import { resetOnboarding, resetAllTours, startOnboarding, startMailTour, startAssetsTour } from '../../components/onboarding.js';
 import { buildPrivacyRows, mergePrivacy } from '../../components/privacyPanel.js';
 import { titleBadge, applyGlobalAppearance } from '../../utils/cosmetics.js';
-import { isTestMode, setTestMode } from '../../utils/features.js';
+import { isTestMode } from '../../utils/features.js';
 import { go } from '../../core/router.js';
 
 /** 游戏类型展示元数据 */
@@ -257,7 +257,9 @@ function openRedeemModal(onSuccess) {
  * @returns {Function} cleanup 函数
  */
 export function renderProfile(container) {
-  const PROFILE_TAB_KEYS = ['info', 'daily', 'history', 'mail', 'assets', 'rewards', 'achievements', 'themes', 'calendar'];
+  const ALL_TAB_KEYS = ['info', 'daily', 'history', 'mail', 'assets', 'rewards', 'achievements', 'themes', 'calendar'];
+  // 「每日」属于测试功能：未开启时不显示 Tab，也不允许通过路由进入
+  const PROFILE_TAB_KEYS = ALL_TAB_KEYS.filter((k) => k !== 'daily' || isTestMode());
   const INIT_TAB = store.get('profile.initTab');
   let activeTab = PROFILE_TAB_KEYS.includes(INIT_TAB) ? INIT_TAB : 'info';
   store.set('profile.initTab', null); // 初始 Tab 已消费，避免下次进入仍停留在上次 Tab
@@ -418,7 +420,7 @@ export function renderProfile(container) {
     const claimableRewards = (profileData?.levelRewards?.available || []).length;
     const tabs = [
       { key: 'info', label: '📄 资料概览' },
-      { key: 'daily', label: '🎯 每日' },
+      ...(isTestMode() ? [{ key: 'daily', label: '🎯 每日' }] : []),
       { key: 'history', label: '📜 对战历史' },
       { key: 'mail', label: `📬 邮箱${unreadMail > 0 ? ` (${unreadMail})` : ''}` },
       { key: 'assets', label: '💰 资产明细' },
@@ -806,16 +808,6 @@ export function renderProfile(container) {
                 renderAll();
               }),
             }, '🎟️ 兑换码'),
-            el('button', {
-              class: 'btn btn-secondary',
-              style: 'padding:6px 14px;font-size:12px;',
-              onClick: (e) => {
-                const next = !isTestMode();
-                setTestMode(next);
-                e.currentTarget.textContent = next ? '🧪 测试功能：已开启' : '🧪 测试功能：已关闭';
-                toast[next ? 'success' : 'info'](next ? '测试功能已开启，商城将显示抽奖入口' : '测试功能已关闭');
-              },
-            }, isTestMode() ? '🧪 测试功能：已开启' : '🧪 测试功能：已关闭'),
           ]),
         ]),
         el('div', { class: 'panel profile-card' }, [
@@ -1028,19 +1020,27 @@ export function renderProfile(container) {
   let dailyLoading = false;
 
   async function renderDailyTab() {
-    if (!dailyStatus && !dailyLoading) {
-      dailyLoading = true;
+    if (dailyLoading) {
       contentEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:40px;' }, '⏳ 加载中...'));
-      try {
-        const res = await api.daily.status();
-        dailyStatus = res.data || null;
-      } catch (err) {
-        toast.error(err.message || '加载每日任务失败');
-      } finally {
-        dailyLoading = false;
-        contentEl.innerHTML = '';
-      }
+      return;
     }
+    dailyLoading = true;
+    // 每次进入都向服务端拉取最新状态：任务进度由对局/聊天累积，
+    // 缓存旧数据会导致切回 Tab 仍显示过期进度，跨天也不会自动重置
+    if (!dailyStatus) {
+      contentEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:40px;' }, '⏳ 加载中...'));
+    }
+    try {
+      const res = await api.daily.status();
+      if (res?.success && res.data) dailyStatus = res.data;
+    } catch (err) {
+      toast.error(err.message || '加载每日任务失败');
+    } finally {
+      dailyLoading = false;
+    }
+    // 请求期间已切到其他 Tab：不要把结果写回内容区
+    if (activeTab !== 'daily') return;
+    contentEl.innerHTML = '';
     if (!dailyStatus) {
       contentEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:40px;' }, '加载失败，请稍后重试'));
       return;
@@ -1745,11 +1745,28 @@ export function renderProfile(container) {
     renderAll();
   });
 
+  // 新邮件实时刷新：更新 Tab 未读数；正在邮箱 Tab 时同步刷新列表
+  const offMailReceived = eventBus.on('user:mailReceived', async () => {
+    await reloadMails();
+    renderTabs();
+    if (activeTab === 'mail') {
+      contentEl.innerHTML = '';
+      await renderMailTab();
+    }
+  });
+
+  // 对局结算等会推送 account_updated：正在每日 Tab 时实时刷新任务进度
+  const offAccountUpdated = eventBus.on('user:accountUpdated', () => {
+    if (activeTab === 'daily') refreshDailyTab();
+  });
+
   return () => {
     if (embeddedCleanup) { embeddedCleanup(); embeddedCleanup = null; }
     stopKeyCapture();
     offOpenTab();
     offProfileUpdated();
+    offMailReceived();
+    offAccountUpdated();
     container.innerHTML = '';
   };
 }

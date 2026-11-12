@@ -2420,13 +2420,13 @@
 .daily-hero-title {
   font-size: 15px;
   font-weight: 700;
-  color: var(--text-primary, #e2e8f0);
+  color: var(--text-primary, #2d3748);
 }
 
 .daily-hero-sub {
   margin-top: 4px;
   font-size: 12px;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #718096);
 }
 
 .daily-checkin-btn {
@@ -2448,14 +2448,14 @@
 
 .daily-checkin-btn.done {
   background: rgba(148, 163, 184, 0.16);
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #718096);
   cursor: default;
 }
 
 .daily-section-title {
   font-size: 13px;
   font-weight: 700;
-  color: var(--text-secondary, #cbd5e1);
+  color: var(--text-secondary, #4a5568);
 }
 
 .daily-task-list {
@@ -2470,7 +2470,7 @@
   gap: 12px;
   padding: 12px 14px;
   border-radius: 12px;
-  background: var(--surface-2, rgba(148, 163, 184, 0.08));
+  background: var(--surface-alt, rgba(148, 163, 184, 0.08));
   border: 1px solid var(--border-color, rgba(148, 163, 184, 0.14));
 }
 
@@ -2482,7 +2482,7 @@
 .daily-task-name {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-primary, #e2e8f0);
+  color: var(--text-primary, #2d3748);
 }
 
 .daily-task-progress {
@@ -2503,7 +2503,7 @@
 .daily-task-reward {
   margin-top: 6px;
   font-size: 11px;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #718096);
 }
 
 .daily-task-badge {
@@ -2517,7 +2517,7 @@
 }
 
 .daily-task-badge.locked {
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #718096);
   background: rgba(148, 163, 184, 0.12);
 }
 
@@ -2539,6 +2539,6 @@
 
 .daily-note {
   font-size: 11px;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #718096);
   text-align: center;
 }

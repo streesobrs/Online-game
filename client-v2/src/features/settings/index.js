@@ -23,6 +23,7 @@ import { buildNavPrefsPanel, switchRow, selectRow } from '../../components/navPr
 import { buildPrivacyRows, mergePrivacy } from '../../components/privacyPanel.js';
 import { buildShortcutEditor } from '../../components/shortcutEditor.js';
 import { FEATURES } from '../../data/navItems.js';
+import { isTestMode, setTestMode } from '../../utils/features.js';
 import { setNavPrefs } from '../../layouts/mode.js';
 import { store } from '../../core/store.js';
 import { eventBus } from '../../core/eventBus.js';
@@ -424,6 +425,19 @@ export function renderSettings(container) {
       icon: '🔗',
       label: '更多',
       build: () => [
+        section('🧪 测试功能', '开启后显示尚未正式开放的入口，仅保存在本机浏览器。', [
+          el('div', { class: 'nav-prefs' }, [
+            switchRow({
+              name: '启用测试功能',
+              hint: '商城显示抽奖入口，个人资料显示「每日」签到与任务',
+              checked: isTestMode(),
+              onChange: (v) => {
+                setTestMode(v);
+                toast.success(v ? '测试功能已开启' : '测试功能已关闭');
+              },
+            }),
+          ]),
+        ]),
         section('🔗 更多入口', null, [
           el('div', { class: 'settings-links' }, [
             linkButton('👤', '个人资料', () => go('profile')),
