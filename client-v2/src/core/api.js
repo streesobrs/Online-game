@@ -210,4 +210,13 @@ export const api = {
     list: () => api.get('/api/feedbacks'),
     submit: (data) => api.post('/api/feedbacks', data),
   },
+
+  announcements: {
+    /** 公告列表 @param {boolean} [includeExpired=false] 是否包含已过期公告（后台用） */
+    list: (includeExpired = false) => api.get(`/api/announcements${includeExpired ? '?includeExpired=1' : ''}`),
+    /** 当前账号需要弹窗展示的公告 */
+    popup: () => api.get('/api/announcements/popup'),
+    /** 标记弹窗公告已读 */
+    ack: (id) => api.post(`/api/announcements/${encodeURIComponent(id)}/ack`),
+  },
 };

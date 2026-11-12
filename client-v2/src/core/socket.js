@@ -185,6 +185,9 @@ const EVENT_MAP = {
   feedback_voted: 'feedback:voted',
   comment_added: 'feedback:commentAdded',
 
+  // 公告（管理员发布/编辑/删除后服务端广播最新列表）
+  announcements_updated: 'announcements:updated',
+
   // 系统与维护
   error: 'system:error',
   kicked: 'system:kicked',

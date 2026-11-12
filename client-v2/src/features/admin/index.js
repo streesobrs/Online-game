@@ -12,6 +12,7 @@
  * - 反馈：查看反馈并修改处理状态
  */
 import { el } from '../../utils/dom.js';
+import { mdToHtml } from '../../utils/md.js';
 import { eventBus } from '../../core/eventBus.js';
 import { store } from '../../core/store.js';
 import { go } from '../../core/router.js';
@@ -40,8 +41,30 @@ const FEEDBACK_STATUS = {
   closed: '已关闭',
 };
 
+const ANNOUNCEMENT_TYPE_NAMES = {
+  notice: '公告',
+  update: '更新',
+  event: '活动',
+  maintenance: '维护',
+};
+
+const ANNOUNCEMENT_TYPE_BADGE = {
+  notice: 'info',
+  update: 'online',
+  event: 'warning',
+  maintenance: 'danger',
+};
+
+const ANNOUNCEMENT_POPUP_NAMES = {
+  none: '不弹窗',
+  once: '一次性弹窗',
+  interval: '周期弹窗',
+  always: '限时常驻弹窗',
+};
+
 const TABS = [
   { id: 'overview', label: '概览', icon: '📊' },
+  { id: 'announcements', label: '公告', icon: '📢' },
   { id: 'accounts', label: '账号', icon: '👥' },
   { id: 'mail', label: '邮件物品', icon: '✉️' },
   { id: 'games', label: '对局', icon: '🎮' },
@@ -196,6 +219,9 @@ export function renderAdmin(container) {
     feedbacks: [],
     feedbackLoaded: false,
     feedbackLoading: false,
+    announcements: [],
+    announcementsLoaded: false,
+    announcementsLoading: false,
     redeemCodes: [],
     redeemLoaded: false,
     adminName: '',
@@ -573,6 +599,7 @@ export function renderAdmin(container) {
     if (id !== 'redeem') refs.redeem = null;
 
     if (id === 'overview') renderOverview();
+    else if (id === 'announcements') renderAnnouncements();
     else if (id === 'accounts') renderAccounts();
     else if (id === 'mail') renderMail();
     else if (id === 'games') renderGames();
@@ -599,6 +626,7 @@ export function renderAdmin(container) {
       return;
     }
     if (state.tab === 'overview') session.socket.emit('get_system_stats');
+    if (state.tab === 'announcements') loadAnnouncements();
     if (state.tab === 'accounts') session.socket.emit('get_all_accounts');
     if (state.tab === 'games') {
       session.socket.emit('get_game_history', { limit: 20 });
@@ -2059,6 +2087,264 @@ export function renderAdmin(container) {
       toast.error(`更新失败：${err.message}`);
       renderFeedbackBody();
     }
+  }
+
+  // ===== 公告管理 =====
+  function renderAnnouncements() {
+    content.innerHTML = '';
+    refs.overview = null;
+    refs.accounts = null;
+    refs.games = null;
+    refs.feedback = null;
+
+    const list = el('div', { class: 'admin-list', 'data-announcement-list': '' });
+    content.append(section('公告管理', '发布后玩家端的公告栏与公告中心会实时刷新', [
+      el('div', { class: 'admin-toolbar' }, [
+        el('button', {
+          class: 'admin-btn admin-btn--primary',
+          type: 'button',
+          onClick: () => openAnnouncementForm(null),
+        }, '➕ 发布公告'),
+        el('button', {
+          class: 'admin-btn',
+          type: 'button',
+          onClick: () => loadAnnouncements(),
+        }, '🔄 刷新'),
+      ]),
+      list,
+    ]));
+
+    refs.announcements = { list };
+    if (!state.announcementsLoaded) loadAnnouncements();
+    else renderAnnouncementsBody();
+  }
+
+  async function loadAnnouncements() {
+    if (!session?.token) {
+      if (refs.announcements) {
+        refs.announcements.list.innerHTML = '';
+        refs.announcements.list.append(el('div', { class: 'admin-empty admin-empty--inline' }, [
+          el('div', { class: 'admin-empty__desc' }, '后台尚未就绪，请稍后重试'),
+        ]));
+      }
+      return;
+    }
+
+    state.announcementsLoading = true;
+    if (refs.announcements) {
+      refs.announcements.list.innerHTML = '';
+      refs.announcements.list.append(el('div', { class: 'admin-empty admin-empty--inline' }, [
+        el('div', { class: 'admin-empty__desc' }, '正在加载公告…'),
+      ]));
+    }
+
+    try {
+      const res = await adminFetch('/api/announcements?includeExpired=1', {}, session.token);
+      state.announcements = Array.isArray(res?.data) ? res.data : [];
+      state.announcementsLoaded = true;
+    } catch (err) {
+      toast.error(`加载公告失败：${err.message}`);
+      state.announcements = [];
+    } finally {
+      state.announcementsLoading = false;
+      if (state.tab === 'announcements') renderAnnouncementsBody();
+    }
+  }
+
+  function renderAnnouncementsBody() {
+    if (!refs.announcements) return;
+    const { list } = refs.announcements;
+    list.innerHTML = '';
+
+    if (!state.announcements.length) {
+      list.append(el('div', { class: 'admin-empty admin-empty--inline' }, [
+        el('div', { class: 'admin-empty__icon' }, '📭'),
+        el('div', { class: 'admin-empty__desc' }, state.announcementsLoading ? '正在加载公告…' : '还没有发布过公告'),
+      ]));
+      return;
+    }
+
+    state.announcements.forEach((item) => {
+      const expired = !!item.expiresAt && item.expiresAt <= Date.now();
+      const actions = el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' }, [
+        el('button', {
+          class: 'admin-btn admin-btn--sm',
+          type: 'button',
+          onClick: () => toggleAnnouncementPin(item),
+        }, item.pinned ? '取消置顶' : '置顶'),
+        el('button', {
+          class: 'admin-btn admin-btn--sm',
+          type: 'button',
+          onClick: () => openAnnouncementForm(item),
+        }, '编辑'),
+        el('button', {
+          class: 'admin-btn admin-btn--sm admin-btn--danger',
+          type: 'button',
+          onClick: () => confirmDeleteAnnouncement(item),
+        }, '删除'),
+      ]);
+
+      const preview = el('div', { class: 'admin-feedback__content markdown-body' });
+      preview.innerHTML = mdToHtml(item.content || '');
+
+      list.append(el('div', { class: 'admin-feedback' }, [
+        el('div', { class: 'admin-feedback__head' }, [
+          el('div', { class: 'admin-feedback__title' }, [
+            item.pinned ? badge('📌 置顶', 'warning') : null,
+            badge(ANNOUNCEMENT_TYPE_NAMES[item.type] || '公告', ANNOUNCEMENT_TYPE_BADGE[item.type] || 'info'),
+            item.popupMode && item.popupMode !== 'none'
+              ? badge(ANNOUNCEMENT_POPUP_NAMES[item.popupMode] || '弹窗', 'info')
+              : null,
+            expired ? badge('已过期', 'danger') : null,
+            el('span', { class: 'admin-feedback__name' }, item.title || '（无标题）'),
+          ]),
+          actions,
+        ]),
+        preview,
+        el('div', { class: 'admin-feedback__meta' },
+          `管理员 · ${formatTime(item.createdAt)}`
+          + (item.expiresAt ? ` · 到期 ${formatTime(item.expiresAt)}` : '')),
+      ]));
+    });
+  }
+
+  async function saveAnnouncement(id, payload, successMessage) {
+    if (!session?.token) {
+      toast.warn('后台登录凭证缺失，请刷新页面重试');
+      return;
+    }
+    try {
+      const path = id ? `/api/announcements/${encodeURIComponent(id)}` : '/api/announcements';
+      await adminFetch(path, {
+        method: id ? 'PUT' : 'POST',
+        body: JSON.stringify(payload),
+      }, session.token);
+      toast.success(successMessage);
+      await loadAnnouncements();
+    } catch (err) {
+      toast.error(`保存失败：${err.message}`);
+    }
+  }
+
+  function toDateTimeLocal(ts) {
+    const d = new Date(ts);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function openAnnouncementForm(item) {
+    const editing = !!item;
+    const titleInput = el('input', {
+      class: 'admin-input',
+      type: 'text',
+      maxlength: '60',
+      placeholder: '公告标题',
+      value: editing ? item.title : '',
+    });
+    const contentInput = el('textarea', {
+      class: 'admin-input',
+      rows: '8',
+      placeholder: '公告内容，支持 Markdown：# 标题、**粗体**、- 列表、`代码`、[链接](url)、> 引用、```代码块```',
+    });
+    contentInput.value = editing ? item.content : '';
+    const typeSelect = el('select', { class: 'admin-select' },
+      Object.entries(ANNOUNCEMENT_TYPE_NAMES).map(([value, label]) => el('option', {
+        value,
+        selected: (item?.type || 'notice') === value,
+      }, label)));
+    const pinnedInput = el('input', { type: 'checkbox', checked: !!item?.pinned });
+    const popupModeSelect = el('select', { class: 'admin-select' },
+      Object.entries(ANNOUNCEMENT_POPUP_NAMES).map(([value, label]) => el('option', {
+        value,
+        selected: (item?.popupMode || 'none') === value,
+      }, label)));
+    const popupIntervalInput = el('input', {
+      class: 'admin-input',
+      type: 'number',
+      min: '1',
+      value: String(item?.popupIntervalHours || 24),
+    });
+    const expiresInput = el('input', {
+      class: 'admin-input',
+      type: 'datetime-local',
+      value: item?.expiresAt ? toDateTimeLocal(item.expiresAt) : '',
+    });
+
+    modal.show({
+      title: editing ? '编辑公告' : '发布公告',
+      content: el('div', { class: 'admin-form' }, [
+        el('label', { class: 'admin-field admin-field--stack' }, [
+          el('span', { class: 'admin-field__label' }, '标题'),
+          titleInput,
+        ]),
+        el('label', { class: 'admin-field admin-field--stack' }, [
+          el('span', { class: 'admin-field__label' }, '内容（支持 Markdown）'),
+          contentInput,
+        ]),
+        el('label', { class: 'admin-field admin-field--stack' }, [
+          el('span', { class: 'admin-field__label' }, '类型'),
+          typeSelect,
+        ]),
+        el('label', { class: 'admin-field', style: 'flex-direction:row;align-items:center;gap:8px' }, [
+          pinnedInput,
+          el('span', { class: 'admin-field__label' }, '置顶公告'),
+        ]),
+        el('label', { class: 'admin-field admin-field--stack' }, [
+          el('span', { class: 'admin-field__label' }, '弹窗策略'),
+          popupModeSelect,
+        ]),
+        el('label', { class: 'admin-field admin-field--stack' }, [
+          el('span', { class: 'admin-field__label' }, '弹窗间隔（小时，仅周期弹窗生效）'),
+          popupIntervalInput,
+        ]),
+        el('label', { class: 'admin-field admin-field--stack' }, [
+          el('span', { class: 'admin-field__label' }, '到期时间（留空表示永不过期）'),
+          expiresInput,
+        ]),
+      ]),
+      confirmText: '保存',
+      onConfirm: () => {
+        const title = titleInput.value.trim();
+        const content = contentInput.value.trim();
+        if (!title) { toast.warn('请输入公告标题'); return false; }
+        if (!content) { toast.warn('请输入公告内容'); return false; }
+        const expiresAt = expiresInput.value ? new Date(expiresInput.value).getTime() : 0;
+        saveAnnouncement(editing ? item.id : null, {
+          title,
+          content,
+          type: typeSelect.value,
+          pinned: pinnedInput.checked,
+          popupMode: popupModeSelect.value,
+          popupIntervalHours: Number(popupIntervalInput.value) || 24,
+          expiresAt,
+        }, editing ? '公告已更新' : '公告已发布');
+      },
+    });
+  }
+
+  async function toggleAnnouncementPin(item) {
+    await saveAnnouncement(item.id, { pinned: !item.pinned }, item.pinned ? '已取消置顶' : '公告已置顶');
+  }
+
+  function confirmDeleteAnnouncement(item) {
+    modal.show({
+      title: '删除公告',
+      content: el('div', {}, `确定删除「${item.title || '（无标题）'}」吗？删除后玩家端将不再显示。`),
+      confirmText: '删除',
+      onConfirm: async () => {
+        if (!session?.token) {
+          toast.warn('后台登录凭证缺失，请刷新页面重试');
+          return;
+        }
+        try {
+          await adminFetch(`/api/announcements/${encodeURIComponent(item.id)}`, { method: 'DELETE' }, session.token);
+          toast.success('公告已删除');
+          await loadAnnouncements();
+        } catch (err) {
+          toast.error(`删除失败：${err.message}`);
+        }
+      },
+    });
   }
 
   // ===== 兑换码 =====

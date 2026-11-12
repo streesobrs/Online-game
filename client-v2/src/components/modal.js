@@ -53,7 +53,7 @@ function ensureStyle() {
  * @param {Object} [options]
  * @param {string} [options.title=''] - 标题
  * @param {string|Node} [options.content=''] - 内容（字符串或 DOM 节点）
- * @param {Function} [options.onConfirm] - 点击「确定」回调
+ * @param {Function} [options.onConfirm] - 点击「确定」回调；返回 false 时阻止弹窗关闭（用于校验失败）
  * @param {Function} [options.onCancel] - 取消回调（取消按钮 / 遮罩点击 / 关闭按钮）
  * @param {string} [options.confirmText='确定'] - 确认按钮文案
  * @param {string} [options.cancelText='取消'] - 取消按钮文案
@@ -97,10 +97,14 @@ export function show(options = {}) {
   // 锁定 body 滚动（移动端关键）
   document.body.classList.add('modal-open');
 
-  // 确认
+  // 确认（回调返回 false 时保持弹窗打开，避免校验失败丢失输入）
   modal.querySelector('.btn--primary').addEventListener('click', () => {
-    close();
-    if (typeof onConfirm === 'function') onConfirm();
+    if (typeof onConfirm === 'function') {
+      const result = onConfirm();
+      if (result === false) return;
+    }
+    // 回调内可能已关闭或重新打开了新弹窗（如校验失败后重开），此时不要再关闭当前活动弹窗
+    if (activeOverlay === overlay) close();
   });
 
   // 取消按钮

@@ -100,6 +100,7 @@ registerRoute('leaderboard', lazyView('./features/leaderboard/index.js', 'render
 registerRoute('spectate', lazyView('./features/spectate/index.js', 'renderSpectate'));
 registerRoute('puzzle', lazyView('./features/puzzle/index.js', 'renderPuzzle'));
 registerRoute('feedback', lazyView('./features/feedback/index.js', 'renderFeedback'));
+registerRoute('announcements', lazyView('./features/announcements/index.js', 'renderAnnouncements'));
 registerRoute('profile', lazyView('./features/profile/index.js', 'renderProfile'));
 registerRoute('shop', lazyView('./features/shop/index.js', 'renderShop'));
 registerRoute('settings', lazyView('./features/settings/index.js', 'renderSettings'));

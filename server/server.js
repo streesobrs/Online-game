@@ -28,6 +28,7 @@ const AchievementManager = require('./modules/AchievementManager');
 const AIManager = require('./modules/AIManager');
 const ThemeManager = require('./modules/ThemeManager');
 const FeedbackManager = require('./modules/FeedbackManager');
+const AnnouncementManager = require('./modules/AnnouncementManager');
 const ShopManager = require('./modules/ShopManager');
 const LotteryManager = require('./modules/LotteryManager');
 const FriendsManager = require('./modules/FriendsManager');
@@ -1325,6 +1326,88 @@ app.put('/api/feedbacks/:id/status', authenticateToken, async (req, res) => {
   }
 });
 
+// ========== 公告相关API ==========
+
+/** 公告变更后向所有在线客户端推送最新列表 */
+async function broadcastAnnouncements() {
+  try {
+    const announcements = await announcementManager.list();
+    io.emit('announcements_updated', { announcements, timestamp: Date.now() });
+  } catch (err) {
+    logger.error('广播公告失败', { error: err.message });
+  }
+}
+
+// 获取公告列表（公开，所有人可见）
+app.get('/api/announcements', async (req, res) => {
+  try {
+    const includeExpired = req.query.includeExpired === '1';
+    const announcements = await announcementManager.list({ includeExpired });
+    res.json({ success: true, data: announcements });
+  } catch (err) {
+    logger.error('获取公告列表失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取公告列表失败' });
+  }
+});
+
+// 获取当前账号需要弹窗展示的公告
+app.get('/api/announcements/popup', authenticateUser, async (req, res) => {
+  try {
+    const announcements = await announcementManager.getPopupFor(req.authAccountId);
+    res.json({ success: true, data: announcements });
+  } catch (err) {
+    logger.error('获取弹窗公告失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取弹窗公告失败' });
+  }
+});
+
+// 标记弹窗公告已读（用于一次性 / 周期弹窗）
+app.post('/api/announcements/:id/ack', authenticateUser, async (req, res) => {
+  try {
+    const result = await announcementManager.ackPopup(req.params.id, req.authAccountId);
+    res.json(result);
+  } catch (err) {
+    logger.error('记录弹窗已读失败', { id: req.params.id, error: err.message });
+    res.status(500).json({ success: false, message: '记录弹窗已读失败' });
+  }
+});
+
+// 发布公告（管理员）
+app.post('/api/announcements', authenticateToken, async (req, res) => {
+  try {
+    const result = await announcementManager.create(req.body || {}, req.adminIdentity || {});
+    if (result.success) broadcastAnnouncements();
+    res.json(result);
+  } catch (err) {
+    logger.error('发布公告失败', { error: err.message });
+    res.status(500).json({ success: false, message: '发布公告失败' });
+  }
+});
+
+// 编辑公告（管理员）
+app.put('/api/announcements/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await announcementManager.update(req.params.id, req.body || {}, req.adminIdentity || {});
+    if (result.success) broadcastAnnouncements();
+    res.json(result);
+  } catch (err) {
+    logger.error('更新公告失败', { id: req.params.id, error: err.message });
+    res.status(500).json({ success: false, message: '更新公告失败' });
+  }
+});
+
+// 删除公告（管理员）
+app.delete('/api/announcements/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await announcementManager.remove(req.params.id, req.adminIdentity || {});
+    if (result.success) broadcastAnnouncements();
+    res.json(result);
+  } catch (err) {
+    logger.error('删除公告失败', { id: req.params.id, error: err.message });
+    res.status(500).json({ success: false, message: '删除公告失败' });
+  }
+});
+
 // 获取游戏回放
 app.get('/api/games/replay/:id', async (req, res) => {
   try {
@@ -2278,6 +2361,10 @@ const lotteryManager = new LotteryManager();
 // 注入accountManager到FeedbackManager用于实时查询昵称
 feedbackManager.accountManager = accountManager;
 feedbackManager.operationLogger = operationLogger;
+
+const announcementManager = AnnouncementManager;
+announcementManager.operationLogger = operationLogger;
+logger.info('公告系统初始化完成');
 
 const friendsManager = new FriendsManager();
 friendsManager.userManager = userManager;

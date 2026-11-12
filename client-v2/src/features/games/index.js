@@ -17,7 +17,9 @@
  * 见 core/shortcuts.js；本视图通过 registerScopeHandler 注册作用域处理函数）
  */
 import { el } from '../../utils/dom.js';
+import { mdToHtml } from '../../utils/md.js';
 import { toast } from '../../components/toast.js';
+import { modal } from '../../components/modal.js';
 import { emit } from '../../core/socket.js';
 import { api } from '../../core/api.js';
 import { store } from '../../core/store.js';
@@ -432,6 +434,93 @@ export function renderGames(container) {
 
   container.innerHTML = '';
   container.append(pageEl);
+
+  // ---- 进入大厅时弹窗展示公告（是否弹、多久弹一次由发布者配置）----
+  async function showAnnouncementPopup() {
+    let popupList = [];
+    try {
+      const res = await api.announcements.popup();
+      popupList = Array.isArray(res?.data) ? res.data : [];
+    } catch {
+      return;
+    }
+    if (!popupList.length) return;
+
+    // 关闭弹窗时记录已读，一次性 / 周期弹窗据此控制下次是否再弹
+    const ackAll = () => {
+      popupList.forEach((item) => {
+        api.announcements.ack(item.id).catch(() => {});
+      });
+    };
+
+    const renderBody = (item) => {
+      const body = el('div', { class: 'announcement-popup__content markdown-body' });
+      body.innerHTML = mdToHtml(item.content || '');
+      return body;
+    };
+
+    const renderItem = (item) => el('article', { class: 'announcement-popup__item' }, [
+      el('h4', { class: 'announcement-popup__title' }, [
+        item.pinned ? el('span', { class: 'announcement-popup__pin' }, '📌 ') : null,
+        item.title || '（无标题）',
+      ]),
+      renderBody(item),
+    ]);
+
+    // 多条公告时分页展示，一页一条
+    const total = popupList.length;
+    let currentIndex = 0;
+    const pageWrap = el('div', { class: 'announcement-popup__page' });
+    const counter = el('span', { class: 'announcement-popup__counter' });
+    const prevBtn = el('button', {
+      type: 'button',
+      class: 'announcement-popup__pager-btn',
+    }, '上一页');
+    const nextBtn = el('button', {
+      type: 'button',
+      class: 'announcement-popup__pager-btn',
+    }, '下一页');
+
+    const updatePage = (index) => {
+      currentIndex = Math.max(0, Math.min(total - 1, index));
+      pageWrap.replaceChildren(renderItem(popupList[currentIndex]));
+      counter.textContent = `${currentIndex + 1} / ${total}`;
+      prevBtn.disabled = currentIndex === 0;
+      nextBtn.disabled = currentIndex === total - 1;
+    };
+    prevBtn.addEventListener('click', () => updatePage(currentIndex - 1));
+    nextBtn.addEventListener('click', () => updatePage(currentIndex + 1));
+    updatePage(0);
+
+    const content = el('div', { class: 'announcement-popup' }, [
+      pageWrap,
+      total > 1
+        ? el('div', { class: 'announcement-popup__pager' }, [prevBtn, counter, nextBtn])
+        : null,
+      el('div', { class: 'announcement-popup__more' }, [
+        el('button', {
+          class: 'announcement-popup__link',
+          type: 'button',
+          onClick: () => {
+            ackAll();
+            modal.close();
+            go('announcements');
+          },
+        }, '查看全部公告 →'),
+      ]),
+    ]);
+
+    modal.show({
+      title: '📢 公告',
+      content,
+      confirmText: '我知道了',
+      showCancel: false,
+      onConfirm: ackAll,
+      onCancel: ackAll,
+    });
+  }
+
+  showAnnouncementPopup();
 
   // ---- 渲染游戏卡片墙：全部游戏平铺 ----
   function renderPicker() {

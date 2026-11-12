@@ -286,6 +286,18 @@
   white-space: nowrap;
 }
 
+/* 上下排版：标签在上，输入控件在下 */
+.admin-field--stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.admin-field--stack .admin-field__label {
+  white-space: normal;
+  line-height: 1.4;
+}
+
 .admin-check {
   display: inline-flex;
   align-items: center;

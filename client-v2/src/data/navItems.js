@@ -38,6 +38,15 @@ export const NAV_ITEMS = [
     order: 3,
   },
   {
+    id: 'announcements',
+    type: 'feature',
+    name: '公告',
+    icon: '📢',
+    shortcut: 'N',
+    category: '社交',
+    order: 7,
+  },
+  {
     id: 'friends',
     type: 'feature',
     name: '好友',
