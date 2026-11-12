@@ -1015,7 +1015,7 @@ export function renderProfile(container) {
     return detail;
   }
 
-  // ============ 每日签到 / 每日任务 Tab ============
+  // ============ 每日签到 / 每周任务 Tab ============
   let dailyStatus = null;
   let dailyLoading = false;
 
@@ -1026,7 +1026,7 @@ export function renderProfile(container) {
     }
     dailyLoading = true;
     // 每次进入都向服务端拉取最新状态：任务进度由对局/聊天累积，
-    // 缓存旧数据会导致切回 Tab 仍显示过期进度，跨天也不会自动重置
+    // 缓存旧数据会导致切回 Tab 仍显示过期进度，跨周也不会自动重置
     if (!dailyStatus) {
       contentEl.append(el('div', { class: 'text-muted', style: 'text-align:center;padding:40px;' }, '⏳ 加载中...'));
     }
@@ -1034,7 +1034,7 @@ export function renderProfile(container) {
       const res = await api.daily.status();
       if (res?.success && res.data) dailyStatus = res.data;
     } catch (err) {
-      toast.error(err.message || '加载每日任务失败');
+      toast.error(err.message || '加载每周任务失败');
     } finally {
       dailyLoading = false;
     }
@@ -1126,7 +1126,7 @@ export function renderProfile(container) {
         ]),
         signBtn,
       ]),
-      el('div', { class: 'daily-section-title' }, '🎯 每日任务'),
+      el('div', { class: 'daily-section-title' }, '🎯 每周任务'),
       el('div', { class: 'daily-task-list' }, taskRows.length
         ? taskRows
         : [el('div', { class: 'friends-empty' }, '暂无任务')]),

@@ -314,11 +314,11 @@ class AccountManager {
     return [...history, { ip: ip || '未知', time, type: type || 'login' }].slice(-10);
   }
 
-  // 每日任务配置（进度来自 activity 里的当日计数，奖励通过邮件发放）
-  static DAILY_TASKS = [
-    { id: 'games3', name: '完成 3 局对局', metric: 'dailyGames', target: 3, reward: { exp: 300, starCoins: 30 } },
-    { id: 'win1', name: '赢得 1 局对局', metric: 'dailyWins', target: 1, reward: { exp: 200, starCoins: 20 } },
-    { id: 'chat5', name: '发送 5 条聊天', metric: 'dailyChatMessages', target: 5, reward: { exp: 150, starCoins: 15 } },
+  // 每周任务配置（进度来自 activity 里的本周计数，奖励通过邮件发放）
+  static WEEKLY_TASKS = [
+    { id: 'games3', name: '完成 3 局对局', metric: 'weeklyGames', target: 3, reward: { exp: 300, starCoins: 30 } },
+    { id: 'win1', name: '赢得 1 局对局', metric: 'weeklyWins', target: 1, reward: { exp: 200, starCoins: 20 } },
+    { id: 'chat5', name: '发送 5 条聊天', metric: 'weeklyChatMessages', target: 5, reward: { exp: 150, starCoins: 15 } },
   ];
 
   /**
@@ -337,8 +337,11 @@ class AccountManager {
       activity.lastDailyReset = now;
       changed = true;
     }
-    if (!activity.lastWeeklyReset || weekKeyOf(activity.lastWeeklyReset) !== weekKeyOf(now)) {
+    const weeklyKey = weekKeyOf(now);
+    if (!activity.lastWeeklyReset || weekKeyOf(activity.lastWeeklyReset) !== weeklyKey) {
       activity.weeklyGames = 0;
+      activity.weeklyWins = 0;
+      activity.weeklyChatMessages = 0;
       activity.lastWeeklyReset = now;
       changed = true;
     }
@@ -347,8 +350,8 @@ class AccountManager {
       activity.lastMonthlyReset = now;
       changed = true;
     }
-    if (!activity.dailyTaskClaims || activity.dailyTaskClaims.date !== dailyKey) {
-      activity.dailyTaskClaims = { date: dailyKey, ids: [] };
+    if (!activity.weeklyTaskClaims || activity.weeklyTaskClaims.week !== weeklyKey) {
+      activity.weeklyTaskClaims = { week: weeklyKey, ids: [] };
       changed = true;
     }
     return { activity, changed };
@@ -373,13 +376,14 @@ class AccountManager {
       const now = Date.now();
       const { activity } = this.normalizeActivity(account.account?.activity || {}, now);
       const today = dayKeyOf(now);
+      const weekKey = weekKeyOf(now);
       const signedToday = Number(activity.lastSignIn) > 0 && dayKeyOf(activity.lastSignIn) === today;
       const streak = Number(activity.signInStreak) || 0;
-      const claimedIds = activity.dailyTaskClaims?.date === today
-        ? (activity.dailyTaskClaims.ids || [])
+      const claimedIds = activity.weeklyTaskClaims?.week === weekKey
+        ? (activity.weeklyTaskClaims.ids || [])
         : [];
 
-      const tasks = AccountManager.DAILY_TASKS.map((t) => {
+      const tasks = AccountManager.WEEKLY_TASKS.map((t) => {
         const progress = Math.min(t.target, Number(activity[t.metric]) || 0);
         return {
           id: t.id,
@@ -453,9 +457,9 @@ class AccountManager {
     }
   }
 
-  // 领取每日任务奖励（奖励通过邮件发放）
+  // 领取每周任务奖励（奖励通过邮件发放）
   async claimDailyTask(accountId, taskId) {
-    const task = AccountManager.DAILY_TASKS.find((t) => t.id === taskId);
+    const task = AccountManager.WEEKLY_TASKS.find((t) => t.id === taskId);
     if (!task) return { success: false, message: '任务不存在' };
 
     try {
@@ -464,20 +468,20 @@ class AccountManager {
 
       const now = Date.now();
       const { activity } = this.normalizeActivity(account.account?.activity || {}, now);
-      const today = dayKeyOf(now);
-      const claims = activity.dailyTaskClaims?.date === today
-        ? activity.dailyTaskClaims
-        : { date: today, ids: [] };
+      const weekKey = weekKeyOf(now);
+      const claims = activity.weeklyTaskClaims?.week === weekKey
+        ? activity.weeklyTaskClaims
+        : { week: weekKey, ids: [] };
 
       if (claims.ids.includes(task.id)) {
-        return { success: false, message: '该任务今日已领取' };
+        return { success: false, message: '该任务本周已领取' };
       }
       if ((Number(activity[task.metric]) || 0) < task.target) {
         return { success: false, message: '任务尚未完成' };
       }
 
       claims.ids.push(task.id);
-      activity.dailyTaskClaims = claims;
+      activity.weeklyTaskClaims = claims;
 
       await dataStore.update('accounts', { 'account.id': accountId }, {
         'account.activity': activity,
@@ -485,18 +489,18 @@ class AccountManager {
       });
 
       await this.sendMail(accountId, {
-        title: `每日任务 · ${task.name}`,
+        title: `每周任务 · ${task.name}`,
         content: '任务奖励已发放，继续加油！',
         starCoins: task.reward.starCoins || 0,
         exp: task.reward.exp || 0,
         tickets: task.reward.tickets || 0,
-        from: '每日任务',
+        from: '每周任务',
       });
 
-      logger.info('每日任务奖励领取', { accountId, taskId: task.id });
+      logger.info('每周任务奖励领取', { accountId, taskId: task.id });
       return { success: true, message: '领取成功，奖励已发送到邮箱', data: { taskId: task.id, reward: task.reward } };
     } catch (err) {
-      logger.error('领取每日任务失败', { accountId, taskId, error: err.message });
+      logger.error('领取每周任务失败', { accountId, taskId, error: err.message });
       return { success: false, message: '领取失败，请稍后重试' };
     }
   }
@@ -1833,6 +1837,7 @@ class AccountManager {
       const { activity } = this.normalizeActivity(account.account?.activity || { chatMessages: 0 }, now);
       activity.chatMessages = (activity.chatMessages || 0) + 1;
       activity.dailyChatMessages = (activity.dailyChatMessages || 0) + 1;
+      activity.weeklyChatMessages = (activity.weeklyChatMessages || 0) + 1;
 
       await dataStore.update('accounts', { 'account.id': id }, { 'account.activity': activity, 'account.updatedAt': now });
       logger.info('聊天消息统计更新', { id, total: activity.chatMessages, daily: activity.dailyChatMessages });
@@ -2013,6 +2018,7 @@ class AccountManager {
       activity.monthlyGames = (activity.monthlyGames || 0) + 1;
       if (result === 'win') {
         activity.dailyWins = (activity.dailyWins || 0) + 1;
+        activity.weeklyWins = (activity.weeklyWins || 0) + 1;
       }
 
       // 检查是否是首次游戏

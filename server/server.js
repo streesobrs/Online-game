@@ -710,7 +710,7 @@ app.post('/api/redeem-code', authenticateUser, requireSelf(req => req.body.userI
   }
 });
 
-// 每日签到 / 每日任务
+// 每日签到 / 每周任务
 app.get('/api/daily/status', authenticateUser, async (req, res) => {
   try {
     const result = await accountManager.getDailyStatus(req.authAccountId);
@@ -737,7 +737,7 @@ app.post('/api/daily/claim', authenticateUser, async (req, res) => {
     const result = await accountManager.claimDailyTask(req.authAccountId, taskId);
     res.json(result);
   } catch (err) {
-    logger.error('领取每日任务失败', { error: err.message });
+    logger.error('领取每周任务失败', { error: err.message });
     res.status(500).json({ success: false, message: '领取失败' });
   }
 });
