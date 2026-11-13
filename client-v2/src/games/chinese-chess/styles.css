@@ -202,10 +202,21 @@
   position: absolute;
   width: calc(var(--board-cell-size, 16px) * 1.4);
   height: calc(var(--board-cell-size, 16px) * 1.4);
+  /* 用 left/top + 负 margin 居中：动画里要用 transform: scale()，
+     若这里也用 transform 居中会被动画覆盖，红晕就会偏到交叉点右下角 */
+  left: 50%;
+  top: 50%;
+  margin-left: calc(var(--board-cell-size, 16px) * -0.7);
+  margin-top: calc(var(--board-cell-size, 16px) * -0.7);
   background: radial-gradient(circle, rgba(255, 0, 0, 0.5) 0%, transparent 70%);
   border-radius: 50%;
   animation: chess-pulse 1.5s ease-in-out infinite;
   z-index: 10;
+}
+
+/* 我方走子：绿色光晕，和对方应招（红色）区分开；棋盘是暖木色，绿色对比更明显 */
+.chess-intersection.last-move.last-move--mine::before {
+  background: radial-gradient(circle, rgba(46, 204, 113, 0.7) 0%, transparent 70%);
 }
 
 .chess-intersection.valid-move::before {

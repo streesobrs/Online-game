@@ -316,10 +316,35 @@ class AccountManager {
 
   // 每周任务配置（进度来自 activity 里的本周计数，奖励通过邮件发放）
   static WEEKLY_TASKS = [
-    { id: 'games3', name: '完成 3 局对局', metric: 'weeklyGames', target: 3, reward: { exp: 300, starCoins: 30 } },
-    { id: 'win1', name: '赢得 1 局对局', metric: 'weeklyWins', target: 1, reward: { exp: 200, starCoins: 20 } },
-    { id: 'chat5', name: '发送 5 条聊天', metric: 'weeklyChatMessages', target: 5, reward: { exp: 150, starCoins: 15 } },
+    { id: 'games5', name: '完成 5 局对局', metric: 'weeklyGames', target: 5, reward: { exp: 300, starCoins: 30 } },
+    { id: 'win2', name: '赢得 2 局对局', metric: 'weeklyWins', target: 2, reward: { exp: 250, starCoins: 25 } },
+    { id: 'ai3', name: '与 AI 对战 3 局', metric: 'weeklyAiGames', target: 3, reward: { exp: 200, starCoins: 20 } },
+    { id: 'aiWin1', name: '战胜 AI 1 次', metric: 'weeklyAiWins', target: 1, reward: { exp: 180, starCoins: 18 } },
+    { id: 'gobang2', name: '玩 2 局五子棋', metric: 'weeklyGobangGames', target: 2, reward: { exp: 150, starCoins: 15 } },
+    { id: 'go1', name: '玩 1 局围棋', metric: 'weeklyGoGames', target: 1, reward: { exp: 120, starCoins: 12 } },
+    { id: 'chess1', name: '玩 1 局中国象棋', metric: 'weeklyChessGames', target: 1, reward: { exp: 120, starCoins: 12 } },
+    { id: 'snake1', name: '玩 1 局贪吃蛇', metric: 'weeklySnakeGames', target: 1, reward: { exp: 120, starCoins: 12 } },
+    { id: 'match3_1', name: '玩 1 局消消乐', metric: 'weeklyMatch3Games', target: 1, reward: { exp: 120, starCoins: 12 } },
+    { id: 'chat10', name: '发送 10 条聊天', metric: 'weeklyChatMessages', target: 10, reward: { exp: 150, starCoins: 15 } },
+    { id: 'time20', name: '累计游玩 20 分钟', metric: 'weeklyPlaySeconds', target: 1200, reward: { exp: 200, starCoins: 20 } },
   ];
+
+  // 每周重置的计数项
+  static WEEKLY_COUNTERS = [
+    'weeklyGames', 'weeklyWins', 'weeklyChatMessages',
+    'weeklyAiGames', 'weeklyAiWins', 'weeklyPlaySeconds',
+    'weeklyGobangGames', 'weeklyGoGames', 'weeklyChessGames',
+    'weeklySnakeGames', 'weeklyMatch3Games',
+  ];
+
+  // 棋种 -> 每周计数项
+  static WEEKLY_GAME_KEYS = {
+    gobang: 'weeklyGobangGames',
+    go: 'weeklyGoGames',
+    'chinese-chess': 'weeklyChessGames',
+    snake: 'weeklySnakeGames',
+    match3: 'weeklyMatch3Games',
+  };
 
   /**
    * 归一化活动计数：跨自然日/周/月时把周期计数清零。
@@ -330,6 +355,26 @@ class AccountManager {
     let changed = false;
 
     const dailyKey = dayKeyOf(now);
+    // 兼容旧账号：从每日任务升级到每周任务时，部分周计数从未写入过，
+    // 若直接按 0 计算会让已有进度看起来被清空，这里用当日计数做一次初值填充
+    if (typeof activity.weeklyGames !== 'number') {
+      activity.weeklyGames = Number(activity.dailyGames) || 0;
+      changed = true;
+    }
+    if (typeof activity.weeklyWins !== 'number') {
+      activity.weeklyWins = Number(activity.dailyWins) || 0;
+      changed = true;
+    }
+    if (typeof activity.weeklyChatMessages !== 'number') {
+      activity.weeklyChatMessages = Number(activity.dailyChatMessages) || 0;
+      changed = true;
+    }
+    for (const key of AccountManager.WEEKLY_COUNTERS) {
+      if (typeof activity[key] !== 'number') {
+        activity[key] = 0;
+        changed = true;
+      }
+    }
     if (!activity.lastDailyReset || dayKeyOf(activity.lastDailyReset) !== dailyKey) {
       activity.dailyGames = 0;
       activity.dailyWins = 0;
@@ -339,9 +384,7 @@ class AccountManager {
     }
     const weeklyKey = weekKeyOf(now);
     if (!activity.lastWeeklyReset || weekKeyOf(activity.lastWeeklyReset) !== weeklyKey) {
-      activity.weeklyGames = 0;
-      activity.weeklyWins = 0;
-      activity.weeklyChatMessages = 0;
+      for (const key of AccountManager.WEEKLY_COUNTERS) activity[key] = 0;
       activity.lastWeeklyReset = now;
       changed = true;
     }
@@ -512,6 +555,7 @@ class AccountManager {
   static DAILY_PUZZLES = [
     {
       id: 'p1',
+      type: 'attack',
       title: '横向收官',
       tip: '黑棋右侧被堵，找出另一端的制胜点。',
       black: [[9, 5], [9, 6], [9, 7], [9, 8], [7, 7], [11, 7], [8, 9]],
@@ -520,6 +564,7 @@ class AccountManager {
     },
     {
       id: 'p2',
+      type: 'attack',
       title: '纵向突破',
       tip: '四子竖排，上方已封，落子何处？',
       black: [[4, 9], [5, 9], [6, 9], [7, 9], [4, 6], [6, 6], [8, 11]],
@@ -528,6 +573,7 @@ class AccountManager {
     },
     {
       id: 'p3',
+      type: 'attack',
       title: '斜线一击',
       tip: '顺着对角线看，答案就在延长线尽头。',
       black: [[5, 5], [6, 6], [7, 7], [8, 8], [6, 4], [8, 10]],
@@ -536,6 +582,7 @@ class AccountManager {
     },
     {
       id: 'p4',
+      type: 'attack',
       title: '反斜连线',
       tip: '另一条对角线同样致命。',
       black: [[4, 10], [5, 9], [6, 8], [7, 7], [6, 10], [4, 6]],
@@ -544,6 +591,7 @@ class AccountManager {
     },
     {
       id: 'p5',
+      type: 'gap',
       title: '补中制胜',
       tip: '中间留了一个空位，填上就是五连。',
       black: [[9, 4], [9, 5], [9, 7], [9, 8], [7, 5], [11, 7]],
@@ -552,13 +600,268 @@ class AccountManager {
     },
     {
       id: 'p6',
+      type: 'gap',
       title: '竖缝补刀',
       tip: '竖线上的缺口，就是唯一的胜点。',
       black: [[5, 4], [6, 4], [8, 4], [9, 4], [6, 3], [8, 5]],
       white: [[4, 4], [10, 4], [6, 5], [8, 6], [7, 6]],
       solutions: [[7, 4]],
     },
+    {
+      id: 'p7',
+      type: 'attack',
+      title: '边路封杀',
+      tip: '横向四子已被白棋封住一端，另一端就是胜点。',
+      black: [[5, 4], [5, 5], [5, 6], [5, 7], [3, 6], [7, 8], [4, 10]],
+      white: [[5, 3], [4, 7], [6, 7], [3, 9], [6, 4]],
+      solutions: [[5, 8]],
+    },
+    {
+      id: 'p8',
+      type: 'attack',
+      title: '纵线延伸',
+      tip: '竖线四子只差一步，注意上方已被白棋占据。',
+      black: [[7, 12], [8, 12], [9, 12], [10, 12], [8, 10], [10, 14], [6, 8]],
+      white: [[6, 12], [11, 13], [9, 11], [7, 14], [11, 9]],
+      solutions: [[11, 12]],
+    },
+    {
+      id: 'p9',
+      type: 'attack',
+      title: '斜线封口',
+      tip: '沿对角线方向延伸，左上角已被封死。',
+      black: [[4, 4], [5, 5], [6, 6], [7, 7], [5, 3], [7, 9], [3, 8]],
+      white: [[3, 3], [8, 10], [6, 8], [7, 5], [4, 7]],
+      solutions: [[8, 8]],
+    },
+    {
+      id: 'p10',
+      type: 'attack',
+      title: '反斜制胜',
+      tip: '反斜线四子，右下被堵，胜点在另一头。',
+      black: [[5, 12], [6, 11], [7, 10], [8, 9], [6, 13], [4, 10], [9, 13]],
+      white: [[9, 8], [4, 11], [8, 11], [5, 9], [10, 12]],
+      solutions: [[4, 13]],
+    },
+    {
+      id: 'p11',
+      type: 'gap',
+      title: '中间开花',
+      tip: '横向 XX_XX，中间的空位就是答案。',
+      black: [[9, 6], [9, 7], [9, 9], [9, 10], [7, 7], [11, 9]],
+      white: [[9, 5], [9, 11], [8, 8], [10, 8], [7, 10]],
+      solutions: [[9, 8]],
+    },
+    {
+      id: 'p12',
+      type: 'gap',
+      title: '竖线补缺',
+      tip: '竖线中间少了一颗，补上即五连。',
+      black: [[6, 14], [7, 14], [9, 14], [10, 14], [7, 12], [9, 16]],
+      white: [[5, 14], [11, 14], [8, 13], [8, 15], [6, 16]],
+      solutions: [[8, 14]],
+    },
+    {
+      id: 'p13',
+      type: 'double',
+      title: '双线齐发',
+      tip: '横竖两条线各差一步，两个胜点任选其一。',
+      black: [[5, 5], [5, 6], [5, 7], [5, 8], [7, 5], [8, 5], [9, 5], [10, 5], [3, 7], [12, 7]],
+      white: [[5, 4], [6, 5], [6, 9], [4, 5], [11, 9], [8, 8], [9, 9]],
+      solutions: [[5, 9], [11, 5]],
+    },
+    {
+      id: 'p14',
+      type: 'double',
+      title: '双向必杀',
+      tip: '斜线与横线同时叫杀，任选一个成五点。',
+      black: [[4, 4], [5, 5], [6, 6], [7, 7], [10, 6], [10, 7], [10, 9], [10, 10], [12, 12], [2, 10]],
+      white: [[3, 3], [10, 5], [10, 11], [11, 8], [9, 8], [5, 9], [7, 9]],
+      solutions: [[8, 8], [10, 8]],
+    },
+    {
+      id: 'p15',
+      type: 'defense',
+      title: '紧急封堵',
+      tip: '白棋横向四连只差一步，黑棋必须堵住开口。',
+      black: [[6, 5], [8, 7], [4, 9], [9, 4], [7, 11]],
+      white: [[6, 6], [6, 7], [6, 8], [6, 9]],
+      solutions: [[6, 10]],
+    },
+    {
+      id: 'p16',
+      type: 'defense',
+      title: '纵线救火',
+      tip: '白棋竖向四连，别让它在下方连成五子。',
+      black: [[7, 12], [8, 9], [10, 14], [6, 11], [13, 9]],
+      white: [[8, 12], [9, 12], [10, 12], [11, 12]],
+      solutions: [[12, 12]],
+    },
+    {
+      id: 'p17',
+      type: 'defense',
+      title: '斜线堵截',
+      tip: '白棋斜向四连，找出必须封堵的落点。',
+      black: [[4, 4], [6, 8], [8, 6], [4, 8], [9, 5], [3, 9]],
+      white: [[5, 5], [6, 6], [7, 7], [8, 8]],
+      solutions: [[9, 9]],
+    },
+    {
+      id: 'p18',
+      type: 'defense',
+      title: '反斜封死',
+      tip: '白棋反斜四连，别让它连成五子。',
+      black: [[4, 13], [5, 9], [7, 12], [9, 10], [6, 13], [10, 7]],
+      white: [[5, 12], [6, 11], [7, 10], [8, 9]],
+      solutions: [[9, 8]],
+    },
+    {
+      id: 'p19',
+      type: 'attack',
+      title: '对角收官',
+      tip: '斜向四子，左下已封，往右上落子。',
+      black: [[6, 5], [7, 6], [8, 7], [9, 8], [4, 7], [10, 5], [8, 11]],
+      white: [[10, 9], [4, 5], [8, 9], [6, 7], [11, 12]],
+      solutions: [[5, 4]],
+    },
+    {
+      id: 'p20',
+      type: 'attack',
+      title: '贴边连五',
+      tip: '贴着上边线的四子，只差最右一格。',
+      black: [[2, 8], [2, 9], [2, 10], [2, 11], [4, 6], [0, 9], [5, 12]],
+      white: [[2, 7], [4, 9], [1, 11], [3, 13], [0, 6]],
+      solutions: [[2, 12]],
+    },
   ];
+
+  // 中国象棋残局（红方先行；line 按「红、黑、红…」顺序记录正解，黑方由客户端自动应对）
+  // rows 简写：大写红方、小写黑方；K/k 帅将、A/a 仕士、B/b 相象、N/n 马、R/r 车、C/c 炮、P/p 兵卒
+  static XIANGQI_PUZZLES = [
+    {
+      id: 'x1',
+      title: '车马绝杀',
+      tip: '红先，一步将死黑方。',
+      rows: [
+        '...ak....',
+        'R........',
+        '....N....',
+        '.........',
+        '.....R...',
+        '.........',
+        '.........',
+        '.........',
+        '.........',
+        '....K....',
+      ],
+      line: [[4, 5, 0, 5]],
+    },
+    {
+      id: 'x2',
+      title: '卧槽马',
+      tip: '红先，一步将死黑方。',
+      rows: [
+        '...aka...',
+        'R........',
+        '.........',
+        '...N.....',
+        '....p....',
+        '.........',
+        '.........',
+        '.........',
+        '.........',
+        '....K....',
+      ],
+      line: [[3, 3, 2, 5]],
+    },
+    {
+      id: 'x3',
+      title: '双车夺宫',
+      tip: '红先，一步将死黑方。',
+      rows: [
+        'R..ak....',
+        '....a....',
+        '......N..',
+        '.........',
+        '.....R...',
+        '.........',
+        '.........',
+        '.........',
+        '.........',
+        '....K....',
+      ],
+      line: [[4, 5, 0, 5]],
+    },
+    {
+      id: 'x4',
+      title: '双马守门',
+      tip: '红先，一步将死黑方。',
+      rows: [
+        '....k....',
+        '....p....',
+        '..N...N..',
+        '.........',
+        'R........',
+        '.........',
+        '.........',
+        '.........',
+        '.........',
+        '....K....',
+      ],
+      line: [[4, 0, 0, 0]],
+    },
+    {
+      id: 'x5',
+      title: '两步成杀',
+      tip: '红先，两步将死黑方。第一手要把黑将逼到绝路。',
+      rows: [
+        '...ak....',
+        '.........',
+        '.N.......',
+        '....p.N..',
+        '.........',
+        '........C',
+        '.........',
+        '.........',
+        '.........',
+        '....K..R.',
+      ],
+      line: [[9, 7, 0, 7], [0, 4, 1, 4], [5, 8, 5, 4]],
+    },
+    {
+      id: 'x6',
+      title: '反败为胜',
+      defense: true,
+      tip: '黑方下一手就要将死红方，红方必须抢先出手，两步反杀。',
+      rows: [
+        '...ak....',
+        '.........',
+        '.N.......',
+        '....p.N..',
+        '.........',
+        '........C',
+        '.........',
+        '....p....',
+        '...p.....',
+        'r..AK..R.',
+      ],
+      line: [[9, 7, 0, 7], [0, 4, 1, 4], [5, 8, 5, 4]],
+    },
+  ];
+
+  /** 把象棋残局简写行转成棋盘数据（10×9 的 {name,color}|null 数组） */
+  static parseXiangqiRows(rows) {
+    const map = {
+      K: ['帅', 'red'], A: ['仕', 'red'], B: ['相', 'red'], N: ['马', 'red'],
+      R: ['车', 'red'], C: ['炮', 'red'], P: ['兵', 'red'],
+      k: ['将', 'black'], a: ['士', 'black'], b: ['象', 'black'], n: ['马', 'black'],
+      r: ['车', 'black'], c: ['炮', 'black'], p: ['卒', 'black'],
+    };
+    return rows.map((line) => [...line].map((ch) => {
+      const item = map[ch];
+      return item ? { name: item[0], color: item[1] } : null;
+    }));
+  }
 
   /** 本地日期对应的天序号（同一天全服同一题） */
   static puzzleDayIndex(now = Date.now()) {
@@ -567,10 +870,13 @@ class AccountManager {
     return Math.floor(dayStart / 86400000);
   }
 
-  /** 取当天题目（含答案，仅供服务端内部使用） */
+  /** 取当天题目（含答案，仅供服务端内部使用）：双数日五子棋，单数日象棋 */
   static puzzleOfDay(now = Date.now()) {
-    const list = AccountManager.DAILY_PUZZLES;
-    return list[AccountManager.puzzleDayIndex(now) % list.length];
+    const day = AccountManager.puzzleDayIndex(now);
+    const index = Math.floor(day / 2);
+    const xiangqi = day % 2 === 1;
+    const list = xiangqi ? AccountManager.XIANGQI_PUZZLES : AccountManager.DAILY_PUZZLES;
+    return { ...list[index % list.length], game: xiangqi ? 'xiangqi' : 'gobang' };
   }
 
   // 获取每日一题状态（不返回答案）
@@ -583,18 +889,25 @@ class AccountManager {
       const today = dayKeyOf(now);
       const puzzle = AccountManager.puzzleOfDay(now);
       const progress = account.account?.activity?.puzzle;
-      const isToday = progress && progress.date === today;
+      const isToday = progress && progress.date === today && progress.puzzleId === puzzle.id;
+      const totalSteps = puzzle.game === 'xiangqi'
+        ? Math.ceil((puzzle.line || []).length / 2)
+        : 1;
 
       return {
         success: true,
         data: {
           date: today,
           puzzleId: puzzle.id,
+          game: puzzle.game,
           title: puzzle.title,
           tip: puzzle.tip,
           size: AccountManager.PUZZLE_SIZE,
           black: puzzle.black,
           white: puzzle.white,
+          layout: puzzle.game === 'xiangqi' ? AccountManager.parseXiangqiRows(puzzle.rows) : null,
+          defense: !!puzzle.defense,
+          totalSteps,
           reward: AccountManager.PUZZLE_REWARD,
           solved: !!(isToday && progress.solved),
           attempts: isToday ? (Number(progress.attempts) || 0) : 0,
@@ -607,14 +920,7 @@ class AccountManager {
   }
 
   // 提交每日一题答案（服务端校验，答对后奖励通过邮件发放，每日仅一次）
-  async submitDailyPuzzle(accountId, r, c) {
-    const row = Number(r);
-    const col = Number(c);
-    const size = AccountManager.PUZZLE_SIZE;
-    if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || col < 0 || row >= size || col >= size) {
-      return { success: false, message: '落点无效' };
-    }
-
+  async submitDailyPuzzle(accountId, payload = {}) {
     try {
       const account = await dataStore.findOne('accounts', { 'account.id': accountId });
       if (!account) return { success: false, message: '账号不存在' };
@@ -623,15 +929,49 @@ class AccountManager {
       const today = dayKeyOf(now);
       const puzzle = AccountManager.puzzleOfDay(now);
       const { activity } = this.normalizeActivity(account.account?.activity || {}, now);
-      const prev = activity.puzzle && activity.puzzle.date === today
+      const prev = activity.puzzle && activity.puzzle.date === today && activity.puzzle.puzzleId === puzzle.id
         ? activity.puzzle
-        : { date: today, solved: false, attempts: 0 };
+        : { date: today, puzzleId: puzzle.id, solved: false, attempts: 0 };
 
-      const occupied = [...puzzle.black, ...puzzle.white]
-        .some(([rr, cc]) => rr === row && cc === col);
-      if (occupied) return { success: false, message: '该位置已有棋子' };
-
-      const correct = puzzle.solutions.some(([rr, cc]) => rr === row && cc === col);
+      let correct = false;
+      let finished = true;
+      let reply = null;
+      let step = 1;
+      let totalSteps = 1;
+      if (puzzle.game === 'xiangqi') {
+        // line 按「红、黑、红…」排列；客户端回传红方已走的全部走法，服务端逐手比对
+        const line = puzzle.line || [];
+        const redMoves = line.filter((_, i) => i % 2 === 0);
+        totalSteps = redMoves.length;
+        const moves = Array.isArray(payload.moves)
+          ? payload.moves.map((m) => (Array.isArray(m) ? m.map(Number) : []))
+          : [];
+        const inRange = moves.length > 0 && moves.length <= redMoves.length
+          && moves.every((m) => m.length === 4 && m.every(Number.isInteger)
+            && m[0] >= 0 && m[0] < 10 && m[2] >= 0 && m[2] < 10
+            && m[1] >= 0 && m[1] < 9 && m[3] >= 0 && m[3] < 9);
+        if (!inRange) return { success: false, message: '走法无效' };
+        step = moves.length;
+        correct = moves.every(([fr, fc, tr, tc], i) => {
+          const [a, b, x, y] = redMoves[i];
+          return a === fr && b === fc && x === tr && y === tc;
+        });
+        if (correct) {
+          finished = step >= redMoves.length;
+          if (!finished) reply = line[step * 2 - 1];
+        }
+      } else {
+        const row = Number(payload.r);
+        const col = Number(payload.c);
+        const size = AccountManager.PUZZLE_SIZE;
+        if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || col < 0 || row >= size || col >= size) {
+          return { success: false, message: '落点无效' };
+        }
+        const occupied = [...puzzle.black, ...puzzle.white]
+          .some(([rr, cc]) => rr === row && cc === col);
+        if (occupied) return { success: false, message: '该位置已有棋子' };
+        correct = puzzle.solutions.some(([rr, cc]) => rr === row && cc === col);
+      }
 
       if (!correct) {
         activity.puzzle = { ...prev, attempts: (Number(prev.attempts) || 0) + 1 };
@@ -639,16 +979,50 @@ class AccountManager {
           'account.activity': activity,
           'account.updatedAt': now
         });
+        let failMessage = '这一步没有形成五连，再想想';
+        if (puzzle.game === 'xiangqi') {
+          failMessage = puzzle.defense
+            ? '这一步没能破解黑方的杀招，再想想'
+            : '这一步不是正解，再想想';
+        } else if (puzzle.type === 'defense') {
+          failMessage = '这一步没挡住白棋，再想想';
+        }
         return {
           success: true,
-          data: { correct: false, attempts: activity.puzzle.attempts, message: '这一步没能连成五子，再想想' },
+          data: { correct: false, attempts: activity.puzzle.attempts, step: 0, totalSteps, message: failMessage },
         };
       }
 
       if (prev.solved) return { success: false, message: '今日残局已经通关' };
 
+      // 多步残局：中间步只记录尝试次数，最后一步才发奖励
+      if (!finished) {
+        activity.puzzle = {
+          date: today,
+          puzzleId: puzzle.id,
+          solved: false,
+          attempts: (Number(prev.attempts) || 0) + 1,
+        };
+        await dataStore.update('accounts', { 'account.id': accountId }, {
+          'account.activity': activity,
+          'account.updatedAt': now
+        });
+        return {
+          success: true,
+          data: {
+            correct: true,
+            finished: false,
+            attempts: activity.puzzle.attempts,
+            reply,
+            step,
+            totalSteps,
+          },
+        };
+      }
+
       activity.puzzle = {
         date: today,
+        puzzleId: puzzle.id,
         solved: true,
         attempts: (Number(prev.attempts) || 0) + 1,
         solvedAt: now,
@@ -668,7 +1042,7 @@ class AccountManager {
       });
 
       logger.info('每日一题通关', { accountId, puzzleId: puzzle.id });
-      return { success: true, data: { correct: true, solved: true, reward } };
+      return { success: true, data: { correct: true, finished: true, solved: true, reward, step, totalSteps } };
     } catch (err) {
       logger.error('提交每日一题失败', { accountId, error: err.message });
       return { success: false, message: '提交失败，请稍后重试' };
@@ -2019,6 +2393,21 @@ class AccountManager {
       if (result === 'win') {
         activity.dailyWins = (activity.dailyWins || 0) + 1;
         activity.weeklyWins = (activity.weeklyWins || 0) + 1;
+      }
+      if (isAI) {
+        activity.weeklyAiGames = (activity.weeklyAiGames || 0) + 1;
+        if (result === 'win') {
+          activity.weeklyAiWins = (activity.weeklyAiWins || 0) + 1;
+        }
+      }
+      const weeklyGameKey = AccountManager.WEEKLY_GAME_KEYS[gameType];
+      if (weeklyGameKey) {
+        activity[weeklyGameKey] = (activity[weeklyGameKey] || 0) + 1;
+      }
+      // 单局时长最多计 2 小时，避免异常数据刷任务进度
+      if (typeof duration === 'number' && duration > 0) {
+        activity.weeklyPlaySeconds = (activity.weeklyPlaySeconds || 0)
+          + Math.min(Math.round(duration / 1000), 7200);
       }
 
       // 检查是否是首次游戏

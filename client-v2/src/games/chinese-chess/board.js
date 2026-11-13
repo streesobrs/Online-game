@@ -43,7 +43,7 @@ export function createChessBoard(container, options = {}) {
     let board = defaultLayout();
     let selected = null; // {r, c}
     let validMoves = [];
-    let lastMove = null; // {r, c}
+    let lastMoves = []; // 最近走子标记 [{r, c}]，可同时标记双方（如残局里的「我方 + 对方应招」）
     let destroyed = false;
 
     const root = el('div', { class: `chess-board${flip ? ' chess-board--flipped' : ''}` });
@@ -186,8 +186,14 @@ export function createChessBoard(container, options = {}) {
         init(layout = defaultLayout()) {
             board = layout;
             selected = null;
-            lastMove = null;
             validMoves = [];
+            // 清掉上一局遗留的“最后一步”红点与合法走位标记，否则复位后红点会一直留在棋盘上
+            for (let r = 0; r < BOARD_H; r++) {
+                for (let c = 0; c < BOARD_W; c++) {
+                    cells[r][c].classList.remove('last-move', 'last-move--mine', 'valid-move');
+                }
+            }
+            lastMoves = [];
             renderPieces();
         },
 
@@ -262,11 +268,39 @@ export function createChessBoard(container, options = {}) {
             this.setValidMoves([]);
         },
 
-        /** 标记最后一步位置 */
+        /** 标记最后一步位置（会清掉之前的标记，只保留这一步） */
         setLastMove(r, c) {
-            if (lastMove) cells[lastMove.r][lastMove.c].classList.remove('last-move');
-            lastMove = { r, c };
-            if (r !== undefined) cells[r][c].classList.add('last-move');
+            this.clearLastMoves();
+            if (r !== undefined) {
+                lastMoves.push({ r, c });
+                cells[r][c].classList.add('last-move');
+            }
+        },
+
+        /** 追加一个走子标记（保留已有标记，残局里同时显示我方走子与对方应招） */
+        addLastMove(r, c, mine = false) {
+            if (r === undefined || lastMoves.some((m) => m.r === r && m.c === c)) return;
+            lastMoves.push({ r, c, mine });
+            cells[r][c].classList.add('last-move');
+            if (mine) cells[r][c].classList.add('last-move--mine');
+        },
+
+        /** 设置某一方的最近一步（只替换同侧标记，另一侧标记保留） */
+        setSideLastMove(r, c, mine = false) {
+            lastMoves = lastMoves.filter((m) => {
+                if (!!m.mine !== mine) return true;
+                cells[m.r][m.c].classList.remove('last-move', 'last-move--mine');
+                return false;
+            });
+            this.addLastMove(r, c, mine);
+        },
+
+        /** 清除全部走子标记 */
+        clearLastMoves() {
+            for (const { r, c } of lastMoves) {
+                cells[r][c].classList.remove('last-move', 'last-move--mine');
+            }
+            lastMoves = [];
         },
 
         /** 销毁棋盘 DOM */

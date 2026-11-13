@@ -742,7 +742,7 @@ app.post('/api/daily/claim', authenticateUser, async (req, res) => {
   }
 });
 
-// 每日一题（五子棋残局）
+// 每日一题（五子棋 / 中国象棋残局）
 app.get('/api/puzzle/daily', authenticateUser, async (req, res) => {
   try {
     const result = await accountManager.getDailyPuzzle(req.authAccountId);
@@ -755,8 +755,7 @@ app.get('/api/puzzle/daily', authenticateUser, async (req, res) => {
 
 app.post('/api/puzzle/submit', authenticateUser, async (req, res) => {
   try {
-    const { r, c } = req.body || {};
-    const result = await accountManager.submitDailyPuzzle(req.authAccountId, r, c);
+    const result = await accountManager.submitDailyPuzzle(req.authAccountId, req.body || {});
     res.json(result);
   } catch (err) {
     logger.error('提交每日一题失败', { error: err.message });

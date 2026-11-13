@@ -121,7 +121,8 @@ export function startMatch(container, matchData) {
     const moving = board.get(fromR, fromC);
     if (!moving) return;
     board.movePiece(fromR, fromC, toR, toC);
-    board.setLastMove(toR, toC);
+    // 保留双方轨迹：我方落点用绿色标记，对方上一步的红色标记不清除
+    board.setSideLastMove(toR, toC, true);
     // 发送走子（color 为当前回合方：服务端校验回合后转发）
     emit('move', {
       game: 'chinese-chess',
@@ -318,7 +319,8 @@ export function startMatch(container, matchData) {
     if (data.from != null && String(data.from) === String(currentAccountId())) return;
     if (data.fromR == null || data.fromC == null || data.toR == null || data.toC == null) return;
     board.movePiece(data.fromR, data.fromC, data.toR, data.toC);
-    board.setLastMove(data.toR, data.toC);
+    // 对方落点用红色标记，保留我方上一步的金色标记
+    board.setSideLastMove(data.toR, data.toC);
     turn = me; // 轮到我了
     clearHintMarkers();
     // 对手走完后检查我方是否被将军

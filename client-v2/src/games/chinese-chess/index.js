@@ -38,7 +38,8 @@ export function renderChess(container = viewRoot()) {
         const moves = getChessMoves(board.board, selected.r, selected.c);
         if (moves.some((m) => m.r === r && m.c === c)) {
           const captured = board.movePiece(selected.r, selected.c, r, c);
-          board.setLastMove(r, c);
+          // 双方各自保留最近一步：红方绿色、黑方红色
+          board.setSideLastMove(r, c, turn === 'red');
           toast.success(`${captured ? '吃子！' : ''}${turn === 'red' ? '红' : '黑'}方走子`);
           turn = turn === 'red' ? 'black' : 'red';
           board.clearSelection();

@@ -79,6 +79,8 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
   let startTime = Date.now();
   let timerHandle = null;
   let selected = null; // 象棋选子
+  let myLastMove = null; // 我方最近一步落点（绿色标记）
+  let aiLastMove = null; // AI 最近一步落点（红色标记）
 
   // ---- 信息栏 ----
   const turnEl = el('span', { class: 'ai-info-tag' });
@@ -152,7 +154,8 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
             const pieceName = board.get(fromR, fromC).name;
             clearHintMarkers(boardEl); // 走子后清除提示标记
             board.movePiece(fromR, fromC, r, c);
-            board.setLastMove(r, c);
+            myLastMove = { r, c };
+            refreshLastMoves();
             board.clearSelection();
             selected = null;
             myTurn = false;
@@ -176,6 +179,14 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
         }
       },
     });
+  }
+
+  /** 重绘双方最后一步：AI 红色、我方绿色；服务端重建棋盘后也能恢复 */
+  function refreshLastMoves() {
+    if (gameType !== 'chinese-chess' || !board) return;
+    board.clearLastMoves();
+    if (aiLastMove) board.addLastMove(aiLastMove.r, aiLastMove.c);
+    if (myLastMove) board.addLastMove(myLastMove.r, myLastMove.c, true);
   }
 
   container.innerHTML = '';
@@ -296,6 +307,8 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
     if (gameType === 'chinese-chess' && data.board) {
       const layout = convertBackendBoardToFrontend(data.board);
       if (layout) board.init(layout);
+      myLastMove = null;
+      aiLastMove = null;
     } else if (data.currentPlayer) {
       board.turn = data.currentPlayer;
     }
@@ -320,6 +333,8 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
         // 已重建棋盘，清除本地选子
         board.clearSelection();
         selected = null;
+        // 重建会清掉标记，重新绘制双方轨迹
+        refreshLastMoves();
       }
       myTurn = currentPlayer === me;
       updateTurn();
@@ -333,7 +348,8 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
         board.turn = BLACK;
       }
     } else if (gameType === 'chinese-chess' && position && position.toR != null) {
-      board.setLastMove(position.toR, position.toC);
+      aiLastMove = { r: position.toR, c: position.toC };
+      refreshLastMoves();
       board.clearSelection();
       selected = null;
       // 本地检测将死（服务端也判定，双保险）
@@ -378,6 +394,10 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
       if (layout) board.init(layout);
       board.clearSelection();
       selected = null;
+      // 悔棋后最后一步已不存在，清空双方轨迹
+      myLastMove = null;
+      aiLastMove = null;
+      refreshLastMoves();
     } else {
       board.restore(data.board, data.currentPlayer);
     }

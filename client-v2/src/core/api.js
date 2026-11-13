@@ -126,8 +126,8 @@ export const api = {
   puzzle: {
     /** 每日一题（残局）状态与题目 */
     daily: () => api.get('/api/puzzle/daily'),
-    /** 提交落点 @param {number} r @param {number} c */
-    submit: (r, c) => api.post('/api/puzzle/submit', { r, c }),
+    /** 提交答案：五子棋 {r,c}；象棋 {from:[r,c], to:[r,c]} */
+    submit: (payload) => api.post('/api/puzzle/submit', payload),
   },
 
   mails: {
