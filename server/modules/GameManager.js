@@ -2374,6 +2374,11 @@ class GameManager {
       return false;
     }
 
+    // 象棋：执行移动前记录被吃棋子（悔棋 revertMove 时需恢复，否则吃掉的棋子丢失）
+    const captured = position.fromR !== undefined && aiGame.board
+      ? aiGame.board[position.toR][position.toC]
+      : 0;
+
     // 执行玩家移动
     this.executeMove(aiGame.gameType, aiGame.board, position, aiGame.currentPlayer);
 
@@ -2384,6 +2389,7 @@ class GameManager {
       position: position,
       timestamp: Date.now()
     };
+    if (captured) move.captured = captured;
     aiGame.moves.push(move);
     aiGame.lastMoveTime = Date.now();
 
@@ -2490,6 +2496,11 @@ class GameManager {
 
       logger.info('🤖 AI 执行移动', { accountId, gameType: aiGame.gameType, move: aiMove });
 
+      // 象棋：执行移动前记录被吃棋子（悔棋 revertMove 时需恢复，否则吃掉的棋子丢失）
+      const captured = aiMove.fromR !== undefined && aiGame.board
+        ? aiGame.board[aiMove.toR][aiMove.toC]
+        : 0;
+
       // 执行 AI 移动
       this.executeMove(aiGame.gameType, aiGame.board, aiMove, aiGame.currentPlayer);
 
@@ -2500,6 +2511,7 @@ class GameManager {
         position: aiMove,
         timestamp: Date.now()
       };
+      if (captured) move.captured = captured;
       aiGame.moves.push(move);
       aiGame.lastMoveTime = Date.now();
 

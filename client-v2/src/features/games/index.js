@@ -20,7 +20,7 @@ import { el } from '../../utils/dom.js';
 import { mdToHtml } from '../../utils/md.js';
 import { toast } from '../../components/toast.js';
 import { modal } from '../../components/modal.js';
-import { emit } from '../../core/socket.js';
+import { emit, socket } from '../../core/socket.js';
 import { api } from '../../core/api.js';
 import { store } from '../../core/store.js';
 import { eventBus } from '../../core/eventBus.js';
@@ -32,11 +32,12 @@ import { startGameTour, startSnakeTour } from '../../components/onboarding.js';
 import { registerScopeHandler, getBinding, formatCombo } from '../../core/shortcuts.js';
 
 const GAME_MAP = Object.fromEntries(GAMES.map((g) => [g.id, g]));
-
 // 单机游戏：独立页面入口（不做联机/AI 匹配）
 const SOLO_GAMES = [
   { id: 'match3', name: '消消乐', icon: '🍬' },
   { id: 'train3d', name: '3D驾驶', icon: '🚆' },
+  { id: 'survivors', name: '刷怪肉鸽', icon: '⚔️' },
+  { id: 'doudizhu', name: '斗地主', icon: '🃏' },
 ];
 
 /** 模式展示文案 */
@@ -50,6 +51,8 @@ const MODES_BY_GAME = {
   snake: ['online', 'solo'],
   match3: ['solo'],
   train3d: ['solo'],
+  survivors: ['solo'],
+  doudizhu: ['online'],
 };
 
 /** 全部游戏平铺展示（棋类在前，单机在后） */
@@ -57,6 +60,9 @@ const ALL_GAMES = [...GAMES, ...SOLO_GAMES].map((g) => ({
   ...g,
   modes: MODES_BY_GAME[g.id] || ['online'],
 }));
+
+/** 全量游戏元数据（匹配中 UI 需要显示斗地主等非棋类游戏名） */
+const ALL_GAME_MAP = Object.fromEntries(ALL_GAMES.map((g) => [g.id, g]));
 
 
 /** 游戏展示元数据：简介 / 主题色 / 标签，供卡片与详情面板使用 */
@@ -90,6 +96,18 @@ const GAME_UI = {
     desc: '3D 火车模拟驾驶，手动/自动挡与昼夜切换',
     accent: '#2f7fd0',
     tags: ['3D 模拟', '手动/自动挡', '昼夜切换'],
+  },
+  survivors: {
+    desc: '幸存者 like 刷怪肉鸽：自动攻击、怪潮围杀、升级三选一，活得更久',
+    accent: '#e05a4f',
+    tags: ['测试版 Demo', '自动战斗', '局内构筑'],
+    badge: '单机 · 测试版',
+  },
+  doudizhu: {
+    desc: '54 张牌三人斗地主，叫地主抢底牌，先出完手牌者获胜',
+    accent: '#2fae6d',
+    tags: ['3 人房间', 'AI 补位', '叫地主'],
+    badge: '3 人联机 · 测试版',
   },
 };
 
@@ -162,6 +180,20 @@ const GAME_MODE_CARDS = {
       id: 'solo', icon: '🚆', color: '#2f7fd0', title: '进入驾驶',
       desc: '选好驾驶方式，进入 3D 驾驶舱',
       button: '🚀 进入游戏',
+    },
+  ],
+  survivors: [
+    {
+      id: 'solo', icon: '⚔️', color: '#e05a4f', title: '测试版 Demo',
+      desc: 'WASD 移动、武器自动攻击；击杀捡经验，升级三选一，每 90 秒刷 Boss',
+      button: '🚀 开始试玩',
+    },
+  ],
+  doudizhu: [
+    {
+      id: 'online', icon: '🃏', color: '#2fae6d', title: '3 人牌桌',
+      desc: '真人匹配满 3 人立即开局；不足 3 人等待 6 秒由 AI 补位',
+      button: '🎯 进入牌桌',
     },
   ],
 };
@@ -394,6 +426,7 @@ export function renderGames(container) {
     // 纯单机游戏在面板里预选的子玩法（消消乐 / 3D 驾驶）
     soloModes: { match3: 'level', train3d: 'manual' },
     isMatching: false,
+    ddzQueued: null, // 斗地主排队信息 { position, aiInMs }
     reconnectGame: store.get('reconnectGame') || null, // 战局内刷新后的对局快照
   };
 
@@ -527,7 +560,7 @@ export function renderGames(container) {
     pickGrid.innerHTML = '';
     ALL_GAMES.forEach((g) => {
       const ui = GAME_UI[g.id] || { accent: '#4299e1', desc: '' };
-      const badge = g.modes.map((m) => MODE_LABEL[m]).join(' · ');
+      const badge = ui.badge || g.modes.map((m) => MODE_LABEL[m]).join(' · ');
       pickGrid.append(el('button', {
         type: 'button',
         class: 'games-card' + (state.selectedGame === g.id ? ' active' : ''),
@@ -628,7 +661,8 @@ export function renderGames(container) {
    * 3D 驾驶目前没有成就与道具，返回 null，主区域自动铺满
    */
   function renderSidePanel(g) {
-    if (g.id === 'train3d') return null;
+    // 纯单机试玩 / 无成就与道具体系的游戏不展示右侧栏，主区域自动铺满
+    if (g.id === 'train3d' || g.id === 'survivors' || g.id === 'doudizhu') return null;
     const cards = [renderAchievementCard(g)];
     cards.push(g.id === 'match3' ? renderCodexCard() : renderItemCard(g));
     return el('aside', { class: 'games-side' }, cards);
@@ -849,6 +883,8 @@ export function renderGames(container) {
 
     const startBtn = el('button', { class: 'btn btn-primary games-block-btn' }, card.button || '开始');
     startBtn.addEventListener('click', () => {
+      // 斗地主：先在大厅匹配，成功后进入独立牌桌页
+      if (g.id === 'doudizhu') { startDDZMatch(); return; }
       if (card.id === 'online') startMatch();
       else if (card.id === 'ai') startAIBattle();
       else enterSoloMode(g.id);
@@ -885,19 +921,38 @@ export function renderGames(container) {
     emit('match_request', { game: state.selectedGame });
   }
 
+  /** 斗地主：匹配在大厅内完成，成功后跳转到牌桌页 */
+  function startDDZMatch() {
+    if (state.isMatching) return;
+    if (!store.get('socketConnected')) { toast.error('未连接服务器'); return; }
+    if (!store.get('user')) { toast.error('请先登录'); return; }
+    state.selectedGame = 'doudizhu';
+    state.isMatching = true;
+    state.ddzQueued = null;
+    renderMain();
+    emit('ddz_match_request');
+  }
+
   // ---- 匹配中 UI ----
   function renderMatchingUI() {
-    const g = GAME_MAP[state.selectedGame];
+    const g = ALL_GAME_MAP[state.selectedGame] || GAME_MAP[state.selectedGame] || {};
+    const isDDZ = state.selectedGame === 'doudizhu';
     const cancelBtn = el('button', { class: 'btn btn-secondary', style: 'min-width:220px;' }, '❌ 取消匹配');
     cancelBtn.addEventListener('click', () => {
       state.isMatching = false;
       renderMain();
-      emit('cancel_match');
+      emit(isDDZ ? 'ddz_cancel_match' : 'cancel_match');
     });
     return el('div', { class: 'games-detail games-detail--center games-matching' }, [
       el('div', { class: 'games-matching-spinner' }, '🔍'),
-      el('h2', { class: 'games-detail-name' }, `正在寻找 ${g.icon} ${g.name} 对手…`),
-      el('div', { class: 'games-matching-dots' }, '匹配成功后自动进入对局，请稍候'),
+      el('h2', { class: 'games-detail-name' }, `正在寻找 ${g.icon || ''} ${g.name || ''} 对手…`),
+      el('div', { class: 'games-matching-dots' },
+        isDDZ
+          ? '3 人牌桌，满员立即开局；等待 6 秒后由 AI 补位'
+          : '匹配成功后自动进入对局，请稍候'),
+      isDDZ && state.ddzQueued
+        ? el('div', { class: 'games-matching-dots' }, `队列第 ${state.ddzQueued.position || 1} 位`)
+        : null,
       cancelBtn,
     ]);
   }
@@ -1111,6 +1166,37 @@ export function renderGames(container) {
     toast.success('已重新连接');
   });
 
+  // ---- 斗地主匹配（大厅内完成）----
+  const onDdzQueued = (info) => {
+    if (!state.isMatching || state.selectedGame !== 'doudizhu') return;
+    state.ddzQueued = info || {};
+    renderMain();
+  };
+  const onDdzMatchSuccess = () => {
+    if (state.selectedGame !== 'doudizhu') return;
+    state.isMatching = false;
+    state.ddzQueued = null;
+    toast.success('匹配成功，进入牌桌');
+    go('doudizhu');
+  };
+  const onDdzCancelled = () => {
+    if (!state.isMatching || state.selectedGame !== 'doudizhu') return;
+    state.isMatching = false;
+    state.ddzQueued = null;
+    renderMain();
+  };
+  const onDdzError = (payload) => {
+    if (!state.isMatching || state.selectedGame !== 'doudizhu') return;
+    state.isMatching = false;
+    state.ddzQueued = null;
+    toast.error(payload?.message || '斗地主匹配失败');
+    renderMain();
+  };
+  socket.on('ddz_queued', onDdzQueued);
+  socket.on('ddz_match_success', onDdzMatchSuccess);
+  socket.on('ddz_cancelled', onDdzCancelled);
+  socket.on('ddz_error', onDdzError);
+
   // ---- 进入单机模式 ----
   // 贪吃蛇没有独立路由（snake 会别名回大厅），必须像联机一样在大厅内直接挂载；
   // 消消乐、3D 驾驶等有自己的路由，走正常跳转
@@ -1222,11 +1308,13 @@ export function renderGames(container) {
         if (!current.modes.includes('ai')) { toast.warn(`${current.name}暂不支持 AI 对战`); return; }
         startAIBattle();
       } else if (op.mode === 'online') {
+        if (current.id === 'doudizhu') { startDDZMatch(); return; }
         if (!current.modes.includes('online')) { toast.warn(`${current.name}暂不支持联机对战`); return; }
         startMatch();
       }
     } else if (op.type === 'start') {
       if (state.isMatching) return;
+      if (current.id === 'doudizhu') { startDDZMatch(); return; }
       // 同时支持联机与单机的游戏（贪吃蛇），快捷键默认走联机匹配
       if (current.modes.includes('online')) { startMatch(); return; }
       if (current.modes.includes('solo')) { enterSoloMode(current.id); return; }
@@ -1245,6 +1333,11 @@ export function renderGames(container) {
 
   // ---- 清理 ----
   return () => {
+    // 离开大厅时取消斗地主排队，避免服务端把已经离开的玩家拉进牌桌
+    if (state.isMatching && state.selectedGame === 'doudizhu') {
+      emit('ddz_cancel_match');
+      emit('ddz_leave');
+    }
     unregisterLobbyShortcut();
     offMatchSuccess();
     offMatchTimeout();
@@ -1256,6 +1349,10 @@ export function renderGames(container) {
     offSystemError();
     offSocketDisconnect();
     offSocketReconnect();
+    socket.off('ddz_queued', onDdzQueued);
+    socket.off('ddz_match_success', onDdzMatchSuccess);
+    socket.off('ddz_cancelled', onDdzCancelled);
+    socket.off('ddz_error', onDdzError);
     runCleanup();
     container.innerHTML = '';
   };

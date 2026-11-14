@@ -15,7 +15,7 @@ import { emit } from './socket.js';
 const HEARTBEAT_INTERVAL = 5 * 60 * 1000;
 
 // 对局只可能发生在这两个视图内（消消乐是独立路由，其余玩法都在统一大厅内）
-const GAME_VIEWS = new Set(['games', 'match3']);
+const GAME_VIEWS = new Set(['games', 'match3', 'doudizhu']);
 
 let active = false;
 let timer = null;

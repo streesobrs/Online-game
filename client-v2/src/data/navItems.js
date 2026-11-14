@@ -38,6 +38,24 @@ export const NAV_ITEMS = [
     order: 3,
   },
   {
+    // 刷怪肉鸽（测试版 Demo）：入口在大厅，单独路由便于直接打开/刷新
+    id: 'survivors',
+    type: 'game',
+    name: '刷怪肉鸽',
+    icon: '⚔️',
+    category: '游戏',
+    order: 4,
+  },
+  {
+    // 斗地主：3 人联机房间制，入口在大厅，单独路由
+    id: 'doudizhu',
+    type: 'game',
+    name: '斗地主',
+    icon: '🃏',
+    category: '游戏',
+    order: 5,
+  },
+  {
     id: 'announcements',
     type: 'feature',
     name: '公告',

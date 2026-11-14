@@ -1,0 +1,609 @@
+/* 斗地主：3 人牌桌 */
+.ddz-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* 占满导航下方可视区：导航 + 边距约 90px，剩余全部给牌桌 */
+  min-height: calc(100dvh - 90px);
+  padding: 16px;
+  box-sizing: border-box;
+  color: var(--text, #2d3748);
+}
+
+.ddz-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ddz-back {
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--surface, #ffffff);
+  color: var(--text, #2d3748);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.ddz-back:hover {
+  background: var(--surface-hover, #eef1f5);
+}
+
+.ddz-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.ddz-tag {
+  font-size: 12px;
+  color: var(--text-secondary, #5b6b7c);
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--surface, #ffffff);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.ddz-stage {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 480px;
+  border-radius: 18px;
+  /* 浅色绿绒桌布：跟站点浅色主题一致，文字用深色保证可读 */
+  background:
+    radial-gradient(circle at 50% 28%, rgba(52, 168, 106, 0.16), transparent 62%),
+    linear-gradient(160deg, #eef8f1, #dceee3 72%);
+  border: 1px solid rgba(47, 158, 110, 0.26);
+  overflow: hidden;
+}
+
+/* ---------- 匹配 / 空闲 ---------- */
+.ddz-idle {
+  flex: 1;
+  min-height: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px 20px;
+  text-align: center;
+}
+
+.ddz-idle-icon {
+  font-size: 56px;
+  filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.4));
+}
+
+.ddz-idle h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.ddz-idle-desc {
+  max-width: 460px;
+  margin: 0;
+  color: var(--text-secondary, #4a5568);
+  line-height: 1.7;
+  font-size: 14px;
+}
+
+.ddz-idle-tip {
+  margin: 0;
+  color: #1f8a54;
+  font-size: 13px;
+}
+
+.ddz-start {
+  margin-top: 8px;
+  min-width: 200px;
+}
+
+.ddz-btn {
+  border: 1px solid var(--border-color, #dfe5ec);
+  background: var(--surface, #ffffff);
+  color: var(--text, #2d3748);
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.ddz-btn:hover:not(:disabled) {
+  background: var(--surface-hover, #eef1f5);
+}
+
+.ddz-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.ddz-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ddz-btn-primary {
+  background: linear-gradient(135deg, #2fae6d, #1f8a54);
+  border-color: rgba(120, 255, 180, 0.35);
+  color: #fff;
+  font-weight: 600;
+}
+
+.ddz-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #39c67c, #24995e);
+}
+
+/* ---------- 牌桌 ---------- */
+.ddz-table {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) minmax(300px, 1.8fr) minmax(200px, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "left center right"
+    "self self self";
+  gap: 10px 24px;
+  height: 100%;
+  min-height: 480px;
+  padding: 18px 24px 14px;
+  box-sizing: border-box;
+  /* 中间一圈淡绿桌布，把空出来的区域圈成牌桌 */
+  background: radial-gradient(ellipse 46% 42% at 50% 46%, rgba(47, 158, 110, 0.1), transparent 68%);
+}
+
+.ddz-side {
+  /* 左右两家贴到牌桌两侧、顶部对齐，像真实牌桌的上下家位置 */
+  align-self: start;
+  justify-self: start;
+  width: 100%;
+  max-width: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding-top: 6px;
+}
+
+.ddz-side-left {
+  grid-area: left;
+}
+
+.ddz-side-right {
+  grid-area: right;
+  justify-self: end;
+}
+
+.ddz-seat {
+  width: 100%;
+  max-width: 200px;
+  border-radius: 14px;
+  padding: 14px 12px;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  box-shadow: 0 2px 8px rgba(20, 60, 40, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  text-align: center;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.ddz-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(47, 158, 110, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 23px;
+}
+
+.ddz-avatar.is-me {
+  width: 26px;
+  height: 26px;
+  font-size: 15px;
+}
+
+.ddz-seat.is-turn,
+.ddz-self.is-turn .ddz-me {
+  border-color: #2fae6d;
+  box-shadow: 0 0 0 2px rgba(47, 174, 109, 0.18);
+}
+
+.ddz-seat-name {
+  font-size: 15px;
+  font-weight: 600;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ddz-seat.is-ai .ddz-seat-name {
+  color: #3b5b7a;
+}
+
+.ddz-seat-count {
+  font-size: 13px;
+  color: var(--text-secondary, #5b6b7c);
+}
+
+.ddz-seat-stack {
+  display: flex;
+  justify-content: center;
+  padding-top: 2px;
+}
+
+.ddz-seat-stack .ddz-card-back:not(:first-child) {
+  margin-left: -6px;
+}
+
+.ddz-card-back {
+  width: 14px;
+  height: 20px;
+  border-radius: 3px;
+  background: repeating-linear-gradient(45deg, #2b4c7e 0 3px, #1d3557 3px 6px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.ddz-center {
+  grid-area: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0 4px;
+  min-width: 0;
+}
+
+.ddz-bottom-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  box-shadow: 0 2px 8px rgba(20, 60, 40, 0.06);
+}
+
+.ddz-bottom-label {
+  font-size: 12px;
+  color: var(--text-secondary, #5b6b7c);
+  margin-right: 2px;
+}
+
+.ddz-hint {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1c7a4d;
+  padding: 7px 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(47, 158, 110, 0.28);
+  white-space: nowrap;
+}
+
+.ddz-bid-info {
+  font-size: 12px;
+  color: var(--text-secondary, #4a5568);
+}
+
+/* 每家的出牌区：贴在自己座位/手牌旁 */
+.ddz-play-zone {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  min-height: 84px;
+  justify-content: center;
+}
+
+.ddz-play-zone-self {
+  min-height: 86px;
+}
+
+.ddz-play-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f6b48;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ddz-card-row {
+  display: flex;
+  justify-content: center;
+}
+
+.ddz-card-row .ddz-card {
+  margin-left: -22px;
+}
+
+.ddz-card-row .ddz-card:first-child {
+  margin-left: 0;
+}
+
+/* ---------- 扑克牌 ---------- */
+.ddz-card {
+  position: relative;
+  width: 48px;
+  height: 66px;
+  padding: 4px;
+  border-radius: 7px;
+  border: 1px solid #c7d0da;
+  background: #ffffff;
+  color: #1a1a1a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  font-family: 'Segoe UI', 'PingFang SC', sans-serif;
+  cursor: default;
+  box-shadow: 0 2px 6px rgba(20, 50, 35, 0.18);
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+.ddz-card.is-red {
+  color: #d0263a;
+}
+
+.ddz-card-rank {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ddz-card-suit {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.ddz-card.is-joker .ddz-card-rank {
+  font-size: 13px;
+  writing-mode: vertical-rl;
+  letter-spacing: 1px;
+}
+
+.ddz-hand .ddz-card {
+  width: 54px;
+  height: 76px;
+  cursor: pointer;
+  margin-left: -20px;
+}
+
+.ddz-hand .ddz-card:first-child {
+  margin-left: 0;
+}
+
+.ddz-hand .ddz-card-rank {
+  font-size: 19px;
+}
+
+.ddz-hand .ddz-card-suit {
+  font-size: 15px;
+}
+
+.ddz-hand .ddz-card:hover {
+  transform: translateY(-6px);
+  z-index: 2;
+}
+
+.ddz-hand .ddz-card.is-selected {
+  transform: translateY(-16px);
+  z-index: 3;
+  box-shadow: 0 0 0 2px #3ee08a, 0 8px 14px rgba(0, 0, 0, 0.4);
+}
+
+/* ---------- 自己 ---------- */
+.ddz-self {
+  grid-area: self;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 4px 2px;
+  background: transparent;
+  border: none;
+}
+
+.ddz-self-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 10px;
+}
+
+/* 自己的名字/张数做成小胶囊，直接浮在桌布上，不再铺一条白色大横条 */
+.ddz-me {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 12px 4px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid var(--border-color, #e2e8f0);
+}
+
+.ddz-hand {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  /* 上方留够选中牌抬起的空间：overflow-x 会让纵向也变成裁切容器，
+     之前 padding 只有 10px，牌抬起 16px 时顶部会被切掉 */
+  padding: 26px 0 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.ddz-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 2px 0;
+}
+
+.ddz-wait {
+  font-size: 13px;
+  color: var(--text-secondary, #5b6b7c);
+}
+
+/* ---------- 结算 ---------- */
+.ddz-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 45, 32, 0.42);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+}
+
+.ddz-result {
+  width: min(360px, 86%);
+  border-radius: 18px;
+  padding: 26px 22px;
+  text-align: center;
+  background: var(--surface, #ffffff);
+  border: 1px solid rgba(47, 158, 110, 0.35);
+  box-shadow: 0 18px 48px rgba(15, 40, 25, 0.28);
+}
+
+.ddz-result.is-lose {
+  border-color: rgba(220, 80, 80, 0.35);
+}
+
+.ddz-result-icon {
+  font-size: 44px;
+}
+
+.ddz-result h2 {
+  margin: 8px 0 6px;
+  font-size: 22px;
+}
+
+.ddz-result p {
+  margin: 0 0 18px;
+  color: var(--text-secondary, #4a5568);
+  font-size: 14px;
+}
+
+.ddz-result-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* ---------- 深色主题：牌桌压暗，文字保持浅色 ---------- */
+body[data-theme="forest"] .ddz-stage,
+body[data-theme="ocean"] .ddz-stage,
+body[data-theme="cyberpunk"] .ddz-stage {
+  background:
+    radial-gradient(circle at 50% 28%, rgba(60, 180, 120, 0.18), transparent 62%),
+    linear-gradient(160deg, #12241b, #0b1712 72%);
+  border-color: rgba(90, 200, 140, 0.22);
+}
+
+body[data-theme="forest"] .ddz-play-label,
+body[data-theme="ocean"] .ddz-play-label,
+body[data-theme="cyberpunk"] .ddz-play-label {
+  color: #8fd9ad;
+}
+
+body[data-theme="forest"] .ddz-idle-tip,
+body[data-theme="ocean"] .ddz-idle-tip,
+body[data-theme="cyberpunk"] .ddz-idle-tip {
+  color: #7fd6a4;
+}
+
+body[data-theme="forest"] .ddz-table,
+body[data-theme="ocean"] .ddz-table,
+body[data-theme="cyberpunk"] .ddz-table {
+  background: radial-gradient(ellipse 46% 42% at 50% 46%, rgba(70, 190, 130, 0.08), transparent 68%);
+}
+
+/* ---------- 移动端 ---------- */
+@media (max-width: 820px) {
+  .ddz-view {
+    padding: 10px;
+  }
+
+  .ddz-table {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "left right"
+      "center center"
+      "self self";
+    gap: 8px;
+    padding: 10px;
+    min-height: 420px;
+  }
+
+  .ddz-side {
+    justify-self: stretch;
+    max-width: none;
+    padding-top: 0;
+  }
+
+  .ddz-seat {
+    width: 100%;
+    padding: 8px;
+    flex-direction: row;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .ddz-seat-stack { display: none; }
+
+  .ddz-center { grid-area: center; }
+  .ddz-self { grid-area: self; }
+
+  .ddz-stage { min-height: 420px; }
+
+  .ddz-card {
+    width: 38px;
+    height: 54px;
+  }
+
+  .ddz-card-rank { font-size: 14px; }
+  .ddz-card-suit { font-size: 12px; }
+
+  .ddz-hand .ddz-card {
+    width: 42px;
+    height: 60px;
+    margin-left: -14px;
+  }
+  .ddz-hand .ddz-card:first-child { margin-left: 0; }
+  .ddz-hand .ddz-card-rank { font-size: 15px; }
+  .ddz-hand .ddz-card-suit { font-size: 12px; }
+
+  .ddz-card-row .ddz-card { margin-left: -14px; }
+  .ddz-card-row .ddz-card:first-child { margin-left: 0; }
+
+  .ddz-hint {
+    font-size: 13px;
+    padding: 6px 14px;
+  }
+}

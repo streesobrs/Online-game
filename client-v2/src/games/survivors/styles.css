@@ -1,0 +1,365 @@
+/**
+ * 刷怪肉鸽（幸存者 like）· 测试版样式
+ * 深色竞技场 + 悬浮 HUD + 覆盖层（开始 / 升级 / 结算 / 暂停）
+ */
+.sv-view {
+  width: 100%;
+  max-width: 1020px;
+  margin: 0 auto;
+  padding: 8px 0 24px;
+}
+
+.sv-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.sv-back-btn {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--theme-text-secondary, #6c757d);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.sv-back-btn:hover {
+  background: var(--theme-hover-bg, rgba(0, 0, 0, 0.05));
+  color: var(--theme-accent, #4ecdc4);
+}
+
+.sv-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--theme-text);
+}
+
+.sv-beta {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(224, 90, 79, 0.16);
+  border: 1px solid rgba(224, 90, 79, 0.45);
+  color: #e05a4f;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.sv-stage {
+  position: relative;
+  border: 3px solid #2d2d44;
+  border-radius: 14px;
+  background: #0d101d;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+
+.sv-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 960 / 600;
+  cursor: crosshair;
+}
+
+/* ---- HUD ---- */
+.sv-hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  pointer-events: none;
+}
+
+.sv-hud-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: min(240px, 42vw);
+}
+
+.sv-bar {
+  position: relative;
+  height: 13px;
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.sv-bar-xp {
+  height: 8px;
+  border-radius: 5px;
+}
+
+.sv-bar-fill {
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  transition: width 0.12s linear;
+}
+
+.sv-hp-fill {
+  background: linear-gradient(90deg, #ef4444, #f87171);
+}
+
+.sv-xp-fill {
+  background: linear-gradient(90deg, #14b8a6, #5eead4);
+}
+
+.sv-bar-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.sv-hud-mid {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.sv-hud-time {
+  padding: 2px 12px;
+  border-radius: 8px;
+  background: rgba(8, 10, 20, 0.6);
+  color: #e2e8f0;
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 1px;
+}
+
+.sv-hud-right {
+  display: flex;
+  gap: 6px;
+}
+
+.sv-hud-chip {
+  padding: 3px 9px;
+  border-radius: 7px;
+  background: rgba(8, 10, 20, 0.6);
+  color: #dbeafe;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---- 覆盖层 ---- */
+.sv-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(6, 8, 16, 0.74);
+  backdrop-filter: blur(3px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.18s ease;
+}
+
+.sv-overlay.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+.sv-panel {
+  width: min(94%, 560px);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 24px 26px;
+  border-radius: 16px;
+  background: rgba(20, 24, 44, 0.97);
+  border: 1px solid rgba(120, 150, 220, 0.28);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  text-align: center;
+  color: #e2e8f0;
+}
+
+.sv-panel-icon {
+  font-size: 34px;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.sv-panel-title {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.sv-panel-sub {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #93c5fd;
+}
+
+.sv-panel-desc {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #aab6cc;
+}
+
+.sv-best {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 14px 0 18px;
+  font-size: 13px;
+  color: #cbd5e1;
+}
+
+.sv-big-btn {
+  padding: 10px 34px;
+  font-size: 15px;
+}
+
+.sv-panel-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.sv-panel-actions .btn {
+  min-width: 120px;
+}
+
+.sv-result {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 16px 0 4px;
+}
+
+.sv-result > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 6px;
+  border-radius: 10px;
+  background: rgba(120, 150, 220, 0.1);
+}
+
+.sv-result strong {
+  font-size: 19px;
+  font-weight: 800;
+  color: #f8fafc;
+  font-variant-numeric: tabular-nums;
+}
+
+.sv-result span {
+  font-size: 11px;
+  color: #93a4c0;
+}
+
+/* ---- 升级三选一 ---- */
+.sv-upgrades {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.sv-upgrade {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(120, 150, 220, 0.28);
+  background: rgba(30, 36, 62, 0.85);
+  color: #e2e8f0;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+.sv-upgrade:hover {
+  transform: translateY(-3px);
+  border-color: #5eead4;
+  background: rgba(45, 212, 191, 0.14);
+}
+
+.sv-upgrade-key {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.sv-upgrade-icon {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.sv-upgrade-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.sv-upgrade-desc {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #9fb0cb;
+}
+
+.sv-foot {
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--theme-text-secondary, #6c757d);
+}
+
+@media (max-width: 640px) {
+  .sv-upgrades {
+    grid-template-columns: 1fr;
+  }
+
+  .sv-upgrade {
+    flex-direction: row;
+    justify-content: flex-start;
+    text-align: left;
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .sv-upgrade-icon {
+    font-size: 20px;
+  }
+
+  .sv-hud-time {
+    font-size: 17px;
+  }
+
+  .sv-bar-text {
+    font-size: 9px;
+  }
+}

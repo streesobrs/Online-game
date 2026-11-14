@@ -20,6 +20,7 @@ runtimeConfig.init(config);
 // 加载模块
 const UserManager = require('./modules/UserManager');
 const GameManager = require('./modules/GameManager');
+const { DouDiZhuManager } = require('./modules/DouDiZhuManager');
 const AdminManager = require('./modules/AdminManager');
 const ChatManager = require('./modules/ChatManager');
 const VersionManager = require('./modules/VersionManager');
@@ -2318,6 +2319,10 @@ const gameManager = new GameManager(userManager, accountManager, achievementMana
 gameManager.operationLogger = operationLogger;
 logger.info('游戏管理器初始化完成');
 
+// 斗地主：独立的 3 人房间体系（不影响 GameManager 的 1v1 对局）
+const douDiZhuManager = new DouDiZhuManager({ userManager, logger });
+logger.info('斗地主管理器初始化完成');
+
 const chatManager = new ChatManager(userManager, gameManager, accountManager);
 chatManager.operationLogger = operationLogger;
 logger.info('聊天系统初始化完成');
@@ -2617,6 +2622,9 @@ function pruneMatch3Sessions(sessions) {
 io.on('connection', (socket) => {
   logger.connectEvent(socket.id, { ip: socket.handshake.address });
   const snakeGames = io.snakeGames;
+
+  // 斗地主事件（ddz_*）
+  douDiZhuManager.attachSocket(socket);
 
   // 维护模式检查（返回true表示被拦截）
   function checkMaintenance(actionType = 'game') {
