@@ -218,6 +218,22 @@ app.use('/data/cosmetics/avatars', express.static(path.join(__dirname, '..', 'da
 app.use('/beta', express.static(path.join(__dirname, '..', 'client-v2')));
 app.use('/preview', express.static(path.join(__dirname, '..', 'client-v2')));
 
+// 刷怪肉鸽图鉴目录：返回 buffs/ 与 monsters/ 下的单文件列表，前端动态 import 后自动排布
+app.get('/api/survivors/catalog', (req, res) => {
+  const base = path.join(__dirname, '..', 'client-v2', 'src', 'games', 'survivors');
+  const list = (dir) => {
+    try {
+      return fs.readdirSync(path.join(base, dir))
+        .filter((file) => file.endsWith('.js'))
+        .sort();
+    } catch (e) {
+      return [];
+    }
+  };
+  res.set('Cache-Control', 'no-store');
+  res.json({ buffs: list('buffs'), monsters: list('monsters') });
+});
+
 // API路由
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'admin.html'));

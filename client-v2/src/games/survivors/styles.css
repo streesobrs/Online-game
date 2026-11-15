@@ -3,10 +3,12 @@
  * 深色竞技场 + 悬浮 HUD + 覆盖层（开始 / 升级 / 结算 / 暂停）
  */
 .sv-view {
-  width: 100%;
-  max-width: 1020px;
+  /* 按可用视口高度放大并铺满页面，同时保持 16:10，避免超宽屏只占中间一小块 */
+  width: min(100%, calc((100vh - 180px) * 1.6));
+  width: min(100%, calc((100dvh - 180px) * 1.6));
+  max-width: none;
   margin: 0 auto;
-  padding: 8px 0 24px;
+  padding: 8px 0 12px;
 }
 
 .sv-head {
@@ -132,7 +134,9 @@
 .sv-hud-mid {
   flex: 1;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
 }
 
 .sv-hud-time {
@@ -144,6 +148,23 @@
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   letter-spacing: 1px;
+}
+
+/* 波次与下一波倒计时 */
+.sv-hud-wave {
+  padding: 1px 10px;
+  border-radius: 6px;
+  background: rgba(8, 10, 20, 0.6);
+  color: #93c5fd;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sv-hud-wave.is-boss {
+  color: #fca5a5;
+  background: rgba(248, 113, 113, 0.16);
 }
 
 .sv-hud-right {
@@ -160,6 +181,52 @@
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* HUD 上的手动结算按钮：HUD 本身不接收事件，这里单独放开 */
+.sv-hud-quit {
+  pointer-events: auto;
+  cursor: pointer;
+  border: 1px solid rgba(224, 90, 79, 0.55);
+  background: rgba(224, 90, 79, 0.18);
+  color: #fca5a5;
+  font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sv-hud-quit:hover {
+  background: rgba(224, 90, 79, 0.34);
+  color: #fee2e2;
+}
+
+.sv-hud-quit.active {
+  border-color: rgba(94, 234, 212, 0.55);
+  background: rgba(94, 234, 212, 0.2);
+  color: #5eead4;
+}
+
+/* ---- 调试面板（右下角） ---- */
+.sv-debug {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  margin: 0;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: rgba(6, 8, 16, 0.76);
+  border: 1px solid rgba(120, 150, 220, 0.28);
+  color: #7dd3fc;
+  font: 11px/1.55 ui-monospace, Consolas, monospace;
+  white-space: pre;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease;
+}
+
+.sv-debug.show {
+  opacity: 1;
+  visibility: visible;
 }
 
 /* ---- 覆盖层 ---- */
@@ -331,11 +398,163 @@
   color: #9fb0cb;
 }
 
+.sv-upgrade-stacks {
+  font-size: 10px;
+  font-weight: 700;
+  color: #7dd3fc;
+}
+
+.sv-upgrade-effect {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #5eead4;
+}
+
+/* ---- 图鉴与养成：整页复用消消乐图鉴外壳（.m3-codex-*，见 match3/styles.css） ----
+ * 这里只补两处游戏专属的小元素：满级天赋卡的强调色、怪物图鉴的颜色块。 */
+.m3-codex-tile--maxed {
+  border-color: var(--theme-accent, #27ae60);
+  box-shadow: 0 0 0 1px var(--theme-accent, #27ae60) inset;
+}
+
+.sv-codex-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  vertical-align: middle;
+}
+
 .sv-foot {
   margin: 10px 0 0;
   text-align: center;
   font-size: 12px;
   color: var(--theme-text-secondary, #6c757d);
+}
+
+/* ---- 图鉴：卡片由 buffs/ 与 monsters/ 下的单文件自动生成 ---- */
+.sv-panel-catalog {
+  width: min(96%, 780px);
+  text-align: left;
+}
+
+.sv-panel-catalog .sv-panel-icon,
+.sv-panel-catalog .sv-panel-title,
+.sv-panel-catalog .sv-panel-sub {
+  text-align: center;
+}
+
+.sv-catalog-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 2px 0 12px;
+}
+
+.sv-catalog-tab {
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(120, 150, 220, 0.28);
+  background: rgba(30, 36, 62, 0.85);
+  color: #9fb0cb;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.sv-catalog-tab:hover {
+  border-color: rgba(94, 234, 212, 0.6);
+}
+
+.sv-catalog-tab.active {
+  border-color: #5eead4;
+  background: rgba(45, 212, 191, 0.16);
+  color: #5eead4;
+}
+
+.sv-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
+  gap: 10px;
+  max-height: 54vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.sv-catalog-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 13px;
+  border-radius: 12px;
+  border: 1px solid rgba(120, 150, 220, 0.24);
+  background: rgba(30, 36, 62, 0.72);
+}
+
+.sv-catalog-card-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.sv-catalog-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.sv-catalog-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  flex: none;
+}
+
+.sv-catalog-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.sv-catalog-tag {
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+  color: #a9bad5;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sv-catalog-desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #c3d0e6;
+}
+
+.sv-catalog-detail {
+  color: #8698b5;
+}
+
+.sv-catalog-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin-top: auto;
+}
+
+.sv-catalog-stat {
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(120, 150, 220, 0.12);
+  color: #a9bad5;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 640px) {
@@ -345,6 +564,7 @@
 
   .sv-upgrade {
     flex-direction: row;
+    flex-wrap: wrap;
     justify-content: flex-start;
     text-align: left;
     padding: 10px 12px;
@@ -357,6 +577,24 @@
 
   .sv-hud-time {
     font-size: 17px;
+  }
+
+  .sv-hud-right {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 46vw;
+  }
+
+  .sv-hud-quit {
+    padding: 3px 7px;
+    font-size: 11px;
+  }
+
+  .sv-debug {
+    right: 6px;
+    bottom: 6px;
+    padding: 5px 7px;
+    font-size: 10px;
   }
 
   .sv-bar-text {

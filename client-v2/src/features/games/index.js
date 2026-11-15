@@ -98,9 +98,9 @@ const GAME_UI = {
     tags: ['3D 模拟', '手动/自动挡', '昼夜切换'],
   },
   survivors: {
-    desc: '幸存者 like 刷怪肉鸽：自动攻击、怪潮围杀、升级三选一，活得更久',
+    desc: '幸存者 like 刷怪肉鸽：自动攻击、怪潮围杀、升级三选一，局外天赋永久养成',
     accent: '#e05a4f',
-    tags: ['测试版 Demo', '自动战斗', '局内构筑'],
+    tags: ['测试版 Demo', '自动战斗', '局内构筑', '局外天赋'],
     badge: '单机 · 测试版',
   },
   doudizhu: {
@@ -185,7 +185,7 @@ const GAME_MODE_CARDS = {
   survivors: [
     {
       id: 'solo', icon: '⚔️', color: '#e05a4f', title: '测试版 Demo',
-      desc: 'WASD 移动、武器自动攻击；击杀捡经验，升级三选一，每 90 秒刷 Boss',
+      desc: 'WASD 移动、武器自动攻击；击杀捡经验，升级三选一，每 90 秒刷 Boss；天赋点跨局养成',
       button: '🚀 开始试玩',
     },
   ],
@@ -661,11 +661,96 @@ export function renderGames(container) {
    * 3D 驾驶目前没有成就与道具，返回 null，主区域自动铺满
    */
   function renderSidePanel(g) {
+    if (g.id === 'survivors') return renderSurvivorSide(g);
     // 纯单机试玩 / 无成就与道具体系的游戏不展示右侧栏，主区域自动铺满
-    if (g.id === 'train3d' || g.id === 'survivors' || g.id === 'doudizhu') return null;
+    if (g.id === 'train3d' || g.id === 'doudizhu') return null;
     const cards = [renderAchievementCard(g)];
     cards.push(g.id === 'match3' ? renderCodexCard() : renderItemCard(g));
     return el('aside', { class: 'games-side' }, cards);
+  }
+
+  /** 刷怪肉鸽侧栏：局外天赋 / 战绩 / 图鉴规模，数据全部来自本地存档 */
+  function renderSurvivorSide(g) {
+    // 局外天赋与三张图鉴都收在站点级整页 #/survivor-codex 里，这里只负责带上要落到的分页
+    const talent = renderSideCard(g, '🌟 局外天赋', '进入加点 →', () => {
+      store.set('survivor.codex.tab', 'talents');
+      store.set('survivor.codex.back', 'games');
+      go('survivor-codex');
+    });
+    const record = renderSideCard(g, '🏆 局内进度', '进入游戏 →', () => go('survivors'));
+    const codex = renderSideCard(g, '📖 图鉴', '进入查看 →', () => {
+      store.set('survivor.codex.tab', 'buffs');
+      store.set('survivor.codex.back', 'games');
+      go('survivor-codex');
+    });
+
+    let disposed = false;
+    registerPanelCleanup(() => { disposed = true; });
+
+    talent.body.append(el('p', { class: 'games-side-empty' }, '天赋加载中…'));
+    Promise.all([
+      import('../../games/survivors/meta.js'),
+      import('../../games/survivors/helpers.js'),
+      import('../../games/survivors/save.js'),
+    ]).then(([metaMod, helpers, save]) => {
+      if (disposed) return;
+
+      const meta = metaMod.getMeta();
+      talent.body.innerHTML = '';
+      talent.body.append(
+        el('div', { class: 'games-side-metric' }, [
+          el('span', { class: 'games-side-strong' }, String(meta.points)),
+          el('span', { class: 'games-side-label' }, '可用天赋点'),
+        ]),
+        el('p', { class: 'games-side-note' }, `已投入 ${metaMod.totalTalentLevels()} 级 · 共 ${metaMod.TALENTS.length} 条天赋`),
+        el('p', { class: 'games-side-note' }, '每局结算按存活、击杀和 Boss 发放，开局界面即可加点'),
+      );
+
+      const best = helpers.loadBest();
+      const saved = save.loadRun();
+      record.body.innerHTML = '';
+      record.body.append(
+        el('div', { class: 'games-side-metric' }, [
+          el('span', { class: 'games-side-strong' }, helpers.formatTime(best.time)),
+          el('span', { class: 'games-side-label' }, '最佳存活'),
+        ]),
+        el('p', { class: 'games-side-note' }, `💀 最高击杀 ${best.kills}`),
+        saved
+          ? el('p', { class: 'games-side-badge' }, `♻️ 未完成战局 ${helpers.formatTime(saved.time)} · Lv.${saved.level}`)
+          : el('p', { class: 'games-side-note' }, '暂无未完成战局'),
+      );
+    }).catch(() => {
+      if (disposed) return;
+      talent.body.innerHTML = '';
+      talent.body.append(el('p', { class: 'games-side-empty' }, '天赋数据暂时无法读取'));
+      record.body.innerHTML = '';
+      record.body.append(el('p', { class: 'games-side-empty' }, '战绩数据暂时无法读取'));
+    });
+
+    codex.body.append(el('p', { class: 'games-side-empty' }, '内容加载中…'));
+    fetch('/api/survivors/catalog', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
+      .then((dirs) => {
+        if (disposed) return;
+        const buffs = (dirs.buffs || []).length;
+        const monsters = (dirs.monsters || []).length;
+        codex.body.innerHTML = '';
+        codex.body.append(
+          el('div', { class: 'games-side-metric' }, [
+            el('span', { class: 'games-side-strong' }, String(buffs + monsters)),
+            el('span', { class: 'games-side-label' }, '图鉴条目'),
+          ]),
+          el('p', { class: 'games-side-note' }, `强化 ${buffs} 种 · 怪物 ${monsters} 种`),
+          el('p', { class: 'games-side-note' }, '元素反应链与更多怪物持续加入'),
+        );
+      })
+      .catch(() => {
+        if (disposed) return;
+        codex.body.innerHTML = '';
+        codex.body.append(el('p', { class: 'games-side-empty' }, '图鉴数据暂时无法读取'));
+      });
+
+    return el('aside', { class: 'games-side' }, [talent.card, record.card, codex.card]);
   }
 
   /** 侧栏卡片外壳（标题 + 右上角入口链接） */

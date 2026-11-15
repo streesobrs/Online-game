@@ -96,6 +96,8 @@ registerRoute('match3', lazyView('./games/match3/index.js', 'renderMatch3'));
 registerRoute('train3d', lazyView('./games/train3d/index.js', 'renderTrain3d'));
 // 刷怪肉鸽（单机测试版 Demo，入口在统一游戏大厅）
 registerRoute('survivors', lazyView('./games/survivors/index.js', 'renderSurvivors'));
+// 刷怪肉鸽 · 图鉴与养成（局外天赋 + 强化 / 元素 / 怪物图鉴）：站点级整页，游戏内则走图鉴模态框
+registerRoute('survivor-codex', lazyView('./games/survivors/codex-page.js', 'renderSurvivorCodexPage'));
 // 斗地主（3 人联机 + AI 补位，入口在统一游戏大厅）
 registerRoute('doudizhu', lazyView('./games/doudizhu/index.js', 'renderDouDiZhu'));
 // 肉鸽图鉴 / 养成：站点级整页入口（大厅 / 任意页面都能开），复用消消乐同一条整页外壳

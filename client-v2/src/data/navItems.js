@@ -144,6 +144,17 @@ export const NAV_ITEMS = [
     parent: 'profile', // 归入「个人资料」大类
   },
   {
+    // 刷怪肉鸽 · 图鉴与养成：站点级整页 #/survivor-codex，
+    // 天赋 / 强化 / 元素 / 怪物四页合一；大厅侧栏与移动端抽屉可进入，游戏内用模态框查看
+    id: 'survivor-codex',
+    type: 'feature',
+    name: '刷怪图鉴',
+    icon: '🌟',
+    category: '辅助',
+    order: 12.55,
+    parent: 'games', // 归入「游戏」大类
+  },
+  {
     // 消费中心：商城 / 抽奖 / 背包 / 我的装扮，独立导航项，不再挂在个人资料页
     id: 'shop',
     type: 'feature',

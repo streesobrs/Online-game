@@ -27,7 +27,7 @@ export function setRouteGuard(guard) {
 
 /**
  * 注册路由处理器
- * @param {string} id - 视图 ID（须存在于 NAV_ITEMS，或为默认大厅 'games'）
+ * @param {string} id - 视图 ID（须存在于 NAV_ITEMS，或已通过 registerRoute 注册的站点级隐藏路由）
  * @param {Function} handler - 挂载视图的函数
  */
 export function registerRoute(id, handler) {
@@ -61,7 +61,9 @@ export function go(id) {
       id = 'games';
     }
   }
-  if (!NAV_ITEMS.find((i) => i.id === id)) {
+  // 导航项或已注册的站点级路由都可以跳转：
+  // 像 #/survivor-codex 这类「游戏内外共用」的整页不占顶部导航，但仍需能被 go() 打开
+  if (!NAV_ITEMS.find((i) => i.id === id) && !ROUTES.has(id)) {
     console.warn(`[Router] 未知路由: ${id}`);
     return;
   }
