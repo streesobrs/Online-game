@@ -3,6 +3,8 @@
  */
 import { el } from '../../utils/dom.js';
 import { TALENTS, getMeta, talentLevel, upgradeTalent } from './meta.js';
+import { REACTIONS } from './elements.js';
+import { scheduleUpload } from './server-save.js';
 
 const CATALOG_API = '/api/survivors/catalog';
 
@@ -57,8 +59,9 @@ export function createCatalog({ state, formatTime, showOverlay, getBuffs, getMon
       el('div', { class: 'sv-catalog-card-head' }, [
         el('span', { class: 'sv-catalog-icon' }, buff.icon),
         el('span', { class: 'sv-catalog-name' }, buff.name),
-        buff.element
-          ? el('span', { class: 'sv-catalog-tag', style: { color: buff.color, borderColor: buff.color } }, buff.element)
+        buff.element || buff.reaction
+          ? el('span', { class: 'sv-catalog-tag', style: { color: buff.color, borderColor: buff.color } },
+            buff.element || buff.reactionName || '反应')
           : null,
         el('span', { class: 'sv-catalog-tag' }, `上限 ${max} 层`),
         buff.requireText
@@ -101,7 +104,10 @@ export function createCatalog({ state, formatTime, showOverlay, getBuffs, getMon
           type: 'button',
           disabled: meta.points < cost,
           onClick: () => {
-            if (upgradeTalent(talent.id).ok) open('talents', back);
+            if (upgradeTalent(talent.id).ok) {
+              scheduleUpload();
+              open('talents', back);
+            }
           },
         }, `升级 · ${cost} 点`),
     ]);
@@ -136,7 +142,8 @@ export function createCatalog({ state, formatTime, showOverlay, getBuffs, getMon
     const isMonsters = tab === 'monsters';
     const buffs = getBuffs();
     const elements = buffs.filter((b) => b.element);
-    const normalBuffs = buffs.filter((b) => !b.element);
+    const reactionBuffs = buffs.filter((b) => b.reaction);
+    const normalBuffs = buffs.filter((b) => !b.element && !b.reaction);
     const monsters = getMonsters();
     const items = isTalents
       ? TALENTS
@@ -145,8 +152,12 @@ export function createCatalog({ state, formatTime, showOverlay, getBuffs, getMon
     const title = isTalents ? '局外天赋' : (isMonsters ? '怪物图鉴' : (isElements ? '元素图鉴' : '强化图鉴'));
     let sub = `共 ${normalBuffs.length} 种强化 · 每张卡对应 buffs/ 下的一个文件`;
     if (isMonsters) sub = `共 ${monsters.length} 种怪物 · 数值为初始值，会随对局时间成长`;
-    if (isElements) sub = `共 ${elements.length} 种元素弹 · 元素反应链后续加入`;
+    if (isElements) sub = `基础元素弹 ${elements.length} 种 · 反应 buff ${reactionBuffs.length} 种 · 感电基础倍率 ×${REACTIONS.electro.baseMultiplier}`;
     if (isTalents) sub = `可用天赋点 🌟${getMeta().points} · 每局结算发放，升级后下一局开局生效`;
+    const cardList = (list) => el('div', { class: 'sv-catalog-grid' }, list.map((item) => {
+      if (isTalents) return talentCard(item);
+      return isMonsters ? monsterCard(item) : buffCard(item);
+    }));
     showOverlay(el('div', { class: 'sv-panel sv-panel-catalog' }, [
       el('div', { class: 'sv-panel-icon' }, icon),
       el('h2', { class: 'sv-panel-title' }, title),
@@ -157,10 +168,16 @@ export function createCatalog({ state, formatTime, showOverlay, getBuffs, getMon
         tabBtn('elements', '⚛️ 元素'),
         tabBtn('monsters', '👾 怪物'),
       ]),
-      el('div', { class: 'sv-catalog-grid' }, items.map((item) => {
-        if (isTalents) return talentCard(item);
-        return isMonsters ? monsterCard(item) : buffCard(item);
-      })),
+      isElements
+        ? el('div', { class: 'sv-catalog-scroll' }, [
+          el('p', { class: 'sv-catalog-sec' }, `基础元素弹 · ${elements.length} 种`),
+          cardList(elements),
+          el('p', { class: 'sv-catalog-sec' }, `反应 buff · ${reactionBuffs.length} 种`),
+          reactionBuffs.length
+            ? cardList(reactionBuffs)
+            : el('p', { class: 'sv-catalog-desc' }, '获得水与雷元素弹后，升级时会出现感电反应强化。'),
+        ])
+        : cardList(items),
       el('div', { class: 'sv-panel-actions' }, [
         el('button', { class: 'btn btn-secondary', type: 'button', onClick: close }, '返回'),
       ]),

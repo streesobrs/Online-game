@@ -4,14 +4,14 @@ export default {
   icon: '💧',
   name: '水流弹',
   desc: '每轮额外发射 1 枚水属性弹',
-  detail: '每层让每轮射击多出 1 枚水流弹，造成 50% 伤害。元素机制（潮湿/击退等）后续加入。',
+  detail: '每层让每轮射击多出 1 枚水流弹，造成 50% 伤害。命中时对周围 42 半径范围挂水元素（每层 +12 半径），持续 3.5 秒；与雷元素接触触发「感电」，连锁附近带水/雷的敌人一同受伤。',
   max: 5,
   order: 53,
   aoe: false,
   element: 'water',
   color: '#3b82f6',
   effect(lv) {
-    return `额外 ${lv} 枚水流弹 · 50% 伤害`;
+    return `额外 ${lv} 枚水流弹 · 50% 伤害 · 挂水半径 ${30 + 12 * lv}`;
   },
   apply(p) {
     p.waterLevel += 1;
@@ -29,6 +29,8 @@ export default {
         r: 4,
         life: 1.5,
         element: 'water',
+        elementRadius: 30 + 12 * lv,
+        elementDuration: 3.5,
         color: '#3b82f6',
       });
     }

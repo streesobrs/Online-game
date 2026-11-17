@@ -15,9 +15,11 @@ import { store } from '../../core/store.js';
 import { eventBus } from '../../core/eventBus.js';
 import { loadCatalog } from './catalog.js';
 import { formatTime } from './helpers.js';
+import { REACTIONS } from './elements.js';
 import {
   TALENTS, getMeta, talentLevel, upgradeTalent, totalTalentLevels,
 } from './meta.js';
+import { scheduleUpload } from './server-save.js';
 
 /** 分页：天赋 + 三类图鉴 */
 const TABS = [
@@ -81,7 +83,10 @@ export function renderSurvivorCodexPage(container = viewRoot()) {
   }
 
   function buy(talent) {
-    if (upgradeTalent(talent.id).ok) paint();
+    if (upgradeTalent(talent.id).ok) {
+      scheduleUpload();
+      paint();
+    }
   }
 
   /** 天赋卡：等级 / 当前效果 / 下一级 / 进度条 / 升级按钮 */
@@ -151,8 +156,9 @@ export function renderSurvivorCodexPage(container = viewRoot()) {
         { class: 'm3-codex-tile-head' },
         el('span', { class: 'm3-codex-icon' }, buff.icon || '📖'),
         el('span', { class: 'm3-codex-tile-name' }, buff.name),
-        buff.element
-          ? el('span', { class: 'm3-codex-limit', style: { color: buff.color } }, buff.element)
+        buff.element || buff.reaction
+          ? el('span', { class: 'm3-codex-limit', style: { color: buff.color } },
+            buff.element || buff.reactionName || '反应')
           : null,
         el('span', { class: 'm3-codex-lv' }, `上限 ${buff.max || 1} 层`),
       ),
@@ -209,7 +215,8 @@ export function renderSurvivorCodexPage(container = viewRoot()) {
     const pct = Math.round((totalLv / totalTalentMax) * 100);
     const ready = loaded && !loadError;
     const elements = ready ? buffs.filter((b) => b.element).length : null;
-    const normalBuffs = ready ? buffs.filter((b) => !b.element).length : null;
+    const reactions = ready ? buffs.filter((b) => b.reaction).length : null;
+    const normalBuffs = ready ? buffs.filter((b) => !b.element && !b.reaction).length : null;
     const count = (n) => (n === null ? '…' : String(n));
     return el(
       'div',
@@ -222,6 +229,7 @@ export function renderSurvivorCodexPage(container = viewRoot()) {
         el('span', { class: 'm3-codex-topitem' }, `累计获得 🌟${meta.earned}`),
         el('span', { class: 'm3-codex-topitem' }, `📖 强化 ${count(normalBuffs)}`),
         el('span', { class: 'm3-codex-topitem' }, `⚛️ 元素 ${count(elements)}`),
+        el('span', { class: 'm3-codex-topitem' }, `⚡ 反应 ${count(reactions)}`),
         el('span', { class: 'm3-codex-topitem' }, `👾 怪物 ${count(ready ? monsters.length : null)}`),
       ),
       el(
@@ -335,12 +343,14 @@ export function renderSurvivorCodexPage(container = viewRoot()) {
     }
 
     if (tab === 'elements') {
-      const items = buffs.filter((b) => b.element);
+      const shots = buffs.filter((b) => b.element);
+      const reactions = buffs.filter((b) => b.reaction);
       return el(
         'div',
         { class: 'm3-codex-pane' },
-        paneHead('⚛️ 元素图鉴', `共 ${items.length} 种元素弹 · 元素反应链后续加入`),
-        section(`元素弹 · ${items.length} 种`, null, items.map(buffTile)),
+        paneHead('⚛️ 元素图鉴', `基础元素弹 ${shots.length} 种 · 反应 buff ${reactions.length} 种 · 感电基础倍率 ×${REACTIONS.electro.baseMultiplier}`),
+        section(`基础元素弹 · ${shots.length} 种`, '命中时对周围范围挂元素', shots.map(buffTile)),
+        section(`反应 buff · ${reactions.length} 种`, '拥有水与雷元素弹后，升级时出现，强化感电反应', reactions.map(buffTile)),
       );
     }
 

@@ -4,14 +4,14 @@ export default {
   icon: '⚡',
   name: '雷光弹',
   desc: '每轮额外发射 1 枚雷属性弹',
-  detail: '每层让每轮射击多出 1 枚雷光弹，造成 50% 伤害。元素机制（连锁闪电等）后续加入。',
+  detail: '每层让每轮射击多出 1 枚雷光弹，造成 50% 伤害。命中时对周围 42 半径范围挂雷元素（每层 +12 半径），持续 3.5 秒；与水元素接触触发「感电」，连接附近头顶带水/雷的敌人一同受到伤害。',
   max: 5,
   order: 51,
   aoe: false,
   element: 'thunder',
   color: '#facc15',
   effect(lv) {
-    return `额外 ${lv} 枚雷光弹 · 50% 伤害`;
+    return `额外 ${lv} 枚雷光弹 · 50% 伤害 · 挂雷半径 ${30 + 12 * lv}`;
   },
   apply(p) {
     p.thunderLevel += 1;
@@ -29,6 +29,8 @@ export default {
         r: 4,
         life: 1.3,
         element: 'thunder',
+        elementRadius: 30 + 12 * lv,
+        elementDuration: 3.5,
         color: '#facc15',
       });
     }

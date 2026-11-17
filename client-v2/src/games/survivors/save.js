@@ -6,41 +6,72 @@ const KEY = 'survivorsRun';
 const VERSION = 1;
 
 /**
+ * 把局内状态整理成可序列化的存档体
+ * @param {object} state - 游戏状态
+ * @returns {object}
+ */
+function serializeRun(state) {
+  return {
+    v: VERSION,
+    savedAt: Date.now(),
+    time: state.time,
+    kills: state.kills,
+    level: state.level,
+    xp: state.xp,
+    xpNeeded: state.xpNeeded,
+    pendingLevels: state.pendingLevels,
+    player: state.player,
+    enemies: state.enemies.filter((e) => !e.dead),
+    projectiles: state.projectiles.filter((pr) => !pr.dead).map((pr) => ({ ...pr, hit: [...pr.hit] })),
+    enemyShots: state.enemyShots.filter((s) => !s.dead),
+    gems: state.gems,
+    upgradeStacks: state.upgradeStacks,
+    attackTimer: state.attackTimer,
+    comboTimer: state.comboTimer,
+    comboPending: state.comboPending,
+    spawnTimer: state.spawnTimer,
+    bossTimer: state.bossTimer,
+    bossCount: state.bossCount,
+    wave: state.wave,
+    hurtCd: state.hurtCd,
+    novaTimer: state.novaTimer,
+    nextEnemyId: state.nextEnemyId,
+  };
+}
+
+/**
  * 保存当前战局（仅 playing 状态）
  * @param {object} state - 游戏状态
  */
 export function saveRun(state) {
   if (!state || state.mode !== 'playing') return;
   try {
-    const payload = {
-      v: VERSION,
-      savedAt: Date.now(),
-      time: state.time,
-      kills: state.kills,
-      level: state.level,
-      xp: state.xp,
-      xpNeeded: state.xpNeeded,
-      pendingLevels: state.pendingLevels,
-      player: state.player,
-      enemies: state.enemies.filter((e) => !e.dead),
-      projectiles: state.projectiles.filter((pr) => !pr.dead).map((pr) => ({ ...pr, hit: [...pr.hit] })),
-      enemyShots: state.enemyShots.filter((s) => !s.dead),
-      gems: state.gems,
-      upgradeStacks: state.upgradeStacks,
-      attackTimer: state.attackTimer,
-      comboTimer: state.comboTimer,
-      comboPending: state.comboPending,
-      spawnTimer: state.spawnTimer,
-      bossTimer: state.bossTimer,
-      bossCount: state.bossCount,
-      wave: state.wave,
-      hurtCd: state.hurtCd,
-      novaTimer: state.novaTimer,
-      nextEnemyId: state.nextEnemyId,
-    };
-    localStorage.setItem(KEY, JSON.stringify(payload));
+    localStorage.setItem(KEY, JSON.stringify(serializeRun(state)));
   } catch (e) {
     // 隐私模式 / 超出配额时静默失败，不影响游戏
+  }
+}
+
+/** 读取原始存档对象（不做版本校验，云同步用） */
+export function getRawRun() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/** 写入原始存档对象（云同步用；传 null 视为清空） */
+export function setRawRun(raw) {
+  try {
+    if (!raw) {
+      localStorage.removeItem(KEY);
+      return;
+    }
+    localStorage.setItem(KEY, JSON.stringify(raw));
+  } catch (e) {
+    // 忽略写入失败
   }
 }
 

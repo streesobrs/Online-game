@@ -141,6 +141,13 @@ export function getMeta() {
   return meta;
 }
 
+/** 用云存档覆盖本地养成数据（登录后同步用），返回归一化后的 meta */
+export function setMeta(raw) {
+  meta = normalizeMeta(raw);
+  persist();
+  return meta;
+}
+
 export function talentLevel(id) {
   return meta.talents[id] || 0;
 }

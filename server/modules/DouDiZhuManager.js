@@ -13,6 +13,8 @@
  * - 先出完手牌的一方获胜；地主赢或两个农民任意一人出完则农民赢
  * - 真人不足 3 人时，等待一段时间后由 AI 补位；玩家掉线/离开由 AI 托管
  */
+const dataStore = require('../utils/dataStore');
+
 const AI_FILL_DELAY = 6000; // 匹配等待 6 秒后 AI 补位
 const AI_ACT_DELAY = 900;   // AI 叫牌/出牌思考时间
 const ROOM_KEEP_MS = 30000; // 结算后房间保留时间
@@ -271,9 +273,11 @@ function aiChoosePlay(room, seat) {
 }
 
 class DouDiZhuManager {
-  constructor({ userManager, logger } = {}) {
+  constructor({ userManager, logger, accountManager, gameManager } = {}) {
     this.userManager = userManager;
     this.logger = logger || console;
+    this.accountManager = accountManager || null;
+    this.gameManager = gameManager || null;
     this.queue = [];
     this.rooms = new Map();
     this.accountRoom = new Map();
@@ -761,8 +765,65 @@ class DouDiZhuManager {
       landlordWin: room.landlordWin,
     });
 
+    // 落库放到结算广播之后，失败不影响对局本身
+    this.persistResult(room).catch((err) => {
+      this.logger.warn?.('斗地主对局落库失败', { roomId: room.id, error: err.message });
+    });
+
     const timer = setTimeout(() => this.removeRoom(room), ROOM_KEEP_MS);
     if (timer.unref) timer.unref();
+  }
+
+  /**
+   * 结算持久化：每个真人座位写一条对局明细到 games 集合，并累计账号 doudizhu 胜负。
+   * 同一房间只写一次（room.persisted 去重）。
+   */
+  async persistResult(room) {
+    if (room.persisted) return;
+    room.persisted = true;
+
+    const endTime = Date.now();
+    const duration = endTime - (room.createdAt || endTime);
+    const humans = room.seats
+      .map((seat, index) => ({ seat, index }))
+      .filter(({ seat }) => !seat.isAI && seat.accountId);
+
+    await Promise.all(humans.map(async ({ seat, index }) => {
+      const isLandlord = index === room.landlordSeat;
+      const win = isLandlord === room.landlordWin;
+
+      const record = {
+        gameId: `ddz_${room.id}_${seat.accountId}`,
+        gameType: 'doudizhu',
+        mode: 'ddz',
+        gameMode: 'ddz',
+        roomId: room.id,
+        player: { id: seat.accountId, accountId: seat.accountId, nickname: seat.nickname },
+        players: room.seats.map((s, i) => ({
+          id: s.accountId || null,
+          accountId: s.accountId || null,
+          nickname: s.nickname,
+          isAI: !!s.isAI,
+          seat: i,
+        })),
+        landlordSeat: room.landlordSeat,
+        winnerSeat: room.winnerSeat,
+        winner: room.seats[room.winnerSeat]?.accountId || null,
+        landlordWin: room.landlordWin,
+        isLandlord,
+        win,
+        result: win ? 'win' : 'loss',
+        startTime: room.createdAt,
+        endTime,
+        duration,
+        savedAt: endTime,
+      };
+
+      await dataStore.add('games', record);
+      if (this.accountManager?.updateGameStats) {
+        await this.accountManager.updateGameStats(seat.accountId, win ? 'win' : 'loss', 'doudizhu', false, null, duration);
+      }
+    }));
   }
 
   removeRoom(room) {

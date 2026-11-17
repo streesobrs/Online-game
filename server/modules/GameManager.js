@@ -1990,7 +1990,8 @@ class GameManager {
   isGameParticipant(game, accountId) {
     if (!accountId) return false;
     if (game.player?.id === accountId) return true;
-    if (Array.isArray(game.players) && game.players.some(p => p?.id === accountId)) return true;
+    if (game.player?.accountId === accountId) return true;
+    if (Array.isArray(game.players) && game.players.some(p => p?.id === accountId || p?.accountId === accountId)) return true;
     return game.player1 === accountId || game.player2 === accountId;
   }
 
@@ -2059,6 +2060,20 @@ class GameManager {
         maxLength: game.maxLength || 0,
         foodEaten: game.foodEaten || 0,
         moves: Array.isArray(game.moves) ? game.moves.length : (game.moves || 0)
+      };
+    }
+
+    if (game.gameType === 'doudizhu') {
+      return {
+        ...base,
+        player: game.player || { id: game.player1, nickname: game.player1Nickname || '玩家' },
+        players: Array.isArray(game.players) ? game.players : [],
+        isLandlord: game.isLandlord === true,
+        result: game.win === true ? 'win' : 'loss',
+        landlordWin: game.landlordWin === true,
+        winnerSeat: game.winnerSeat ?? null,
+        roomId: game.roomId || null,
+        gameMode: 'ddz'
       };
     }
 

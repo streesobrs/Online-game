@@ -21,6 +21,8 @@ import { createRenderer } from './renderer.js';
 import { loadCatalog, createCatalog } from './catalog.js';
 import { saveRun, loadRun, clearRun } from './save.js';
 import { applyTalents, getMeta, grantRunPoints } from './meta.js';
+import { syncOnEnter, scheduleUpload, flushUpload, cancelScheduledUpload } from './server-save.js';
+import { applyElementHit, applyElementAoe, ELEMENT_DURATION } from './elements.js';
 
 let activeCleanup = null;
 
@@ -75,6 +77,9 @@ const PLAYER_BASE = {
   thunderLevel: 0,
   iceLevel: 0,
   waterLevel: 0,
+  electroAmpLevel: 0,
+  electroChainLevel: 0,
+  electroStormLevel: 0,
   face: -Math.PI / 2,
 };
 
@@ -138,6 +143,8 @@ export function renderSurvivors(container = viewRoot()) {
     novaTimer: 2.5,
     novas: [],
     explosions: [],
+    lightningArcs: [],
+    reactionCd: 0,
     nextEnemyId: 1,
     flash: 0,
     shake: 0,
@@ -305,6 +312,7 @@ export function renderSurvivors(container = viewRoot()) {
     if (state.mode !== 'playing' || state.paused) return;
     state.paused = true;
     saveRun(state);
+    scheduleUpload();
     openCatalog('buffs', closeCatalogInRun);
   }
 
@@ -339,6 +347,8 @@ export function renderSurvivors(container = viewRoot()) {
     state.particles = [];
     state.novas = [];
     state.explosions = [];
+    state.lightningArcs = [];
+    state.reactionCd = 0;
     state.upgradeStacks = run.upgradeStacks;
     state.attackTimer = run.attackTimer ?? 0.35;
     state.comboTimer = 0;
@@ -392,7 +402,7 @@ export function renderSurvivors(container = viewRoot()) {
       el('div', { class: 'sv-panel-actions' }, [
         el('button', { class: 'btn btn-warning', type: 'button', onClick: () => openCatalog('talents') }, '🌟 局外天赋'),
         el('button', { class: 'btn btn-secondary', type: 'button', onClick: () => openCatalog('buffs') }, `📖 强化图鉴 (${BUFFS.filter((b) => !b.element).length})`),
-        el('button', { class: 'btn btn-secondary', type: 'button', onClick: () => openCatalog('elements') }, `⚛️ 元素图鉴 (${BUFFS.filter((b) => b.element).length})`),
+        el('button', { class: 'btn btn-secondary', type: 'button', onClick: () => openCatalog('elements') }, `⚛️ 元素图鉴 (${BUFFS.filter((b) => b.element || b.reaction).length})`),
         el('button', { class: 'btn btn-secondary', type: 'button', onClick: () => openCatalog('monsters') }, `👾 怪物图鉴 (${MONSTERS.length})`),
       ]),
     ]));
@@ -443,6 +453,7 @@ export function renderSurvivors(container = viewRoot()) {
     const newRecord = state.time > state.best.time || state.kills > state.best.kills;
     state.best = { time: bestTime, kills: bestKills };
     saveBest(state.best);
+    scheduleUpload();
 
     // 结算面板单独抽成函数：从局外天赋模态框返回时重画它，而不是回到开始面板
     const showResult = () => showOverlay(el('div', { class: 'sv-panel' }, [
@@ -719,6 +730,8 @@ export function renderSurvivors(container = viewRoot()) {
       life: spec.life ?? 1.5,
       dead: false,
       element: spec.element || 'physical',
+      elementRadius: spec.elementRadius || 0,
+      elementDuration: spec.elementDuration || ELEMENT_DURATION,
       color: spec.color || '',
       fragment: spec.fragment || false,
     });
@@ -920,6 +933,10 @@ export function renderSurvivors(container = viewRoot()) {
         if ((e.x - x) ** 2 + (e.y - y) ** 2 <= rr * rr) damageEnemy(e, damage);
       }
     },
+    // 元素反应等需要指定目标结算伤害时使用
+    damageEnemy(enemy, damage, depth = 0) {
+      damageEnemy(enemy, damage, depth);
+    },
     explodeAt,
     fireVolley(damageScale = 1) {
       return fireVolley(damageScale);
@@ -966,6 +983,7 @@ export function renderSurvivors(container = viewRoot()) {
     state.flash = Math.max(0, state.flash - dt * 2.2);
     state.shake = Math.max(0, state.shake - dt * 2.5);
     state.hurtCd = Math.max(0, state.hurtCd - dt);
+    state.reactionCd = Math.max(0, (state.reactionCd || 0) - dt);
 
     // DPS：每 0.5 秒记录一次实际造成的伤害，取最近 4 秒平均
     state.dpsTick += dt;
@@ -983,6 +1001,7 @@ export function renderSurvivors(container = viewRoot()) {
     if (state.saveTimer <= 0) {
       state.saveTimer = 5;
       saveRun(state);
+      scheduleUpload();
     }
 
     const p = state.player;
@@ -1020,6 +1039,7 @@ export function renderSurvivors(container = viewRoot()) {
         e.elementTimer -= dt;
         if (e.elementTimer <= 0) e.element = '';
       }
+      if (e.reactCd > 0) e.reactCd = Math.max(0, e.reactCd - dt);
       const dx = p.x - e.x;
       const dy = p.y - e.y;
       const dist = Math.hypot(dx, dy) || 1;
@@ -1057,10 +1077,12 @@ export function renderSurvivors(container = viewRoot()) {
         if ((pr.x - e.x) ** 2 + (pr.y - e.y) ** 2 <= rr * rr) {
           pr.hit.add(e.id);
           damageEnemy(e, pr.damage);
-          // 元素弹会给怪物挂上对应元素，供后续元素反应使用
+          // 元素弹：直接命中先结算元素反应/附着，再以命中点为中心给周围怪挂元素
           if (pr.element && pr.element !== 'physical') {
-            e.element = pr.element;
-            e.elementTimer = 3;
+            applyElementHit(e, pr.element, state, p, buffApi, pr.elementDuration);
+            if (pr.elementRadius > 0) {
+              applyElementAoe(state, p, buffApi, pr.x, pr.y, pr.elementRadius, pr.element, pr.elementDuration, e.id);
+            }
           }
           // buff 的命中效果（如爆裂弹溅射）由各 buff 文件实现
           for (const buff of BUFFS) {
@@ -1075,20 +1097,21 @@ export function renderSurvivors(container = viewRoot()) {
       }
     }
 
-    // 经验宝石：进入拾取范围后飞向玩家
+    // 经验宝石：进入拾取范围后飞向玩家（先用平方距离筛掉范围外的宝石，避免大量开方）
+    const pickup2 = p.pickup * p.pickup;
     for (const g of state.gems) {
       const dx = p.x - g.x;
       const dy = p.y - g.y;
-      const dist = Math.hypot(dx, dy) || 1;
-      if (dist < p.pickup) {
-        const step = 420 * dt;
-        if (dist <= step) {
-          g.dead = true;
-          gainXp(g.value);
-        } else {
-          g.x += (dx / dist) * step;
-          g.y += (dy / dist) * step;
-        }
+      const d2 = dx * dx + dy * dy;
+      if (d2 >= pickup2) continue;
+      const dist = Math.sqrt(d2) || 1;
+      const step = 420 * dt;
+      if (dist <= step) {
+        g.dead = true;
+        gainXp(g.value);
+      } else {
+        g.x += (dx / dist) * step;
+        g.y += (dy / dist) * step;
       }
     }
 
@@ -1101,9 +1124,10 @@ export function renderSurvivors(container = viewRoot()) {
       pt.life -= dt;
     }
 
-    // 冲击波 / 爆炸特效
+    // 冲击波 / 爆炸 / 感电闪电特效
     for (const n of state.novas) n.life -= dt;
     for (const ex of state.explosions) ex.life -= dt;
+    for (const arc of state.lightningArcs) arc.life -= dt;
 
     state.enemies = state.enemies.filter((e) => !e.dead);
     state.projectiles = state.projectiles.filter((pr) => !pr.dead);
@@ -1112,12 +1136,14 @@ export function renderSurvivors(container = viewRoot()) {
     state.particles = state.particles.filter((pt) => pt.life > 0);
     state.novas = state.novas.filter((n) => n.life > 0);
     state.explosions = state.explosions.filter((ex) => ex.life > 0);
+    state.lightningArcs = state.lightningArcs.filter((arc) => arc.life > 0);
   }
 
   // ---- 开局 / 结算 ----
   function startGame() {
     if (!BUFFS.length || !MONSTERS.length) return; // 图鉴数据未就绪时不开局
     clearRun();
+    scheduleUpload();
     hideOverlay();
     state.mode = 'playing';
     state.paused = false;
@@ -1156,6 +1182,8 @@ export function renderSurvivors(container = viewRoot()) {
     state.novaTimer = 2.5;
     state.novas = [];
     state.explosions = [];
+    state.lightningArcs = [];
+    state.reactionCd = 0;
     state.flash = 0;
     state.shake = 0;
     state.drag = { x: 0, y: 0 };
@@ -1175,6 +1203,7 @@ export function renderSurvivors(container = viewRoot()) {
       bossCount: state.bossCount,
     });
     state.lastReward = reward.gained;
+    scheduleUpload();
     showGameOver();
   }
 
@@ -1251,6 +1280,7 @@ export function renderSurvivors(container = viewRoot()) {
     if (state.pausedByLevelUp) return; // 升级选择中不允许用暂停跳过
     state.paused = true;
     saveRun(state);
+    scheduleUpload();
     showOverlay(el('div', { class: 'sv-panel' }, [
       el('div', { class: 'sv-panel-icon' }, '⏸'),
       el('h2', { class: 'sv-panel-title' }, '已暂停'),
@@ -1333,7 +1363,10 @@ export function renderSurvivors(container = viewRoot()) {
 
   // ---- 事件绑定 ----
   function saveIfPlaying() {
-    if (state.mode === 'playing') saveRun(state);
+    if (state.mode === 'playing') {
+      saveRun(state);
+      scheduleUpload();
+    }
   }
   function onVisibilityChange() {
     if (document.hidden) saveIfPlaying();
@@ -1355,12 +1388,25 @@ export function renderSurvivors(container = viewRoot()) {
     showStart();
   }).catch(showCatalogError);
 
+  // 登录账号：拉取服务端存档（游客直接跳过）；服务端较新时覆盖本地并刷新面板
+  syncOnEnter().then((applied) => {
+    if (!applied) return;
+    state.best = loadBest();
+    updateHud();
+    if (state.mode === 'idle' && !catalogOpen) showStart();
+  });
+
   let disposed = false;
   function cleanupSurvivors() {
     if (disposed) return;
     disposed = true;
     // 离开视图时保留战局，回来可继续
-    if (state.mode === 'playing') saveRun(state);
+    if (state.mode === 'playing') {
+      saveRun(state);
+      scheduleUpload();
+    }
+    cancelScheduledUpload();
+    flushUpload();
     offRoute();
     fsCtrl.destroy();
     cancelAnimationFrame(state.raf);

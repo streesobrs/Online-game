@@ -17,10 +17,17 @@ export function loadBest() {
 }
 
 export function saveBest(best) {
+  return setBest(best);
+}
+
+/** 写入最佳纪录（云存档同步用），返回是否写入成功 */
+export function setBest(best) {
   try {
-    localStorage.setItem(BEST_KEY, JSON.stringify(best));
+    localStorage.setItem(BEST_KEY, JSON.stringify(best || {}));
+    return true;
   } catch (e) {
     // 隐私模式下 localStorage 不可写，忽略即可
+    return false;
   }
 }
 

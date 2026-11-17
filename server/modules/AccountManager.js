@@ -2281,6 +2281,15 @@ class AccountManager {
           maxLevel: 0,
           totalStars: 0,
           lastPlayedAt: null
+        },
+        doudizhu: {
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          totalGames: 0,
+          streak: 0,
+          maxStreak: 0,
+          lastPlayedAt: null
         }
       };
       for (const [key, entry] of Object.entries(defaultGames)) {

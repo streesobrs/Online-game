@@ -24,12 +24,14 @@ async function request(path, options = {}) {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };
+  // silent：后台同步类请求失败时不弹提示，由调用方自行降级
+  const { silent, ...fetchOptions } = options;
 
   let res;
   try {
-    res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+    res = await fetch(`${BASE_URL}${path}`, { ...fetchOptions, headers });
   } catch (err) {
-    toast.error(`网络请求失败: ${path}`);
+    if (!silent) toast.error(`网络请求失败: ${path}`);
     throw err;
   }
 
@@ -200,6 +202,17 @@ export const api = {
     /** 对战历史 @param {string} accountId @param {number|'all'} [limit=20] */
     history: (accountId, limit = 20) => api.get(`/api/games/history?accountId=${encodeURIComponent(accountId || '')}&limit=${limit}`),
     stats: () => api.get('/api/games/stats'),
+  },
+
+  survivors: {
+    /** 拉取刷怪肉鸽云存档（后台同步，失败不弹提示） */
+    getSave: () => request('/api/survivors/save', { method: 'GET', silent: true }),
+    /** 上传刷怪肉鸽云存档（后台同步，失败不弹提示） */
+    putSave: (payload) => request('/api/survivors/save', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+      silent: true,
+    }),
   },
 
   spectate: {

@@ -4,14 +4,14 @@ export default {
   icon: '🔥',
   name: '火焰弹',
   desc: '每轮额外发射 1 枚火属性弹',
-  detail: '每层让每轮射击多出 1 枚火焰弹，造成 50% 伤害。元素机制（灼烧等）后续加入。',
+  detail: '每层让每轮射击多出 1 枚火焰弹，造成 50% 伤害。命中时对周围 42 半径范围挂火元素（每层 +12 半径），持续 3.5 秒。',
   max: 5,
   order: 50,
   aoe: false,
   element: 'fire',
   color: '#ff6b3d',
   effect(lv) {
-    return `额外 ${lv} 枚火焰弹 · 50% 伤害`;
+    return `额外 ${lv} 枚火焰弹 · 50% 伤害 · 挂火半径 ${30 + 12 * lv}`;
   },
   apply(p) {
     p.fireLevel += 1;
@@ -29,6 +29,8 @@ export default {
         r: 4,
         life: 1.4,
         element: 'fire',
+        elementRadius: 30 + 12 * lv,
+        elementDuration: 3.5,
         color: '#ff6b3d',
       });
     }

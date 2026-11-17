@@ -18,6 +18,7 @@ class DataStore {
       'mails': 'mails', // 邮件记录按用户ID拆分存储
       'inventories': 'inventories', // 背包资源按用户ID拆分存储
       'match3': 'match3', // 消消乐逐关明细按用户ID拆分存储（逐关星数随关卡数增长，不能混在账号文件里）
+      'survivorSaves': 'survivor_saves', // 刷怪肉鸽云存档按用户ID拆分存储（含局内存档，体积较大）
       'operationLogs': 'operation_logs' // 操作日志按用户ID拆分存储
     };
 

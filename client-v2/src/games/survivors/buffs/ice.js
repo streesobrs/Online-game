@@ -4,14 +4,14 @@ export default {
   icon: '❄️',
   name: '寒冰弹',
   desc: '每轮额外发射 1 枚冰属性弹',
-  detail: '每层让每轮射击多出 1 枚寒冰弹，造成 50% 伤害。元素机制（减速/冻结等）后续加入。',
+  detail: '每层让每轮射击多出 1 枚寒冰弹，造成 50% 伤害。命中时对周围 42 半径范围挂冰元素（每层 +12 半径），持续 3.5 秒。',
   max: 5,
   order: 52,
   aoe: false,
   element: 'ice',
   color: '#7dd3fc',
   effect(lv) {
-    return `额外 ${lv} 枚寒冰弹 · 50% 伤害`;
+    return `额外 ${lv} 枚寒冰弹 · 50% 伤害 · 挂冰半径 ${30 + 12 * lv}`;
   },
   apply(p) {
     p.iceLevel += 1;
@@ -29,6 +29,8 @@ export default {
         r: 4,
         life: 1.5,
         element: 'ice',
+        elementRadius: 30 + 12 * lv,
+        elementDuration: 3.5,
         color: '#7dd3fc',
       });
     }

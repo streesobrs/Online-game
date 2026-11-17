@@ -1148,6 +1148,97 @@ app.get('/api/games/history', authenticateUser, requireSelf(req => req.query.acc
   }
 });
 
+// ========== 刷怪肉鸽云存档 ==========
+// 只按登录身份存取自己的存档（不接收 accountId，天然 self），服务端仅做最后写入存储，
+// 新旧判定交给客户端比较 updatedAt / clientUpdatedAt
+const SURVIVOR_SAVE_MAX_BYTES = 256 * 1024;
+const SURVIVOR_SAVE_BLOCKED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+// 深拷贝前的结构校验：拒原型污染键、限制深度/键数/数组长度/字符串长度，数字必须有限
+function isValidSurvivorValue(value, depth = 0) {
+  if (depth > 6) return false;
+  if (value === null) return true;
+  const type = typeof value;
+  if (type === 'number') return Number.isFinite(value);
+  if (type === 'string') return value.length <= 2048;
+  if (type === 'boolean') return true;
+  if (Array.isArray(value)) {
+    if (value.length > 2000) return false;
+    return value.every((item) => isValidSurvivorValue(item, depth + 1));
+  }
+  if (type === 'object') {
+    const keys = Object.keys(value);
+    if (keys.length > 500) return false;
+    return keys.every((key) => (
+      !SURVIVOR_SAVE_BLOCKED_KEYS.has(key) && isValidSurvivorValue(value[key], depth + 1)
+    ));
+  }
+  return false;
+}
+
+function isPlainObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+app.get('/api/survivors/save', authenticateUser, async (req, res) => {
+  try {
+    const record = await dataStore.readOne('survivorSaves', req.authAccountId);
+    if (!record) {
+      return res.json({ success: true, save: null, updatedAt: 0 });
+    }
+    const updatedAt = record.updatedAt || 0;
+    res.json({
+      success: true,
+      save: {
+        meta: record.meta || {},
+        best: record.best || {},
+        run: record.run === undefined ? null : record.run,
+        updatedAt,
+        clientUpdatedAt: record.clientUpdatedAt || 0
+      },
+      updatedAt
+    });
+  } catch (err) {
+    logger.warn('读取刷怪肉鸽存档失败', { accountId: req.authAccountId, error: err.message });
+    res.status(500).json({ success: false, message: '读取存档失败' });
+  }
+});
+
+app.put('/api/survivors/save', authenticateUser, async (req, res) => {
+  try {
+    const { meta, best, clientUpdatedAt } = req.body || {};
+    const run = req.body?.run;
+    if (!isPlainObject(meta) || !isPlainObject(best) || !(run === null || run === undefined || isPlainObject(run))) {
+      return res.status(400).json({ success: false, message: '存档格式不正确' });
+    }
+
+    const body = { meta, best, run: run === undefined ? null : run };
+    if (!isValidSurvivorValue(body)) {
+      return res.status(400).json({ success: false, message: '存档数据不合法' });
+    }
+    // 校验通过后再深拷贝，避免原型污染对象被写入磁盘
+    const payload = JSON.parse(JSON.stringify(body));
+    if (Buffer.byteLength(JSON.stringify(payload)) > SURVIVOR_SAVE_MAX_BYTES) {
+      return res.status(413).json({ success: false, message: '存档体积超出限制' });
+    }
+
+    const updatedAt = Date.now();
+    await dataStore.writeOne('survivorSaves', req.authAccountId, {
+      id: req.authAccountId,
+      accountId: req.authAccountId,
+      meta: payload.meta,
+      best: payload.best,
+      run: payload.run,
+      clientUpdatedAt: Math.max(0, Math.floor(Number(clientUpdatedAt) || 0)),
+      updatedAt
+    });
+    res.json({ success: true, updatedAt });
+  } catch (err) {
+    logger.warn('保存刷怪肉鸽存档失败', { accountId: req.authAccountId, error: err.message });
+    res.status(500).json({ success: false, message: '保存存档失败' });
+  }
+});
+
 // 管理员：获取所有对局记录（分页+筛选）
 app.get('/api/admin/games', authenticateToken, async (req, res) => {
   try {
@@ -2342,7 +2433,7 @@ gameManager.operationLogger = operationLogger;
 logger.info('游戏管理器初始化完成');
 
 // 斗地主：独立的 3 人房间体系（不影响 GameManager 的 1v1 对局）
-const douDiZhuManager = new DouDiZhuManager({ userManager, logger });
+const douDiZhuManager = new DouDiZhuManager({ userManager, logger, accountManager, gameManager });
 logger.info('斗地主管理器初始化完成');
 
 const chatManager = new ChatManager(userManager, gameManager, accountManager);
