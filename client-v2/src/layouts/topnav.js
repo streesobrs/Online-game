@@ -3,9 +3,10 @@
  * 导航栏由 NAV_ITEMS 元数据驱动：统一游戏（1）+ 功能（若干）+ 旧版入口。
  * 点击按钮 → 路由切换；currentView 变化 → active 高亮同步。
  */
-import { FEATURES } from '../data/navItems.js';
+import { NAV_ITEMS } from '../data/navItems.js';
 import { handleNavClick, isActive, go } from '../core/router.js';
 import { store } from '../core/store.js';
+import { isAdminAccount } from './shared.js';
 import { el } from '../utils/dom.js';
 import { api } from '../core/api.js';
 import * as auth from '../core/auth.js';
@@ -15,12 +16,14 @@ import { avatarNode } from '../utils/avatar.js';
 /** 生成导航按钮 */
 function navButton(item) {
   return el('button', {
-    class: `nav-btn${isActive(item.id) ? ' active' : ''}`,
+    // mobileTab 的项在窄屏作为底部标签，其余项收进「更多」
+    class: `nav-btn${item.mobileTab ? '' : ' nav-btn--more'}${isActive(item.id) ? ' active' : ''}`,
     'data-nav': item.id,
     onClick: () => handleNavClick(item.id),
   }, [
     el('span', { class: 'nav-btn__icon' }, item.icon),
     el('span', { class: 'nav-btn__name' }, item.name),
+    el('span', { class: 'nav-btn__name-short' }, item.mobileName || item.name),
     item.shortcut ? el('sup', { class: 'nav-btn__shortcut' }, item.shortcut) : null,
     // 好友申请红点：数量由 store.friendRequestCount 驱动
     item.id === 'friends' ? el('span', { class: 'nav-btn__badge hidden' }) : null,
@@ -265,25 +268,17 @@ export function renderAccountBar(container) {
   return () => { unsubscribe(); stopInteractions(); bar.remove(); };
 }
 
-/** 当前登录账号是否为管理员（账号数据在 store.user.account.account 上） */
-function isAdminAccount() {
-  const user = store.get('user');
-  const inner = user?.account?.account || user?.account || null;
-  return !!inner?.isAdmin;
-}
-
 /**
- * 渲染顶部导航布局
+ * 渲染导航栏：桌面在顶部，窄屏由 CSS 变成底部标签栏（同一个元素，不会出现上下两套）
  * @param {HTMLElement} container - 挂载容器
  * @returns {Function} cleanup 函数
  */
 export function renderTopNav(container) {
-  // GAMES 现在是游戏元数据（非导航项），需映射回导航项
-  // 使用 FEATURES 中的第一个导航项 'games' 作为入口
-  const gamesNav = { id: 'games', name: '游戏', icon: '🎮', shortcut: 'G' };
-
-  // 顶部导航只放大类入口：inProfile（并入个人资料）与 parent（归入某大类）的项不单独展示
-  const navFeatures = FEATURES.filter((i) => !i.inProfile && !i.parent);
+  // 入口统一来自 NAV_ITEMS：inProfile（并入个人资料）与 parent（归入某大类）的项不单独展示；
+  // type='game' 里只有大厅入口 id='games' 进导航，其余单机游戏入口都在大厅内
+  const topItems = NAV_ITEMS
+    .filter((i) => !i.inProfile && !i.parent && (i.id === 'games' || i.type === 'feature'))
+    .sort((a, b) => a.order - b.order);
 
   // 后台入口：默认隐藏，登录账号是管理员时才出现
   const adminBtn = el('a', {
@@ -295,20 +290,74 @@ export function renderTopNav(container) {
     el('span', { class: 'nav-btn__name' }, '后台'),
   ]);
 
+  const legacyLink = el('a', { class: 'nav-btn nav-btn--legacy', href: '/', title: '切换回旧版客户端' }, [
+    el('span', { class: 'nav-btn__icon' }, '🕰️'),
+    el('span', { class: 'nav-btn__name' }, '旧版'),
+  ]);
+
+  // ---- 「更多」：窄屏才显示，承载没进底部标签栏的入口 ----
+  let sheetOpen = false;
+  const sheet = el('div', { class: 'nav-sheet' });
+  const sheetPanel = el('div', { class: 'nav-sheet__panel' });
+
+  const sheetAdmin = el('button', {
+    class: 'nav-sheet__item hidden',
+    type: 'button',
+    onClick: () => { setSheetOpen(false); go('admin'); },
+  }, [
+    el('span', { class: 'nav-sheet__icon' }, '🛠️'),
+    el('span', { class: 'nav-sheet__name' }, '后台'),
+  ]);
+
+  const sheetItems = topItems.filter((i) => !i.mobileTab).map((item) => el('button', {
+    class: 'nav-sheet__item',
+    type: 'button',
+    'data-nav': item.id,
+    onClick: () => { setSheetOpen(false); handleNavClick(item.id); },
+  }, [
+    el('span', { class: 'nav-sheet__icon' }, item.icon),
+    el('span', { class: 'nav-sheet__name' }, item.name),
+  ]));
+
+  const sheetLegacy = el('a', { class: 'nav-sheet__item', href: '/', title: '切换回旧版客户端' }, [
+    el('span', { class: 'nav-sheet__icon' }, '🕰️'),
+    el('span', { class: 'nav-sheet__name' }, '旧版'),
+  ]);
+
+  sheetPanel.append(...sheetItems, sheetAdmin, sheetLegacy);
+  sheet.append(el('div', { class: 'nav-sheet__scrim', onClick: () => setSheetOpen(false) }), sheetPanel);
+
+  const moreBtn = el('button', {
+    class: 'nav-btn nav-more-btn',
+    type: 'button',
+    onClick: () => setSheetOpen(),
+  }, [
+    el('span', { class: 'nav-btn__icon' }, '⋯'),
+    el('span', { class: 'nav-btn__name' }, '更多'),
+    el('span', { class: 'nav-btn__name-short' }, '更多'),
+  ]);
+
+  function setSheetOpen(v) {
+    sheetOpen = typeof v === 'boolean' ? v : !sheetOpen;
+    sheet.classList.toggle('open', sheetOpen);
+    moreBtn.classList.toggle('active', sheetOpen);
+  }
+
   container.append(
-    el('div', { class: 'nav-group nav-group--games' }, navButton(gamesNav)),
+    ...topItems.map(navButton),
     el('div', { class: 'nav-divider' }),
-    // 已迁移进个人资料页 / 设置页 / 游戏页的二级模块不再出现在导航栏
-    el('div', { class: 'nav-group nav-group--features' }, navFeatures.map(navButton)),
-    el('div', { class: 'nav-group nav-group--admin' }, adminBtn),
+    adminBtn,
     el('div', { class: 'nav-divider' }),
-    el('a', { class: 'nav-btn nav-btn--legacy', href: '/', title: '切换回旧版客户端' }, [
-      el('span', { class: 'nav-btn__icon' }, '🕰️'),
-      el('span', { class: 'nav-btn__name' }, '旧版'),
-    ])
+    legacyLink,
+    moreBtn,
+    sheet,
   );
 
-  const syncAdminBtn = () => adminBtn.classList.toggle('hidden', !isAdminAccount());
+  const syncAdminBtn = () => {
+    const isAdmin = isAdminAccount();
+    adminBtn.classList.toggle('hidden', !isAdmin);
+    sheetAdmin.classList.toggle('hidden', !isAdmin);
+  };
   syncAdminBtn();
   const unsubscribeAdmin = store.subscribe('user', syncAdminBtn);
 

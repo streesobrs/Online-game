@@ -332,6 +332,15 @@ a.nav-btn.nav-btn--admin.hidden {
     display: none;
 }
 
+/* ---- 窄屏导航：底部标签栏的「更多」入口与面板、短标签 ----
+ * 导航是同一个 #nav-root 元素，窄屏由 responsive.css 改成底部栏，
+ * 这几类只属于窄屏形态，桌面一律隐藏。 */
+.nav-more-btn,
+.nav-sheet,
+.nav-btn__name-short {
+    display: none;
+}
+
 /* ---- 顶部悬浮账号条（脱离文档流，可拖动） ---- */
 #account-root {
     position: fixed;

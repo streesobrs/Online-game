@@ -426,7 +426,8 @@ export function renderGames(container) {
     // 纯单机游戏在面板里预选的子玩法（消消乐 / 3D 驾驶）
     soloModes: { match3: 'level', train3d: 'manual' },
     isMatching: false,
-    ddzQueued: null, // 斗地主排队信息 { position, aiInMs }
+    ddzQueued: null, // 斗地主排队信息 { position, queueSize, aiInMs }
+    ddzEarlyPending: false, // 已点击「提前开始」，等待服务端开 AI 局
     reconnectGame: store.get('reconnectGame') || null, // 战局内刷新后的对局快照
   };
 
@@ -1014,21 +1015,41 @@ export function renderGames(container) {
     state.selectedGame = 'doudizhu';
     state.isMatching = true;
     state.ddzQueued = null;
+    state.ddzEarlyPending = false;
     renderMain();
     emit('ddz_match_request');
+  }
+
+  /** 斗地主：队列里只有自己时提前开始，服务端立即用 2 个 AI 补位开局 */
+  function startDDZEarly() {
+    if (!state.isMatching || state.selectedGame !== 'doudizhu') return;
+    if (state.ddzEarlyPending) return;
+    if (!store.get('socketConnected')) { toast.error('未连接服务器'); return; }
+    state.ddzEarlyPending = true;
+    renderMain();
+    toast.info('正在为你分配 AI 对手，即将进入对局…');
+    if (!emit('ddz_start_early')) {
+      state.ddzEarlyPending = false;
+      toast.error('未连接服务器');
+      renderMain();
+    }
   }
 
   // ---- 匹配中 UI ----
   function renderMatchingUI() {
     const g = ALL_GAME_MAP[state.selectedGame] || GAME_MAP[state.selectedGame] || {};
     const isDDZ = state.selectedGame === 'doudizhu';
+    const queueSize = state.ddzQueued ? (state.ddzQueued.queueSize || 1) : 0;
     const cancelBtn = el('button', { class: 'btn btn-secondary', style: 'min-width:220px;' }, '❌ 取消匹配');
     cancelBtn.addEventListener('click', () => {
       state.isMatching = false;
+      state.ddzQueued = null;
+      state.ddzEarlyPending = false;
       renderMain();
       emit(isDDZ ? 'ddz_cancel_match' : 'cancel_match');
     });
-    return el('div', { class: 'games-detail games-detail--center games-matching' }, [
+
+    const children = [
       el('div', { class: 'games-matching-spinner' }, '🔍'),
       el('h2', { class: 'games-detail-name' }, `正在寻找 ${g.icon || ''} ${g.name || ''} 对手…`),
       el('div', { class: 'games-matching-dots' },
@@ -1036,10 +1057,30 @@ export function renderGames(container) {
           ? '3 人牌桌，满员立即开局；等待 6 秒后由 AI 补位'
           : '匹配成功后自动进入对局，请稍候'),
       isDDZ && state.ddzQueued
-        ? el('div', { class: 'games-matching-dots' }, `队列第 ${state.ddzQueued.position || 1} 位`)
+        ? el('div', { class: 'games-matching-dots' },
+          `当前队列 ${queueSize} 人 · 你在第 ${state.ddzQueued.position || 1} 位`)
         : null,
-      cancelBtn,
-    ]);
+    ];
+
+    // 提前开始：仅在「队列里只有自己」时出现，人数 ≥2 时隐藏，避免影响正常匹配
+    if (isDDZ && queueSize === 1) {
+      const earlyBtn = el('button', {
+        class: 'btn btn-primary games-matching-early',
+        type: 'button',
+        disabled: state.ddzEarlyPending ? 'true' : null,
+      }, state.ddzEarlyPending ? '🤖 正在分配 AI 对手…' : '⚡ 提前开始（AI 对手）');
+      earlyBtn.addEventListener('click', () => startDDZEarly());
+      children.push(el('div', { class: 'games-matching-early-box' }, [
+        earlyBtn,
+        el('p', { class: 'games-matching-early-hint' },
+          state.ddzEarlyPending
+            ? '正在为你准备 AI 牌局，即将进入对局'
+            : '当前仅你 1 人等待，可立即与 2 名 AI 开局'),
+      ]));
+    }
+
+    children.push(cancelBtn);
+    return el('div', { class: 'games-detail games-detail--center games-matching' }, children);
   }
 
   // ---- 战局重连恢复 UI（战局内刷新后：继续对局 / 放弃对局）----
@@ -1242,6 +1283,11 @@ export function renderGames(container) {
   // 连接状态可见提示：socket 断开时明确告知，避免操作被静默丢弃
   let disconnectNoticeShown = false;
   const offSocketDisconnect = eventBus.on('socket:disconnect', () => {
+    // 断线时退出「提前开始」等待态，避免按钮一直卡在分配中
+    if (state.ddzEarlyPending) {
+      state.ddzEarlyPending = false;
+      if (state.isMatching) renderMain();
+    }
     if (disconnectNoticeShown) return; // 断开期间只提示一次，避免刷屏
     disconnectNoticeShown = true;
     toast.warn('连接已断开，正在自动重连…');
@@ -1261,6 +1307,7 @@ export function renderGames(container) {
     if (state.selectedGame !== 'doudizhu') return;
     state.isMatching = false;
     state.ddzQueued = null;
+    state.ddzEarlyPending = false;
     toast.success('匹配成功，进入牌桌');
     go('doudizhu');
   };
@@ -1268,12 +1315,21 @@ export function renderGames(container) {
     if (!state.isMatching || state.selectedGame !== 'doudizhu') return;
     state.isMatching = false;
     state.ddzQueued = null;
+    state.ddzEarlyPending = false;
     renderMain();
   };
   const onDdzError = (payload) => {
     if (!state.isMatching || state.selectedGame !== 'doudizhu') return;
+    // 非致命（如队列里已有其他玩家，无法提前开始）：留在匹配界面继续等待
+    if (payload && payload.fatal === false) {
+      state.ddzEarlyPending = false;
+      toast.warn(payload.message || '暂时无法提前开始');
+      renderMain();
+      return;
+    }
     state.isMatching = false;
     state.ddzQueued = null;
+    state.ddzEarlyPending = false;
     toast.error(payload?.message || '斗地主匹配失败');
     renderMain();
   };

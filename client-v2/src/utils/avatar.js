@@ -15,27 +15,56 @@ export function avatarInfo(cosmetics, cosmeticConfig) {
   return { type: 'emoji', text: '👤' };
 }
 
-/** 头像框颜色 */
+/** 头像框颜色（纯色框取色值；渐变框返回渐变本身） */
 export function frameColor(cosmetics, cosmeticConfig) {
   const frameId = cosmetics?.equipped?.frame;
   return cosmeticConfig?.frames?.[frameId]?.color || '#e2e8f0';
 }
 
+/**
+ * 头像框背景
+ * 纯色框用 conic-gradient 做成环状（外圈有色、内圈收白）；
+ * 渐变框（配置里是 linear-gradient(...)）不能塞进 conic-gradient，
+ * 否则整条 background 声明失效 → 头像框完全不显示，这里直接铺渐变。
+ */
+export function frameBackground(cosmetics, cosmeticConfig) {
+  const color = frameColor(cosmetics, cosmeticConfig);
+  if (/gradient\(/i.test(color)) return color;
+  return `conic-gradient(from 0deg, ${color}, #fff, ${color})`;
+}
+
+/**
+ * 头像框环宽：跟随头像尺寸缩放
+ * 固定的 3px 在大头像上只占 3%，会被头像图片淹没；按 10% 取，最大 12px
+ */
+export function frameRingSize(size) {
+  return Math.min(12, Math.max(2, Math.round(size * 0.1)));
+}
+
 /** 渲染带头像框的头像节点（需已获取 cosmetics 数据） */
 export function avatarEl(cosmetics, cosmeticConfig, size = 36) {
   const av = avatarInfo(cosmetics, cosmeticConfig);
-  const inner = av.type === 'img'
+  // 用 border-box + 内边距做环：外径固定为 size，图片缩进，框就不会被图片盖住
+  const ring = frameRingSize(size);
+  const inner = size - ring * 2;
+  // 内圈必须是不透明的圆底：透明 PNG / emoji 会把渐变透出来，
+  // 整块看起来就成了「渐变背景图」而不是头像框
+  const plate = 'border-radius:50%;overflow:hidden;background:var(--surface, #fff);';
+  const innerEl = av.type === 'img'
     ? el('img', {
         class: 'v2-avatar-img',
         src: av.src,
         alt: '',
-        style: `width:${size - 6}px;height:${size - 6}px;`,
+        style: `width:${inner}px;height:${inner}px;${plate}`,
       })
-    : el('span', { class: 'v2-avatar-emoji', style: `font-size:${Math.round(size * 0.5)}px;` }, av.text);
+    : el('span', {
+        class: 'v2-avatar-emoji',
+        style: `width:${inner}px;height:${inner}px;${plate}display:inline-flex;align-items:center;justify-content:center;font-size:${Math.round(inner * 0.55)}px;`,
+      }, av.text);
   return el('span', {
     class: 'v2-avatar',
-    style: `width:${size}px;height:${size}px;background:conic-gradient(from 0deg, ${frameColor(cosmetics, cosmeticConfig)}, #fff, ${frameColor(cosmetics, cosmeticConfig)});`,
-  }, inner);
+    style: `width:${size}px;height:${size}px;box-sizing:border-box;padding:${ring}px;background:${frameBackground(cosmetics, cosmeticConfig)};`,
+  }, innerEl);
 }
 
 // 模块级缓存：userId -> { cosmetics, cosmeticConfig }（会话内不变）

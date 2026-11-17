@@ -287,6 +287,7 @@ class DouDiZhuManager {
   /** 在 socket 连接时挂载斗地主事件 */
   attachSocket(socket) {
     socket.on('ddz_match_request', () => this.handleMatchRequest(socket));
+    socket.on('ddz_start_early', () => this.handleStartEarly(socket));
     socket.on('ddz_cancel_match', () => this.handleCancelMatch(socket));
     socket.on('ddz_state_request', () => this.handleStateRequest(socket));
     socket.on('ddz_bid', (data) => this.handleBid(socket, data));
@@ -327,6 +328,15 @@ class DouDiZhuManager {
     return roomId ? this.rooms.get(roomId) : null;
   }
 
+  /** 仍有进行中的房间：直接把玩家送回牌桌（重新匹配 / 提前开始时的兜底） */
+  rejoinRoom(socket, room, accountId) {
+    const seat = room.seats.findIndex((s) => s.accountId === accountId);
+    if (seat < 0) return false;
+    this.send(socket, 'ddz_match_success', { roomId: room.id, seat });
+    this.sendSocketState(socket, room, seat);
+    return true;
+  }
+
   // ==================== 匹配 ====================
 
   handleMatchRequest(socket) {
@@ -339,10 +349,7 @@ class DouDiZhuManager {
     const existing = this.getRoomByAccount(user.accountId);
     if (existing) {
       // 已结算的房间不再恢复，直接清掉重新匹配
-      if (existing.phase !== 'ended') {
-        this.sendState(existing);
-        return;
-      }
+      if (existing.phase !== 'ended' && this.rejoinRoom(socket, existing, user.accountId)) return;
       this.removeRoom(existing);
     }
 
@@ -364,10 +371,47 @@ class DouDiZhuManager {
     this.tryStartRoom();
   }
 
+  /**
+   * 提前开始：队列中只有自己时，立即创建「1 真人 + 2 AI」房间开局。
+   * 正常流程要等 6 秒由 AI 补位，这里只是给玩家一个可选的加速入口。
+   */
+  handleStartEarly(socket) {
+    const user = this.resolveAccount(socket);
+    if (!user) {
+      this.fail(socket, '请先登录');
+      return;
+    }
+
+    const existing = this.getRoomByAccount(user.accountId);
+    if (existing) {
+      if (existing.phase !== 'ended' && this.rejoinRoom(socket, existing, user.accountId)) return;
+      this.removeRoom(existing);
+    }
+
+    const index = this.queue.findIndex((q) => q.accountId === user.accountId);
+    if (index < 0) {
+      this.fail(socket, '你不在匹配队列中，请重新匹配');
+      return;
+    }
+    if (this.queue.length > 1) {
+      // 还有其他真人在等待：不越过正常匹配直接开 AI 局，仅提示并刷新队列
+      this.send(socket, 'ddz_error', { message: '还有其他玩家在匹配，请稍候', fatal: false });
+      this.send(socket, 'ddz_queued', this.queueInfo(user.accountId));
+      return;
+    }
+
+    const [me] = this.queue.splice(index, 1);
+    const room = this.createRoom([me]);
+    this.broadcastQueue();
+    this.startRoom(room);
+    this.logger.info?.('斗地主提前开始（AI 补位）', { accountId: user.accountId, roomId: room.id });
+  }
+
   queueInfo(accountId) {
     const index = this.queue.findIndex((q) => q.accountId === accountId);
     return {
       position: index >= 0 ? index + 1 : 0,
+      queueSize: this.queue.length,
       aiInMs: Math.max(0, AI_FILL_DELAY - (Date.now() - (this.queue[index]?.joinedAt || Date.now()))),
     };
   }

@@ -15,6 +15,7 @@ import { go } from '../../core/router.js';
 import { eventBus } from '../../core/eventBus.js';
 import { startGameActivity, stopGameActivity } from '../../core/activity.js';
 import { setShortcutsSuppressed } from '../../utils/shortcut.js';
+import { createFullscreen } from '../../utils/fullscreen.js';
 import { loadBest, saveBest, formatTime, rand } from './helpers.js';
 import { createRenderer } from './renderer.js';
 import { loadCatalog, createCatalog } from './catalog.js';
@@ -180,20 +181,37 @@ export function renderSurvivors(container = viewRoot()) {
   const debugEl = el('pre', { class: `sv-debug${state.debug ? ' show' : ''}` }, '');
 
   const overlay = el('div', { class: 'sv-overlay' });
-  const stage = el('div', { class: 'sv-stage' }, [canvas, hud, debugEl, overlay]);
+  // arena 由 renderer 按 16:10 计算尺寸；HUD 贴着游戏区，overlay 铺满整个舞台
+  const arena = el('div', { class: 'sv-arena' }, [canvas, hud, debugEl]);
+  const stage = el('div', { class: 'sv-stage' }, [arena, overlay]);
 
   const backBtn = el('button', { class: 'sv-back-btn', type: 'button' }, '← 返回大厅');
   backBtn.addEventListener('click', () => go('games'));
+
+  const fsBtn = el('button', { class: 'sv-fs-btn', type: 'button' }, '⤢ 全屏');
 
   const wrap = el('section', { class: 'sv-view' }, [
     el('div', { class: 'sv-head' }, [
       backBtn,
       el('span', { class: 'sv-title' }, '⚔️ 刷怪肉鸽'),
       el('span', { class: 'sv-beta' }, '测试版 DEMO'),
+      fsBtn,
     ]),
     stage,
     el('p', { class: 'sv-foot' }, 'WASD / 方向键移动，或按住画面拖拽移动 · 武器自动攻击 · Esc 暂停'),
   ]);
+
+  // 全屏切换：布局尺寸变化后需要重新计算画布分辨率
+  // 移动端全屏后尝试锁定横屏（Android Chrome 生效；iOS 不支持时保留竖屏提示）
+  const fsCtrl = createFullscreen(wrap, (active) => {
+    fsBtn.textContent = active ? '⤢ 退出全屏' : '⤢ 全屏';
+    fsBtn.classList.toggle('is-active', active);
+    renderer.resizeCanvas();
+    requestAnimationFrame(() => renderer.resizeCanvas());
+    // 原生全屏动画 / 屏幕旋转结束后再补一次，避免画布分辨率取到过渡中的尺寸
+    setTimeout(() => renderer.resizeCanvas(), 260);
+  }, { orientation: 'landscape' });
+  fsBtn.addEventListener('click', () => fsCtrl.toggle());
 
   container.replaceChildren(wrap);
   renderer.resizeCanvas();
@@ -1254,6 +1272,13 @@ export function renderSurvivors(container = viewRoot()) {
 
   // 拖拽移动（鼠标 / 触摸通用）
   let dragStart = null;
+
+  // 竖屏全屏时容器被 CSS 旋转 90°，需要把屏幕拖拽方向换算成游戏内方向
+  function isForcedLandscape() {
+    return wrap.classList.contains('fs-active')
+      && window.matchMedia('(orientation: portrait) and (max-width: 820px)').matches;
+  }
+
   function onPointerDown(e) {
     if (state.mode !== 'playing' || state.paused) return;
     dragStart = { x: e.clientX, y: e.clientY };
@@ -1268,7 +1293,11 @@ export function renderSurvivors(container = viewRoot()) {
       state.drag = { x: 0, y: 0 };
       return;
     }
-    state.drag = { x: dx / dist, y: dy / dist };
+    // 旋转 90°：屏幕向右 = 游戏向下，屏幕向下 = 游戏向左
+    const forced = isForcedLandscape();
+    const vx = forced ? dy : dx;
+    const vy = forced ? -dx : dy;
+    state.drag = { x: vx / dist, y: vy / dist };
   }
   function onPointerUp() {
     dragStart = null;
@@ -1333,6 +1362,7 @@ export function renderSurvivors(container = viewRoot()) {
     // 离开视图时保留战局，回来可继续
     if (state.mode === 'playing') saveRun(state);
     offRoute();
+    fsCtrl.destroy();
     cancelAnimationFrame(state.raf);
     document.removeEventListener('keydown', onKeydown);
     document.removeEventListener('keyup', onKeyup);

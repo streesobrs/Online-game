@@ -45,6 +45,33 @@
   padding: 3px 10px;
 }
 
+/* 全屏切换按钮：靠右贴齐标题行 */
+.ddz-fs-btn {
+  margin-left: auto;
+  padding: 6px 12px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  background: var(--surface, #ffffff);
+  color: var(--text, #2d3748);
+  font-size: 13px;
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.ddz-fs-btn:hover {
+  border-color: #2fae6d;
+  background: rgba(47, 174, 109, 0.1);
+}
+
+.ddz-fs-btn.is-active {
+  border-color: #2fae6d;
+  background: rgba(47, 174, 109, 0.16);
+  color: #1f8a54;
+  font-weight: 600;
+}
+
 .ddz-stage {
   position: relative;
   flex: 1;
@@ -605,5 +632,211 @@ body[data-theme="cyberpunk"] .ddz-table {
   .ddz-hint {
     font-size: 13px;
     padding: 6px 14px;
+  }
+}
+
+/* ---------- 全屏模式（原生 Fullscreen 或 CSS 模拟） ---------- */
+.ddz-view.fs-active {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  margin: 0;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 6px)
+    calc(env(safe-area-inset-right, 0px) + 10px)
+    calc(env(safe-area-inset-bottom, 0px) + 6px)
+    calc(env(safe-area-inset-left, 0px) + 10px);
+  background: var(--theme-bg, #f7fafc);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+.ddz-view.fs-active .ddz-stage {
+  flex: 1;
+  min-height: 0;
+}
+
+.ddz-view.fs-active .ddz-table {
+  min-height: 0;
+}
+
+.ddz-view.fs-active .ddz-idle {
+  min-height: 0;
+  padding: 20px 16px;
+}
+
+/* 全屏竖屏手机：按钮加大到易点按尺寸 */
+@media (orientation: portrait) and (max-width: 820px) {
+  .ddz-view.fs-active .ddz-actions .ddz-btn {
+    min-height: 44px;
+    padding: 10px 22px;
+  }
+
+  .ddz-view.fs-active .ddz-card-row .ddz-card {
+    width: 40px;
+    height: 56px;
+  }
+}
+
+/* ---------- 横屏紧凑布局（全屏锁定横屏 / 手机横放） ---------- */
+@media (orientation: landscape) and (max-height: 560px) {
+  .ddz-view,
+  .ddz-view.fs-active {
+    padding: 6px 10px;
+    gap: 6px;
+    min-height: 0;
+  }
+
+  .ddz-topbar {
+    gap: 8px;
+  }
+
+  .ddz-title {
+    font-size: 16px;
+  }
+
+  .ddz-back,
+  .ddz-tag,
+  .ddz-fs-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
+  .ddz-stage {
+    min-height: 0;
+  }
+
+  .ddz-table {
+    grid-template-columns: minmax(88px, 0.72fr) minmax(0, 1.7fr) minmax(88px, 0.72fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "left center right"
+      "self self self";
+    gap: 6px 10px;
+    padding: 8px 10px 6px;
+    min-height: 0;
+  }
+
+  .ddz-side {
+    justify-self: stretch;
+    max-width: none;
+    padding-top: 0;
+  }
+
+  .ddz-seat {
+    padding: 6px;
+    gap: 4px;
+  }
+
+  .ddz-seat-stack {
+    display: none;
+  }
+
+  .ddz-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 17px;
+  }
+
+  .ddz-seat-name {
+    font-size: 12px;
+  }
+
+  .ddz-seat-count {
+    font-size: 11px;
+  }
+
+  .ddz-play-zone {
+    min-height: 46px;
+    gap: 2px;
+  }
+
+  .ddz-play-label {
+    font-size: 11px;
+  }
+
+  .ddz-card {
+    width: 34px;
+    height: 48px;
+  }
+
+  .ddz-card-rank {
+    font-size: 13px;
+  }
+
+  .ddz-card-suit {
+    font-size: 11px;
+  }
+
+  .ddz-card-row .ddz-card {
+    margin-left: -16px;
+  }
+
+  .ddz-bottom-row {
+    padding: 3px 8px;
+  }
+
+  .ddz-bottom-label {
+    font-size: 10px;
+  }
+
+  .ddz-hint {
+    font-size: 12px;
+    padding: 4px 12px;
+  }
+
+  .ddz-bid-info {
+    font-size: 11px;
+  }
+
+  .ddz-self {
+    padding: 0;
+  }
+
+  .ddz-self-head {
+    padding: 0 2px;
+  }
+
+  .ddz-hand {
+    padding: 18px 0 4px;
+  }
+
+  .ddz-hand .ddz-card {
+    width: 42px;
+    height: 56px;
+    margin-left: -18px;
+  }
+
+  .ddz-hand .ddz-card-rank {
+    font-size: 15px;
+  }
+
+  .ddz-hand .ddz-card-suit {
+    font-size: 12px;
+  }
+
+  .ddz-actions .ddz-btn {
+    min-height: 32px;
+    padding: 6px 14px;
+    font-size: 13px;
+  }
+
+  .ddz-idle {
+    min-height: 0;
+    padding: 12px 16px;
+  }
+
+  .ddz-idle-icon {
+    font-size: 34px;
+  }
+
+  .ddz-idle h2 {
+    font-size: 18px;
   }
 }

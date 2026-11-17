@@ -14,6 +14,7 @@ export const NAV_ITEMS = [
     icon: '🎮',
     shortcut: 'G',
     order: 1,
+    mobileTab: true, // 手机底部标签栏入口
   },
 
   // ===== 功能 =====
@@ -72,6 +73,7 @@ export const NAV_ITEMS = [
     shortcut: 'H',
     category: '社交',
     order: 8,
+    mobileTab: true,
   },
   {
     id: 'chat',
@@ -81,6 +83,7 @@ export const NAV_ITEMS = [
     shortcut: 'C',
     category: '社交',
     order: 9,
+    mobileTab: true,
   },
   {
     id: 'achievements',
@@ -163,6 +166,7 @@ export const NAV_ITEMS = [
     shortcut: 'S',
     category: '辅助',
     order: 14,
+    mobileTab: true,
   },
   {
     id: 'profile',
@@ -172,6 +176,8 @@ export const NAV_ITEMS = [
     shortcut: 'P',
     category: '辅助',
     order: 15,
+    mobileTab: true,
+    mobileName: '我的', // 底部标签栏用短标签
   },
   {
     id: 'settings',

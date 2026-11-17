@@ -8,6 +8,7 @@ import { handleNavClick, isActive, go } from '../core/router.js';
 import { registerScopeHandler } from '../core/shortcuts.js';
 import { store } from '../core/store.js';
 import { getUiPrefs } from '../core/prefs.js';
+import { isAdminAccount as sharedIsAdmin } from './shared.js';
 import { el } from '../utils/dom.js';
 import { api } from '../core/api.js';
 import * as auth from '../core/auth.js';
@@ -52,12 +53,8 @@ export function renderNavDrawer(container) {
     return user?.account?.account?.id || localStorage.getItem('currentAccountId') || null;
   }
 
-  /** 当前登录账号是否为管理员（与顶部导航取法保持一致） */
-  function isAdminAccount() {
-    const user = store.get('user');
-    const inner = user?.account?.account || user?.account || null;
-    return !!inner?.isAdmin;
-  }
+  /** 当前登录账号是否为管理员（与顶部导航、底部标签栏共用同一判断） */
+  const isAdminAccount = sharedIsAdmin;
 
   // ---- 把手 ----
   function renderHandle() {

@@ -24,6 +24,7 @@ import { requestReplay, showReplay } from '../replay/index.js';
 import { resetOnboarding, resetAllTours, startOnboarding, startMailTour, startAssetsTour } from '../../components/onboarding.js';
 import { buildPrivacyRows, mergePrivacy } from '../../components/privacyPanel.js';
 import { titleBadge, applyGlobalAppearance } from '../../utils/cosmetics.js';
+import { frameBackground, frameRingSize } from '../../utils/avatar.js';
 import { isTestMode } from '../../utils/features.js';
 import { go } from '../../core/router.js';
 
@@ -1715,20 +1716,17 @@ export function renderProfile(container) {
     return { type: 'emoji', text: '👤' };
   }
 
-  function frameColor() {
-    const frameId = cosmetics?.equipped?.frame;
-    return cosmeticConfig?.frames?.[frameId]?.color || '#e2e8f0';
-  }
-
   function avatarPreview(size) {
     const av = avatarInfo();
-    const inner = av.type === 'img'
-      ? el('img', { class: 'profile-avatar-img', src: av.src, style: `width:${size - 8}px;height:${size - 8}px;` })
-      : el('div', { class: 'profile-avatar-emoji', style: `font-size:${Math.round(size * 0.5)}px;` }, av.text);
+    const ring = frameRingSize(size);
+    const inner = size - ring * 2;
+    const innerEl = av.type === 'img'
+      ? el('img', { class: 'profile-avatar-img', src: av.src, style: `width:${inner}px;height:${inner}px;` })
+      : el('div', { class: 'profile-avatar-emoji', style: `font-size:${Math.round(inner * 0.55)}px;` }, av.text);
     return el('div', {
       class: 'profile-avatar-wrap',
-      style: `width:${size}px;height:${size}px;background:conic-gradient(from 0deg, ${frameColor()}, #fff, ${frameColor()});`,
-    }, inner);
+      style: `width:${size}px;height:${size}px;box-sizing:border-box;padding:${ring}px;background:${frameBackground(cosmetics, cosmeticConfig)};`,
+    }, innerEl);
   }
 
   // ---- 组装视图 ----

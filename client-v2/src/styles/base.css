@@ -45,6 +45,11 @@ body {
     transition: background 0.3s ease;
 }
 
+/* 游戏沉浸式全屏：锁定背景页面滚动，避免全屏层下方跟着滑动 */
+body.fs-locked {
+    overflow: hidden;
+}
+
 /* 安全区辅助类：可在需要时显式使用 */
 .pt-safe {
     padding-top: env(safe-area-inset-top, 0px);

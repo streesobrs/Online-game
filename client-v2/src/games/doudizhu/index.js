@@ -15,6 +15,7 @@ import { toast } from '../../components/toast.js';
 import { go } from '../../core/router.js';
 import { eventBus } from '../../core/eventBus.js';
 import { startGameActivity, stopGameActivity } from '../../core/activity.js';
+import { createFullscreen } from '../../utils/fullscreen.js';
 
 let activeCleanup = null;
 
@@ -57,7 +58,14 @@ export function renderDouDiZhu(container = viewRoot()) {
   const backBtn = el('button', { class: 'ddz-back', type: 'button' }, '← 返回大厅');
   const title = el('div', { class: 'ddz-title' }, '🃏 斗地主');
   const tag = el('span', { class: 'ddz-tag' }, '3 人 · 支持 AI 补位');
-  topbar.append(backBtn, title, tag);
+  const fsBtn = el('button', { class: 'ddz-fs-btn', type: 'button' }, '⤢ 全屏');
+  // 斗地主保持竖屏牌桌（手牌纵向更顺手），全屏只做沉浸式铺满，不锁定方向
+  const fsCtrl = createFullscreen(wrap, (active) => {
+    fsBtn.textContent = active ? '⤢ 退出全屏' : '⤢ 全屏';
+    fsBtn.classList.toggle('is-active', active);
+  });
+  fsBtn.addEventListener('click', () => fsCtrl.toggle());
+  topbar.append(backBtn, title, tag, fsBtn);
 
   const stage = el('div', { class: 'ddz-stage' });
   wrap.append(topbar, stage);
@@ -351,6 +359,7 @@ export function renderDouDiZhu(container = viewRoot()) {
     offRoute();
     offReconnect();
     offConnect();
+    fsCtrl.destroy();
     if (stage.isConnected && wrap.isConnected && container.contains(wrap)) {
       // 仍在牌桌/匹配中就直接退出页面：通知服务端离开，由 AI 托管
       // 仍在牌桌上就退出页面：通知服务端离开，由 AI 托管

@@ -51,56 +51,158 @@
     min-height: 40px;
   }
 
-  /* ---- 页面留白收紧 ---- */
+  /* ---- 页面留白收紧（底部给固定标签栏留出高度） ---- */
   body {
     padding: 10px;
     padding-top: calc(env(safe-area-inset-top, 0px) + 10px);
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 68px);
   }
 
   #view-root {
     padding: 0 6px;
   }
 
-  /* ---- 顶部导航：改为横向滚动（空间不足时不换行撑高页面） ---- */
-  .nav-layout {
-    padding: 8px 6px;
-    gap: 0;
-    margin-bottom: 8px;
+  /* ---- 导航栏：窄屏把同一个 #nav-root 变成底部标签栏 ----
+   * 桌面和窄屏共用一个元素，不可能出现上下两套；
+   * 没进标签栏的入口由 .nav-more-btn 打开 .nav-sheet 承载。 */
+  #nav-root {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* 低于游戏全屏层(1200)，避免盖住全屏游戏；高于普通页面内容 */
+    z-index: 1150;
+    display: flex;
     flex-wrap: nowrap;
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    /* Firefox */
+    gap: 2px;
+    width: 100%;
+    margin: 0;
+    padding: 4px 2px calc(4px + env(safe-area-inset-bottom, 0px));
+    background: var(--theme-nav-bg, #ffffff);
+    border-top: 1px solid var(--theme-border-color, #e2e8f0);
+    border-radius: 0;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
   }
 
-  .nav-layout::-webkit-scrollbar {
-    display: none;
-    /* Chrome/Safari */
-  }
-
-  .nav-group,
-  .nav-divider {
-    flex-shrink: 0;
+  /* 底部不再按分组排版，按钮直接均分整行 */
+  .nav-group {
+    display: contents;
   }
 
   .nav-divider {
     display: none;
-    /* 小屏隐藏分隔符，节省宽度 */
   }
 
   .nav-btn {
-    padding: 6px 12px;
-    font-size: 13px;
-    gap: 4px;
-    flex-shrink: 0;
-    white-space: nowrap;
-    min-height: 38px;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px 2px;
+    font-size: 10px;
+    line-height: 1.2;
+    border-radius: 10px;
+    background: transparent;
   }
 
-  .nav-btn__shortcut {
+  /* 没进标签栏的入口收进「更多」；桌面形态的后台/旧版入口不占位 */
+  .nav-btn--more,
+  .nav-btn--admin,
+  .nav-btn--legacy {
     display: none;
+  }
+
+  .nav-more-btn {
+    display: inline-flex;
+  }
+
+  .nav-btn.active {
+    background: rgba(0, 123, 255, 0.08);
+    color: var(--theme-nav-btn-active-bg, #007bff);
+  }
+
+  .nav-btn__icon {
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  .nav-btn__shortcut,
+  .nav-btn__name {
+    display: none;
+  }
+
+  .nav-btn__name-short {
+    display: inline;
+  }
+
+  /* 红点跟着图标居中，不再贴着按钮右边缘 */
+  .nav-btn__badge {
+    top: 1px;
+    right: auto;
+    left: 50%;
+    margin-left: 4px;
+  }
+
+  /* ---- 「更多」底部面板 ---- */
+  .nav-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+  }
+
+  .nav-sheet.open {
+    display: block;
+  }
+
+  .nav-sheet__scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 14, 26, 0.42);
+  }
+
+  .nav-sheet__panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    padding: 16px 14px calc(16px + env(safe-area-inset-bottom, 0px));
+    background: var(--theme-panel-bg, #ffffff);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.18);
+  }
+
+  .nav-sheet__item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 4px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--theme-nav-btn-bg, #f8f9fa);
+    color: var(--theme-nav-btn-color, #495057);
+    font-family: inherit;
+    font-size: 11px;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .nav-sheet__item.hidden {
+    display: none;
+  }
+
+  .nav-sheet__item.active {
+    background: rgba(0, 123, 255, 0.12);
+    color: var(--theme-nav-btn-active-bg, #007bff);
+  }
+
+  .nav-sheet__icon {
+    font-size: 20px;
+    line-height: 1;
   }
 
   /* ---- 账号条：移动端简化，不显示 hover 展开 ---- */
@@ -213,7 +315,7 @@
   body {
     padding: 6px;
     padding-top: calc(env(safe-area-inset-top, 0px) + 6px);
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 62px);
   }
 
   /* ---- 导航栏：更小 padding ---- */
@@ -486,12 +588,8 @@
 
   /* ---- 4.4 Profile 内容层 ---- */
 
-  /* 资料卡头像 + 名字 */
-  .profile-aside-head .profile-avatar-img,
-  .profile-aside-head .profile-avatar-emoji {
-    width: 64px;
-    height: 64px;
-  }
+  /* 资料卡头像尺寸由 avatarPreview 按环宽算好并写成内联样式，
+   * 这里不能再覆盖 img 的宽高，否则图片会撑出/缩进头像环，把框盖住 */
 
   .profile-aside-name {
     font-size: 16px;

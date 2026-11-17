@@ -8,12 +8,21 @@ const ELEMENT_COLORS = { fire: '#ff6b3d', thunder: '#facc15', ice: '#7dd3fc', wa
 export function createRenderer({ canvas, ctx, state, W, H }) {
   let bgGradient = null;
 
-  // 画布按容器实际尺寸 × DPR 设置后备分辨率，再缩放坐标系，
-  // 这样页面放大后画面和图形仍然清晰（逻辑坐标始终是 960×600）
+  // 自适应布局：在舞台可用的宽高内按 16:10 取最大内接尺寸，写回 .sv-arena，
+  // 画布再铺满 arena。用 clientWidth/clientHeight 而非 getBoundingClientRect：
+  // 强制横屏时容器被 rotate(90deg)，rect 会返回旋转后的外接矩形（宽高互换）
   function resizeCanvas() {
-    const rect = canvas.getBoundingClientRect();
-    const cssW = rect.width || W;
-    const cssH = rect.height || cssW * (H / W);
+    const arena = canvas.parentElement;
+    const stage = arena ? arena.parentElement : null;
+    const availW = (stage && stage.clientWidth) || W;
+    const availH = (stage && stage.clientHeight) || H;
+    const scale = Math.min(availW / W, availH / H) || 1;
+    const cssW = Math.max(1, Math.floor(W * scale));
+    const cssH = Math.max(1, Math.floor(H * scale));
+    if (arena) {
+      arena.style.width = `${cssW}px`;
+      arena.style.height = `${cssH}px`;
+    }
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     // 上限 2560，避免 4K + 高 DPR 时像素量过大导致掉帧
     const bw = Math.max(1, Math.min(2560, Math.round(cssW * dpr)));

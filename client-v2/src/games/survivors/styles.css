@@ -3,17 +3,21 @@
  * 深色竞技场 + 悬浮 HUD + 覆盖层（开始 / 升级 / 结算 / 暂停）
  */
 .sv-view {
-  /* 按可用视口高度放大并铺满页面，同时保持 16:10，避免超宽屏只占中间一小块 */
-  width: min(100%, calc((100vh - 180px) * 1.6));
-  width: min(100%, calc((100dvh - 180px) * 1.6));
-  max-width: none;
+  /* 移动端优先：页面撑满导航下方可视区，舞台自适应剩余高度 */
+  width: 100%;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 8px 0 12px;
+  min-height: calc(100dvh - 100px);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
 }
 
 .sv-head {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 10px;
 }
@@ -50,8 +54,39 @@
   letter-spacing: 0.5px;
 }
 
+/* 全屏切换按钮：靠右贴齐标题行 */
+.sv-fs-btn {
+  margin-left: auto;
+  padding: 4px 10px;
+  border: 1px solid var(--theme-border-color, rgba(120, 150, 220, 0.35));
+  border-radius: 8px;
+  background: rgba(120, 150, 220, 0.12);
+  color: var(--theme-text, #2d3748);
+  font-size: 12px;
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.sv-fs-btn:hover {
+  border-color: #5eead4;
+  background: rgba(45, 212, 191, 0.14);
+}
+
+.sv-fs-btn.is-active {
+  border-color: #5eead4;
+  background: rgba(45, 212, 191, 0.18);
+  color: #14b8a6;
+}
+
 .sv-stage {
   position: relative;
+  flex: 1;
+  min-height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 3px solid #2d2d44;
   border-radius: 14px;
   background: #0d101d;
@@ -61,11 +96,18 @@
   user-select: none;
 }
 
+/* 游戏区：由 renderer 按 16:10 计算最大内接尺寸，HUD 贴着它定位 */
+.sv-arena {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 960 / 600;
+  overflow: hidden;
+}
+
 .sv-canvas {
   display: block;
   width: 100%;
-  height: auto;
-  aspect-ratio: 960 / 600;
+  height: 100%;
   cursor: crosshair;
 }
 
@@ -599,5 +641,77 @@
 
   .sv-bar-text {
     font-size: 9px;
+  }
+
+  .sv-fs-btn {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+}
+
+/* ---- 全屏模式（原生 Fullscreen 或被 CSS 模拟） ---- */
+.sv-view.fs-active {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: none;
+  min-height: 0;
+  margin: 0;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 2px)
+    calc(env(safe-area-inset-right, 0px) + 8px)
+    calc(env(safe-area-inset-bottom, 0px) + 2px)
+    calc(env(safe-area-inset-left, 0px) + 8px);
+  background: #0b0e18;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.sv-view.fs-active .sv-head {
+  margin-bottom: 6px;
+}
+
+.sv-view.fs-active .sv-back-btn,
+.sv-view.fs-active .sv-title {
+  color: #cbd5e1;
+}
+
+/* 舞台铺满全屏剩余空间，竞技场在其中自动取最大 16:10 */
+.sv-view.fs-active .sv-stage {
+  width: 100%;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+  background: #0b0e18;
+  box-shadow: none;
+}
+
+.sv-view.fs-active .sv-foot {
+  display: none;
+}
+
+/* 竖屏全屏：模拟器 / iOS 无法真正旋转设备时，用 CSS 旋转模拟横屏，
+   布局尺寸按横屏计算，再整体转 90°，让游戏铺满屏幕 */
+@media (orientation: portrait) and (max-width: 820px) {
+  .sv-view.fs-active {
+    top: 50%;
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    width: 100vh;
+    width: 100dvh;
+    height: 100vw;
+    transform: translate(-50%, -50%) rotate(90deg);
+    transform-origin: center center;
+    overflow: hidden;
+  }
+
+  /* 旋转后 HUD 的宽度基准换成游戏区宽度，避免按竖屏 vw 算得太窄 */
+  .sv-view.fs-active .sv-hud-bars {
+    width: min(240px, 42%);
   }
 }

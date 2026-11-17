@@ -145,13 +145,18 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
+/* 卡片宽度不足时标题用省略号，而不是被挤成「竖排单字」 */
 .games-card-text strong {
   font-size: 14px;
   font-weight: 700;
   color: var(--text-primary, #1a202c);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .games-card-text small {
@@ -658,6 +663,53 @@
   color: var(--text-secondary, #a0aec0);
 }
 
+/* 提前开始（仅 1 人排队时出现）：主行动按钮，PC / 移动端同一套尺寸 */
+.games-matching-early-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.games-matching-early {
+  min-width: 260px;
+  min-height: 48px;
+  padding: 12px 26px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 999px;
+  box-shadow: 0 8px 20px rgba(66, 153, 225, 0.28);
+  transition: transform 0.16s, box-shadow 0.16s, background 0.16s;
+}
+
+.games-matching-early:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(66, 153, 225, 0.36);
+}
+
+.games-matching-early:disabled {
+  cursor: progress;
+  box-shadow: none;
+  opacity: 0.8;
+}
+
+.games-matching-early-hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary, #718096);
+}
+
+@media (max-width: 560px) {
+  .games-matching-early {
+    width: 100%;
+    min-width: 0;
+    max-width: 320px;
+    font-size: 16px;
+  }
+}
+
 /* ---- 对局区域 ---- */
 .games-page.is-playing {
   grid-template-columns: minmax(0, 1fr);
@@ -737,6 +789,35 @@
 
   .games-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* 窄屏卡片：标题列必须留够宽度。徽标移到标题下方太挤，
+     直接隐藏（玩法信息下面的小字里已有），否则中文标题会被挤成竖排 */
+  .games-card {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .games-card-icon {
+    width: 34px;
+    height: 34px;
+    font-size: 18px;
+    border-radius: 9px;
+  }
+
+  .games-card-text {
+    flex: 1 1 auto;
+  }
+
+  .games-card-text strong {
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .games-card-badge {
+    display: none;
   }
 
   .games-pick-hint {
