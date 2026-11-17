@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const yauzl = require('yauzl');
-const { execFile, spawn } = require('child_process');
+const { execFile, spawn, fork } = require('child_process');
 const config = require('../config');
 const logger = require('../utils/logger');
 const VersionManager = require('./VersionManager');
@@ -35,8 +35,16 @@ const PHASES = {
 };
 
 class UpdateManager {
-  constructor(io = null) {
+  constructor(io = null, options = {}) {
     this.io = io;
+    // main：运行在主服务进程（只负责派发/转发进度、重启主服务）
+    // worker：运行在独立子进程（真正执行校验/解压/备份/应用，主服务保持可用）
+    this.mode = options.mode === 'worker' ? 'worker' : 'main';
+    this.parentPid = options.parentPid || process.ppid;
+    this.worker = null;
+    this._workerFinished = false;
+    this._workerRestartRequested = false;
+    this._onAppliedHook = null;
     this.storageRoot = getStorageRoot();
     this.versionManager = new VersionManager();
 
@@ -58,6 +66,10 @@ class UpdateManager {
     this.backupDir = null;
     this.filePlan = null;
     this.progressListeners = new Set();
+    this._lastStatusBroadcastAt = 0;
+    this._pendingStatusBroadcast = null;
+    this._backupListCache = null;
+    this._backupListCacheAt = 0;
 
     this._ensureDirs();
     this.status = this._loadStatus();
@@ -75,7 +87,11 @@ class UpdateManager {
   _cleanupStaleState() {
     if (this.status && this.status.status === 'in_progress') {
       const elapsed = Date.now() - (this.status.startTime || 0);
-      if (elapsed > config.update.staleStateTimeout) {
+      if (this.mode === 'main' && elapsed > 5000) {
+        // 主服务刚启动，不可能还有进行中的更新：说明上次进程在更新中途退出
+        logger.warn('检测到上次更新进程异常中断', { updateId: this.status.updateId });
+        this._failUpdate('检测到上次更新异常中断（更新进程已退出），服务器已正常运行');
+      } else if (elapsed > config.update.staleStateTimeout) {
         logger.warn('检测到停滞的更新状态，重置为失败', { updateId: this.status.updateId });
         this._failUpdate('检测到上次更新异常中断');
       }
@@ -83,7 +99,11 @@ class UpdateManager {
     try {
       if (fs.existsSync(this.paths.lockFile)) {
         const lockStat = fs.statSync(this.paths.lockFile);
-        if (Date.now() - lockStat.mtimeMs > config.update.staleLockTimeout) {
+        // 没有进行中的更新时，残留的锁说明上次进程异常退出，直接清理，避免阻塞重试
+        if (this.mode === 'main' && this.status.status !== 'in_progress') {
+          fs.unlinkSync(this.paths.lockFile);
+          logger.info('清理残留的更新锁');
+        } else if (Date.now() - lockStat.mtimeMs > config.update.staleLockTimeout) {
           fs.unlinkSync(this.paths.lockFile);
           logger.info('清理过期更新锁');
         }
@@ -145,6 +165,11 @@ class UpdateManager {
       logger.info(`[更新] ${message}`, details);
     }
 
+    if (this.mode === 'worker') {
+      this._sendToParent({ type: 'log', entry });
+      return;
+    }
+
     for (const listener of this.progressListeners) {
       try {
         listener({ type: 'log', entry });
@@ -177,12 +202,12 @@ class UpdateManager {
   }
 
   _completePhase(phase, message = '') {
-    if (this.status.phases[phase]) {
-      this.status.phases[phase].status = 'success';
-      this.status.phases[phase].progress = 100;
-      this.status.phases[phase].endTime = Date.now();
-      this.status.phases[phase].duration = this.status.phases[phase].endTime - this.status.phases[phase].startTime;
-    }
+    if (!this.status.phases) this.status.phases = {};
+    this.status.phases[phase] = this.status.phases[phase] || { status: 'in_progress', progress: 0, startTime: Date.now() };
+    this.status.phases[phase].status = 'success';
+    this.status.phases[phase].progress = 100;
+    this.status.phases[phase].endTime = Date.now();
+    this.status.phases[phase].duration = this.status.phases[phase].endTime - this.status.phases[phase].startTime;
     if (message) this._pushLog('info', message);
     this._emitSocket('update_phase', { phase, status: 'complete', message });
     this._emitSocket('update_progress', { phase, progress: 100, message: message || `${phase} 完成` });
@@ -199,7 +224,26 @@ class UpdateManager {
     this._pushLog('error', `阶段失败: ${error.message || error}`);
   }
 
-  _broadcastStatus() {
+  _broadcastStatus(force = false) {
+    if (this.mode === 'worker') {
+      // 主服务进程负责把状态分发给前端，这里只把最新状态同步过去
+      this._sendToParent({ type: 'status', status: this._statusSnapshot() });
+      return;
+    }
+
+    // 更新过程中进度回调非常密集，节流后再推送（状态里包含备份列表扫描，不能每次进度都算）
+    const now = Date.now();
+    if (!force && this._lastStatusBroadcastAt && now - this._lastStatusBroadcastAt < 300) {
+      if (!this._pendingStatusBroadcast) {
+        this._pendingStatusBroadcast = setTimeout(() => {
+          this._pendingStatusBroadcast = null;
+          this._broadcastStatus(true);
+        }, 300);
+      }
+      return;
+    }
+    this._lastStatusBroadcastAt = now;
+
     if (this.io) {
       try {
         this.io.of('/admin').to('admins').emit('update_status', this.getPublicStatus());
@@ -215,6 +259,10 @@ class UpdateManager {
   }
 
   _emitSocket(event, data = {}) {
+    if (this.mode === 'worker') {
+      this._sendToParent({ type: 'event', event, data });
+      return;
+    }
     if (this.io) {
       try {
         const adminNsp = this.io.of('/admin');
@@ -237,8 +285,59 @@ class UpdateManager {
       availableBackups: backups,
       history: history.slice(0, config.update.publicHistoryLimit),
       serverVersion: this.versionManager.getServerVersion(),
-      isPkg: typeof process.pkg !== 'undefined'
+      isPkg: typeof process.pkg !== 'undefined',
+      // 独立更新进程信息：前端可据此判断更新是否在单独的进程里执行
+      worker: {
+        mode: this.mode,
+        pid: this.mode === 'worker' ? process.pid : (this.worker ? this.worker.pid : null),
+        alive: this.mode === 'worker' ? true : !!this.worker
+      }
     };
+  }
+
+  /** 轻量状态快照（不含备份列表/历史，避免每次进度都扫盘） */
+  _statusSnapshot() {
+    return {
+      updateId: this.status.updateId,
+      status: this.status.status,
+      currentPhase: this.status.currentPhase,
+      phases: this.status.phases,
+      version: this.status.version,
+      startTime: this.status.startTime,
+      endTime: this.status.endTime,
+      progress: this.status.progress,
+      message: this.status.message,
+      error: this.status.error,
+      workPaths: {
+        extractDir: this.extractDir,
+        zipPath: this.currentZipPath
+      }
+    };
+  }
+
+  _mergeWorkerStatus(snapshot) {
+    if (!snapshot) return;
+    const logTail = this.status.logTail || [];
+    this.status = { ...this.status, ...snapshot, logTail };
+    if (snapshot.workPaths && snapshot.workPaths.extractDir) {
+      this.extractDir = snapshot.workPaths.extractDir;
+    }
+  }
+
+  _sendToParent(message) {
+    if (this.mode !== 'worker') return;
+    try {
+      if (process.send) process.send(message);
+    } catch (e) { /* 主进程已退出时忽略 */ }
+  }
+
+  _sendToWorker(message) {
+    if (!this.worker) return;
+    try {
+      this.worker.send(message);
+    } catch (e) {
+      this._pushLog('warn', `向更新进程发送指令失败: ${e.message}`);
+    }
   }
 
   onProgress(fn) {
@@ -448,7 +547,19 @@ class UpdateManager {
     return { zipPath, size: stats.size, hash: await this._sha256File(zipPath) };
   }
 
+  /**
+   * 启动更新：
+   * - 源码运行时派发到独立子进程执行，主服务继续对外服务，前端可持续收到进度；
+   * - EXE 打包运行（pkg）无法 fork 快照内脚本，回退到主进程内执行，行为与旧版一致。
+   */
   async startUpdate(zipPath = null, options = {}) {
+    if (typeof process.pkg !== 'undefined') {
+      return this._startUpdateInProcess(zipPath, options);
+    }
+    return this._startUpdateInWorker(zipPath, options);
+  }
+
+  async _startUpdateInProcess(zipPath = null, options = {}) {
     if (this.status.status === 'in_progress') {
       throw new Error('已有更新正在进行中');
     }
@@ -494,6 +605,236 @@ class UpdateManager {
       this.releaseLock();
       throw err;
     }
+  }
+
+  /**
+   * 派发更新任务到独立子进程。
+   * 主进程只负责：持有更新锁、转发子进程进度到前端、在子进程完成后调度重启。
+   * 子进程异常退出时主服务不会跟着退出，会标记失败并保留人工处理（重试/回滚）能力。
+   */
+  async _startUpdateInWorker(zipPath = null, options = {}) {
+    if (this.status.status === 'in_progress') {
+      throw new Error('已有更新正在进行中');
+    }
+    if (this.worker) {
+      throw new Error('已有更新进程在运行');
+    }
+
+    if (zipPath) this.currentZipPath = zipPath;
+    if (!this.currentZipPath || !fs.existsSync(this.currentZipPath)) {
+      throw new Error('未找到更新包文件');
+    }
+
+    await this.acquireLock();
+
+    this.status = this._idleStatus();
+    this.status.updateId = this._generateUpdateId();
+    this.status.status = 'in_progress';
+    this.status.startTime = Date.now();
+    this.status.version.from = this.versionManager.getServerVersion();
+    this.status.logTail = [];
+    this._saveStatus();
+
+    this._onAppliedHook = typeof options.onApplied === 'function' ? options.onApplied : null;
+    this._workerFinished = false;
+    this._workerRestartRequested = false;
+
+    this._pushLog('info', '启动独立更新进程', {
+      updateId: this.status.updateId,
+      pid: process.pid,
+      fromVersion: this.versionManager.getServerVersion()
+    });
+
+    let child;
+    try {
+      child = fork(path.join(__dirname, '..', 'workers', 'update-worker.js'), [], {
+        cwd: this.storageRoot,
+        env: { ...process.env, UPDATE_WORKER: '1' },
+        // stdout/stderr 交还给子进程写日志文件，IPC 只传进度
+        stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+        execArgv: [],
+        windowsHide: true
+      });
+    } catch (e) {
+      this.releaseLock();
+      this._failUpdate(`启动更新进程失败: ${e.message}`);
+      throw e;
+    }
+
+    this.worker = child;
+    child.on('message', (msg) => this._handleWorkerMessage(msg));
+    child.on('exit', (code, signal) => this._handleWorkerExit(code, signal));
+    child.on('error', (err) => {
+      this._pushLog('error', `更新进程通信失败: ${err.message}`);
+    });
+
+    this._sendToWorker({
+      type: 'start',
+      payload: {
+        zipPath: this.currentZipPath,
+        updateId: this.status.updateId,
+        startTime: this.status.startTime,
+        fromVersion: this.status.version.from
+      }
+    });
+
+    this._emitSocket('update_started', { updateId: this.status.updateId });
+    this._broadcastStatus();
+  }
+
+  _handleWorkerMessage(msg) {
+    if (!msg || typeof msg !== 'object') return;
+
+    switch (msg.type) {
+      case 'status':
+        this._mergeWorkerStatus(msg.status);
+        this._broadcastStatus();
+        break;
+
+      case 'log': {
+        const entry = msg.entry;
+        if (!entry) break;
+        if (!this.status.logTail) this.status.logTail = [];
+        this.status.logTail.push(entry);
+        if (this.status.logTail.length > config.update.logTailMaxLength) this.status.logTail.shift();
+        this._emitSocket('update_log', entry);
+        break;
+      }
+
+      case 'event':
+        this._emitSocket(msg.event, msg.data || {});
+        break;
+
+      case 'applied': {
+        // 文件已应用：执行调用方后置回调（如记录 Git 已部署提交），完成后再允许重启
+        this._mergeWorkerStatus(msg.status);
+        const hook = this._onAppliedHook;
+        Promise.resolve().then(async () => {
+          if (typeof hook === 'function') {
+            try {
+              await hook(this.status);
+            } catch (e) {
+              this._pushLog('warn', `更新后置回调失败: ${e.message}`);
+            }
+          }
+          this._sendToWorker({ type: 'applied-ack' });
+        });
+        break;
+      }
+
+      case 'error': {
+        this._workerFinished = true;
+        if (msg.status) {
+          this._mergeWorkerStatus(msg.status);
+        } else {
+          this._failUpdate(msg.error || '更新进程异常');
+        }
+        this.releaseLock();
+        if (msg.rolledBack && typeof this.onRollback === 'function') {
+          try {
+            this.onRollback(this.status);
+          } catch (e) {
+            this._pushLog('warn', `回滚回调失败: ${e.message}`);
+          }
+        }
+        this._broadcastStatus();
+        break;
+      }
+
+      case 'restart': {
+        this._workerRestartRequested = true;
+        this._mergeWorkerStatus(msg.status);
+        this.releaseLock();
+        this._broadcastStatus();
+        setTimeout(() => this._gracefulShutdown(), config.update.shutdownDelayMs);
+        break;
+      }
+
+      default:
+        break;
+    }
+  }
+
+  _handleWorkerExit(code, signal) {
+    this.worker = null;
+    if (this._workerRestartRequested || this.status.status === 'restarting') return;
+    if (this._workerFinished) return;
+
+    this._failUpdate(`更新进程异常退出（code=${code}${signal ? `, signal=${signal}` : ''}）`);
+    this._pushLog('error', '更新未完成，服务器仍在运行；可在更新面板重试或回滚到最近备份');
+    this.releaseLock();
+  }
+
+  /**
+   * 在独立子进程中执行完整更新流水线（由 update-worker.js 调用）。
+   */
+  async runInWorker(payload = {}) {
+    const { zipPath, updateId, startTime, fromVersion } = payload;
+
+    if (zipPath) this.currentZipPath = zipPath;
+    if (!this.currentZipPath || !fs.existsSync(this.currentZipPath)) {
+      throw new Error('未找到更新包文件');
+    }
+
+    this.status = this._idleStatus();
+    this.status.updateId = updateId || this._generateUpdateId();
+    this.status.status = 'in_progress';
+    this.status.startTime = startTime || Date.now();
+    this.status.version.from = fromVersion || this.versionManager.getServerVersion();
+    this.status.logTail = [];
+    this._saveStatus();
+
+    this._pushLog('info', '更新进程已启动（独立于主服务）', {
+      pid: process.pid,
+      parentPid: this.parentPid,
+      updateId: this.status.updateId
+    });
+    this._emitSocket('update_started', { updateId: this.status.updateId });
+
+    try {
+      await this._validatePackage();
+      await this._extractPackage();
+      await this._analyzeDiff();
+      await this._createBackup();
+      await this._applyFiles();
+
+      // 通知主进程文件已应用，等待其完成收尾（如记录 Git 部署提交）后再重启
+      this._sendToParent({ type: 'applied', status: this._statusSnapshot() });
+      await this._waitForAppliedAck();
+
+      await this._triggerRestart();
+      setTimeout(() => process.exit(0), 500);
+      return;
+    } catch (err) {
+      this._failUpdate(err.message || String(err));
+      await this._rollbackInternal();
+      this._saveStatus();
+      this._sendToParent({
+        type: 'error',
+        error: this.status.error,
+        rolledBack: !!this.backupDir,
+        status: this._statusSnapshot()
+      });
+      setTimeout(() => process.exit(0), 300);
+    }
+  }
+
+  _waitForAppliedAck(timeoutMs = 5000) {
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        process.removeListener('message', onMessage);
+        resolve();
+      };
+      const onMessage = (msg) => {
+        if (msg && msg.type === 'applied-ack') finish();
+      };
+      const timer = setTimeout(finish, timeoutMs);
+      process.on('message', onMessage);
+    });
   }
 
   _validatePackage() {
@@ -546,8 +887,7 @@ class UpdateManager {
         });
 
         zipfile.on('end', () => {
-          this._pushLog('info', '更新包基础校验通过', { fileCount, totalSize: totalUncompressed });
-          this._updateProgress(PHASES.VALIDATE, 100);
+          this._completePhase(PHASES.VALIDATE, `更新包校验通过，共 ${fileCount} 个文件`);
           resolve({ fileCount, totalSize: totalUncompressed, fileList });
         });
 
@@ -757,6 +1097,8 @@ class UpdateManager {
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
         const relPath = basePath ? path.join(basePath, entry.name) : entry.name;
+        // 更新功能自身的执行代码不能被旧更新包（不含该目录）判定为“待删除”
+        if (relPath.replace(/\\/g, '/') === 'server/workers') continue;
         if (entry.isDirectory()) {
           if (config.update.skipDirsInDiff.includes(entry.name)) continue;
           scanDeletions(fullPath, relPath);
@@ -886,6 +1228,7 @@ class UpdateManager {
     );
 
     this._cleanupOldBackups();
+    this._backupListCache = null;
 
     this._completePhase(PHASES.BACKUP, `备份完成，共备份 ${backedUp} 个文件`);
   }
@@ -904,6 +1247,10 @@ class UpdateManager {
   }
 
   _listBackups() {
+    const now = Date.now();
+    if (this._backupListCache && now - this._backupListCacheAt < 2000) {
+      return this._backupListCache;
+    }
     try {
       if (!fs.existsSync(this.paths.backup)) return [];
       const entries = fs.readdirSync(this.paths.backup, { withFileTypes: true })
@@ -932,9 +1279,11 @@ class UpdateManager {
           }
         })
         .sort((a, b) => a.mtime - b.mtime);
+      this._backupListCache = entries;
+      this._backupListCacheAt = now;
       return entries;
     } catch (e) {
-      return [];
+      return this._backupListCache || [];
     }
   }
 
@@ -1005,10 +1354,12 @@ class UpdateManager {
     this._setPhase(PHASES.RESTART, '准备重启服务...');
 
     const isPkg = typeof process.pkg !== 'undefined';
+    // worker 模式下需要等待/结束的是主服务进程，不是更新进程自己
+    const oldPid = this.mode === 'worker' ? this.parentPid : process.pid;
     const flagContent = {
       action: 'update-restart',
       updateId: this.status.updateId,
-      pid: process.pid,
+      pid: oldPid,
       backupDir: this.backupDir,
       fromVersion: this.versionManager.getServerVersion(),
       toVersion: this.status.version.to,
@@ -1031,6 +1382,12 @@ class UpdateManager {
     this.status.endTime = Date.now();
     this._saveStatus();
     this._broadcastStatus();
+
+    if (this.mode === 'worker') {
+      // 主进程收到后负责优雅退出；更新进程随之结束
+      this._sendToParent({ type: 'restart', status: this._statusSnapshot() });
+      return;
+    }
 
     this.releaseLock();
 
@@ -1075,7 +1432,7 @@ class UpdateManager {
 
     const waitScript = `
       const fs=require('fs'),cp=require('child_process'),path=require('path');
-      const oldPid=${process.pid};
+      const oldPid=${flagContent.pid};
       const batPath=${JSON.stringify(startBat)};
       const cwd=${JSON.stringify(this.storageRoot)};
       const log=msg=>{try{const d=path.join(cwd,'logs');fs.mkdirSync(d,{recursive:true});const dt=new Date();const p=n=>String(n).padStart(2,'0');const ts=dt.getFullYear()+'-'+p(dt.getMonth()+1)+'-'+p(dt.getDate())+'T'+p(dt.getHours())+':'+p(dt.getMinutes())+':'+p(dt.getSeconds())+'.'+String(dt.getMilliseconds()).padStart(3,'0');fs.appendFileSync(path.join(d,'update.log'),ts+' [restarter] '+msg+'\\n')}catch(e){}};
@@ -1307,6 +1664,7 @@ class UpdateManager {
     if (!flagExists) {
       if (this.status.status === 'restarting') {
         this.status.status = 'success';
+        this.status.currentPhase = PHASES.VERIFY;
         this.status.endTime = Date.now();
         this._completePhase(PHASES.VERIFY, '服务启动成功，更新完成');
         this._saveHistory();
@@ -1324,9 +1682,12 @@ class UpdateManager {
       this._pushLog('info', '检测到重启标记，验证服务状态', { action: flag.action });
 
       if (flag.action === 'update-restart' || flag.action === 'rollback-restart') {
-        this.status = this._idleStatus();
+        // 保留更新过程中记录的各阶段明细，只更新最终状态
+        if (!this.status || typeof this.status !== 'object') this.status = this._idleStatus();
+        if (!this.status.phases) this.status.phases = {};
         this.status.updateId = flag.updateId;
         this.status.status = 'success';
+        this.status.currentPhase = PHASES.VERIFY;
         this.status.version = { from: flag.fromVersion, to: flag.toVersion || this.versionManager.getServerVersion() };
         this.status.startTime = flag.timestamp;
         this.status.endTime = Date.now();
@@ -1357,6 +1718,14 @@ class UpdateManager {
     if (this.status.currentPhase === PHASES.APPLY || this.status.currentPhase === PHASES.RESTART) {
       throw new Error('已开始应用文件，无法取消');
     }
+
+    // 独立更新进程：直接终止子进程，主服务不受影响
+    if (this.worker) {
+      try { this.worker.kill('SIGTERM'); } catch (e) { /* ignore */ }
+      this.worker = null;
+      this._workerFinished = true;
+    }
+
     this._failUpdate('管理员取消更新');
     this._cleanupTempFiles();
     this._emitSocket('update_cancelled', {});
@@ -1368,9 +1737,7 @@ class UpdateManager {
       if (this.extractDir && fs.existsSync(this.extractDir)) {
         fs.rmSync(this.extractDir, { recursive: true, force: true });
       }
-      if (this.currentZipPath && fs.existsSync(this.currentZipPath)) {
-        fs.unlinkSync(this.currentZipPath);
-      }
+      // 保留上传包：失败/取消后可直接在面板重试，无需重新上传
     } catch (e) { /* ignore */ }
   }
 

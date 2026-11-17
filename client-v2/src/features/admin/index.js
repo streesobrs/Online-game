@@ -2584,6 +2584,79 @@ export function renderAdmin(container) {
     });
     const logList = el('div', { class: 'admin-list' });
 
+    // 更新步骤明细：每个阶段一行，实时更新
+    const phaseList = el('div', {
+      style: { display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '10px' },
+    });
+    const phaseRows = {};
+    [
+      ['validate', '校验更新包', '检查包结构、白名单与完整性'],
+      ['extract', '解压更新包', '解压到临时目录并校验文件'],
+      ['diff', '分析文件差异', '计算新增 / 修改 / 删除的文件'],
+      ['backup', '备份当前版本', '备份将被覆盖或删除的文件'],
+      ['apply', '应用文件更新', '写入新文件并清理旧文件'],
+      ['restart', '重启服务', '由守护进程拉起新版本'],
+      ['verify', '验证启动', '确认新版本服务正常运行'],
+      ['rollback', '回滚版本', '更新失败时自动或手动还原备份'],
+    ].forEach(([key, label, desc]) => {
+      const icon = el('span', {
+        style: { width: '18px', flex: '0 0 18px', textAlign: 'center', fontSize: '13px' },
+      }, '○');
+      const labelEl = el('span', {
+        style: { fontSize: '13px', fontWeight: '600' },
+      }, label);
+      const descEl = el('span', {
+        style: { fontSize: '11px', color: 'var(--theme-text-muted, #94a3b8)' },
+      }, desc);
+      const pctEl = el('span', {
+        style: {
+          fontSize: '11px',
+          minWidth: '46px',
+          textAlign: 'right',
+          color: 'var(--theme-text-muted, #94a3b8)',
+        },
+      }, '等待');
+      const row = el('div', {
+        style: {
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '8px',
+          padding: '6px 8px',
+          borderRadius: '8px',
+          background: 'rgba(148, 163, 184, 0.06)',
+        },
+      }, [
+        icon,
+        el('div', {
+          style: { display: 'flex', flexDirection: 'column', gap: '2px', flex: '1', minWidth: '0' },
+        }, [labelEl, descEl]),
+        pctEl,
+      ]);
+      phaseList.append(row);
+      phaseRows[key] = { row, icon, label: labelEl, desc: descEl, pct: pctEl, defaultDesc: desc };
+    });
+
+    const errorBox = el('div', {
+      class: 'admin-list-hint',
+      style: { display: 'none', color: 'var(--theme-stat-lose-color, #e53e3e)', wordBreak: 'break-all' },
+    });
+    const workerHint = el('div', { class: 'admin-list-hint' }, '');
+    const retryBtn = el('button', {
+      class: 'admin-btn admin-btn--ghost',
+      type: 'button',
+      onClick: () => retryUpdate(),
+    }, '🔁 重试更新');
+    const rollbackBtn = el('button', {
+      class: 'admin-btn admin-btn--ghost',
+      type: 'button',
+      onClick: () => rollbackLatestBackup(),
+    }, '↩️ 回滚到最近备份');
+    const refreshBtn = el('button', {
+      class: 'admin-btn admin-btn--ghost',
+      type: 'button',
+      onClick: () => loadUpdateStatus(),
+    }, '🔄 刷新状态');
+
     const versionCard = (label, valueEl) => el('div', { class: 'admin-stat' }, [
       el('span', { class: 'admin-stat__label' }, label),
       valueEl,
@@ -2612,13 +2685,20 @@ export function renderAdmin(container) {
             margin: '8px 0',
           },
         }, [progressFill]),
+        phaseList,
         logList,
+      ]),
+      section('故障处理', '更新由独立进程执行，主服务不会退出；失败后可在此重试或回滚', [
+        errorBox,
+        workerHint,
+        el('div', { class: 'admin-toolbar' }, [retryBtn, rollbackBtn, refreshBtn]),
       ]),
     );
 
     refs.update = {
       badgeEl, localVersionEl, remoteVersionEl, commitHint, detailEl, messageEl,
       checkBtn, applyBtn, statusTitle, statusMsg, progressFill, logList,
+      phaseRows, errorBox, workerHint, retryBtn, rollbackBtn,
     };
 
     state.updateLogs.slice(-30).forEach((entry) => appendUpdateLog(entry));
@@ -2707,6 +2787,61 @@ export function renderAdmin(container) {
     });
   }
 
+  async function retryUpdate() {
+    if (!session?.token) return;
+    const snap = state.updateSnapshot;
+    // 优先重试已上传的更新包（失败后上传包会被保留）
+    if (snap?.packageInfo) {
+      try {
+        await adminFetch('/api/update/start', { method: 'POST' }, session.token);
+        toast.success('已重新开始更新');
+        loadUpdateStatus();
+      } catch (err) {
+        toast.error(`重试失败：${err.message}`);
+      }
+      return;
+    }
+    if (state.gitInfo?.updateAvailable) {
+      applyGitUpdate();
+      return;
+    }
+    toast.warn('没有可重试的更新包，请先上传更新包或检查 Git 更新');
+  }
+
+  async function rollbackLatestBackup() {
+    if (!session?.token) return;
+    let latest = null;
+    try {
+      const data = await adminFetch('/api/update/backups', {}, session.token);
+      const list = Array.isArray(data?.backups) ? data.backups : [];
+      latest = list[0] || null;
+    } catch (err) {
+      toast.error(`获取备份列表失败：${err.message}`);
+      return;
+    }
+    if (!latest) {
+      toast.warn('没有可用的备份');
+      return;
+    }
+    const target = `版本 ${latest.fromVersion || latest.id}（${latest.timestamp || ''}）`;
+    modal.show({
+      title: '确认回滚',
+      content: `确定回滚到 ${target}？回滚会还原备份文件并重启服务，在线玩家会被短暂断开。`,
+      confirmText: '开始回滚',
+      onConfirm: async () => {
+        try {
+          await adminFetch('/api/update/rollback', {
+            method: 'POST',
+            body: JSON.stringify({ backupName: latest.id }),
+          }, session.token);
+          toast.success('已开始回滚，服务将重启');
+        } catch (err) {
+          toast.error(`回滚失败：${err.message}`);
+        }
+      },
+    });
+  }
+
   async function loadUpdateStatus() {
     if (!session?.token) return;
     try {
@@ -2716,11 +2851,97 @@ export function renderAdmin(container) {
     } catch { /* 状态拉取失败不影响更新操作 */ }
   }
 
+  function renderPhaseRows(phases, overall, currentPhase) {
+    if (!refs.update || !refs.update.phaseRows) return;
+    const normalized = (overall === 'updating' || overall === 'restarting')
+      ? 'in_progress'
+      : (overall === 'rollback_failed' ? 'failed' : overall);
+    const iconMap = { pending: '○', in_progress: '⏳', success: '✓', failed: '✕' };
+    const colorMap = {
+      pending: 'var(--theme-text-muted, #94a3b8)',
+      in_progress: '#3b82f6',
+      success: '#22c55e',
+      failed: '#ef4444',
+    };
+
+    Object.entries(refs.update.phaseRows).forEach(([key, row]) => {
+      const meta = phases && phases[key] ? phases[key] : null;
+
+      // 回滚步骤只在更新失败/回滚时展示
+      if (key === 'rollback') {
+        const showRollback = !!meta || currentPhase === 'rollback'
+          || ['rolled_back', 'rollback_failed', 'rolling_back'].includes(overall);
+        row.row.style.display = showRollback ? '' : 'none';
+        if (!showRollback) return;
+      }
+
+      let state = 'pending';
+      if (meta && meta.status === 'success') state = 'success';
+      else if (meta && meta.status === 'failed') state = 'failed';
+      else if (meta && meta.status === 'in_progress') {
+        state = normalized === 'failed' ? 'failed' : (normalized === 'success' ? 'success' : 'in_progress');
+      } else if (normalized === 'success') {
+        // 兼容旧状态文件：整体成功但缺少阶段明细时，按已完成展示
+        state = 'success';
+      } else if (normalized === 'in_progress' && currentPhase === key) {
+        state = 'in_progress';
+      }
+
+      const progress = meta ? Math.max(0, Math.min(100, Number(meta.progress) || 0)) : 0;
+      row.icon.textContent = iconMap[state];
+      row.icon.style.color = colorMap[state];
+      row.label.style.color = state === 'pending' ? 'var(--theme-text-muted, #94a3b8)' : '';
+      row.row.style.background = state === 'in_progress'
+        ? 'rgba(59, 130, 246, 0.12)'
+        : (state === 'failed' ? 'rgba(239, 68, 68, 0.12)' : 'rgba(148, 163, 184, 0.06)');
+
+      if (state === 'success') {
+        const dur = meta && meta.duration ? `${(meta.duration / 1000).toFixed(1)}s` : '';
+        row.pct.textContent = dur || '完成';
+        row.pct.style.color = colorMap.success;
+      } else if (state === 'failed') {
+        row.pct.textContent = '失败';
+        row.pct.style.color = colorMap.failed;
+      } else if (state === 'in_progress') {
+        row.pct.textContent = progress ? `${Math.round(progress)}%` : '进行中';
+        row.pct.style.color = colorMap.in_progress;
+      } else {
+        row.pct.textContent = '等待';
+        row.pct.style.color = colorMap.pending;
+      }
+
+      if (meta && meta.error) {
+        row.desc.textContent = `错误：${meta.error}`;
+        row.desc.style.color = colorMap.failed;
+      } else {
+        row.desc.textContent = row.defaultDesc;
+        row.desc.style.color = 'var(--theme-text-muted, #94a3b8)';
+      }
+    });
+  }
+
   function syncUpdateStatus() {
     if (!refs.update) return;
     const r = refs.update;
     const st = state.updateStatus;
     const snap = state.updateSnapshot;
+
+    r.errorBox.style.display = 'none';
+    r.errorBox.textContent = '';
+    r.workerHint.textContent = '';
+
+    // 阶段明细优先用 socket 实时状态，其次用 REST 拉取的上次状态
+    const phases = (st && st.phases) || (snap && snap.phases) || {};
+    const currentPhase = (st && st.currentPhase) || (snap && snap.currentPhase) || null;
+    const overall = (st && st.status) || (snap && snap.state) || 'idle';
+    renderPhaseRows(phases, overall, currentPhase);
+
+    const setActions = (failed, busy) => {
+      r.retryBtn.disabled = busy;
+      r.rollbackBtn.disabled = busy;
+      r.retryBtn.style.opacity = busy ? '0.5' : '1';
+      r.rollbackBtn.style.opacity = busy ? '0.5' : '1';
+    };
 
     if (st && st.status && st.status !== 'idle') {
       const labels = {
@@ -2732,7 +2953,17 @@ export function renderAdmin(container) {
         failed: '更新失败',
       };
       const label = labels[st.status] || st.status;
-      const phase = st.currentPhase ? ` · ${st.currentPhase}` : '';
+      const phaseLabels = {
+        validate: '校验更新包',
+        extract: '解压更新包',
+        diff: '分析文件差异',
+        backup: '备份当前版本',
+        apply: '应用文件更新',
+        restart: '重启服务',
+        verify: '验证启动',
+        rollback: '回滚版本',
+      };
+      const phase = st.currentPhase ? ` · ${phaseLabels[st.currentPhase] || st.currentPhase}` : '';
       const phaseProgress = st.phases && st.currentPhase && st.phases[st.currentPhase]
         ? Number(st.phases[st.currentPhase].progress) || 0
         : 0;
@@ -2740,6 +2971,21 @@ export function renderAdmin(container) {
       r.statusTitle.textContent = `${label}${phase}${pct ? ` · ${pct}%` : ''}`;
       r.statusMsg.textContent = st.error ? `错误：${st.error}` : (st.message || '');
       r.progressFill.style.width = `${pct}%`;
+
+      const failed = ['failed', 'rolled_back', 'rollback_failed'].includes(st.status);
+      const busy = ['in_progress', 'rolling_back', 'restarting'].includes(st.status);
+      if (failed) {
+        r.errorBox.style.display = 'block';
+        r.errorBox.textContent = st.error
+          ? `失败原因：${st.error}`
+          : '更新失败，可重试本次更新或回滚到最近备份';
+      }
+      if (st.worker) {
+        r.workerHint.textContent = st.worker.alive
+          ? `独立更新进程运行中（PID ${st.worker.pid}），主服务保持可用`
+          : '更新进程已结束，主服务仍在线';
+      }
+      setActions(failed, busy);
       return;
     }
 
@@ -2756,12 +3002,22 @@ export function renderAdmin(container) {
         ? `错误：${snap.lastError}`
         : (snap.currentVersion ? `当前版本 ${snap.currentVersion}` : '');
       r.progressFill.style.width = '0%';
+
+      const failed = snap.state === 'failed';
+      if (failed) {
+        r.errorBox.style.display = 'block';
+        r.errorBox.textContent = snap.lastError
+          ? `失败原因：${snap.lastError}`
+          : '上次更新失败，可重试或回滚到最近备份';
+      }
+      setActions(failed, snap.state === 'updating');
       return;
     }
 
     r.statusTitle.textContent = '当前没有进行中的更新';
     r.statusMsg.textContent = '';
     r.progressFill.style.width = '0%';
+    setActions(false, false);
   }
 
   function appendUpdateLog(entry) {

@@ -10717,7 +10717,7 @@
 
       const isBusy = ['uploading', 'updating', 'rolling_back'].includes(status);
       if (btnStart) {
-        if (status === 'uploaded') {
+        if (status === 'uploaded' || (status === 'failed' && updateCurrentPackage)) {
           btnStart.disabled = false;
           btnStart.style.opacity = '1';
           btnStart.style.cursor = 'pointer';

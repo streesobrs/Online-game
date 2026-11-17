@@ -268,6 +268,12 @@ app.get('/api/update/status', authenticateToken, (req, res) => {
                   status.status === 'success' ? 'success' :
                     (updateManager.currentZipPath ? 'uploaded' : 'idle'),
         currentVersion: status.serverVersion || config.version,
+        // 详细阶段列表：前端逐步骤展示
+        phases: status.phases || {},
+        currentPhase: status.currentPhase || null,
+        updateId: status.updateId || null,
+        message: status.message || '',
+        worker: status.worker || null,
         packageInfo: updateManager.currentZipPath ? {
           path: updateManager.currentZipPath,
           size: require('fs').existsSync(updateManager.currentZipPath) ? require('fs').statSync(updateManager.currentZipPath).size : 0,
