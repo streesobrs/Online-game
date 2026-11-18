@@ -263,8 +263,9 @@ export function createMatch3Board(container, options = {}) {
   }
   // 连锁倍率上限：肉鸽模式的「连环爆发」祝福可抬高，默认与全局配置一致
   const cascadeMax = Number.isFinite(payload.cascadeMax) ? payload.cascadeMax : SCORE.cascadeMax;
-  // 各颜色的出现权重（肉鸽的「同色磁石」祝福），缺省等概率
-  const weights = payload.colorWeights || null;
+  // 各颜色的出现权重（肉鸽的「定向调配」/「同色磁石」祝福），缺省等概率。
+  // 用 let 是因为「定向调配」会在层中任务换色后改写它（见 setColorWeights）
+  let weights = payload.colorWeights || null;
   // 遗物编译出的引擎修正（肉鸽「遗物二期」：炸弹半径 / 彩球额外清色），缺省 null = 与旧行为一致
   const engine = payload.engine && typeof payload.engine === 'object' ? payload.engine : null;
   const currentColorMult = () => (colorScaling ? colorScoreMultiplier(state.colors) : 1) * scoreMult;
@@ -471,6 +472,13 @@ export function createMatch3Board(container, options = {}) {
      */
     setScoreMult(next) {
       if (Number.isFinite(next) && next > 0) scoreMult = next;
+    },
+    /**
+     * 层中改写各颜色出现权重（肉鸽「定向调配」用：局内任务换色后要让后续补充的方块跟着新任务色加权）
+     * 只影响之后补充的方块，已落下的方块不回滚
+     */
+    setColorWeights(next) {
+      weights = Array.isArray(next) && next.length > 0 ? next : null;
     },
     /**
      * 层中就地注入特殊元素（肉鸽的局内任务奖励「爆破 / 彩球」用）

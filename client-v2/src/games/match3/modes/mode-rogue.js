@@ -12,8 +12,8 @@
  */
 import { COLOR_NAMES, ROGUE, ROGUE_BOSSES, ROGUE_GOLD, ROGUE_RELIC, STORAGE_KEYS } from '../config/config.js';
 import {
-  PERKS, QUEST_REWARDS, createBonus, descOf, floorOptions, goalOf, questFor, questNeedFor, rollPerks,
-  taskColorsOf,
+  PERKS, QUEST_REWARDS, colorWeightsFor, createBonus, descOf, floorColors, floorOptions, goalOf,
+  questFor, questNeedFor, rollPerks, taskColorsOf,
 } from '../rogue/perks.js';
 import { essenceForRun, applyMetaBuffs, mechanicCfg, mechanicOn, perkLevel, unlockedSet } from '../rogue/meta.js';
 import { createMatch3Board } from '../ui/board.js';
@@ -494,7 +494,8 @@ export function renderRogue(container, { onExit }) {
   function restoreQuest(saved) {
     if (!saved) return null;
     const reward = QUEST_REWARDS.find((item) => item.id === saved.rewardId);
-    return reward ? { ...saved, reward } : null;
+    // 旧存档没有 baseline：按 0 处理，保持「本层累计消除」的旧语义
+    return reward ? { baseline: 0, ...saved, reward } : null;
   }
 
   /**
@@ -571,7 +572,7 @@ export function renderRogue(container, { onExit }) {
           progress: quest.progress,
           done: quest.done,
           chain: quest.chain || 0,
-          baseline: quest.baseline || 0,
+          baseline: quest.baseline ?? null,
         }
         : null,
       offered: offered ? offered.map((perk) => perk.id) : null,
@@ -1377,12 +1378,28 @@ export function renderRogue(container, { onExit }) {
         bossMult: asc.bossMult,
       });
     }
+    // 本层盘面实际色数：任务色与「定向调配」都必须落在它以内（异形盘会降色）
+    const colors = floorColors(bonus, terrain);
     // 续玩时不重掷任务：重掷会白吃一次随机序列，进度也对不上存档
-    quest = restore ? restoreQuest(restore.quest) : questFor(floor, bonus, runRng);
+    quest = restore ? restoreQuest(restore.quest) : questFor(floor, bonus, runRng, 0, 0, colors);
+    // 旧存档 / 旧配置可能留下越界的任务色（异形盘降色后该颜色根本不会出现）：
+    // 映射回盘面内的颜色，并把进度清零只统计接下来的消除
+    if (quest && (quest.color < 1 || quest.color > colors)) {
+      quest = { ...quest, color: 1 + ((Math.max(1, quest.color) - 1) % colors), progress: 0, baseline: null };
+    }
+    // 旧版本达成任务后存档里是 done=true：续玩时直接接上下一个任务，
+    // 否则侧栏会一直卡在「✅ 已完成」而不再刷新
+    if (quest && quest.done) {
+      const next = questFor(floor, bonus, runRng, (quest.chain || 0) + 1, quest.color, colors);
+      if (next) {
+        next.baseline = null; // 首次刷新时再取当前累计数，只统计接下来的消除
+        quest = next;
+      }
+    }
     // 「定向调配」：本层开局参数要在任务（条件目标 + 局内任务）都定下来之后才算，
     // 因为它的颜色权重来自这两者（taskColorsOf），必须与 payload 同时落定。
     // 顺序仍是 地形 → 目标 → 任务 → 开局参数，runRng 的消耗顺序与旧版逐位一致
-    const opts = floorOptions(bonus, floor, terrain, taskColorsOf(goals, quest));
+    const opts = floorOptions(bonus, floor, terrain, taskColorsOf(goals, quest, colors));
     if (carryMoves > 0) opts.moves += carryMoves; // 商店买来的「下一层 +N 步」并入本层起手步数
     shufflesLeft = restore ? (restore.shufflesLeft || 0) : bonus.shuffles;
 
@@ -1513,10 +1530,13 @@ export function renderRogue(container, { onExit }) {
       // 同层任务链：达成后立刻刷新下一个任务（需求递增、尽量换色），侧栏不再变成死面板。
       // baseline 记下换任务时该颜色已累计的数量，保证新任务只统计「接下来的消除」，
       // 否则本层已有的累计消除会瞬间顶满一个又一个新任务
-      const next = questFor(floor, bonus, runRng, (finished.chain || 0) + 1, finished.color);
+      const next = questFor(floor, bonus, runRng, (finished.chain || 0) + 1, finished.color, opts.colors);
       if (next) {
         next.baseline = (info && info.collected && info.collected[next.color]) || 0;
         quest = next;
+        // 「定向调配」按任务色现算权重：任务换色后要让后续补充的方块跟着新颜色加权，
+        // 否则倍率还挂在上一环的颜色上（看起来就像这张祝福失效了）
+        if (board) board.setColorWeights(colorWeightsFor(bonus, opts.colors, taskColorsOf(goals, next)));
       }
       paintQuest();
       toast.success(`${finished.reward.icon} 任务达成：${finished.reward.name} · ${finished.reward.desc}${gold > 0 ? ` · +${gold} 🪙` : ''}`);
@@ -1783,6 +1803,7 @@ export function renderRogue(container, { onExit }) {
 
       // 局内任务：进度取本层累计消除的各颜色数（同层刷新出的后续任务减去 baseline，只算接任务之后的消除）
       if (quest && !quest.done) {
+        if (quest.baseline === null) quest.baseline = info.collected[quest.color] || 0;
         const got = Math.max(0, (info.collected[quest.color] || 0) - (quest.baseline || 0));
         if (got !== quest.progress) {
           quest.progress = got;

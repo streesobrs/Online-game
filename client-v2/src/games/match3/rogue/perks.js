@@ -216,7 +216,7 @@ export const PERKS = [
     rarity: 'common',
     scales: { kind: 'mult', base: 1.5, per: 0.12 },
     desc(lv) {
-      return `本层要求收集的颜色出现概率 ×${valueAt(this, lv)}（条件目标的收集色 + 局内任务色）`;
+      return `本层要求收集的颜色出现概率 ×${valueAt(this, lv)}（条件目标的收集色 + 局内任务色；无收集要求时随机加权一色）`;
     },
     max: 3,
     growth: true,
@@ -484,14 +484,20 @@ export function goalOf(floor, bonus) {
  * 所以颜色在这里现算，而不是在选中祝福时锁死（那是「同色磁石」的做法）。
  * @param {Array<object>} goals - 本层硬目标
  * @param {object|null} quest - 本层局内任务
+ * @param {number} [colors] - 本层盘面实际颜色数（异形盘会降色）：越界的颜色权重是无效的，
+ *   必须在这里滤掉，否则任务色看着存在、实际永远不会出现（定向调配也就白叠了）
  * @returns {number[]} 颜色下标数组（无任务时为空数组）
  */
-export function taskColorsOf(goals, quest) {
+export function taskColorsOf(goals, quest, colors = 0) {
+  const cap = Number.isFinite(colors) && colors > 0 ? Math.floor(colors) : Infinity;
   const set = new Set();
+  const add = (color) => {
+    if (color > 0 && color <= cap) set.add(color);
+  };
   for (const goal of goals || []) {
-    if (goal && goal.type === 'collect' && goal.color > 0) set.add(goal.color);
+    if (goal && goal.type === 'collect') add(goal.color);
   }
-  if (quest && quest.color > 0) set.add(quest.color);
+  if (quest) add(quest.color);
   return [...set];
 }
 
@@ -501,20 +507,27 @@ export function taskColorsOf(goals, quest) {
  * 两条来源可以叠加（例如磁石锁了红、任务要绿，则红绿各自加权）：
  * - 「同色磁石」：选中时锁定的一色 ×weightMult
  * - 「定向调配」：任务色 ×taskColorMult（同一色同时命中两条就相乘）
+ *   当层没有任何「要求收集的颜色」（纯分数 / 纯清障层、任务尚未开放的浅层）时，
+ *   定向调配不能空转：退化到 `fallbackColor` 这一色上加权，保证祝福始终有作用对象。
  *
  * 两条都没生效时返回 null = 等概率。这个「null 与旧版逐位一致」是硬约束：
  * 非肉鸽模式与历史关卡的复现性都依赖它。
  * @param {object} bonus - 本轮加成
  * @param {number} colors - 本层元素种类数
  * @param {number[]} [taskColors] - 本层任务色（taskColorsOf 的结果）
+ * @param {number} [fallbackColor] - 无任务色时「定向调配」的作用色（由 floorOptions 按层号给出，0 = 不启用）
  * @returns {number[]|null}
  */
-export function colorWeightsFor(bonus, colors, taskColors = []) {
+export function colorWeightsFor(bonus, colors, taskColors = [], fallbackColor = 0) {
   const magnet = bonus.weightColor > 0 && bonus.weightMult > 1 && bonus.weightColor <= colors
     ? bonus.weightColor
     : 0;
   const taskSet = new Set((taskColors || []).filter((c) => c > 0 && c <= colors));
   const taskMult = bonus.taskColorMult > 1 ? bonus.taskColorMult : 1;
+  // 没有任务色时把倍率落到兜底色上：否则「任务色 ×6.43」在纯分数 / 清障层完全无效
+  if (taskSet.size === 0 && taskMult > 1 && fallbackColor > 0 && fallbackColor <= colors) {
+    taskSet.add(fallbackColor);
+  }
   if (magnet === 0 && taskSet.size === 0) return null;
   return Array.from({ length: colors }, (_, k) => {
     const color = k + 1;
@@ -523,6 +536,20 @@ export function colorWeightsFor(bonus, colors, taskColors = []) {
     if (taskSet.has(color)) weight *= taskMult;
     return weight;
   });
+}
+
+/**
+ * 本层盘面实际颜色数（楼层参数与任务色都必须落在它以内）
+ *
+ * colorFloor 默认 4 色；极简主义 Lv3 终极档会把它放到 3 色。
+ * 异形盘（挖洞 / 分仓）行列不贯通，6 色会频繁无解，强制降一档（见 levels.js 标定注释）。
+ * @param {object} bonus - 本轮加成
+ * @param {object} [terrain] - 本层地形
+ * @returns {number}
+ */
+export function floorColors(bonus, terrain = null) {
+  const baseColors = Math.max(bonus.colorFloor ?? ROGUE.minColors, ROGUE.colors - bonus.colorCut);
+  return terrain?.mask ? Math.min(baseColors, ROGUE_SHAPE.maxColors) : baseColors;
 }
 
 /**
@@ -547,12 +574,16 @@ export function floorOptions(bonus, floor = 1, terrain = null, taskColors = []) 
   if (bonus.specials.rainbow) specials.push({ kind: SPECIAL.RAINBOW, count: bonus.specials.rainbow });
 
   // colorFloor 默认 4 色；极简主义 Lv3 终极档会把它放到 3 色
-  const baseColors = Math.max(bonus.colorFloor ?? ROGUE.minColors, ROGUE.colors - bonus.colorCut);
   // 异形盘（挖洞 / 分仓）行列不贯通，6 色会频繁无解，强制降一档（见 levels.js 标定注释）
-  const colors = terrain?.mask ? Math.min(baseColors, ROGUE_SHAPE.maxColors) : baseColors;
+  const colors = floorColors(bonus, terrain);
   // 颜色权重：非均匀权重只由「同色磁石」（锁定一色）与「定向调配」（本层任务色）给出；
   // 其余情况保持 null（等概率），与旧版逐位一致——这一点在引擎侧同样是硬约束（见 cascade.js 的 pickColor）
-  const colorWeights = colorWeightsFor(bonus, colors, taskColors);
+  // 定向调配的兜底色：没有收集要求时，按层号轮换取一色（同层重进 / 续玩结果一致）；
+  // 已有同色磁石时直接叠到磁石那一色上，避免又多出一条随机色
+  const taskFallback = bonus.weightColor > 0 && bonus.weightColor <= colors
+    ? bonus.weightColor
+    : 1 + ((Math.max(1, floor) - 1) % colors);
+  const colorWeights = colorWeightsFor(bonus, colors, taskColors, taskFallback);
 
   const baseMoves = ROGUE.movesPerFloor
     + bonus.moves
@@ -719,10 +750,14 @@ export function questNeedFor(floor, cut = 0) {
  * @param {number} [avoidColor=0] - 上一个任务的颜色（刷新时尽量换色，避免连着做同一种）
  * @returns {object|null} 任务对象；`fromFloor` 之前返回 null
  */
-export function questFor(floor, bonus, rng, chain = 0, avoidColor = 0) {
+export function questFor(floor, bonus, rng, chain = 0, avoidColor = 0, colorsLimit = 0) {
   const cfg = ROGUE.quest;
   if (floor < cfg.fromFloor) return null;
-  const colors = Math.max(bonus.colorFloor ?? ROGUE.minColors, ROGUE.colors - bonus.colorCut);
+  const baseColors = Math.max(bonus.colorFloor ?? ROGUE.minColors, ROGUE.colors - bonus.colorCut);
+  // 任务色必须落在盘面实际存在的颜色里：异形盘会把颜色数压到 ROGUE_SHAPE.maxColors，
+  // 越界的任务色永远收集不到（定向调配也会被当成「没有任务色」滤掉）。
+  // colorsLimit 由调用方传入 floorColors 的结果；不传时按常规盘面计算（标定脚本兼容）
+  const colors = Number.isFinite(colorsLimit) && colorsLimit > 0 ? Math.floor(colorsLimit) : baseColors;
   // 「采集协议」等按比例压需求；原值与折后值都留在任务对象里，侧栏「×25（原 ×42）」要把两边都摆出来
   const { need, base } = questNeedFor(floor, bonus.collectCut);
   // 同层任务链：每完成一个，下一环需求按 chainNeedMult 放大，防止一层内无限刷奖励
@@ -746,5 +781,6 @@ export function questFor(floor, bonus, rng, chain = 0, avoidColor = 0) {
     reward: QUEST_REWARDS[rng.int(QUEST_REWARDS.length)],
     progress: 0,
     done: false,
+    baseline: 0,
   };
 }
