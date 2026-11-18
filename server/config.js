@@ -505,7 +505,7 @@ module.exports = {
     bosses: {
       chain_warden: { depth: 10, biome: 'plain', name: '锁链守卫', hpMult: 1.5, rewardRarity: 'epic' },
       frost_reverent: { depth: 20, biome: 'frost', name: '霜蚀主教', hpMult: 1.6, rewardRarity: 'epic' },
-      core_titan: { depth: 30, biome: 'core', name: '熔核巨神', hpMult: 1.7, rewardRarity: 'epic' }
+      core_titan: { depth: 30, biome: 'core', name: '熔核巨神', hpMult: 1.0, rewardRarity: 'epic' }
     },
     // 图鉴收集里程碑（一次性领取，只发精华）
     // kind：unlocked=已解锁祝福数 / maxed=已满级祝福数 / all=集齐全部 /

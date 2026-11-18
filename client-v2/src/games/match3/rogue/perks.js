@@ -715,18 +715,34 @@ export function questNeedFor(floor, cut = 0) {
  * @param {number} floor - 层号
  * @param {object} bonus - 本轮加成（决定当前颜色数，任务颜色必须落在现有颜色里）
  * @param {object} rng - 随机数发生器
+ * @param {number} [chain=0] - 同层第几个任务（达成后刷新时为 1、2…），需求按 chainNeedMult 递增
+ * @param {number} [avoidColor=0] - 上一个任务的颜色（刷新时尽量换色，避免连着做同一种）
  * @returns {object|null} 任务对象；`fromFloor` 之前返回 null
  */
-export function questFor(floor, bonus, rng) {
+export function questFor(floor, bonus, rng, chain = 0, avoidColor = 0) {
   const cfg = ROGUE.quest;
   if (floor < cfg.fromFloor) return null;
   const colors = Math.max(bonus.colorFloor ?? ROGUE.minColors, ROGUE.colors - bonus.colorCut);
   // 「采集协议」等按比例压需求；原值与折后值都留在任务对象里，侧栏「×25（原 ×42）」要把两边都摆出来
   const { need, base } = questNeedFor(floor, bonus.collectCut);
+  // 同层任务链：每完成一个，下一环需求按 chainNeedMult 放大，防止一层内无限刷奖励
+  const chainMult = cfg.chainNeedMult ** (Math.max(0, chain) || 0);
+  const chainNeed = Math.max(cfg.minNeed, Math.round(need * chainMult));
+  const chainBaseRaw = Math.round(base * chainMult);
+  const chainBase = chainBaseRaw > chainNeed ? chainBaseRaw : undefined;
+
+  let color = 1 + rng.int(colors);
+  if (avoidColor && colors > 1) {
+    for (let guard = 0; color === avoidColor && guard < 8; guard += 1) {
+      color = 1 + rng.int(colors);
+    }
+  }
+
   return {
-    color: 1 + rng.int(colors),
-    need,
-    ...(need !== base ? { base } : {}),
+    color,
+    need: chainNeed,
+    ...(chainBase !== undefined ? { base: chainBase } : {}),
+    chain: chain || 0,
     reward: QUEST_REWARDS[rng.int(QUEST_REWARDS.length)],
     progress: 0,
     done: false,

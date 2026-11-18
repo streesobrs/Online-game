@@ -29,7 +29,7 @@ import { floorGoals, rogueBiome, terrainFor } from '../rogue/floor-types.js';
 import { MASKS } from '../config/levels.js';
 import { allGoalsDone, goalBaseNote, goalProgress, goalShort } from '../engine/goals.js';
 import { createRunState } from '../rogue/run-state.js';
-import { bossAt, createBossState, crossedPhases } from '../rogue/boss.js';
+import { bossAt, bossHpTarget, createBossState, crossedPhases } from '../rogue/boss.js';
 // 局内经济与遗物（开发方案 3.4 / 3.5 / 3.6）：三个模块都是纯逻辑，这里只负责接线与渲染
 import {
   buildRelicHooks, grantOnAcquire, RELICS, relicById, relicRollExtras, rollRelic, rollRelicChoices,
@@ -570,6 +570,8 @@ export function renderRogue(container, { onExit }) {
           rewardId: quest.reward.id,
           progress: quest.progress,
           done: quest.done,
+          chain: quest.chain || 0,
+          baseline: quest.baseline || 0,
         }
         : null,
       offered: offered ? offered.map((perk) => perk.id) : null,
@@ -1390,11 +1392,27 @@ export function renderRogue(container, { onExit }) {
     const bossDef = node?.type === NODE.BOSS ? bossAt(node.depth) : null;
     if (bossDef) {
       if (restore?.boss && ROGUE_BOSSES[restore.boss.id] && Number.isFinite(restore.boss.target)) {
+        const saved = Math.max(1, Math.floor(restore.boss.target));
+        // 版本更新可能下调了 Boss 血量系数：续玩时把旧存档里更高的血量收敛到当前配置（只降不升），
+        // 否则改完数值的老 run 会一直顶着旧血条
+        const current = bossHpTarget(bossDef, bonus, asc.bossMult);
+        const target = Math.min(saved, current);
         boss = {
           id: restore.boss.id,
-          target: Math.max(1, Math.floor(restore.boss.target)),
+          target,
           fired: Array.isArray(restore.boss.fired) ? [...restore.boss.fired] : [],
         };
+        if (target !== saved) {
+          const scoreGoal = goals.find((g) => g.type === 'score');
+          if (scoreGoal) {
+            scoreGoal.target = Math.min(scoreGoal.target, target);
+            if (scoreGoal.base) {
+              scoreGoal.base = bonus.goalCut > 0
+                ? bossHpTarget(bossDef, { ...bonus, goalCut: 0 }, asc.bossMult)
+                : undefined;
+            }
+          }
+        }
       } else {
         boss = createBossState(bossDef, bonus, asc.bossMult);
       }
@@ -1486,13 +1504,25 @@ export function renderRogue(container, { onExit }) {
     }
 
     /** 任务达成：奖励当场生效（加步 / 本层得分翻倍 / 就地注入特殊元素），另发局内金币 */
-    function grantQuestReward() {
-      quest.done = true;
+    function grantQuestReward(info) {
+      const finished = quest;
+      finished.done = true;
       questsDone += 1;
-      quest.reward.apply(board, opts);
+      finished.reward.apply(board, opts);
       const gold = gainGold(ROGUE_GOLD.perQuest); // 达成层内任务的局内金币（开发方案 3.6）
+      // 同层任务链：达成后立刻刷新下一个任务（需求递增、尽量换色），侧栏不再变成死面板。
+      // baseline 记下换任务时该颜色已累计的数量，保证新任务只统计「接下来的消除」，
+      // 否则本层已有的累计消除会瞬间顶满一个又一个新任务
+      const next = questFor(floor, bonus, runRng, (finished.chain || 0) + 1, finished.color);
+      if (next) {
+        next.baseline = (info && info.collected && info.collected[next.color]) || 0;
+        quest = next;
+      }
       paintQuest();
-      toast.success(`${quest.reward.icon} 任务达成：${quest.reward.name} · ${quest.reward.desc}${gold > 0 ? ` · +${gold} 🪙` : ''}`);
+      toast.success(`${finished.reward.icon} 任务达成：${finished.reward.name} · ${finished.reward.desc}${gold > 0 ? ` · +${gold} 🪙` : ''}`);
+      if (next) {
+        toast.info(`📜 新任务：收集 ${COLOR_NAMES[next.color]}色 ×${next.need}`);
+      }
     }
 
     const shuffleBtn = bonus.shuffles > 0
@@ -1751,14 +1781,14 @@ export function renderRogue(container, { onExit }) {
         }
       }
 
-      // 局内任务：进度取本层累计消除的各颜色数（新棋盘从 0 起算，无需另记基线）
+      // 局内任务：进度取本层累计消除的各颜色数（同层刷新出的后续任务减去 baseline，只算接任务之后的消除）
       if (quest && !quest.done) {
-        const got = info.collected[quest.color] || 0;
+        const got = Math.max(0, (info.collected[quest.color] || 0) - (quest.baseline || 0));
         if (got !== quest.progress) {
           quest.progress = got;
           paintQuest();
         }
-        if (got >= quest.need) grantQuestReward();
+        if (got >= quest.need) grantQuestReward(info);
       }
 
       // 过关：本层全部硬目标达成（分数 / 收集 / 清障的任意组合）
