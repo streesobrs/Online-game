@@ -20,6 +20,13 @@ import { el } from '../../utils/dom.js';
 import { toast } from '../../components/toast.js';
 import { modal } from '../../components/modal.js';
 import { go } from '../../core/router.js';
+import { sfx } from '../../core/sfx.js';
+import { showRules } from '../rules-dialog.js';
+import { bindGameKeys } from '../game-keys.js';
+import { createMoveLog, exportGameData } from '../move-log.js';
+import {
+  createInfoTags, createLatencyProbe, createStatsPanel, createPauseController,
+} from '../game-hud.js';
 
 const RED = 1;   // 红方（先手）
 const BLACK = 2; // 黑方
@@ -52,16 +59,41 @@ export function startMatch(container, matchData) {
   let gameStart = Date.now();
   let timerHandle = null;
   let selected = null; // 选中的棋子 {r, c}
+  // 阶段 A：暂停 / 记录 / 重做
+  let paused = false;
+  let lastOwnMove = null;
+  let lastUndoMove = null;
+  let lastWinnerText = '';
 
   // ---- 信息栏 ----
   const turnEl = el('span', { class: 'gobang-info-tag' });
   const oppEl = el('span', { class: 'gobang-info-tag' });
   const timerEl = el('span', { class: 'gobang-info-tag' });
+  const { moveCountEl, latencyEl } = createInfoTags('gobang-info-tag');
   const undoBtn = el('button', { class: 'btn btn-secondary' }, '⏪ 悔棋');
   const hintBtn = el('button', { class: 'btn btn-secondary' }, '💡 提示');
   const resignBtn = el('button', { class: 'btn btn-secondary' }, '🏳️ 认输');
   const resetBtn = el('button', { class: 'btn btn-secondary' }, '🔄 重置');
+  const rulesBtn = el('button', { class: 'btn btn-secondary', title: '规则（T）' }, '📜 规则');
+  const statsBtn = el('button', { class: 'btn btn-secondary' }, '📈 统计');
+  const exportBtn = el('button', { class: 'btn btn-secondary' }, '📤 导出');
   const leaveBtn = el('button', { class: 'btn btn-secondary' }, '返回大厅');
+
+  // ---- 阶段 A：落子记录 / 高级统计 ----
+  const moveLog = createMoveLog({
+    gameType: 'chinese-chess',
+    me,
+    opponentName: opponentNickname || opponentName || opponentId,
+  });
+  const statsPanel = createStatsPanel({
+    gameType: 'chinese-chess',
+    getBoard: () => board.board,
+    getEntries: () => moveLog.getEntries(),
+  });
+
+  function updateMoveCount() {
+    moveCountEl.textContent = `🖐 手数：${moveLog.size()}`;
+  }
 
   function turnName(t) {
     return t === RED ? '红方' : '黑方';
@@ -79,7 +111,7 @@ export function startMatch(container, matchData) {
   }
 
   function updateTimer() {
-    const s = Math.floor((Date.now() - gameStart) / 1000);
+    const s = Math.floor((Date.now() - gameStart - (pauseCtrl ? pauseCtrl.getPausedMs() : 0)) / 1000);
     timerEl.textContent = `⏱ ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   }
 
@@ -91,7 +123,7 @@ export function startMatch(container, matchData) {
     // 黑方视角：棋盘 180° 旋转，黑棋显示在下方（坐标不变，走子协议不受影响）
     flip: me === BLACK,
     onCellClick: (r, c) => {
-      if (gameOver) return;
+      if (gameOver || paused) return;
       const piece = board.get(r, c);
 
       // 已有选中棋子：尝试走子
@@ -117,9 +149,13 @@ export function startMatch(container, matchData) {
 
   // ---- 走子（本地合法走位确认后：更新棋盘 + 发服务端 + 切换回合）----
   function doMove(fromR, fromC, toR, toC) {
-    if (turn !== me) { toast.warn('还没轮到你走子'); return; }
+    if (paused) return false;
+    if (gameOver) return false;
+    if (turn !== me) { toast.warn('还没轮到你走子'); sfx.play('error'); return false; }
     const moving = board.get(fromR, fromC);
-    if (!moving) return;
+    if (!moving) return false;
+    const mover = turn;
+    const target = board.get(toR, toC);
     board.movePiece(fromR, fromC, toR, toC);
     // 保留双方轨迹：我方落点用绿色标记，对方上一步的红色标记不清除
     board.setSideLastMove(toR, toC, true);
@@ -135,9 +171,16 @@ export function startMatch(container, matchData) {
     board.clearSelection();
     selected = null;
     clearHintMarkers();
+    lastOwnMove = { fromR, fromC, toR, toC };
+    lastUndoMove = null;
+    moveLog.add({ color: mover, isSelf: true, fromR, fromC, toR, toC, piece: moving.name });
+    updateMoveCount();
+    statsPanel.refresh();
+    sfx.play(target ? 'capture' : 'place');
     // 走完后检查对方是否被将军（将死由服务端判定并广播 game_ended）
     if (isInCheck(board.board, colorOf(turn))) toast.warn('⚔️ 将军！');
     updateTurn();
+    return true;
   }
 
   // ---- 悔棋：后端棋盘格式（'r-ju'/'b-jiang'）转 v2 {name, color} 模型 ----
@@ -165,18 +208,41 @@ export function startMatch(container, matchData) {
     return layout;
   }
 
+  const boardContainer = el('div', { class: 'game-board-container' }, [boardEl]);
+  const sidePanels = el('div', { class: 'game-side-panels' }, [moveLog.el, statsPanel.el]);
+
   container.innerHTML = '';
   container.append(
-    el('div', { class: 'game-stage' }, [
+    el('div', { class: 'game-stage game-stage--panels' }, [
       el('div', { class: 'game-status-bar' }, [
-        el('div', { class: 'game-status-group' }, [turnEl, oppEl, timerEl]),
+        el('div', { class: 'game-status-group' }, [turnEl, oppEl, timerEl, moveCountEl, latencyEl]),
         el('div', { class: 'game-status-spacer' }),
         leaveBtn,
       ]),
-      el('div', { class: 'game-board-container' }, [boardEl]),
-      el('div', { class: 'game-tools-bar' }, [undoBtn, hintBtn, resignBtn, resetBtn]),
+      boardContainer,
+      el('div', { class: 'game-tools-bar' }, [undoBtn, hintBtn, resignBtn, resetBtn, rulesBtn, statsBtn, exportBtn]),
+      sidePanels,
     ])
   );
+
+  // ---- 阶段 A：暂停 / 延迟 / 记录 ----
+  const pauseCtrl = createPauseController({
+    boardContainer,
+    onChange: (v) => {
+      paused = v;
+      updateTimer();
+    },
+  });
+
+  const latencyProbe = createLatencyProbe({
+    isPaused: () => paused,
+    onChange: (ms) => {
+      latencyEl.textContent = ms == null ? '📶 --ms' : `📶 ${ms}ms`;
+    },
+  });
+  latencyProbe.start();
+  updateMoveCount();
+  statsPanel.refresh();
 
   // 自适应棋盘尺寸：以棋盘容器实际可用空间为准
   const fitBoardSize = () => {
@@ -318,11 +384,24 @@ export function startMatch(container, matchData) {
     // 跳过自己的走子（服务端一般不会回发给自己，防御性过滤）
     if (data.from != null && String(data.from) === String(currentAccountId())) return;
     if (data.fromR == null || data.fromC == null || data.toR == null || data.toC == null) return;
+    const captured = board.get(data.toR, data.toC);
     board.movePiece(data.fromR, data.fromC, data.toR, data.toC);
     // 对方落点用红色标记，保留我方上一步的金色标记
     board.setSideLastMove(data.toR, data.toC);
     turn = me; // 轮到我了
     clearHintMarkers();
+    moveLog.add({
+      color: data.color === BLACK ? BLACK : RED,
+      isSelf: false,
+      fromR: data.fromR,
+      fromC: data.fromC,
+      toR: data.toR,
+      toC: data.toC,
+      piece: data.piece || null,
+    });
+    updateMoveCount();
+    statsPanel.refresh();
+    sfx.play(captured ? 'capture' : 'place');
     // 对手走完后检查我方是否被将军
     if (isInCheck(board.board, colorOf(me))) toast.warn('⚔️ 你被将军了！');
     updateTurn();
@@ -349,6 +428,12 @@ export function startMatch(container, matchData) {
     }
     if (data.reason && data.result === 'win') msg += `（${data.reason}）`;
 
+    const iWon = data.result !== 'draw' && String(data.winner) === String(myId);
+    lastWinnerText = data.result === 'draw' ? 'draw' : (iWon ? 'me' : 'opponent');
+    moveLog.setWinner(lastWinnerText);
+    statsPanel.setWinner(lastWinnerText);
+    if (iWon) sfx.play('win');
+
     modal.show({
       title: '游戏结束',
       content: msg,
@@ -371,6 +456,10 @@ export function startMatch(container, matchData) {
     const msg = reason === 'resign'
       ? '🎉 对方已认输，你获胜了！'
       : (data?.nickname ? `对方（${data.nickname}）已离开游戏` : '对方已离开游戏');
+    lastWinnerText = 'opponent';
+    moveLog.setWinner(lastWinnerText);
+    statsPanel.setWinner(lastWinnerText);
+    sfx.play('win');
     modal.show({
       title: '游戏结束',
       content: msg,
@@ -383,8 +472,9 @@ export function startMatch(container, matchData) {
     });
   }));
 
-  // 认输
-  resignBtn.addEventListener('click', () => {
+  // ---- 阶段 A：对局操作函数（按钮与快捷键共用）----
+  function doResign() {
+    sfx.play('click');
     if (gameOver) { toast.warn('游戏已结束'); return; }
     modal.show({
       title: '认输',
@@ -397,16 +487,96 @@ export function startMatch(container, matchData) {
         toast.info('🏳️ 已认输，等待结果…');
       },
     });
-  });
+  }
 
   // ---- 悔棋（与 v1 一致：undo_request → 对手同意 → undo_accepted 恢复棋盘；含库存检查与道具卡消耗）----
-  undoBtn.addEventListener('click', () => {
+  function doUndo() {
+    sfx.play('click');
     if (gameOver) { toast.warn('游戏已结束，无法悔棋'); return; }
     requestUndo(() => {
       emit('undo_request');
       toast.info('⏪ 已发送悔棋请求…');
     });
-  });
+  }
+
+  function doRedo() {
+    if (gameOver) { toast.warn('游戏已结束，无法重做'); sfx.play('error'); return; }
+    if (!lastUndoMove) { toast.info('暂无可重做的着法'); sfx.play('error'); return; }
+    if (turn !== me) { toast.warn('还没轮到你走子'); sfx.play('error'); return; }
+    const mv = lastUndoMove;
+    if (doMove(mv.fromR, mv.fromC, mv.toR, mv.toC)) {
+      toast.success('↪️ 已重做上一步');
+    }
+  }
+
+  function doReset() {
+    sfx.play('click');
+    if (gameOver) { toast.warn('游戏已结束'); return; }
+    modal.show({
+      title: '重置游戏',
+      content: '请求重置棋盘？',
+      confirmText: '请求重置',
+      showCancel: true,
+      onConfirm: () => emit('reset'),
+    });
+  }
+
+  function doStats() {
+    sfx.play('click');
+    const shown = statsPanel.toggle();
+    statsBtn.textContent = shown ? '📈 收起统计' : '📈 统计';
+    if (shown) statsPanel.refresh();
+  }
+
+  function doExport() {
+    sfx.play('click');
+    const data = exportGameData({
+      gameType: 'chinese-chess',
+      me,
+      opponentId,
+      entries: moveLog.getEntries(),
+      durationSec: (Date.now() - gameStart - pauseCtrl.getPausedMs()) / 1000,
+      winner: lastWinnerText,
+      maxChain: null,
+    });
+    if (!data) {
+      toast.warn('暂无可导出的着法');
+      sfx.play('error');
+      return;
+    }
+    toast.success('📤 已导出对局数据');
+  }
+
+  function doBack() {
+    sfx.play('click');
+    if (gameOver) { emit('return_lobby'); go('lobby'); return; }
+    modal.show({
+      title: '返回大厅',
+      content: '确定要退出当前对局吗？',
+      confirmText: '退出',
+      showCancel: true,
+      onConfirm: () => {
+        emit('return_lobby');
+        go('lobby');
+      },
+    });
+  }
+
+  function doRematch() {
+    sfx.play('click');
+    modal.show({
+      title: '重新匹配',
+      content: '将结束当前对局并重新匹配象棋，确定继续？',
+      confirmText: '重新匹配',
+      showCancel: true,
+      onConfirm: () => {
+        emit('return_lobby');
+        eventBus.emit('games:rematch', 'chinese-chess');
+      },
+    });
+  }
+
+  undoBtn.addEventListener('click', doUndo);
 
   // 收到对方悔棋请求
   offs.push(eventBus.on('game:undoRequest', (data) => {
@@ -430,12 +600,19 @@ export function startMatch(container, matchData) {
   offs.push(eventBus.on('game:undoAccepted', (data) => {
     if (data.gameType && data.gameType !== 'chinese-chess') return;
     toast.success('✅ 悔棋成功！');
+    // 记录被撤销的己方着法，供 Shift+Z 重做（服务端无 redo 协议）
+    lastUndoMove = lastOwnMove;
+    lastOwnMove = null;
     if (data.board) board.init(backendBoardToV2(data.board));
     turn = data.currentPlayer || turn; // 悔棋后轮到请求方走子
     gameOver = false;
     selected = null;
     clearHintMarkers();
     updateTurn();
+    moveLog.clear('棋盘已同步，记录重新开始');
+    updateMoveCount();
+    statsPanel.refresh();
+    sfx.play('click');
   }));
 
   // 悔棋被拒绝
@@ -445,8 +622,9 @@ export function startMatch(container, matchData) {
 
   // ---- 提示（与 v1 一致：request_hint → 服务端 AI 计算 → hint_result 高亮走法；含库存检查与道具卡消耗）----
   hintBtn.addEventListener('click', () => {
+    sfx.play('click');
     if (gameOver) { toast.warn('游戏已结束'); return; }
-    if (turn !== me) { toast.warn('还没轮到你走子'); return; }
+    if (turn !== me) { toast.warn('还没轮到你走子'); sfx.play('error'); return; }
     requestHint(() => {
       emit('request_hint');
       toast.info('💡 正在计算最佳走法…');
@@ -466,18 +644,6 @@ export function startMatch(container, matchData) {
     if (data && data.success === false && data.message) toast.warn(data.message);
   }));
 
-  // ---- 重置（与 v1 一致：reset → 对方确认 → 服务端广播 reset）----
-  resetBtn.addEventListener('click', () => {
-    if (gameOver) { toast.warn('游戏已结束'); return; }
-    modal.show({
-      title: '重置游戏',
-      content: '请求重置棋盘？',
-      confirmText: '请求重置',
-      showCancel: true,
-      onConfirm: () => emit('reset'),
-    });
-  });
-
   // 收到对方重置请求
   offs.push(eventBus.on('game:resetRequest', (data) => {
     if (gameOver) return;
@@ -495,6 +661,10 @@ export function startMatch(container, matchData) {
   // 服务端确认重置后广播 'reset'，双方重建标准开局
   offs.push(eventBus.on('game:reset', () => {
     gameOver = false;
+    lastWinnerText = '';
+    lastOwnMove = null;
+    lastUndoMove = null;
+    pauseCtrl.setPaused(false);
     gameStart = Date.now();
     selected = null;
     clearHintMarkers();
@@ -502,6 +672,12 @@ export function startMatch(container, matchData) {
     turn = RED; // 红先
     updateTurn();
     updateTimer();
+    moveLog.clear('棋盘已重置');
+    moveLog.setWinner('');
+    statsPanel.setWinner('');
+    updateMoveCount();
+    statsPanel.refresh();
+    sfx.play('click');
     toast.success('🔄 游戏已重置');
   }));
 
@@ -520,19 +696,29 @@ export function startMatch(container, matchData) {
     toast.warn(data?.message || '重置请求超时，对方未回应');
   }));
 
-  // 返回大厅按钮
-  leaveBtn.addEventListener('click', () => {
-    if (gameOver) { emit('return_lobby'); go('lobby'); return; }
-    modal.show({
-      title: '返回大厅',
-      content: '确定要退出当前对局吗？',
-      confirmText: '退出',
-      showCancel: true,
-      onConfirm: () => {
-        emit('return_lobby');
-        go('lobby');
-      },
-    });
+  resignBtn.addEventListener('click', doResign);
+  resetBtn.addEventListener('click', doReset);
+  rulesBtn.addEventListener('click', () => showRules('chinese-chess'));
+  statsBtn.addEventListener('click', doStats);
+  exportBtn.addEventListener('click', doExport);
+  leaveBtn.addEventListener('click', doBack);
+
+  const gameKeys = bindGameKeys({
+    isPaused: () => paused,
+    setPaused: (v) => {
+      if (gameOver) return;
+      pauseCtrl.setPaused(v);
+      toast.info(v ? '⏸ 已暂停，按 P 继续' : '▶ 已继续');
+    },
+    handlers: {
+      undo: doUndo,
+      redo: doRedo,
+      resign: doResign,
+      newGame: doReset,
+      rematch: doRematch,
+      back: doBack,
+      rules: () => showRules('chinese-chess'),
+    },
   });
 
   // 启动计时器
@@ -552,6 +738,10 @@ export function startMatch(container, matchData) {
       if (stateSyncTimer) clearTimeout(stateSyncTimer);
       offs.forEach((off) => off());
       if (timerHandle) clearInterval(timerHandle);
+      try { gameKeys.destroy(); } catch { /* noop */ }
+      try { latencyProbe.destroy(); } catch { /* noop */ }
+      try { pauseCtrl.destroy(); } catch { /* noop */ }
+      try { statsPanel.destroy(); } catch { /* noop */ }
       container.innerHTML = '';
       board.destroy();
     },

@@ -5,7 +5,7 @@
  * 分类：
  * - 🎨 外观：动画效果、界面密度
  * - 🧩 界面：导航栏与账号入口、启动页、悬浮与提醒（聊天坞 / 好友红点 / 好友申请提示）
- * - 🎮 对局：棋盘最后一步标记
+ * - 🎮 对局：棋盘最后一步标记、游戏音效
  * - ⌨ 快捷键：全部快捷键与自定义键位
  * - 👤 账号：密码、隐私、退出登录
  * - 🔗 更多：个人资料、重放新手指引、恢复默认
@@ -33,6 +33,7 @@ import {
   getUiPrefs, setUiPrefs, resetUiPrefs,
 } from '../../core/prefs.js';
 import { startOnboarding, resetOnboarding, resetAllTours } from '../../components/onboarding.js';
+import { sfx } from '../../core/sfx.js';
 
 /** 分区外壳 */
 function section(title, hint, children) {
@@ -371,6 +372,17 @@ export function renderSettings(container) {
             onChange: (v) => {
               setUiPrefs({ lastMove: v });
               toast.success(v ? '已显示最后一步标记' : '已隐藏最后一步标记');
+            },
+          }),
+        ]),
+        section('🔊 声音', '对局过程中的合成音效，不需要任何音频资源。', [
+          switchRow({
+            name: '游戏音效',
+            hint: '落子 / 吃子 / 胜利 / 错误提示音',
+            checked: prefs.sfxEnabled,
+            onChange: (v) => {
+              sfx.setEnabled(v);
+              toast.success(v ? '已开启游戏音效' : '已关闭游戏音效');
             },
           }),
         ]),

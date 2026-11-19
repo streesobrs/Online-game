@@ -215,8 +215,16 @@ app.use('/themes', express.static(path.join(__dirname, 'config', 'themes')));
 app.use('/data/cosmetics/avatars', express.static(path.join(__dirname, '..', 'data', 'cosmetics', 'avatars')));
 
 // v2 客户端灰度访问入口（不影响 v1）
-app.use('/beta', express.static(path.join(__dirname, '..', 'client-v2')));
-app.use('/preview', express.static(path.join(__dirname, '..', 'client-v2')));
+// 第三方库（vendor/three 等）体积大、变更少，单独给 1 小时浏览器缓存，减少重复下载
+const v2StaticOptions = {
+  setHeaders(res, filePath) {
+    if (/[\\/]vendor[\\/]/.test(filePath)) {
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+    }
+  },
+};
+app.use('/beta', express.static(path.join(__dirname, '..', 'client-v2'), v2StaticOptions));
+app.use('/preview', express.static(path.join(__dirname, '..', 'client-v2'), v2StaticOptions));
 
 // 刷怪肉鸽图鉴目录：返回 buffs/ 与 monsters/ 下的单文件列表，前端动态 import 后自动排布
 app.get('/api/survivors/catalog', (req, res) => {
@@ -1654,6 +1662,30 @@ app.get('/api/users/all', async (req, res) => {
       success: false,
       message: '获取所有玩家失败'
     });
+  }
+});
+
+// 批量获取玩家公开外观（聊天/在线列表一次请求拿全部头像，避免 N 个用户 N 次请求）
+app.get('/api/users/cosmetics', async (req, res) => {
+  try {
+    const ids = String(req.query.ids || '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean)
+      .slice(0, 50);
+    const entries = await Promise.all(
+      ids.map(async (id) => {
+        const account = await accountManager.getAccount(id);
+        return [id, account ? { equipped: account.cosmetics?.equipped || {} } : null];
+      })
+    );
+    res.json({
+      success: true,
+      data: Object.fromEntries(entries.filter(([, value]) => value))
+    });
+  } catch (err) {
+    logger.error('批量获取玩家外观失败', { error: err.message });
+    res.status(500).json({ success: false, message: '批量获取玩家外观失败' });
   }
 });
 

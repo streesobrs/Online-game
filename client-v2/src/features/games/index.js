@@ -1225,11 +1225,12 @@ export function renderGames(container) {
   // 服务端已恢复会话（game_reconnected / ai_game_start reconnected）或主动查询（get_current_game）
   function applyReconnectSnapshot(data) {
     if (!data || !data.gameType) return;
-    state.reconnectGame = data;
-    store.set('reconnectGame', data);
-    // 若正在对局/匹配中，不打断；否则展示恢复面板
+    // 若正在对局/匹配中，不打断；也不写入恢复快照，避免对局内轮询（网络延迟探测）
+    // 把当前快照写进 store，导致回到大厅后出现已过期的「恢复对局」面板
     if (state.isMatching) return;
     if (currentCleanup) return; // 已在对局内（如对局中 socket 重连），不覆盖
+    state.reconnectGame = data;
+    store.set('reconnectGame', data);
     renderMain();
   }
   const offReconnected = eventBus.on('game:reconnected', (data) => applyReconnectSnapshot(data));
@@ -1431,6 +1432,25 @@ export function renderGames(container) {
     emit('get_current_game');
   }
 
+  // ---- 对局内「重新匹配」（M）：退出当前对局并回到大厅自动开始匹配 ----
+  const offRematch = eventBus.on('games:rematch', (gameId) => {
+    if (typeof currentCleanup === 'function') { currentCleanup(); currentCleanup = null; }
+    stopGameActivity();
+    const target = ALL_GAME_MAP[gameId];
+    if (!target) return;
+    state.selectedGame = gameId;
+    state.isMatching = false;
+    state.reconnectGame = null;
+    store.set('reconnectGame', null);
+    renderPicker();
+    renderMain();
+    // 等一帧让大厅重新挂载后再发起匹配
+    setTimeout(() => {
+      if (gameId === 'doudizhu') startDDZMatch();
+      else startMatch();
+    }, 60);
+  });
+
   // ---- 页面内快捷键（走统一分发，键位由设置页「⌨ 快捷键」决定）----
   function runLobbyShortcut(op) {
     if (!op) return;
@@ -1480,6 +1500,7 @@ export function renderGames(container) {
       emit('ddz_leave');
     }
     unregisterLobbyShortcut();
+    offRematch();
     offMatchSuccess();
     offMatchTimeout();
     offSnakeFound();

@@ -44,6 +44,22 @@ async function request(path, options = {}) {
   return res.json();
 }
 
+/**
+ * 全局静态配置缓存：外观配置、等级经验表等在会话内不变，
+ * 多个模块/多个用户头像同时请求时复用同一个 Promise，避免重复网络请求。
+ */
+const staticConfigCache = new Map();
+function cachedGet(path) {
+  if (!staticConfigCache.has(path)) {
+    const p = request(path, { method: 'GET' }).catch((err) => {
+      staticConfigCache.delete(path); // 失败允许下次重试
+      throw err;
+    });
+    staticConfigCache.set(path, p);
+  }
+  return staticConfigCache.get(path);
+}
+
 /** 全局 API 对象 */
 export const api = {
   get: (path) => request(path, { method: 'GET' }),
@@ -78,8 +94,8 @@ export const api = {
     getVip: (userId) => api.get(`/api/shop/vip?userId=${encodeURIComponent(userId || '')}`),
     /** 用户外观（已拥有 + 已装备） */
     getCosmetics: (userId) => api.get(`/api/shop/cosmetics?userId=${encodeURIComponent(userId || '')}`),
-    /** 全部外观配置 */
-    getCosmeticsConfig: () => api.get('/api/shop/cosmetics/config'),
+    /** 全部外观配置（静态配置，会话内缓存） */
+    getCosmeticsConfig: () => cachedGet('/api/shop/cosmetics/config'),
     /** 装备外观 */
     equipCosmetic: (userId, category, cosmeticId) => api.post('/api/shop/cosmetics/equip', { userId, category, cosmeticId }),
     /** 抽奖信息（费用 / 保底 / 碎片 / 奖池 / 记录） */
@@ -112,8 +128,8 @@ export const api = {
       const sep = accountId.includes('?') ? '&' : '?';
       return api.get(`/api/profile/${encodeURIComponent(accountId)}${sep}selfId=${encodeURIComponent(selfId)}`);
     },
-    /** 等级经验配置（levelExp.json：{level: 升到下一级所需经验}） */
-    levelExp: () => api.get('/api/config/levelExp'),
+    /** 等级经验配置（静态配置，会话内缓存） */
+    levelExp: () => cachedGet('/api/config/levelExp'),
   },
 
   daily: {
@@ -182,6 +198,8 @@ export const api = {
     search: (query) => api.get(`/api/users/search?q=${encodeURIComponent(query)}`),
     /** 指定玩家公开外观（仅已装备，他人头像展示用） */
     getCosmetics: (accountId) => api.get(`/api/users/${encodeURIComponent(accountId)}/cosmetics`),
+    /** 批量获取指定玩家公开外观（头像列表一次请求） */
+    getCosmeticsBatch: (accountIds) => api.get(`/api/users/cosmetics?ids=${accountIds.map(encodeURIComponent).join(',')}`),
   },
 
   /** 好友系统（MVP） */

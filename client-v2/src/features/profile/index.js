@@ -21,6 +21,7 @@ import { store } from '../../core/store.js';
 import { eventBus } from '../../core/eventBus.js';
 import * as auth from '../../core/auth.js';
 import { requestReplay, showReplay } from '../replay/index.js';
+import { exportGameData } from '../../games/move-log.js';
 import { resetOnboarding, resetAllTours, startOnboarding, startMailTour, startAssetsTour } from '../../components/onboarding.js';
 import { buildPrivacyRows, mergePrivacy } from '../../components/privacyPanel.js';
 import { titleBadge, applyGlobalAppearance } from '../../utils/cosmetics.js';
@@ -41,6 +42,9 @@ const HISTORY_GAME_META = {
   ...GAME_META,
   match3: { name: '消消乐', icon: '🍬' },
 };
+
+/** 可导出对局数据的棋类（单人玩法 / 斗地主无棋子记录格式） */
+const EXPORTABLE_GAME_TYPES = new Set(['gobang', 'go', 'chinese-chess']);
 
 /** 消消乐模式名称 */
 const MATCH3_MODE_NAMES = {
@@ -1519,11 +1523,28 @@ export function renderProfile(container) {
     }, '下一页');
     const pagerEl = el('div', { class: 'profile-pager' }, [prevBtn, pagerInfo, nextBtn]);
 
+    const importInput = el('input', {
+      type: 'file',
+      accept: '.json,application/json',
+      hidden: true,
+      onChange: (e) => {
+        importReplayFile(e.target.files && e.target.files[0]);
+        e.target.value = '';
+      },
+    });
+    const importBtn = el('button', {
+      class: 'profile-pager-btn',
+      title: '导入对局 JSON 并回放',
+      onClick: () => importInput.click(),
+    }, '📥 导入');
+
     const filterBar = el('div', { class: 'profile-filter-bar' }, [
       el('span', { class: 'profile-filter-label' }, '游戏:'),
       buildFilter('type', ['all', ...Object.keys(HISTORY_GAME_META)]),
       el('span', { class: 'profile-filter-label' }, '结果:'),
       buildFilter('result', ['all', 'win', 'loss', 'draw']),
+      importBtn,
+      importInput,
       viewToggle,
     ]);
 
@@ -1588,6 +1609,102 @@ export function renderProfile(container) {
     }
   }
 
+  /** 导入 v1 导出格式的对局 JSON，转换成回放数据结构后直接播放 */
+  function importReplayFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(String(reader.result || ''));
+        const gameType = (data.gameType === 'chess' || data.gameType === 'xiangqi')
+          ? 'chinese-chess'
+          : data.gameType;
+        if (!EXPORTABLE_GAME_TYPES.has(gameType)) throw new Error('不支持的对局类型');
+        const log = Array.isArray(data.moveLog) ? data.moveLog : [];
+        if (!log.length) throw new Error('文件中没有着法记录');
+
+        const isChess = gameType === 'chinese-chess';
+        const moves = log.map((m) => {
+          // 象棋：red=1 / black=2；其余：black=1 / white=2
+          const color = isChess ? (m.color === 'red' ? 1 : 2) : (m.color === 'black' ? 1 : 2);
+          if (isChess) {
+            const from = m.fromPosition || [];
+            const to = m.toPosition || [];
+            if (from.length < 2 || to.length < 2) throw new Error('象棋着法格式不正确');
+            return { color, position: { fromR: from[0], fromC: from[1], toR: to[0], toC: to[1], piece: m.piece || null } };
+          }
+          const pos = m.position || [];
+          if (pos.length < 2) throw new Error('着法位置格式不正确');
+          return { color, position: { r: pos[0], c: pos[1] } };
+        });
+
+        const sides = isChess ? ['红方', '黑方'] : ['黑方', '白方'];
+        showReplay({
+          gameType,
+          player1: { nickname: `${sides[0]}（导入）` },
+          player2: { nickname: `${sides[1]}（导入）` },
+          moves,
+        });
+        toast.success('📥 已导入对局，开始回放');
+      } catch (err) {
+        toast.error(err.message || '导入失败：文件格式不正确');
+      }
+    };
+    reader.onerror = () => toast.error('文件读取失败');
+    reader.readAsText(file);
+  }
+
+  /** 从回放数据导出 v1 格式的对局 JSON（历史记录没有实时着法，需要先拉回放） */
+  async function exportHistoryGame(g) {
+    if (!g.gameId) {
+      toast.warn('该对局无回放记录，无法导出');
+      return;
+    }
+    toast.info('⏳ 准备导出数据...');
+    try {
+      const replay = await requestReplay(g.gameId);
+      const myId = String(currentUserId());
+      const me = String(replay.player1?.id) === myId ? 1 : (String(replay.player2?.id) === myId ? 2 : 1);
+      const opponent = me === 1 ? replay.player2?.id : replay.player1?.id;
+
+      const entries = (replay.moves || []).map((m) => {
+        const pos = m.position || {};
+        const isSelf = m.player != null ? String(m.player) === myId : Number(m.color) === me;
+        const base = {
+          color: m.color,
+          isSelf,
+          ts: m.timestamp || replay.startTime || Date.now(),
+        };
+        if (g.gameType === 'chinese-chess') {
+          return { ...base, fromR: pos.fromR, fromC: pos.fromC, toR: pos.toR, toC: pos.toC, piece: pos.piece || null };
+        }
+        return { ...base, r: pos.r, c: pos.c };
+      }).filter((e) => (g.gameType === 'chinese-chess'
+        ? e.fromR !== undefined && e.toR !== undefined
+        : typeof e.r === 'number' && typeof e.c === 'number'));
+
+      const winner = replay.winner == null || replay.winner === 'draw'
+        ? 'draw'
+        : (String(replay.winner) === myId ? 'me' : 'opponent');
+
+      const data = exportGameData({
+        gameType: g.gameType,
+        me,
+        opponentId: opponent,
+        entries,
+        durationSec: replay.duration || g.duration || 0,
+        winner,
+      });
+      if (!data) {
+        toast.warn('该对局暂无可导出的着法');
+        return;
+      }
+      toast.success('📤 已导出对局数据');
+    } catch (err) {
+      toast.error(err.message || '导出失败');
+    }
+  }
+
   function historyCard(g) {
     const meta = HISTORY_GAME_META[g.gameType] || { name: g.gameType, icon: '🎮' };
     const resultMap = { win: ['胜利', '#48bb78'], loss: ['失败', '#e53e3e'], draw: ['平局', '#718096'] };
@@ -1617,6 +1734,14 @@ export function renderProfile(container) {
     // 右侧操作区固定两列：消消乐没有回放，用等宽占位保证「详情」按钮上下对齐
     const canReplay = g.gameType !== 'match3' && Number(g.moves) > 0;
     const actions = el('div', { class: 'profile-history-actions' }, [
+      canReplay && EXPORTABLE_GAME_TYPES.has(g.gameType)
+        ? el('button', {
+            class: 'profile-history-replay',
+            style: 'background:#27ae60;',
+            title: '导出本局数据（JSON）',
+            onClick: () => exportHistoryGame(g),
+          }, '📤 导出')
+        : null,
       canReplay
         ? el('button', {
             class: 'profile-history-replay',
@@ -1638,7 +1763,7 @@ export function renderProfile(container) {
         title: '查看本局详情',
         onClick: () => openGameDetail(g),
       }, '详情'),
-    ]);
+    ].filter(Boolean));
 
     return el('div', { class: 'profile-history-item' }, [
       el('div', { class: 'profile-history-main' }, [

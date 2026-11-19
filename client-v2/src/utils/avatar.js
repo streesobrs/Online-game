@@ -55,6 +55,8 @@ export function avatarEl(cosmetics, cosmeticConfig, size = 36) {
         class: 'v2-avatar-img',
         src: av.src,
         alt: '',
+        loading: 'lazy',
+        decoding: 'async',
         style: `width:${inner}px;height:${inner}px;${plate}`,
       })
     : el('span', {
@@ -70,6 +72,51 @@ export function avatarEl(cosmetics, cosmeticConfig, size = 36) {
 // 模块级缓存：userId -> { cosmetics, cosmeticConfig }（会话内不变）
 const cache = new Map();
 const loading = new Map(); // userId -> Promise
+// 外观配置是全局静态数据，所有用户共用一份：只请求一次，避免 N 个用户发 N 次配置请求
+let configPromise = null;
+function fetchCosmeticConfig() {
+  if (!configPromise) {
+    configPromise = api.shop.getCosmeticsConfig()
+      .then((res) => res?.cosmetics || null)
+      .catch(() => {
+        configPromise = null; // 失败允许下次重试
+        return null;
+      });
+  }
+  return configPromise;
+}
+
+// 同一轮渲染会创建多个头像：把请求合并成一次批量接口（聊天/在线列表从 N 次降到 1 次）
+const pendingAvatarRequests = new Map(); // userId -> [resolve]
+let avatarBatchTimer = null;
+const AVATAR_BATCH_SIZE = 50;
+
+function requestUserCosmetics(userId) {
+  return new Promise((resolve) => {
+    if (!pendingAvatarRequests.has(userId)) pendingAvatarRequests.set(userId, []);
+    pendingAvatarRequests.get(userId).push(resolve);
+    if (!avatarBatchTimer) avatarBatchTimer = setTimeout(flushAvatarBatch, 0);
+  });
+}
+
+function flushAvatarBatch() {
+  avatarBatchTimer = null;
+  const ids = Array.from(pendingAvatarRequests.keys()).slice(0, AVATAR_BATCH_SIZE);
+  const waiters = new Map();
+  ids.forEach((id) => {
+    waiters.set(id, pendingAvatarRequests.get(id));
+    pendingAvatarRequests.delete(id);
+  });
+  if (pendingAvatarRequests.size) avatarBatchTimer = setTimeout(flushAvatarBatch, 0);
+  api.users.getCosmeticsBatch(ids)
+    .then((res) => {
+      const map = res?.data || {};
+      ids.forEach((id) => (waiters.get(id) || []).forEach((fn) => fn(map[id] || null)));
+    })
+    .catch(() => {
+      ids.forEach((id) => (waiters.get(id) || []).forEach((fn) => fn(null)));
+    });
+}
 
 /** 拉取用户外观（带缓存，失败返回空数据） */
 export function fetchAvatarData(userId) {
@@ -77,12 +124,12 @@ export function fetchAvatarData(userId) {
   if (cache.has(userId)) return Promise.resolve(cache.get(userId));
   if (loading.has(userId)) return loading.get(userId);
   const p = Promise.all([
-    // 头像展示只需要已装备数据，走公开接口，避免对他人使用 requireSelf 接口触发 403
-    api.users.getCosmetics(userId).catch(() => null),
-    api.shop.getCosmeticsConfig().catch(() => null),
+    // 头像展示只需要已装备数据，走公开批量接口，避免对他人使用 requireSelf 接口触发 403
+    requestUserCosmetics(userId).catch(() => null),
+    fetchCosmeticConfig(),
   ])
-    .then(([cosRes, cfgRes]) => {
-      const data = { cosmetics: cosRes?.cosmetics || null, cosmeticConfig: cfgRes?.cosmetics || null };
+    .then(([cosmetics, cosmeticConfig]) => {
+      const data = { cosmetics: cosmetics || null, cosmeticConfig };
       cache.set(userId, data);
       loading.delete(userId);
       return data;

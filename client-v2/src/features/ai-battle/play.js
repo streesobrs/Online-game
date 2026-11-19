@@ -24,6 +24,13 @@ import { el } from '../../utils/dom.js';
 import { toast } from '../../components/toast.js';
 import { modal } from '../../components/modal.js';
 import { go } from '../../core/router.js';
+import { sfx } from '../../core/sfx.js';
+import { showRules } from '../../games/rules-dialog.js';
+import { bindGameKeys } from '../../games/game-keys.js';
+import { createMoveLog, exportGameData } from '../../games/move-log.js';
+import {
+  createInfoTags, createLatencyProbe, createStatsPanel, createPauseController,
+} from '../../games/game-hud.js';
 
 let activeBattle = null;
 
@@ -81,14 +88,39 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
   let selected = null; // 象棋选子
   let myLastMove = null; // 我方最近一步落点（绿色标记）
   let aiLastMove = null; // AI 最近一步落点（红色标记）
+  // 阶段 A：暂停 / 记录 / 重做
+  let paused = false;
+  let lastOwnMove = null;
+  let lastUndoMove = null;
+  let lastWinnerText = '';
 
   // ---- 信息栏 ----
   const turnEl = el('span', { class: 'ai-info-tag' });
   const timerEl = el('span', { class: 'ai-info-tag' });
   const diffEl = el('span', { class: 'ai-info-tag' });
+  const { moveCountEl, latencyEl } = createInfoTags('ai-info-tag');
   const undoBtn = el('button', { class: 'btn btn-secondary' }, '⏪ 悔棋');
   const hintBtn = el('button', { class: 'btn btn-secondary' }, '💡 提示');
+  const rulesBtn = el('button', { class: 'btn btn-secondary', title: '规则（T）' }, '📜 规则');
+  const statsBtn = el('button', { class: 'btn btn-secondary' }, '📈 统计');
+  const exportBtn = el('button', { class: 'btn btn-secondary' }, '📤 导出');
   const backBtn = el('button', { class: 'btn btn-secondary' }, '返回AI入口');
+
+  // ---- 阶段 A：落子记录 / 高级统计 ----
+  const moveLog = createMoveLog({
+    gameType,
+    me,
+    opponentName: 'AI',
+  });
+  const statsPanel = createStatsPanel({
+    gameType,
+    getBoard: () => (board ? board.board : null),
+    getEntries: () => moveLog.getEntries(),
+  });
+
+  function updateMoveCount() {
+    moveCountEl.textContent = `🖐 手数：${moveLog.size()}`;
+  }
 
   function updateTurn() {
     if (gameOver) return;
@@ -97,7 +129,7 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
   }
 
   function updateTimer() {
-    const s = Math.floor((Date.now() - startTime) / 1000);
+    const s = Math.floor((Date.now() - startTime - (pauseCtrl ? pauseCtrl.getPausedMs() : 0)) / 1000);
     timerEl.textContent = `⏱ ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   }
 
@@ -110,11 +142,18 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
   if (gameType === 'gobang') {
     board = createBoard(boardEl, {
       onPlace: (r, c) => {
-        if (gameOver || !myTurn) { toast.warn('还没轮到你落子'); return; }
+        if (gameOver || paused) return;
+        if (!myTurn) { toast.warn('还没轮到你落子'); sfx.play('error'); return; }
         clearHintMarkers(boardEl); // 落子后清除提示标记
         board.place(r, c, me);
         myTurn = false;
         updateTurn();
+        lastOwnMove = { r, c };
+        lastUndoMove = null;
+        moveLog.add({ color: me, isSelf: true, r, c });
+        updateMoveCount();
+        statsPanel.refresh();
+        sfx.play('place');
         emit('ai_move', { position: { r, c } });
         // 本地即时提示（正式结果以服务端 ai_game_end 为准）
         if (checkWin(board.board, r, c, me)) {
@@ -126,11 +165,18 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
   } else if (gameType === 'go') {
     board = createGoBoard(boardEl, {
       onPlace: (r, c) => {
-        if (gameOver || !myTurn) { toast.warn('还没轮到你落子'); return; }
+        if (gameOver || paused) return;
+        if (!myTurn) { toast.warn('还没轮到你落子'); sfx.play('error'); return; }
         clearHintMarkers(boardEl); // 落子后清除提示标记
         board.place(r, c, me);
         myTurn = false;
         updateTurn();
+        lastOwnMove = { r, c };
+        lastUndoMove = null;
+        moveLog.add({ color: me, isSelf: true, r, c });
+        updateMoveCount();
+        statsPanel.refresh();
+        sfx.play('place');
         emit('ai_move', { position: { r, c } });
       },
     });
@@ -138,7 +184,7 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
   } else if (gameType === 'chinese-chess') {
     board = createChessBoard(boardEl, {
       onCellClick: (r, c) => {
-        if (gameOver || !myTurn) return;
+        if (gameOver || paused || !myTurn) return;
         const piece = board.get(r, c);
         // 已有选中棋子：尝试走子
         if (selected) {
@@ -152,6 +198,7 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
           if (isValidMove(board.board, selected.r, selected.c, r, c)) {
             const fromR = selected.r, fromC = selected.c;
             const pieceName = board.get(fromR, fromC).name;
+            const captured = board.get(r, c);
             clearHintMarkers(boardEl); // 走子后清除提示标记
             board.movePiece(fromR, fromC, r, c);
             myLastMove = { r, c };
@@ -160,6 +207,12 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
             selected = null;
             myTurn = false;
             updateTurn();
+            lastOwnMove = { fromR, fromC, toR: r, toC: c };
+            lastUndoMove = null;
+            moveLog.add({ color: me, isSelf: true, fromR, fromC, toR: r, toC: c, piece: pieceName });
+            updateMoveCount();
+            statsPanel.refresh();
+            sfx.play(captured ? 'capture' : 'place');
             emit('ai_move', {
               position: { fromR, fromC, toR: r, toC: c, piece: pieceName },
             });
@@ -189,18 +242,41 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
     if (myLastMove) board.addLastMove(myLastMove.r, myLastMove.c, true);
   }
 
+  const boardContainer = el('div', { class: 'game-board-container' }, [boardEl]);
+  const sidePanels = el('div', { class: 'game-side-panels' }, [moveLog.el, statsPanel.el]);
+
   container.innerHTML = '';
   container.append(
-    el('div', { class: 'game-stage' }, [
+    el('div', { class: 'game-stage game-stage--panels' }, [
       el('div', { class: 'game-status-bar' }, [
-        el('div', { class: 'game-status-group' }, [turnEl, diffEl, timerEl]),
+        el('div', { class: 'game-status-group' }, [turnEl, diffEl, timerEl, moveCountEl, latencyEl]),
         el('div', { class: 'game-status-spacer' }),
         backBtn,
       ]),
-      el('div', { class: 'game-board-container' }, [boardEl]),
-      el('div', { class: 'game-tools-bar' }, [undoBtn, hintBtn]),
+      boardContainer,
+      el('div', { class: 'game-tools-bar' }, [undoBtn, hintBtn, rulesBtn, statsBtn, exportBtn]),
+      sidePanels,
     ])
   );
+
+  // ---- 阶段 A：暂停 / 延迟 / 记录 ----
+  const pauseCtrl = createPauseController({
+    boardContainer,
+    onChange: (v) => {
+      paused = v;
+      updateTimer();
+    },
+  });
+
+  const latencyProbe = createLatencyProbe({
+    isPaused: () => paused,
+    onChange: (ms) => {
+      latencyEl.textContent = ms == null ? '📶 --ms' : `📶 ${ms}ms`;
+    },
+  });
+  latencyProbe.start();
+  updateMoveCount();
+  statsPanel.refresh();
 
   // 自适应棋盘尺寸 (根据游戏类型动态计算)：以棋盘容器实际可用空间为准
   const fitBoardSize = () => {
@@ -346,12 +422,28 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
       if (position && position.r != null && position.c != null) {
         board.place(position.r, position.c, color);
         board.turn = BLACK;
+        moveLog.add({ color, isSelf: false, r: position.r, c: position.c });
+        updateMoveCount();
+        statsPanel.refresh();
+        sfx.play('place');
       }
     } else if (gameType === 'chinese-chess' && position && position.toR != null) {
       aiLastMove = { r: position.toR, c: position.toC };
       refreshLastMoves();
       board.clearSelection();
       selected = null;
+      moveLog.add({
+        color: 2,
+        isSelf: false,
+        fromR: position.fromR,
+        fromC: position.fromC,
+        toR: position.toR,
+        toC: position.toC,
+        piece: position.piece || null,
+      });
+      updateMoveCount();
+      statsPanel.refresh();
+      sfx.play('place');
       // 本地检测将死（服务端也判定，双保险）
       if (isCheckmate(board.board, 'red')) {
         finishGame('loss');
@@ -375,20 +467,134 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
     finishGame(data.result === 'win' ? 'win' : 'loss');
   }));
 
+  // ---- 阶段 A：对局操作函数（按钮与快捷键共用）----
   // ---- 悔棋（对齐 v1：AI 对局由服务端直接执行悔棋，无需对手确认）----
-  undoBtn.addEventListener('click', () => {
+  function doUndo() {
+    sfx.play('click');
     if (gameOver) { toast.warn('游戏已结束，无法悔棋'); return; }
-    if (!myTurn) { toast.warn('AI 思考中，暂时无法悔棋'); return; }
+    if (!myTurn) { toast.warn('AI 思考中，暂时无法悔棋'); sfx.play('error'); return; }
     requestUndo(() => {
       emit('undo_request');
       toast.info('⏪ 悔棋请求已发送…');
     });
-  });
+  }
+
+  /** 重做：重发被撤销的己方着法（服务端无 redo 协议） */
+  function doRedo() {
+    if (gameOver) { toast.warn('游戏已结束，无法重做'); sfx.play('error'); return; }
+    if (!lastUndoMove) { toast.info('暂无可重做的着法'); sfx.play('error'); return; }
+    if (!myTurn) { toast.warn('AI 思考中，请稍候'); sfx.play('error'); return; }
+    const mv = lastUndoMove;
+    lastUndoMove = null;
+
+    if (gameType === 'chinese-chess') {
+      const piece = board.get(mv.fromR, mv.fromC);
+      if (!piece) { toast.warn('无法重做：起点已无棋子'); return; }
+      const target = board.get(mv.toR, mv.toC);
+      board.movePiece(mv.fromR, mv.fromC, mv.toR, mv.toC);
+      myLastMove = { r: mv.toR, c: mv.toC };
+      refreshLastMoves();
+      board.clearSelection();
+      selected = null;
+      myTurn = false;
+      updateTurn();
+      lastOwnMove = mv;
+      moveLog.add({ color: 1, isSelf: true, fromR: mv.fromR, fromC: mv.fromC, toR: mv.toR, toC: mv.toC, piece: piece.name });
+      updateMoveCount();
+      statsPanel.refresh();
+      sfx.play(target ? 'capture' : 'place');
+      emit('ai_move', { position: { fromR: mv.fromR, fromC: mv.fromC, toR: mv.toR, toC: mv.toC, piece: piece.name } });
+    } else {
+      if (board.board[mv.r]?.[mv.c] !== 0) { toast.warn('无法重做：该位置已有棋子'); return; }
+      board.place(mv.r, mv.c, me);
+      myTurn = false;
+      updateTurn();
+      lastOwnMove = { r: mv.r, c: mv.c };
+      moveLog.add({ color: me, isSelf: true, r: mv.r, c: mv.c });
+      updateMoveCount();
+      statsPanel.refresh();
+      sfx.play('place');
+      emit('ai_move', { position: { r: mv.r, c: mv.c } });
+    }
+    toast.success('↪️ 已重做上一步');
+  }
+
+  function doResign() {
+    sfx.play('click');
+    if (gameOver) { toast.warn('游戏已结束'); return; }
+    modal.show({
+      title: '认输',
+      content: '确定要认输吗？',
+      confirmText: '认输',
+      showCancel: true,
+      onConfirm: () => finishGame('loss'),
+    });
+  }
+
+  function doRestart() {
+    sfx.play('click');
+    modal.show({
+      title: '新对局',
+      content: '将结束当前对局并重新开始，确定继续？',
+      confirmText: '重新开始',
+      showCancel: true,
+      onConfirm: () => {
+        cleanupBattle();
+        startAIBattle(container, { gameType, difficulty });
+      },
+    });
+  }
+
+  function doStats() {
+    sfx.play('click');
+    const shown = statsPanel.toggle();
+    statsBtn.textContent = shown ? '📈 收起统计' : '📈 统计';
+    if (shown) statsPanel.refresh();
+  }
+
+  function doExport() {
+    sfx.play('click');
+    const data = exportGameData({
+      gameType,
+      me,
+      opponentId: 'AI',
+      entries: moveLog.getEntries(),
+      durationSec: (Date.now() - startTime - pauseCtrl.getPausedMs()) / 1000,
+      winner: lastWinnerText,
+      maxChain: null,
+    });
+    if (!data) {
+      toast.warn('暂无可导出的着法');
+      sfx.play('error');
+      return;
+    }
+    toast.success('📤 已导出对局数据');
+  }
+
+  function doBack() {
+    sfx.play('click');
+    if (gameOver) { go('ai-battle'); return; }
+    modal.show({
+      title: '返回AI对战',
+      content: '确定要退出当前对局吗？',
+      confirmText: '退出',
+      showCancel: true,
+      onConfirm: () => {
+        emit('return_lobby');
+        go('ai-battle');
+      },
+    });
+  }
+
+  undoBtn.addEventListener('click', doUndo);
 
   // 悔棋成功：用服务端棋盘恢复（撤销玩家与 AI 各一步）
   offs.push(eventBus.on('game:undoAccepted', (data) => {
     if (data.isAI === false) return; // 只处理 AI 对局的悔棋回执
     if (!data.board) return;
+    // 记录被撤销的己方着法，供 Shift+Z 重做（服务端无 redo 协议）
+    lastUndoMove = lastOwnMove;
+    lastOwnMove = null;
     if (gameType === 'chinese-chess') {
       const layout = convertBackendBoardToFrontend(data.board);
       if (layout) board.init(layout);
@@ -404,13 +610,18 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
     gameOver = false;
     myTurn = true; // 悔棋后轮到玩家
     updateTurn();
+    moveLog.clear('棋盘已同步，记录重新开始');
+    updateMoveCount();
+    statsPanel.refresh();
+    sfx.play('click');
     toast.success('✅ 悔棋成功，轮到你了');
   }));
 
   // ---- 提示（对齐 v1：request_hint → hint_result 高亮推荐位置）----
   hintBtn.addEventListener('click', () => {
+    sfx.play('click');
     if (gameOver) { toast.warn('游戏已结束'); return; }
-    if (!myTurn) { toast.warn('AI 思考中，暂时无法提示'); return; }
+    if (!myTurn) { toast.warn('AI 思考中，暂时无法提示'); sfx.play('error'); return; }
     requestHint(() => {
       emit('request_hint');
       toast.info('💡 正在计算最佳位置...');
@@ -436,6 +647,10 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
     resultSent = true;
     if (timerHandle) clearInterval(timerHandle);
     updateTurn();
+    lastWinnerText = result === 'win' ? 'me' : 'opponent';
+    moveLog.setWinner(lastWinnerText);
+    statsPanel.setWinner(lastWinnerText);
+    sfx.play(result === 'win' ? 'win' : 'error');
 
     // 上报结果（服务端 endAIGame 有 finished 幂等保护，重复发送安全）
     emit('ai_game_result', {
@@ -458,19 +673,28 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
     });
   }
 
-  // 返回按钮
-  backBtn.addEventListener('click', () => {
-    if (gameOver) { go('ai-battle'); return; }
-    modal.show({
-      title: '返回AI对战',
-      content: '确定要退出当前对局吗？',
-      confirmText: '退出',
-      showCancel: true,
-      onConfirm: () => {
-        emit('return_lobby');
-        go('ai-battle');
-      },
-    });
+  // 返回按钮 + 阶段 A 工具栏 / 快捷键
+  rulesBtn.addEventListener('click', () => showRules(gameType));
+  statsBtn.addEventListener('click', doStats);
+  exportBtn.addEventListener('click', doExport);
+  backBtn.addEventListener('click', doBack);
+
+  const gameKeys = bindGameKeys({
+    isPaused: () => paused,
+    setPaused: (v) => {
+      if (gameOver) return;
+      pauseCtrl.setPaused(v);
+      toast.info(v ? '⏸ 已暂停，按 P 继续' : '▶ 已继续');
+    },
+    handlers: {
+      undo: doUndo,
+      redo: doRedo,
+      resign: doResign,
+      newGame: doRestart,
+      rematch: doRestart,
+      back: doBack,
+      rules: () => showRules(gameType),
+    },
   });
 
   // 计时器
@@ -486,6 +710,10 @@ export function startAIBattle(container, { gameType, difficulty, snapshot }) {
       if (stateSyncTimer) clearTimeout(stateSyncTimer);
       offs.forEach((off) => off());
       if (timerHandle) clearInterval(timerHandle);
+      try { gameKeys.destroy(); } catch { /* noop */ }
+      try { latencyProbe.destroy(); } catch { /* noop */ }
+      try { pauseCtrl.destroy(); } catch { /* noop */ }
+      try { statsPanel.destroy(); } catch { /* noop */ }
       if (board && typeof board.destroy === 'function') board.destroy();
       container.innerHTML = '';
     },

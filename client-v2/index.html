@@ -23,6 +23,7 @@
   <link rel="stylesheet" href="./src/games/train3d/styles.css">
   <link rel="stylesheet" href="./src/games/survivors/styles.css">
   <link rel="stylesheet" href="./src/games/doudizhu/styles.css">
+  <link rel="stylesheet" href="./src/games/panels.css">
   <!-- 功能模块样式 -->
   <link rel="stylesheet" href="./src/features/games/styles.css">
   <link rel="stylesheet" href="./src/features/chat/styles.css">
@@ -44,6 +45,14 @@
   <!-- 引导式登录页 + 登录后新手引导 -->
   <link rel="stylesheet" href="./src/features/auth/styles.css">
   <link rel="stylesheet" href="./src/components/onboarding.css">
+  <!-- 入口关键依赖预加载：消除 main.js → 依赖模块 的发现瀑布 -->
+  <link rel="modulepreload" href="./src/core/api.js">
+  <link rel="modulepreload" href="./src/core/socket.js">
+  <link rel="modulepreload" href="./src/core/router.js">
+  <link rel="modulepreload" href="./src/features/themes/index.js">
+  <link rel="modulepreload" href="./src/features/games/index.js">
+  <link rel="modulepreload" href="./src/features/chat/index.js">
+  <link rel="modulepreload" href="./src/features/achievements/index.js">
   <!-- 动态主题 CSS 由 src/features/themes/index.js 运行时注入（<style id="theme-dynamic-css">） -->
 </head>
 

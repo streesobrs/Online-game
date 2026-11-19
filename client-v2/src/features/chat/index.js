@@ -547,9 +547,27 @@ export function renderChat(container = viewRoot()) {
   }
 
   // ---- 订阅 ----
-  const onGlobalChange = () => { if (currentTarget === null) renderMessages(history.global); };
-  const offGlobalMsg = eventBus.on('chat:message', onGlobalChange);
-  const offGlobalHist = eventBus.on('chat:history', onGlobalChange);
+  // 新消息只追加一行；只有历史重载/撤回等场景才整表重绘，避免每条消息 O(n) 重建 DOM
+  const offGlobalMsg = eventBus.on('chat:message', (data) => {
+    if (currentTarget !== null) return;
+    if (data?.scope === 'game') return; // 局内频道消息不影响大厅列表
+    const last = history.global[history.global.length - 1];
+    const canAppend =
+      messagesEl.childElementCount > 0 &&
+      last &&
+      data?.messageId &&
+      last.messageId === data.messageId;
+    if (!canAppend) {
+      renderMessages(history.global);
+      return;
+    }
+    if (messagesEl.childElementCount >= MAX_HISTORY) messagesEl.firstElementChild?.remove();
+    messagesEl.append(messageNode(last));
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  });
+  const offGlobalHist = eventBus.on('chat:history', () => {
+    if (currentTarget === null) renderMessages(history.global);
+  });
 
   const viewRef = {
     onPrivateMessage: (conv, partnerId) => {

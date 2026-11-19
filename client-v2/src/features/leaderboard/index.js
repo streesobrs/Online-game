@@ -144,6 +144,64 @@ export function renderLeaderboard(container = viewRoot()) {
   const listEl = el('div', { class: 'leaderboard-list' });
   const myRankEl = el('div', { class: 'leaderboard-self-container' });
 
+  // ---- 阶段 A：参与人数 + 昵称搜索 ----
+  let lastList = [];
+  let keyword = '';
+  const countEl = el('span', { class: 'leaderboard-count' }, '👥 参与玩家 0');
+  const searchInput = el('input', {
+    class: 'leaderboard-search-input',
+    type: 'search',
+    placeholder: '🔍 搜索玩家昵称',
+  });
+  const clearBtn = el('button', {
+    class: 'leaderboard-search-clear',
+    type: 'button',
+    title: '清空搜索',
+    hidden: true,
+  }, '✕');
+  const toolbarEl = el('div', { class: 'leaderboard-toolbar' }, [
+    countEl,
+    el('div', { class: 'leaderboard-search' }, [searchInput, clearBtn]),
+  ]);
+
+  function applySearch() {
+    keyword = searchInput.value.trim().toLowerCase();
+    clearBtn.hidden = !keyword;
+    renderFiltered();
+  }
+
+  searchInput.addEventListener('input', applySearch);
+  clearBtn.addEventListener('click', () => {
+    searchInput.value = '';
+    applySearch();
+    searchInput.focus();
+  });
+
+  /** 按当前关键词渲染榜单（只影响展示，不影响我的排名请求） */
+  function renderFiltered() {
+    listEl.innerHTML = '';
+    if (lastList.length === 0) {
+      listEl.append(el('div', { class: 'leaderboard-empty' }, '暂无排行数据'));
+      return;
+    }
+    const filtered = keyword
+      ? lastList.filter((p) => `${p.name || ''} ${p.username || ''}`.toLowerCase().includes(keyword))
+      : lastList;
+    if (filtered.length === 0) {
+      listEl.append(el('div', { class: 'leaderboard-empty' }, '🔍 未找到匹配的玩家'));
+      return;
+    }
+    const gameType = currentType();
+    filtered.forEach((player) => listEl.append(leaderboardItem(player, gameType)));
+  }
+
+  function resetSearch() {
+    keyword = '';
+    searchInput.value = '';
+    clearBtn.hidden = true;
+  }
+
+
   container.innerHTML = '';
   container.append(
     el('div', { class: 'leaderboard-page' }, [
@@ -153,6 +211,7 @@ export function renderLeaderboard(container = viewRoot()) {
       ]),
       typeBtnsEl,
       subTypeBtnsEl,
+      toolbarEl,
       listEl,
       myRankEl,
     ])
@@ -180,6 +239,7 @@ export function renderLeaderboard(container = viewRoot()) {
           class: `lobby-btn ${key === match3Type ? 'active' : ''}`,
           onClick: () => {
             match3Type = key;
+            resetSearch();
             renderSubTypes();
             load();
           },
@@ -190,6 +250,7 @@ export function renderLeaderboard(container = viewRoot()) {
 
   function selectType(key) {
     mainType = key;
+    resetSearch();
     renderTypes();
     renderSubTypes();
     load();
@@ -197,14 +258,14 @@ export function renderLeaderboard(container = viewRoot()) {
 
   function render(data) {
     const list = Array.isArray(data.leaderboard) ? data.leaderboard : [];
+    lastList = list;
+    countEl.textContent = `👥 参与玩家 ${list.length}`;
+    renderFiltered();
     if (list.length === 0) {
-      listEl.innerHTML = '';
-      listEl.append(el('div', { class: 'leaderboard-empty' }, '暂无排行数据'));
+      // 空榜时仍需清掉「我的排名」，避免残留上一榜数据
+      myRankEl.innerHTML = '';
       return;
     }
-    listEl.innerHTML = '';
-    const gameType = currentType();
-    list.forEach((player) => listEl.append(leaderboardItem(player, gameType)));
 
     // 我的排名：自己不在 Top20 时向服务端请求单独排名（对齐 v1 updateLeaderboard）
     const myUsername = localStorage.getItem('nickname');
@@ -216,7 +277,7 @@ export function renderLeaderboard(container = viewRoot()) {
     if (inTopList) {
       myRankEl.innerHTML = '';
     } else {
-      emit('get_my_rank', { gameType });
+      emit('get_my_rank', { gameType: currentType() });
     }
   }
 

@@ -40,6 +40,76 @@
   margin-bottom: 16px;
 }
 
+/* ===== 参与人数 + 搜索（阶段 A） ===== */
+.leaderboard-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+}
+
+.leaderboard-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary, #4a5568);
+  white-space: nowrap;
+}
+
+.leaderboard-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 180px;
+  max-width: 320px;
+}
+
+.leaderboard-search-input {
+  width: 100%;
+  padding: 8px 34px 8px 12px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 20px;
+  background: var(--surface-alt, #f7fafc);
+  color: var(--text, #2d3748);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.leaderboard-search-input::placeholder {
+  color: var(--text-muted, #a0aec0);
+}
+
+.leaderboard-search-input:focus {
+  border-color: var(--theme-primary, #3498db);
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15);
+}
+
+.leaderboard-search-clear {
+  position: absolute;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: var(--surface-alt, #e2e8f0);
+  color: var(--text-secondary, #4a5568);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.leaderboard-search-clear:hover {
+  background: var(--theme-primary, #3498db);
+  color: #fff;
+}
+
 .leaderboard-controls .lobby-btn {
   padding: 7px 16px;
   border: 1px solid #e2e8f0;

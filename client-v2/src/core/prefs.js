@@ -13,6 +13,7 @@
  * - friendToast：好友申请弹窗提示
  * - friendOnline：好友上线提醒
  * - lastMove：棋盘最后一步标记
+ * - sfxEnabled：对局音效开关
  * - drawerHidden：侧边栏（全局抽屉）中隐藏的导航项 id 列表
  */
 
@@ -28,6 +29,7 @@ const FRIEND_BADGE_KEY = 'ui-friend-badge';
 const FRIEND_TOAST_KEY = 'ui-friend-toast';
 const FRIEND_ONLINE_KEY = 'ui-friend-online';
 const LAST_MOVE_KEY = 'ui-last-move';
+const SFX_ENABLED_KEY = 'ui-sfx-enabled';
 const DRAWER_HIDDEN_KEY = 'ui-drawer-hidden';
 
 // 旧版偏好，读取时迁移
@@ -142,13 +144,14 @@ export function getUiPrefs() {
     friendToast: localStorage.getItem(FRIEND_TOAST_KEY) !== '0',
     friendOnline: localStorage.getItem(FRIEND_ONLINE_KEY) !== '0',
     lastMove: localStorage.getItem(LAST_MOVE_KEY) !== '0',
+    sfxEnabled: localStorage.getItem(SFX_ENABLED_KEY) !== '0',
     drawerHidden: readDrawerHidden(),
   };
 }
 
 /**
  * 写入偏好并立即生效（只传要改的项）
- * @param {{animEnabled?: boolean, animSpeed?: number, toastPosition?: string, toastDuration?: number, startPage?: string, floatChat?: boolean, friendBadge?: boolean, friendToast?: boolean, friendOnline?: boolean, lastMove?: boolean, drawerHidden?: string[]}} patch
+ * @param {{animEnabled?: boolean, animSpeed?: number, toastPosition?: string, toastDuration?: number, startPage?: string, floatChat?: boolean, friendBadge?: boolean, friendToast?: boolean, friendOnline?: boolean, lastMove?: boolean, sfxEnabled?: boolean, drawerHidden?: string[]}} patch
  */
 export function setUiPrefs(patch) {
   if (patch.animEnabled !== undefined) {
@@ -176,6 +179,7 @@ export function setUiPrefs(patch) {
     friendToast: FRIEND_TOAST_KEY,
     friendOnline: FRIEND_ONLINE_KEY,
     lastMove: LAST_MOVE_KEY,
+    sfxEnabled: SFX_ENABLED_KEY,
   };
   Object.entries(boolKeys).forEach(([field, key]) => {
     if (patch[field] !== undefined) localStorage.setItem(key, patch[field] ? '1' : '0');
@@ -187,7 +191,7 @@ export function setUiPrefs(patch) {
 export function resetUiPrefs() {
   [
     ANIM_ENABLED_KEY, ANIM_SPEED_KEY, DENSITY_KEY, TOAST_POS_KEY, TOAST_DIR_KEY, TOAST_DURATION_KEY, START_PAGE_KEY,
-    FLOAT_CHAT_KEY, FRIEND_BADGE_KEY, FRIEND_TOAST_KEY, FRIEND_ONLINE_KEY, LAST_MOVE_KEY, DRAWER_HIDDEN_KEY,
+    FLOAT_CHAT_KEY, FRIEND_BADGE_KEY, FRIEND_TOAST_KEY, FRIEND_ONLINE_KEY, LAST_MOVE_KEY, SFX_ENABLED_KEY, DRAWER_HIDDEN_KEY,
     LEGACY_MOTION_KEY, LEGACY_REDUCE_MOTION_KEY,
   ].forEach((key) => localStorage.removeItem(key));
   applyUiPrefs();

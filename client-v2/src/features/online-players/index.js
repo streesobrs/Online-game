@@ -70,21 +70,35 @@ export function subscribeOnlineUsers(fn) {
 
 /**
  * 拉取全部玩家公开信息（含离线），用于离线私信等场景
- * 加载完成后会刷新所有已订阅视图
+ * 加载完成后会刷新所有已订阅视图。
+ * 该列表变化缓慢：30 秒内重复进入聊天页直接复用，且并发调用共享同一个请求。
  */
-export async function loadAllPlayers() {
-  try {
-    const res = await api.users.all();
-    allPlayers = (Array.isArray(res?.data) ? res.data : []).map((p) => ({
-      accountId: p.accountId,
-      nickname: p.nickname,
-      level: p.level || 1,
-      lastLogin: p.lastLogin || null,
-    }));
-  } catch (err) {
-    allPlayers = allPlayers || [];
-  }
-  refresh();
+let allPlayersFetchedAt = 0;
+let allPlayersPromise = null;
+const ALL_PLAYERS_TTL = 30 * 1000;
+
+export async function loadAllPlayers(force = false) {
+  if (!force && Date.now() - allPlayersFetchedAt < ALL_PLAYERS_TTL) return;
+  if (allPlayersPromise) return allPlayersPromise;
+
+  allPlayersPromise = (async () => {
+    try {
+      const res = await api.users.all();
+      allPlayers = (Array.isArray(res?.data) ? res.data : []).map((p) => ({
+        accountId: p.accountId,
+        nickname: p.nickname,
+        level: p.level || 1,
+        lastLogin: p.lastLogin || null,
+      }));
+      allPlayersFetchedAt = Date.now();
+    } catch (err) {
+      allPlayers = allPlayers || [];
+    } finally {
+      allPlayersPromise = null;
+    }
+    refresh();
+  })();
+  return allPlayersPromise;
 }
 
 /**
