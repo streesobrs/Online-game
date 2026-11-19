@@ -180,6 +180,8 @@ export const api = {
     /** 全部玩家公开信息（含离线，供聊天页离线私聊） */
     all: () => api.get('/api/users/all'),
     search: (query) => api.get(`/api/users/search?q=${encodeURIComponent(query)}`),
+    /** 指定玩家公开外观（仅已装备，他人头像展示用） */
+    getCosmetics: (accountId) => api.get(`/api/users/${encodeURIComponent(accountId)}/cosmetics`),
   },
 
   /** 好友系统（MVP） */

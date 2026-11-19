@@ -1,27 +1,70 @@
 /**
  * 主题切换功能
  * 机制与 v1 一致：body[data-theme="xxx"] 触发 CSS 变量作用域换肤 + 动态加载主题 CSS。
+ * 主题元数据与 CSS 统一由服务端提供（GET /api/themes → server/config/themes/*.json|*.css），
+ * v1/v2 共用同一份主题，新增/修改主题只需维护服务端，不再两边各存一份。
  * 持久化 key：selectedTheme（与 v1 完全一致，v1/v2 切换共享主题选择）。
- * 主题 CSS 使用本地相对路径（./themes/xxx.css，来自任务 1.5.2 复制）。
  */
 import { el } from '../../utils/dom.js';
 import { toast } from '../../components/toast.js';
+import { api } from '../../core/api.js';
 
 const THEME_KEY = 'selectedTheme';
 
-/** 主题列表：default 本地（变量在 variables.css）+ 3 个复制自 v1 的主题 */
-export const THEMES = [
-  { id: 'default', name: '默认', icon: '🌞', description: '明亮简洁，经典蓝调', preview: '#3498db', cssUrl: '' },
-  { id: 'cyberpunk', name: '赛博朋克', icon: '🌃', description: '霓虹紫蓝，科技感十足', preview: '#00d4ff', cssUrl: './themes/cyberpunk.css' },
-  { id: 'forest', name: '森林', icon: '🌲', description: '自然绿意，清新护眼', preview: '#4caf50', cssUrl: './themes/forest.css' },
-  { id: 'ocean', name: '海洋', icon: '🌊', description: '深邃蓝调，宁静致远', preview: '#00bcd4', cssUrl: './themes/ocean.css' },
-];
+/** 默认主题：无独立 CSS，变量定义在 variables.css */
+const DEFAULT_THEME = {
+  id: 'default',
+  name: '默认',
+  icon: '🌞',
+  description: '明亮简洁，经典蓝调',
+  preview: '#3498db',
+  cssUrl: '',
+};
 
+/** 卡片图标是 v2 展示用的装饰，服务端主题元数据不包含该字段 */
+const THEME_ICONS = { cyberpunk: '🌃', forest: '🌲', ocean: '🌊' };
+
+let themes = [DEFAULT_THEME];
 let currentThemeId = 'default';
+let loadingPromise = null;
 const cssCache = new Map(); // cssUrl → css 文本缓存
 
 function getTheme(id) {
-  return THEMES.find((t) => t.id === id);
+  return themes.find((t) => t.id === id);
+}
+
+/** 把服务端主题元数据转换成卡片所需的展示字段 */
+function normalizeTheme(meta, fallbackId) {
+  const id = meta.id || fallbackId;
+  return {
+    id,
+    name: meta.name || id,
+    icon: THEME_ICONS[id] || '🎨',
+    description: meta.description || '',
+    preview: meta.primaryColor || '#3498db',
+    cssUrl: meta.cssUrl || '',
+  };
+}
+
+/** 拉取服务端主题列表（失败时保留默认主题，页面仍可正常使用） */
+async function loadThemes() {
+  try {
+    const res = await api.get('/api/themes');
+    const data = res?.data || {};
+    const list = Object.entries(data)
+      .map(([id, meta]) => normalizeTheme(meta || {}, id))
+      .filter((t) => t.id !== 'default');
+    themes = [DEFAULT_THEME, ...list];
+  } catch (err) {
+    console.warn('[Themes] 获取主题列表失败，仅使用默认主题', err?.message || err);
+  }
+  return themes;
+}
+
+/** 主题列表只拉一次，多处调用共享同一个 Promise */
+function ensureThemes() {
+  if (!loadingPromise) loadingPromise = loadThemes();
+  return loadingPromise;
 }
 
 /** 当前主题 ID */
@@ -31,7 +74,7 @@ export function getCurrentTheme() {
 
 /** 主题列表（副本） */
 export function getThemeList() {
-  return THEMES.map((t) => ({ ...t }));
+  return themes.map((t) => ({ ...t }));
 }
 
 /** 动态加载主题 CSS（异步，已缓存直接应用） */
@@ -71,6 +114,7 @@ function syncPanel() {
  * @param {string} id - 主题 ID
  */
 export async function applyTheme(id) {
+  await ensureThemes();
   const theme = getTheme(id);
   if (!theme) {
     console.warn('[Themes] 未知主题:', id);
@@ -87,29 +131,29 @@ export async function applyTheme(id) {
 
 /**
  * 初始化：应用本地保存的主题（v1/v2 共享 selectedTheme）
+ * 先同步设置 data-theme 避免闪烁，待服务端主题列表就绪后再加载对应 CSS。
  */
-export function initThemes() {
-  const saved = localStorage.getItem(THEME_KEY);
-  if (saved && getTheme(saved)) {
-    currentThemeId = saved;
-    document.body.dataset.theme = saved;
-    const theme = getTheme(saved);
-    if (theme.cssUrl) loadThemeCss(theme.cssUrl);
-  } else {
-    document.body.dataset.theme = 'default';
-  }
+export async function initThemes() {
+  const saved = localStorage.getItem(THEME_KEY) || 'default';
+  document.body.dataset.theme = saved;
+  await ensureThemes();
+  const theme = getTheme(saved);
+  currentThemeId = theme ? theme.id : 'default';
+  document.body.dataset.theme = currentThemeId;
+  if (theme?.cssUrl) loadThemeCss(theme.cssUrl);
 }
 
 /**
  * 渲染主题选择面板（卡片式，当前主题高亮）
  * @param {HTMLElement} container - 挂载容器
- * @returns {HTMLElement} 面板元素
+ * @returns {Promise<HTMLElement>} 面板元素
  */
-export function renderThemePanel(container) {
+export async function renderThemePanel(container) {
+  await ensureThemes();
   const panel = el('div', { class: 'theme-container panel' }, [
     el('h2', { class: 'panel-title' }, '🎨 主题设置'),
     el('div', { class: 'theme-grid' },
-      THEMES.map((theme) => {
+      themes.map((theme) => {
         const active = theme.id === currentThemeId;
         return el('div', {
           class: 'theme-card' + (active ? ' active' : ''),

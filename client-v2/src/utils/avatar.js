@@ -1,6 +1,6 @@
 /**
  * 头像工具（功能补齐：账号栏/在线玩家/聊天头像/资料卡共用）
- * 头像数据来自 GET /api/shop/cosmetics?userId= → { cosmetics: { owned, equipped } }
+ * 头像数据来自 GET /api/users/:accountId/cosmetics → { cosmetics: { equipped } }（公开，仅已装备）
  * 展示逻辑复用 v2 profile 页（4.7）：equipped.avatarCustom → 图片，equipped.avatar → 配置表情，否则 👤
  */
 import { el } from './dom.js';
@@ -77,8 +77,8 @@ export function fetchAvatarData(userId) {
   if (cache.has(userId)) return Promise.resolve(cache.get(userId));
   if (loading.has(userId)) return loading.get(userId);
   const p = Promise.all([
-    // 他人外观接口是 requireSelf，会 403；失败时不影响公开的配置读取
-    api.shop.getCosmetics(userId).catch(() => null),
+    // 头像展示只需要已装备数据，走公开接口，避免对他人使用 requireSelf 接口触发 403
+    api.users.getCosmetics(userId).catch(() => null),
     api.shop.getCosmeticsConfig().catch(() => null),
   ])
     .then(([cosRes, cfgRes]) => {

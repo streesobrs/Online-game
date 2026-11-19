@@ -1657,6 +1657,23 @@ app.get('/api/users/all', async (req, res) => {
   }
 });
 
+// 获取指定玩家的公开外观（仅已装备，供聊天/好友头像等场景使用，不返回 owned）
+app.get('/api/users/:accountId/cosmetics', async (req, res) => {
+  try {
+    const account = await accountManager.getAccount(req.params.accountId);
+    if (!account) {
+      return res.status(404).json({ success: false, message: '账号不存在' });
+    }
+    res.json({
+      success: true,
+      cosmetics: { equipped: account.cosmetics?.equipped || {} }
+    });
+  } catch (err) {
+    logger.error('获取玩家外观失败', { error: err.message });
+    res.status(500).json({ success: false, message: '获取玩家外观失败' });
+  }
+});
+
 // ========== 好友相关API ==========
 // 获取好友状态：好友列表 + 收到的申请 + 已发出的申请
 app.get('/api/friends/:accountId', authenticateUser, requireSelf(req => req.params.accountId), async (req, res) => {

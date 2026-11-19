@@ -13,7 +13,7 @@
       "type": "character",
       "title": "Lucy",
       "description": "夜之城边缘行者",
-      "image": "/server/assets/lucy.png",
+      "image": "/assets/lucy.png",
       "position": {
         "right": "40px",
         "bottom": "80px",
