@@ -215,7 +215,7 @@
 
 .fb-vote-btn.voted {
   background: var(--surface-alt, #e3f2fd);
-  color: #1976d2;
+  color: var(--accent-blue, #1976d2);
 }
 
 .fb-meta {
@@ -650,7 +650,7 @@
   font-size: 11px;
   font-weight: 600;
   background: var(--surface-alt, #e0f2fe);
-  color: #0369a1;
+  color: var(--accent-blue, #0369a1);
   padding: 1px 6px;
   border-radius: 4px;
 }
@@ -790,7 +790,7 @@
   font-size: 11px;
   font-weight: 600;
   background: var(--surface-alt, #e0f2fe);
-  color: #0369a1;
+  color: var(--accent-blue, #0369a1);
   padding: 2px 8px;
   border-radius: 4px;
 }

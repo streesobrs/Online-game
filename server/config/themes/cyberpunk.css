@@ -73,6 +73,8 @@ body[data-theme="cyberpunk"] {
   /* 通用按钮 */
   --theme-btn-primary-bg: #00d4ff;
   --theme-btn-primary-bg-hover: #00b8d9;
+  /* 亮青色底上用深色文字，避免白字看不清 */
+  --theme-btn-primary-color: #06121a;
   --theme-btn-primary-shadow: 0 2px 8px rgba(0, 212, 255, 0.5);
   --theme-btn-primary-shadow-hover: 0 4px 12px rgba(0, 212, 255, 0.7);
   --theme-btn-disabled-bg: #4a4a5e;

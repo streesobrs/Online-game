@@ -420,7 +420,7 @@
   left: 8px;
   font-size: 10px;
   font-weight: 700;
-  color: #94a3b8;
+  color: var(--text-muted, #94a3b8);
 }
 
 .sv-upgrade-icon {

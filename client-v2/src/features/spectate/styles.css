@@ -42,7 +42,7 @@
 .spectate-badge {
   font-size: 12px;
   background: var(--surface-alt, #ebf8ff);
-  color: #3182ce;
+  color: var(--accent-blue, #3182ce);
   padding: 2px 8px;
   border-radius: 12px;
 }

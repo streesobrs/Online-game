@@ -150,7 +150,7 @@
 }
 
 .settings-link-arrow {
-  color: #a0aec0;
+  color: var(--text-muted, #a0aec0);
   font-size: 18px;
   line-height: 1;
 }

@@ -66,6 +66,8 @@ body[data-theme="forest"] {
   /* 通用按钮 */
   --theme-btn-primary-bg: #4caf50;
   --theme-btn-primary-bg-hover: #388e3c;
+  /* 绿色主色偏亮，用深色文字保证对比度 */
+  --theme-btn-primary-color: #0b2913;
   --theme-btn-primary-shadow: 0 3px 10px rgba(76, 175, 80, 0.4);
   --theme-btn-primary-shadow-hover: 0 4px 14px rgba(76, 175, 80, 0.55);
   --theme-btn-disabled-bg: #6d7c6e;

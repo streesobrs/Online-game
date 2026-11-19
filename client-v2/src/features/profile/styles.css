@@ -1696,7 +1696,7 @@
 .profile-tx-detail-label {
   width: 64px;
   flex-shrink: 0;
-  color: #64748b;
+  color: var(--text-secondary, #64748b);
   font-weight: 600;
 }
 
@@ -1909,7 +1909,7 @@
   border-radius: 8px;
   background: var(--surface-alt, #f7fafc);
   border: 1px solid var(--border-color, #e2e8f0);
-  color: #a0aec0;
+  color: var(--text-muted, #a0aec0);
   cursor: default;
   user-select: none;
   transition: transform 0.12s;
@@ -2231,7 +2231,7 @@
   border: 1px solid #bfdbfe;
   border-radius: 10px;
   font-size: 11px;
-  color: #1e40af;
+  color: var(--accent-blue, #1e40af);
   white-space: nowrap;
 }
 

@@ -9,7 +9,7 @@
     border: none;
     border-radius: 6px;
     cursor: pointer;
-    color: #ffffff;
+    color: var(--theme-btn-primary-color, #ffffff);
     background: var(--theme-btn-primary-bg);
     box-shadow: var(--theme-btn-primary-shadow);
     transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
@@ -541,6 +541,7 @@ a.nav-btn.nav-btn--admin.hidden {
 
 .account-btn--primary {
     background: var(--theme-btn-primary-bg, #4299e1);
+    color: var(--theme-btn-primary-color, #ffffff);
 }
 
 .account-btn--primary:hover {
@@ -549,6 +550,7 @@ a.nav-btn.nav-btn--admin.hidden {
 
 .account-btn--success {
     background: var(--theme-btn-match-bg-hover, #48bb78);
+    color: var(--theme-btn-primary-color, #ffffff);
 }
 
 .account-btn--success:hover {
@@ -557,6 +559,7 @@ a.nav-btn.nav-btn--admin.hidden {
 
 .account-btn--info {
     background: var(--theme-btn-primary-bg, #4299e1);
+    color: var(--theme-btn-primary-color, #ffffff);
 }
 
 .account-btn--info:hover {
@@ -565,6 +568,7 @@ a.nav-btn.nav-btn--admin.hidden {
 
 .account-btn--danger {
     background: var(--theme-btn-danger-bg, #e53e3e);
+    color: var(--theme-btn-primary-color, #ffffff);
 }
 
 .account-btn--danger:hover {

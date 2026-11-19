@@ -261,7 +261,7 @@
 
 .ach-status-tag.unlocked {
   background: var(--surface-alt, #c6f6d5);
-  color: #276749;
+  color: var(--accent-green, #276749);
 }
 
 .ach-status-tag.locked {

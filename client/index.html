@@ -14046,7 +14046,12 @@
 
     // 初始化时加载默认主题
     document.addEventListener('DOMContentLoaded', () => {
-      applyTheme(currentTheme);
+      // 服务器主题列表可能在 DOMContentLoaded 之后才返回：
+      // 此时先跳过，避免把已保存的服务器主题误判为“未知主题”回退到默认；
+      // fetchThemesFromServer() 拿到列表后会重新应用 localStorage 里的主题
+      if (themes[currentTheme]) {
+        applyTheme(currentTheme);
+      }
 
       if (themeBg) {
         let lastScrollY = 0;
@@ -14285,13 +14290,14 @@
     });
 
     // ========== 页面清理 ==========
-    window.onunload = () => {
+    // unload 已被浏览器权限策略禁用（Permissions policy violation），改用 pagehide 清理
+    window.addEventListener('pagehide', () => {
       if (gameState.gameTimer) clearInterval(gameState.gameTimer);
       socket.emit('user_status', {
         status: 'offline',
         game: currentGame
       });
-    };
+    });
 
     // init函数现在由setupSocketListeners在socket连接成功后自动调用
   </script>

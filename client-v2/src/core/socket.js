@@ -53,6 +53,8 @@ socket.on('connect', () => {
     clientType: 'v2',
     token: localStorage.getItem('userToken') || 'none',
   });
+  // 连接建立前调用 emit() 暂存的事件（成就/历史等初始化请求）在这里补发
+  flushPendingEmits();
   eventBus.emit('socket:connect');
 });
 
@@ -221,23 +223,39 @@ socket.on('ai_game_start', (data) => {
   }
 });
 
-// 未连接时被丢弃的事件，按类型只警告一次，避免刷屏
-const droppedEventWarned = new Set();
+// 未连接时暂存的事件：socket 连接（含重连）后自动补发。
+// socket.io 本身也会缓存 emit，但这里统一走 emit() 封装，需要自己保证不丢。
+const pendingEmits = [];
+const MAX_PENDING_EMITS = 100;
+// 同一事件只提示一次，避免刷屏
+const queuedEventWarned = new Set();
+
+/** 连接建立后按顺序补发暂存事件（client_connect 先发，保证会话已绑定） */
+function flushPendingEmits() {
+  while (pendingEmits.length && socket.connected) {
+    const [event, data] = pendingEmits.shift();
+    socket.emit(event, data);
+  }
+}
 
 /**
  * 主动发送 socket 事件
+ * 未连接时先暂存，连接/重连后自动补发（与 v1 直接 socket.emit 的行为一致）。
  * @param {string} event - 事件名（与 v1 一致，见附录 A）
  * @param {*} [data] - 数据
- * @returns {boolean} 是否已发出（未连接时为 false，调用方可据此提示玩家）
+ * @returns {boolean} 是否已发出或已进入待发队列
  */
 export function emit(event, data) {
   if (socket.connected) {
     socket.emit(event, data);
     return true;
   }
-  if (!droppedEventWarned.has(event)) {
-    droppedEventWarned.add(event);
-    console.warn(`[Socket] 未连接，事件已丢弃: ${event}（连接后将自动恢复）`);
+  if (pendingEmits.length >= MAX_PENDING_EMITS) pendingEmits.shift();
+  pendingEmits.push([event, data]);
+  if (!queuedEventWarned.has(event)) {
+    queuedEventWarned.add(event);
+    // 首屏渲染早于 socket 连接属于正常时序，用 debug 级别避免刷 Warning
+    console.debug(`[Socket] 未连接，事件已暂存，连接后自动补发: ${event}`);
   }
-  return false;
+  return true;
 }

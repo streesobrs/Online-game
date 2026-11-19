@@ -67,6 +67,8 @@
     /* 通用按钮 */
     --theme-btn-primary-bg: #3498db;
     --theme-btn-primary-bg-hover: #2980b9;
+    /* 主色按钮上的文字色：霓虹/亮色主题会覆盖为深色以保证对比度 */
+    --theme-btn-primary-color: #ffffff;
     --theme-btn-primary-shadow: 0 3px 6px rgba(52, 152, 219, 0.2);
     --theme-btn-primary-shadow-hover: 0 4px 8px rgba(52, 152, 219, 0.3);
     --theme-btn-disabled-bg: #bdc3c7;
@@ -261,18 +263,35 @@
 body {
     /* 文本 */
     --text: var(--theme-info-value-color);
+    --text-primary: var(--theme-info-value-color);
     --text-secondary: var(--theme-info-label-color);
     --text-muted: var(--theme-tip-text-color);
+    /* 各业务文件历史遗留的别名，统一指向同一套主题文本色 */
+    --theme-text: var(--theme-info-value-color);
+    --theme-text-color: var(--theme-info-value-color);
+    --theme-text-secondary: var(--theme-info-label-color);
+    --theme-text-muted: var(--theme-tip-text-color);
 
     /* 背景 */
     --surface: var(--theme-panel-bg);
+    --surface-1: var(--theme-panel-bg);
+    --surface-2: var(--theme-stat-item-bg);
     --surface-alt: var(--theme-stat-item-bg);
     --surface-hover: var(--theme-nav-btn-bg-hover);
     --surface-input: var(--theme-status-bg);
+    --theme-card: var(--theme-panel-bg);
+    --theme-panel-bg-hover: var(--theme-nav-btn-bg-hover);
+    --theme-hover-bg: var(--theme-nav-btn-bg-hover);
 
     /* 边框 */
     --border-color: var(--theme-border-color);
     --border-color-strong: var(--theme-info-title-border);
+    --border: var(--theme-border-color);
+    --theme-border: var(--theme-border-color);
+
+    /* 阴影 */
+    --theme-shadow-sm: var(--theme-panel-shadow);
+    --theme-shadow-md: var(--theme-panel-shadow);
 
     /* 主题强调色（可被主题覆盖；未覆盖时用默认） */
     --accent-indigo: var(--theme-primary, #6366f1);

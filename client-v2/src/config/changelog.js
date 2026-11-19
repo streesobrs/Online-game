@@ -3,10 +3,19 @@
  *
  * 生成命令：npm run changelog
  * 数据源：git 提交记录（遵循 .trae/rules/git-commit-message.md 提交规范）
- * 生成时间：2026-11-19T15:04:18.016+08:00
+ * 生成时间：2026-11-19T15:15:49.651+08:00
  */
 
 export const CHANGELOG = [
+  {
+    "tag": "Build 910",
+    "name": "重构主题系统为服务端驱动，删除冗余主题文件",
+    "type": "refactor",
+    "scope": "全端",
+    "hash": "bebd135",
+    "publishedAt": "2026-11-19T15:08:11+08:00",
+    "body": "### 后端改动\n- 新增 /api/themes 接口，返回主题元数据（id、name、description、primaryColor、cssUrl）\n- 调整 cyberpunk.json 主题元数据，补充 primaryColor 字段\n\n### 前端改动\n- 重构主题切换逻辑，改为从服务端拉取主题列表\n- 删除本地主题列表（THEMES），改为动态加载服务端主题\n- 删除冗余的 ocean.css、forest.css、cyberpunk.css 主题文件\n- 调整头像工具接口，改为使用新的公开外观接口 /api/users/:accountId/cosmetics"
+  },
   {
     "tag": "Build 907",
     "name": "优化肉鸽模式同层任务链与定向调配机制",

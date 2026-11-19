@@ -292,7 +292,7 @@
 
 .shop-equip-btn.equipped {
   background: var(--surface-alt, #ebf8ff);
-  color: #3182ce;
+  color: var(--accent-blue, #3182ce);
   cursor: default;
 }
 
@@ -493,7 +493,7 @@
 
 .shop-detail-price-original {
   text-decoration: line-through;
-  color: #a0aec0;
+  color: var(--text-muted, #a0aec0);
 }
 
 .shop-detail-price-final {

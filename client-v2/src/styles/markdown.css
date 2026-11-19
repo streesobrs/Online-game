@@ -93,7 +93,8 @@
 .markdown-body mark {
   padding: 0.05em 0.25em;
   border-radius: 3px;
-  background: var(--markdown-mark-bg, #fff3bf);
+  /* 半透明高亮，深浅主题下都能保持文字可读 */
+  background: var(--markdown-mark-bg, rgba(255, 196, 0, 0.28));
   color: inherit;
 }
 

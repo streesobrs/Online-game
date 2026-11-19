@@ -294,7 +294,7 @@
 .chess-river::before {
   content: '楚 河';
   font-size: calc(var(--board-cell-size, 16px) * 0.5);
-  color: #2c3e50;
+  color: var(--text, #2c3e50);
   opacity: 0.6;
   font-weight: bold;
   font-family: 'KaiTi', '楷体', serif;
@@ -303,7 +303,7 @@
 .chess-river::after {
   content: '汉 界';
   font-size: calc(var(--board-cell-size, 16px) * 0.5);
-  color: #2c3e50;
+  color: var(--text, #2c3e50);
   opacity: 0.6;
   font-weight: bold;
   font-family: 'KaiTi', '楷体', serif;
