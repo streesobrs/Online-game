@@ -16,19 +16,22 @@ import { eventBus } from '../../core/eventBus.js';
 import { startGameActivity, stopGameActivity } from '../../core/activity.js';
 import { setShortcutsSuppressed } from '../../utils/shortcut.js';
 import { createFullscreen } from '../../utils/fullscreen.js';
-import { loadBest, saveBest, formatTime, rand } from './helpers.js';
+import { PLAYER_BASE, BASE_SHOT, snapshotBaseStats, deriveStats } from './base.js';
+import { skillDamage, damageTakenZone } from './combat.js';
+import { loadBest, saveBest, formatTime, rand, highlightNumbers } from './helpers.js';
 import { createRenderer } from './renderer.js';
 import { loadCatalog, createCatalog } from './catalog.js';
 import { saveRun, loadRun, clearRun } from './save.js';
 import { applyTalents, getMeta, grantRunPoints } from './meta.js';
 import { syncOnEnter, scheduleUpload, flushUpload, cancelScheduledUpload } from './server-save.js';
 import { applyElementHit, applyElementAoe, ELEMENT_DURATION } from './elements.js';
+import { BOSS_INTERVAL } from './monsters/boss.js';
+import { SHIELD_HIT_CD } from './buffs/shield.js';
 
 let activeCleanup = null;
 
 const W = 960;
 const H = 600;
-const BOSS_INTERVAL = 90; // 秒
 const WAVE_INTERVAL = 30; // 秒，每波持续 30 秒
 
 function formatDps(v) {
@@ -45,43 +48,7 @@ function loadDebugPref() {
   }
 }
 
-const PLAYER_BASE = {
-  x: W / 2,
-  y: H / 2,
-  r: 15,
-  hp: 100,
-  maxHp: 100,
-  speed: 235,
-  damage: 16,
-  attackInterval: 0.5,
-  projectiles: 1,
-  projectileSpeed: 560,
-  pierce: 0,
-  pickup: 90,
-  regen: 0,
-  lifesteal: 0,
-  splashRadius: 0,
-  splashRatio: 0,
-  novaLevel: 0,
-  explodeLevel: 0,
-  xpGain: 1,
-  damageReduction: 0,
-  shield: 0,
-  shieldMax: 0,
-  shieldRegen: 0,
-  shieldCd: 0,
-  thornsLevel: 0,
-  fragmentLevel: 0,
-  comboLevel: 0,
-  fireLevel: 0,
-  thunderLevel: 0,
-  iceLevel: 0,
-  waterLevel: 0,
-  electroAmpLevel: 0,
-  electroChainLevel: 0,
-  electroStormLevel: 0,
-  face: -Math.PI / 2,
-};
+const PLAYER_START = { ...PLAYER_BASE, base: snapshotBaseStats(PLAYER_BASE) };
 
 /**
  * 图鉴数据：每个强化 / 怪物一个文件，分别放在 buffs/ 与 monsters/ 目录。
@@ -113,7 +80,7 @@ export function renderSurvivors(container = viewRoot()) {
     xp: 0,
     xpNeeded: 9,
     pendingLevels: 0,
-    player: { ...PLAYER_BASE },
+    player: { ...PLAYER_START, base: { ...PLAYER_START.base } },
     enemies: [],
     projectiles: [],
     enemyShots: [],
@@ -162,6 +129,8 @@ export function renderSurvivors(container = viewRoot()) {
   const hpFill = el('div', { class: 'sv-bar-fill sv-hp-fill' });
   const hpText = el('span', { class: 'sv-bar-text' }, '100 / 100');
   const xpFill = el('div', { class: 'sv-bar-fill sv-xp-fill' });
+  const baseStatsEl = el('div', { class: 'sv-hud-base' }, '');
+  let hudBaseCache = '';
   const timeEl = el('span', { class: 'sv-hud-time' }, '00:00');
   const waveEl = el('span', { class: 'sv-hud-wave' }, '第 1 波 · 30s');
   const lvEl = el('span', { class: 'sv-hud-chip' }, 'Lv.1');
@@ -180,6 +149,7 @@ export function renderSurvivors(container = viewRoot()) {
     el('div', { class: 'sv-hud-bars' }, [
       el('div', { class: 'sv-bar sv-bar-hp' }, [hpFill, hpText]),
       el('div', { class: 'sv-bar sv-bar-xp' }, [xpFill]),
+      baseStatsEl,
     ]),
     el('div', { class: 'sv-hud-mid' }, [timeEl, waveEl]),
     el('div', { class: 'sv-hud-right' }, [lvEl, killEl, dpsEl, shieldEl, debugBtn, catalogBtn, settleBtn]),
@@ -233,6 +203,15 @@ export function renderSurvivors(container = viewRoot()) {
     const xpPct = Math.max(0, Math.min(1, state.xp / state.xpNeeded));
     xpFill.style.width = `${(xpPct * 100).toFixed(1)}%`;
     timeEl.textContent = formatTime(state.time);
+    // 局内默认展示加成后的当前属性；基础属性只在战局外的开始页展示
+    const fmt = (v, d = 0) => Number(Number(v).toFixed(d));
+    const curRow = (label, key, digits) => `${label} <span class="sv-num">${fmt(p[key], digits)}</span>`;
+    const curText = `当前 ${curRow('攻', 'atk', 1)} · ${curRow('血', 'maxHp')} · ${curRow('防', 'def')} · ${curRow('速', 'speed')}`;
+    // 属性只在选强化时变化，缓存后避免每帧重写 DOM
+    if (curText !== hudBaseCache) {
+      hudBaseCache = curText;
+      baseStatsEl.innerHTML = curText;
+    }
     const remain = Math.max(0, WAVE_INTERVAL - (state.time % WAVE_INTERVAL));
     const bossNext = Math.abs(state.time + remain - state.bossTimer) < 0.6;
     waveEl.textContent = bossNext
@@ -339,7 +318,7 @@ export function renderSurvivors(container = viewRoot()) {
     state.xp = run.xp || 0;
     state.xpNeeded = run.xpNeeded || 9;
     state.pendingLevels = run.pendingLevels || 0;
-    state.player = { ...PLAYER_BASE, ...run.player };
+    state.player = deriveStats({ ...PLAYER_BASE, ...run.player });
     state.enemies = run.enemies;
     state.projectiles = run.projectiles;
     state.enemyShots = run.enemyShots;
@@ -379,12 +358,17 @@ export function renderSurvivors(container = viewRoot()) {
   function showStart() {
     state.paused = true;
     const saved = loadRun();
+    // 战局外展示基础属性：基础值 + 当前天赋等级
+    const preview = { ...PLAYER_BASE };
+    applyTalents(preview);
+    deriveStats(preview);
     showOverlay(el('div', { class: 'sv-panel sv-panel-start' }, [
       el('div', { class: 'sv-panel-icon' }, '⚔️'),
       el('h2', { class: 'sv-panel-title' }, '刷怪肉鸽'),
       el('p', { class: 'sv-panel-sub' }, '幸存者 like · 测试版 Demo'),
       el('p', { class: 'sv-panel-desc' }, '武器自动索敌攻击。WASD / 方向键移动，手机或鼠标按住画面拖拽也能移动。'),
-      el('p', { class: 'sv-panel-desc' }, '击杀怪物拾取经验，升级时三选一强化；每 90 秒出现一个 Boss。后期会出现冲锋、远程、自爆和分裂怪。'),
+      el('p', { class: 'sv-panel-desc' }, `击杀怪物拾取经验，升级时三选一强化；每 ${BOSS_INTERVAL} 秒出现一个 Boss。后期会出现冲锋、远程、自爆和分裂怪。`),
+      el('p', { class: 'sv-panel-desc' }, `基础属性 攻击 ${Number(preview.atk.toFixed(1))} · 生命 ${Math.round(preview.maxHp)} · 防御 ${Math.round(preview.def)} · 移速 ${Math.round(preview.speed)}`),
       el('div', { class: 'sv-best' }, [
         el('span', {}, `🏆 最佳存活 ${formatTime(state.best.time)}`),
         el('span', {}, `💀 最高击杀 ${state.best.kills}`),
@@ -525,10 +509,10 @@ export function renderSurvivors(container = viewRoot()) {
         el('span', { class: 'sv-upgrade-icon' }, u.icon),
         el('span', { class: 'sv-upgrade-name' }, u.name),
         el('span', { class: 'sv-upgrade-stacks' }, cur > 0 ? `已有 ${cur} / ${u.max} 层` : '新强化'),
-        el('span', { class: 'sv-upgrade-desc' }, u.desc),
-        el('span', { class: 'sv-upgrade-effect' }, cur > 0
+        el('span', { class: 'sv-upgrade-desc' }, ...highlightNumbers(u.desc)),
+        el('span', { class: 'sv-upgrade-effect' }, ...highlightNumbers(cur > 0
           ? `${curText} → ${nextText}`
-          : `选后：${nextText}`),
+          : `选后：${nextText}`)),
       ]);
     });
 
@@ -544,6 +528,7 @@ export function renderSurvivors(container = viewRoot()) {
 
   function chooseUpgrade(upgrade) {
     upgrade.apply(state.player, state);
+    deriveStats(state.player);
     state.upgradeStacks[upgrade.id] = (state.upgradeStacks[upgrade.id] || 0) + 1;
     state.pendingLevels -= 1;
     updateHud();
@@ -744,19 +729,19 @@ export function renderSurvivors(container = viewRoot()) {
     const p = state.player;
     const base = Math.atan2(target.y - p.y, target.x - p.x);
     const n = p.projectiles;
-    const spread = n > 1 ? Math.min(0.5, 0.2 * (n - 1)) : 0;
+    const spread = n > 1 ? Math.min(BASE_SHOT.spreadMax, BASE_SHOT.spreadStep * (n - 1)) : 0;
     const volley = { base, damageScale, shots: [] };
     for (let i = 0; i < n; i += 1) {
       const angle = n === 1 ? base : base - spread + (spread * 2 * i) / (n - 1);
       volley.shots.push({
-        x: p.x + Math.cos(angle) * (p.r + 6),
-        y: p.y + Math.sin(angle) * (p.r + 6),
+        x: p.x + Math.cos(angle) * (p.r + BASE_SHOT.muzzle),
+        y: p.y + Math.sin(angle) * (p.r + BASE_SHOT.muzzle),
         angle,
         speed: p.projectileSpeed,
-        damage: p.damage * damageScale,
-        r: 4.5,
+        damage: skillDamage(p, { atkPct: damageScale }),
+        r: BASE_SHOT.r,
         pierce: p.pierce,
-        life: 1.5,
+        life: BASE_SHOT.life,
         element: 'physical',
       });
     }
@@ -807,14 +792,14 @@ export function renderSurvivors(container = viewRoot()) {
     const p = state.player;
     // 单次伤害上限为最大生命的 30%，避免后期高倍率怪直接秒杀
     const capped = Math.min(amount, p.maxHp * 0.3);
-    // 减伤 → 护盾吸收 → 扣血
-    let final = Math.max(1, capped * (1 - (p.damageReduction || 0)));
+    // 防御区减伤 → 护盾吸收 → 扣血
+    let final = Math.max(1, capped * damageTakenZone(p.def));
     let absorbed = 0;
     if (p.shield > 0) {
       absorbed = Math.min(p.shield, final);
       p.shield -= absorbed;
       final -= absorbed;
-      p.shieldCd = 2; // 受击后 2 秒不再回复护盾
+      p.shieldCd = SHIELD_HIT_CD; // 受击后短时间内不再回复护盾
     }
     if (final > 0) p.hp -= final;
     state.flash = 1;
@@ -1156,6 +1141,11 @@ export function renderSurvivors(container = viewRoot()) {
     state.pendingLevels = 0;
     state.player = { ...PLAYER_BASE };
     applyTalents(state.player);
+    // 局外天赋先作用到基础属性，之后 buff 只按层数在 base 上做修正
+    deriveStats(state.player);
+    state.player.base = snapshotBaseStats(state.player);
+    state.player.hp = state.player.maxHp;
+    state.player.shield = state.player.shieldMax;
     state.enemies = [];
     state.projectiles = [];
     state.enemyShots = [];

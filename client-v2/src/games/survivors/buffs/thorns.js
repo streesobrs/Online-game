@@ -1,11 +1,20 @@
 /** 反伤冲击波：受击时向周围释放冲击波，需先获得护盾 */
+import { skillDamage } from '../combat.js';
+
+const RADIUS_BASE = 90;
+const RADIUS_PER_LEVEL = 20;
+const DAMAGE_RATIO_BASE = 0.5;
+const DAMAGE_RATIO_PER_LEVEL = 0.15;
+const COOLDOWN = 1;
+const MAX_LEVEL = 5;
+
 export default {
   id: 'thorns',
   icon: '💥',
   name: '反伤冲击波',
   desc: '受击时释放冲击波反击',
-  detail: '护盾解锁后才会出现在强化池。受到伤害时向周围释放冲击波，对范围内怪物造成伤害，冷却 1 秒。',
-  max: 5,
+  detail: `护盾解锁后才会出现在强化池。受到伤害时向周围释放冲击波，造成防御力 ${Math.round(DAMAGE_RATIO_BASE * 100)}% 的伤害，冷却 ${COOLDOWN} 秒。`,
+  max: MAX_LEVEL,
   order: 62,
   aoe: true,
   requireText: '需先获得护盾',
@@ -13,7 +22,7 @@ export default {
     return p.shieldMax > 0;
   },
   effect(lv) {
-    return `半径 ${90 + 20 * lv} · ${Math.round((0.6 + 0.15 * lv) * 100)}% 伤害`;
+    return `半径 ${RADIUS_BASE + RADIUS_PER_LEVEL * lv} · ${Math.round((DAMAGE_RATIO_BASE + DAMAGE_RATIO_PER_LEVEL * lv) * 100)}% 防御力`;
   },
   apply(p) {
     p.thornsLevel += 1;
@@ -24,9 +33,14 @@ export default {
   onHurt(p, s, info, api) {
     const lv = p.thornsLevel;
     if (lv <= 0 || s.thornsCd > 0) return;
-    s.thornsCd = 1;
-    const radius = 90 + 20 * lv;
+    s.thornsCd = COOLDOWN;
+    const radius = RADIUS_BASE + RADIUS_PER_LEVEL * lv;
     api.addNova(p.x, p.y, 50, radius);
-    api.damageInRadius(p.x, p.y, radius, p.damage * (0.6 + 0.15 * lv));
+    api.damageInRadius(
+      p.x,
+      p.y,
+      radius,
+      skillDamage(p, { defPct: DAMAGE_RATIO_BASE + DAMAGE_RATIO_PER_LEVEL * lv }),
+    );
   },
 };

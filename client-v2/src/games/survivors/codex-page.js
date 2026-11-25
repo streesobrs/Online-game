@@ -14,7 +14,7 @@ import { go } from '../../core/router.js';
 import { store } from '../../core/store.js';
 import { eventBus } from '../../core/eventBus.js';
 import { loadCatalog } from './catalog.js';
-import { formatTime } from './helpers.js';
+import { formatTime, highlightNumbers } from './helpers.js';
 import { REACTIONS } from './elements.js';
 import {
   TALENTS, getMeta, talentLevel, upgradeTalent, totalTalentLevels,
@@ -114,10 +114,10 @@ export function renderSurvivorCodexPage(container = viewRoot()) {
       el(
         'div',
         { class: 'm3-codex-tile-body' },
-        el('div', { class: 'm3-codex-desc' }, lv > 0 ? talent.desc(lv) : `解锁后：${talent.desc(1)}`),
+        el('div', { class: 'm3-codex-desc' }, ...highlightNumbers(lv > 0 ? talent.desc(lv) : `解锁后：${talent.desc(1)}`)),
         maxed
           ? el('div', { class: 'm3-codex-next' }, '已达到上限')
-          : el('div', { class: 'm3-codex-next' }, `下一级 Lv.${lv + 1}：${talent.desc(lv + 1)}`),
+          : el('div', { class: 'm3-codex-next' }, ...highlightNumbers(`下一级 Lv.${lv + 1}：${talent.desc(lv + 1)}`)),
         el(
           'span',
           { class: 'm3-codex-bar' },
@@ -165,11 +165,11 @@ export function renderSurvivorCodexPage(container = viewRoot()) {
       el(
         'div',
         { class: 'm3-codex-tile-body' },
-        el('div', { class: 'm3-codex-desc' }, buff.desc),
-        buff.detail ? el('div', { class: 'm3-codex-meta' }, buff.detail) : null,
+        el('div', { class: 'm3-codex-desc' }, ...highlightNumbers(buff.desc)),
+        buff.detail ? el('div', { class: 'm3-codex-meta' }, ...highlightNumbers(buff.detail)) : null,
         buff.requireText ? el('div', { class: 'm3-codex-meta' }, buff.requireText) : null,
         typeof buff.effect === 'function'
-          ? el('div', { class: 'm3-codex-next' }, `1 层：${buff.effect(1)}`)
+          ? el('div', { class: 'm3-codex-next' }, ...highlightNumbers(`1 层：${buff.effect(1)}`))
           : null,
       ),
     );
@@ -180,7 +180,7 @@ export function renderSurvivorCodexPage(container = viewRoot()) {
     const s = monster.stats || {};
     let unlock = '特殊召唤';
     if (monster.spawnable) unlock = monster.unlockAt ? `${formatTime(monster.unlockAt)} 后出现` : '开局出现';
-    else if (monster.boss) unlock = '每 90 秒出现';
+    else if (monster.boss) unlock = `每 ${monster.spawnInterval} 秒出现`;
     return el(
       'div',
       { class: 'm3-codex-tile' },
@@ -198,11 +198,11 @@ export function renderSurvivorCodexPage(container = viewRoot()) {
       el(
         'div',
         { class: 'm3-codex-tile-body' },
-        el('div', { class: 'm3-codex-desc' }, monster.desc),
+        el('div', { class: 'm3-codex-desc' }, ...highlightNumbers(monster.desc)),
         el(
           'div',
           { class: 'm3-codex-meta' },
-          `❤ 生命 ${s.hp} · 👣 速度 ${s.speed} · ⚔ 伤害 ${s.dmg} · ⭐ 经验 ${s.xp}`,
+          ...highlightNumbers(`❤ 生命 ${s.hp} · 👣 速度 ${s.speed} · ⚔ 伤害 ${s.dmg} · ⭐ 经验 ${s.xp}`),
         ),
       ),
     );

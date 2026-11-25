@@ -1,6 +1,7 @@
 /**
  * 刷怪肉鸽通用小工具：最佳成绩存储、时间格式化与随机数。
  */
+import { el } from '../../utils/dom.js';
 
 export const BEST_KEY = 'survivorsBest';
 
@@ -40,4 +41,24 @@ export function formatTime(sec) {
 
 export function rand(min, max) {
   return min + Math.random() * (max - min);
+}
+
+/**
+ * 把文案中的数值包成高亮 span，便于在说明文字里快速扫读。
+ * 支持正负号、小数与百分号，例如 -7.5%、×1.30、190~300。
+ * @param {string} text
+ * @returns {Array<string|HTMLElement>}
+ */
+export function highlightNumbers(text) {
+  const str = String(text ?? '');
+  const parts = [];
+  const re = /[+-]?\d+(?:\.\d+)?%?/g;
+  let last = 0;
+  for (const match of str.matchAll(re)) {
+    if (match.index > last) parts.push(str.slice(last, match.index));
+    parts.push(el('span', { class: 'sv-num' }, match[0]));
+    last = match.index + match[0].length;
+  }
+  if (last < str.length) parts.push(str.slice(last));
+  return parts;
 }

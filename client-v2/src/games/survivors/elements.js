@@ -5,6 +5,7 @@
  * 水元素与雷元素接触时触发「感电」：以触发怪为起点，连锁连接周围头顶带水/雷的怪，
  * 让它们一同受到反应伤害，同时记录闪电特效供渲染层绘制。
  */
+import { reactionDamage } from './combat.js';
 
 export const ELEMENT_INFO = {
   fire: { icon: '🔥', color: '#ff6b3d', name: '火' },
@@ -16,8 +17,25 @@ export const ELEMENT_INFO = {
 /** 元素默认附着时长（秒） */
 export const ELEMENT_DURATION = 3.5;
 
+/** 元素弹命中时挂元素的基础半径与每层成长，元素 buff 的文案与射击逻辑共用 */
+export const ELEMENT_RADIUS_BASE = 30;
+export const ELEMENT_RADIUS_PER_LEVEL = 12;
+/** 元素弹相对主武器伤害的倍率 */
+export const ELEMENT_SHOT_RATIO = 0.5;
+
+/** 感电连锁：每层增加的搜索半径与连接目标数 */
+export const CHAIN_RADIUS_PER_LEVEL = 25;
+export const CHAIN_LINKS_PER_LEVEL = 2;
+
+/** 感电·雷暴：半径与反应倍率（剧变反应） */
+export const STORM_RADIUS_BASE = 80;
+export const STORM_RADIUS_PER_LEVEL = 15;
+export const STORM_REACTION_BASE = 1.2;
+export const STORM_REACTION_PER_LEVEL = 0.3;
+
 /**
- * 元素反应表：baseMultiplier 为反应基础倍率，反应伤害 = 角色伤害 × 基础倍率 × 等级成长 × 增幅。
+ * 元素反应表：baseMultiplier 为剧变反应的基础倍率，
+ * 反应伤害 = 等级系数 × 反应倍率 × (1 + 元素精通加成 + 反应伤害加成)。
  * 目前只有水 + 雷的「感电」，基础倍率为 2。
  */
 export const REACTIONS = {
@@ -75,12 +93,10 @@ function electroCharged(trigger, state, player, api) {
   const reaction = REACTIONS.electro;
   const totalLv = Math.max(2, (player.waterLevel || 0) + (player.thunderLevel || 0));
   const chainBonus = player.electroChainLevel || 0;
-  const chainRadius = CHAIN_RADIUS + 25 * chainBonus;
-  const maxLinks = Math.min(28, 4 + totalLv * 2 + chainBonus * 2);
-  const amp = 1 + 0.25 * (player.electroAmpLevel || 0);
-  // 水/雷总层数每多 1 级，反应伤害 +10%（最低按 1 级水 + 1 级雷计算）
-  const levelScale = 1 + 0.1 * (totalLv - 2);
-  const damage = player.damage * reaction.baseMultiplier * levelScale * amp;
+  const chainRadius = CHAIN_RADIUS + CHAIN_RADIUS_PER_LEVEL * chainBonus;
+  const maxLinks = Math.min(28, 4 + totalLv * 2 + chainBonus * CHAIN_LINKS_PER_LEVEL);
+  // 剧变反应：伤害由等级系数、反应倍率和元素精通决定，与攻击力无关
+  const damage = reactionDamage(player, state.level || 1, reaction.baseMultiplier);
 
   state.reactionCd = GLOBAL_REACT_CD;
   trigger.reactCd = REACT_CD;
@@ -114,9 +130,14 @@ function electroCharged(trigger, state, player, api) {
   // 感电·雷暴：触发点额外释放一圈范围雷电
   const stormLv = player.electroStormLevel || 0;
   if (stormLv > 0) {
-    const radius = 80 + 15 * stormLv;
+    const radius = STORM_RADIUS_BASE + STORM_RADIUS_PER_LEVEL * stormLv;
     api.addNova(trigger.x, trigger.y, 24, radius);
-    api.damageInRadius(trigger.x, trigger.y, radius, player.damage * (0.35 + 0.15 * stormLv));
+    api.damageInRadius(
+      trigger.x,
+      trigger.y,
+      radius,
+      reactionDamage(player, state.level || 1, STORM_REACTION_BASE + STORM_REACTION_PER_LEVEL * stormLv),
+    );
   }
 }
 

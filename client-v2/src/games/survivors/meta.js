@@ -14,9 +14,9 @@ export const TALENTS = [
     name: '强健',
     max: 5,
     cost: (lv) => lv + 1,
-    desc: (lv) => `生命上限 +${20 * lv}`,
+    desc: (lv) => `生命上限 +${8 * lv}%`,
     apply(p, lv) {
-      p.maxHp += 20 * lv;
+      p.maxHp *= 1 + 0.08 * lv;
     },
   },
   {
@@ -25,9 +25,9 @@ export const TALENTS = [
     name: '凶暴',
     max: 5,
     cost: (lv) => lv + 1,
-    desc: (lv) => `伤害 +${6 * lv}%`,
+    desc: (lv) => `攻击力 +${6 * lv}%`,
     apply(p, lv) {
-      p.damage *= 1 + 0.06 * lv;
+      p.atk *= 1 + 0.06 * lv;
     },
   },
   {
@@ -58,9 +58,9 @@ export const TALENTS = [
     name: '再生',
     max: 5,
     cost: (lv) => lv + 1,
-    desc: (lv) => `每秒回血 +${(0.3 * lv).toFixed(1)}`,
+    desc: (lv) => `每秒回复 +${(0.2 * lv).toFixed(1)}% 最大生命`,
     apply(p, lv) {
-      p.regen += 0.3 * lv;
+      p.regenPct += 0.002 * lv;
     },
   },
   {
@@ -80,11 +80,10 @@ export const TALENTS = [
     name: '护心',
     max: 4,
     cost: (lv) => lv + 1,
-    desc: (lv) => `起始护盾 ${15 * lv} · 回复 ${lv}/s`,
+    desc: (lv) => `护盾上限 +${3 * lv}% 最大生命 · 回复 +${(0.2 * lv).toFixed(1)}%/s`,
     apply(p, lv) {
-      p.shieldMax += 15 * lv;
-      p.shield += 15 * lv;
-      p.shieldRegen += lv;
+      p.shieldPct += 0.03 * lv;
+      p.shieldRegenPct += 0.002 * lv;
     },
   },
   {
@@ -194,5 +193,4 @@ export function applyTalents(player) {
     const lv = talentLevel(talent.id);
     if (lv > 0 && typeof talent.apply === 'function') talent.apply(player, lv);
   }
-  player.hp = player.maxHp;
 }

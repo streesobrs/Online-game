@@ -132,6 +132,16 @@
   width: min(240px, 42vw);
 }
 
+/* HUD 上的玩家基础属性（开局快照，不随强化变化） */
+.sv-hud-base {
+  font-size: 10px;
+  line-height: 1.35;
+  font-weight: 600;
+  color: #cbd5e1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  font-variant-numeric: tabular-nums;
+}
+
 .sv-bar {
   position: relative;
   height: 13px;
@@ -453,6 +463,18 @@
   color: #5eead4;
 }
 
+/* 文案中的数值：比正文更亮并加粗，方便快速扫读 */
+.sv-num {
+  color: #fde68a;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 图鉴整页是浅色主题，数值改用高饱和强调色 */
+.m3-codex .sv-num {
+  color: #0d9488;
+}
+
 /* ---- 图鉴与养成：整页复用消消乐图鉴外壳（.m3-codex-*，见 match3/styles.css） ----
  * 这里只补两处游戏专属的小元素：满级天赋卡的强调色、怪物图鉴的颜色块。 */
 .m3-codex-tile--maxed {
@@ -523,6 +545,50 @@
   max-height: 54vh;
   overflow-y: auto;
   padding-right: 4px;
+}
+
+/* 强化图鉴顶部的玩家属性总览 */
+.sv-catalog-base {
+  margin-bottom: 10px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  border: 1px solid rgba(94, 234, 212, 0.22);
+  background: rgba(20, 26, 46, 0.7);
+}
+
+.sv-catalog-base-title {
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #9fb0cb;
+}
+
+.sv-catalog-base-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+  gap: 4px 12px;
+}
+
+.sv-catalog-base-item {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 11px;
+  color: #cbd5e1;
+}
+
+.sv-catalog-base-label {
+  color: #9fb0cb;
+}
+
+.sv-catalog-base-arrow {
+  color: #64748b;
+}
+
+/* 基础值保持柔和，只有「当前值」用高亮色 */
+.sv-catalog-base-from .sv-num {
+  color: #94a3b8;
+  font-weight: 600;
 }
 
 /* 元素页拆成「基础元素弹 / 反应 buff」两组：共用一层滚动，避免双滚动条 */

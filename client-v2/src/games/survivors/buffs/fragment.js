@@ -1,17 +1,25 @@
 /** 裂片：子弹命中后分裂出小碎片 */
+import { skillDamage } from '../combat.js';
+
+const COUNT_BASE = 1;
+const COUNT_PER_LEVEL = 1;
+const DAMAGE_RATIO_BASE = 0.35;
+const DAMAGE_RATIO_PER_LEVEL = 0.05;
+const MAX_LEVEL = 6;
+
 export default {
   id: 'fragment',
   icon: '🔱',
   name: '裂片',
   desc: '子弹命中后裂成碎片继续向前飞',
   detail: '命中敌人时沿飞行方向分裂出多枚碎片，对命中目标后方的敌人造成伤害；碎片本身不会再次分裂。',
-  max: 6,
+  max: MAX_LEVEL,
   order: 35,
   aoe: true,
   effect(lv) {
-    const count = 1 + lv;
-    const pct = Math.round((0.35 + 0.05 * lv) * 100);
-    return `${count} 枚碎片 · ${pct}% 伤害`;
+    const count = COUNT_BASE + COUNT_PER_LEVEL * lv;
+    const pct = Math.round((DAMAGE_RATIO_BASE + DAMAGE_RATIO_PER_LEVEL * lv) * 100);
+    return `${count} 枚碎片 · ${pct}% 攻击力`;
   },
   apply(p) {
     p.fragmentLevel += 1;
@@ -21,8 +29,8 @@ export default {
   onHit(enemy, pr, p, api) {
     if (p.fragmentLevel <= 0 || pr.fragment) return;
     const lv = p.fragmentLevel;
-    const count = 1 + lv;
-    const damage = pr.damage * (0.35 + 0.05 * lv);
+    const count = COUNT_BASE + COUNT_PER_LEVEL * lv;
+    const damage = skillDamage(p, { atkPct: DAMAGE_RATIO_BASE + DAMAGE_RATIO_PER_LEVEL * lv });
     const base = Math.atan2(pr.vy, pr.vx);
     const spread = Math.min(0.9, 0.16 * count);
     for (let i = 0; i < count; i += 1) {
@@ -37,6 +45,11 @@ export default {
         life: 0.45,
         fragment: true,
         ignoreIds: [...pr.hit],
+        // 继承父弹丸的元素，避免元素弹分裂后变成普通弹
+        element: pr.element,
+        elementRadius: pr.elementRadius,
+        elementDuration: pr.elementDuration,
+        color: pr.color,
       });
     }
   },

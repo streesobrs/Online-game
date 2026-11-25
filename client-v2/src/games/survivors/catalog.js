@@ -2,6 +2,7 @@
  * 刷怪肉鸽图鉴：目录数据动态加载与图鉴面板 UI。
  */
 import { el } from '../../utils/dom.js';
+import { highlightNumbers } from './helpers.js';
 import { TALENTS, getMeta, talentLevel, upgradeTalent } from './meta.js';
 import { REACTIONS } from './elements.js';
 import { scheduleUpload } from './server-save.js';
@@ -68,14 +69,14 @@ export function createCatalog({ state, formatTime, showOverlay, getBuffs, getMon
           ? el('span', { class: 'sv-catalog-tag' }, buff.requireText)
           : null,
       ]),
-      el('p', { class: 'sv-catalog-desc' }, buff.desc),
-      el('p', { class: 'sv-catalog-desc sv-catalog-detail' }, buff.detail || ''),
+      el('p', { class: 'sv-catalog-desc' }, ...highlightNumbers(buff.desc)),
+      el('p', { class: 'sv-catalog-desc sv-catalog-detail' }, ...highlightNumbers(buff.detail || '')),
       el('div', { class: 'sv-catalog-stats' }, [
-        stacks > 0 ? el('span', { class: 'sv-catalog-stat' }, `本局 ${stacks} / ${max} 层`) : null,
+        stacks > 0 ? el('span', { class: 'sv-catalog-stat' }, ...highlightNumbers(`本局 ${stacks} / ${max} 层`)) : null,
         typeof buff.effect === 'function'
-          ? el('span', { class: 'sv-catalog-stat' }, stacks > 0
+          ? el('span', { class: 'sv-catalog-stat' }, ...highlightNumbers(stacks > 0
             ? `当前 ${buff.effect(stacks)}`
-            : `1 层 ${buff.effect(1)}`)
+            : `1 层 ${buff.effect(1)}`))
           : null,
       ]),
     ]);
@@ -93,10 +94,10 @@ export function createCatalog({ state, formatTime, showOverlay, getBuffs, getMon
         el('span', { class: 'sv-catalog-name' }, talent.name),
         el('span', { class: 'sv-catalog-tag' }, `Lv.${lv}/${talent.max}`),
       ]),
-      el('p', { class: 'sv-catalog-desc' }, lv > 0 ? talent.desc(lv) : `解锁后：${talent.desc(1)}`),
+      el('p', { class: 'sv-catalog-desc' }, ...highlightNumbers(lv > 0 ? talent.desc(lv) : `解锁后：${talent.desc(1)}`)),
       maxed
         ? el('p', { class: 'sv-catalog-desc sv-catalog-detail' }, '已达到上限')
-        : el('p', { class: 'sv-catalog-desc sv-catalog-detail' }, `下一级：${talent.desc(lv + 1)}`),
+        : el('p', { class: 'sv-catalog-desc sv-catalog-detail' }, ...highlightNumbers(`下一级：${talent.desc(lv + 1)}`)),
       maxed
         ? el('span', { class: 'sv-catalog-stat' }, '已满级')
         : el('button', {
@@ -113,23 +114,53 @@ export function createCatalog({ state, formatTime, showOverlay, getBuffs, getMon
     ]);
   }
 
-  function monsterCard(monster) {
-    const s = monster.stats || {};
+  // 强化图鉴顶部的玩家属性总览：基础值来自开局快照，当前值由各 buff 层数修正得到
+  function baseStatsPanel() {
+    const p = state.player;
+    // 只在真正的对局中展示；开始页 / 结算页的 player 可能是上一局残留
+    if (!p || !p.base || state.mode !== 'playing') return null;
+    const b = p.base || p;
+    const fmt = (v, digits = 0) => Number(Number(v).toFixed(digits));
+    const rate = (interval) => `${(1 / interval).toFixed(2)}/s`;
+    const rows = [
+      ['❤️ 生命上限', fmt(b.maxHp), fmt(p.maxHp)],
+      ['⚔️ 攻击力', fmt(b.atk, 1), fmt(p.atk, 1)],
+      ['🛡️ 防御力', fmt(b.def), fmt(p.def)],
+      ['👟 移速', fmt(b.speed), fmt(p.speed)],
+      ['✨ 元素精通', fmt(b.em), fmt(p.em)],
+      ['⏱️ 攻速', rate(b.attackInterval), rate(p.attackInterval)],
+      ['🎯 弹丸', b.projectiles, p.projectiles],
+      ['🏹 穿透', b.pierce, p.pierce],
+      ['🧲 拾取', fmt(b.pickup), fmt(p.pickup)],
+      ['🔵 护盾上限', fmt(b.maxHp * b.shieldPct), fmt(p.shieldMax)],
+    ];
+    return el('div', { class: 'sv-catalog-base' }, [
+      el('div', { class: 'sv-catalog-base-title' }, '玩家基础属性 → 当前（子弹与 buff 都按基础值计算）'),
+      el('div', { class: 'sv-catalog-base-grid' }, rows.map(([label, from, to]) => el('span', { class: 'sv-catalog-base-item' }, [
+        el('span', { class: 'sv-catalog-base-label' }, label),
+        el('span', { class: 'sv-catalog-base-from' }, ...highlightNumbers(String(from))),
+        el('span', { class: 'sv-catalog-base-arrow' }, '→'),
+        el('span', { class: 'sv-catalog-base-to' }, ...highlightNumbers(String(to))),
+      ]))),
+    ]);
+  }
+
+  function monsterCard(monster) {    const s = monster.stats || {};
     let unlock = '特殊召唤';
     if (monster.spawnable) unlock = monster.unlockAt ? `${formatTime(monster.unlockAt)} 后出现` : '开局出现';
-    else if (monster.boss) unlock = '每 90 秒出现';
+    else if (monster.boss) unlock = `每 ${monster.spawnInterval} 秒出现`;
     return el('div', { class: 'sv-catalog-card' }, [
       el('div', { class: 'sv-catalog-card-head' }, [
         el('span', { class: 'sv-catalog-swatch', style: { background: s.color || '#94a3b8' } }),
         el('span', { class: 'sv-catalog-name' }, monster.name),
         el('span', { class: 'sv-catalog-tag' }, unlock),
       ]),
-      el('p', { class: 'sv-catalog-desc' }, monster.desc),
+      el('p', { class: 'sv-catalog-desc' }, ...highlightNumbers(monster.desc)),
       el('div', { class: 'sv-catalog-stats' }, [
-        el('span', { class: 'sv-catalog-stat' }, `❤ 生命 ${s.hp}`),
-        el('span', { class: 'sv-catalog-stat' }, `👣 速度 ${s.speed}`),
-        el('span', { class: 'sv-catalog-stat' }, `⚔ 伤害 ${s.dmg}`),
-        el('span', { class: 'sv-catalog-stat' }, `⭐ 经验 ${s.xp}`),
+        el('span', { class: 'sv-catalog-stat' }, ...highlightNumbers(`❤ 生命 ${s.hp}`)),
+        el('span', { class: 'sv-catalog-stat' }, ...highlightNumbers(`👣 速度 ${s.speed}`)),
+        el('span', { class: 'sv-catalog-stat' }, ...highlightNumbers(`⚔ 伤害 ${s.dmg}`)),
+        el('span', { class: 'sv-catalog-stat' }, ...highlightNumbers(`⭐ 经验 ${s.xp}`)),
       ]),
     ]);
   }
@@ -168,16 +199,18 @@ export function createCatalog({ state, formatTime, showOverlay, getBuffs, getMon
         tabBtn('elements', '⚛️ 元素'),
         tabBtn('monsters', '👾 怪物'),
       ]),
-      isElements
-        ? el('div', { class: 'sv-catalog-scroll' }, [
-          el('p', { class: 'sv-catalog-sec' }, `基础元素弹 · ${elements.length} 种`),
-          cardList(elements),
-          el('p', { class: 'sv-catalog-sec' }, `反应 buff · ${reactionBuffs.length} 种`),
-          reactionBuffs.length
-            ? cardList(reactionBuffs)
-            : el('p', { class: 'sv-catalog-desc' }, '获得水与雷元素弹后，升级时会出现感电反应强化。'),
-        ])
-        : cardList(items),
+      tab === 'buffs'
+        ? el('div', { class: 'sv-catalog-buffs' }, [baseStatsPanel(), cardList(items)])
+        : (isElements
+          ? el('div', { class: 'sv-catalog-scroll' }, [
+            el('p', { class: 'sv-catalog-sec' }, `基础元素弹 · ${elements.length} 种`),
+            cardList(elements),
+            el('p', { class: 'sv-catalog-sec' }, `反应 buff · ${reactionBuffs.length} 种`),
+            reactionBuffs.length
+              ? cardList(reactionBuffs)
+              : el('p', { class: 'sv-catalog-desc' }, '获得水与雷元素弹后，升级时会出现感电反应强化。'),
+          ])
+          : cardList(items)),
       el('div', { class: 'sv-panel-actions' }, [
         el('button', { class: 'btn btn-secondary', type: 'button', onClick: close }, '返回'),
       ]),

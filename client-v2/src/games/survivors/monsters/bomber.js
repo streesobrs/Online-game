@@ -1,16 +1,24 @@
 /** 自爆虫：靠近或死亡时爆炸 */
+const TRIGGER_DIST = 110;
+const FUSE_TIME = 0.9;
+const BLAST_RADIUS = 120;
+const VISUAL_RADIUS = 110;
+const BLAST_DAMAGE_MULT = 2.2;
+
 function explode(e, api) {
-  api.addExplosionVisual(e.x, e.y, 110);
+  api.addExplosionVisual(e.x, e.y, VISUAL_RADIUS);
   api.spawnParticles(e.x, e.y, '#fb923c', 16, 260);
   api.shake(0.35);
   const p = api.state.player;
-  if ((p.x - e.x) ** 2 + (p.y - e.y) ** 2 <= 120 * 120) api.hurtPlayer(e.dmg * 2.2);
+  if ((p.x - e.x) ** 2 + (p.y - e.y) ** 2 <= BLAST_RADIUS * BLAST_RADIUS) {
+    api.hurtPlayer(e.dmg * BLAST_DAMAGE_MULT);
+  }
 }
 
 export default {
   id: 'bomber',
   name: '自爆虫',
-  desc: '进入 110 距离后开始点火，0.9 秒后爆炸；被击杀时也会爆炸，需要保持距离处理。',
+  desc: `进入 ${TRIGGER_DIST} 距离后开始点火，${FUSE_TIME} 秒后爆炸；被击杀时也会爆炸，需要保持距离处理。`,
   order: 70,
   spawnable: true,
   unlockAt: 300,
@@ -28,8 +36,8 @@ export default {
       return;
     }
     api.moveEnemy(e, dx, dy, dist, dt, 1);
-    if (dist < 110) {
-      e.fuse = 0.9;
+    if (dist < TRIGGER_DIST) {
+      e.fuse = FUSE_TIME;
       api.spawnParticles(e.x, e.y, '#fb923c', 6, 120);
     }
   },
