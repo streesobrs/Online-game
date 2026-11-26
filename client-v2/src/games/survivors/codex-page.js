@@ -14,6 +14,7 @@ import { go } from '../../core/router.js';
 import { store } from '../../core/store.js';
 import { eventBus } from '../../core/eventBus.js';
 import { loadCatalog } from './catalog.js';
+import { openBuffDetail, openMonsterDetail } from './detail-modal.js';
 import { formatTime, highlightNumbers } from './helpers.js';
 import { REACTIONS } from './elements.js';
 import {
@@ -146,11 +147,23 @@ export function renderSurvivorCodexPage(container = viewRoot()) {
     );
   }
 
-  /** 强化 / 元素卡 */
+  /** 强化 / 元素卡：点击打开详情（左演示 / 右数值） */
   function buffTile(buff) {
+    const openDetail = () => openBuffDetail(buff);
     return el(
       'div',
-      { class: 'm3-codex-tile' },
+      {
+        class: 'm3-codex-tile m3-codex-tile--detail',
+        role: 'button',
+        tabIndex: 0,
+        title: '查看详情',
+        onClick: openDetail,
+        onKeydown: (e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          e.preventDefault();
+          openDetail();
+        },
+      },
       el(
         'div',
         { class: 'm3-codex-tile-head' },
@@ -175,15 +188,27 @@ export function renderSurvivorCodexPage(container = viewRoot()) {
     );
   }
 
-  /** 怪物卡：颜色块 + 出现时机 + 初始数值 */
+  /** 怪物卡：颜色块 + 出现时机 + 初始数值，点击打开详情 */
   function monsterTile(monster) {
     const s = monster.stats || {};
     let unlock = '特殊召唤';
     if (monster.spawnable) unlock = monster.unlockAt ? `${formatTime(monster.unlockAt)} 后出现` : '开局出现';
     else if (monster.boss) unlock = `每 ${monster.spawnInterval} 秒出现`;
+    const openDetail = () => openMonsterDetail(monster);
     return el(
       'div',
-      { class: 'm3-codex-tile' },
+      {
+        class: 'm3-codex-tile m3-codex-tile--detail',
+        role: 'button',
+        tabIndex: 0,
+        title: '查看详情',
+        onClick: openDetail,
+        onKeydown: (e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          e.preventDefault();
+          openDetail();
+        },
+      },
       el(
         'div',
         { class: 'm3-codex-tile-head' },
@@ -348,9 +373,9 @@ export function renderSurvivorCodexPage(container = viewRoot()) {
       return el(
         'div',
         { class: 'm3-codex-pane' },
-        paneHead('⚛️ 元素图鉴', `基础元素弹 ${shots.length} 种 · 反应 buff ${reactions.length} 种 · 感电基础倍率 ×${REACTIONS.electro.baseMultiplier}`),
+        paneHead('⚛️ 元素图鉴', `基础元素弹 ${shots.length} 种 · 反应 buff ${reactions.length} 种 · 元素反应 ${Object.values(REACTIONS).map((r) => r.name).join(' / ')}`),
         section(`基础元素弹 · ${shots.length} 种`, '命中时对周围范围挂元素', shots.map(buffTile)),
-        section(`反应 buff · ${reactions.length} 种`, '拥有水与雷元素弹后，升级时出现，强化感电反应', reactions.map(buffTile)),
+        section(`反应 buff · ${reactions.length} 种`, '同时拥有两种相关元素弹后，升级时出现，强化对应反应', reactions.map(buffTile)),
       );
     }
 

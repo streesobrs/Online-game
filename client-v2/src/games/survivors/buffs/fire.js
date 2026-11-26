@@ -14,7 +14,7 @@ export default {
   icon: '🔥',
   name: '火焰弹',
   desc: `每轮额外发射 ${SHOTS_PER_LEVEL} 枚火属性弹`,
-  detail: `每层让每轮射击多出 ${SHOTS_PER_LEVEL} 枚火焰弹，造成 ${DAMAGE_PCT}% 伤害。命中时对周围 ${RADIUS_AT_LEVEL_1} 半径范围挂火元素（每层 +${ELEMENT_RADIUS_PER_LEVEL} 半径），持续 ${ELEMENT_DURATION} 秒。`,
+  detail: `每层让每轮射击多出 ${SHOTS_PER_LEVEL} 枚火焰弹，造成 ${DAMAGE_PCT}% 伤害。命中时对周围 ${RADIUS_AT_LEVEL_1} 半径范围挂火元素（每层 +${ELEMENT_RADIUS_PER_LEVEL} 半径），持续 ${ELEMENT_DURATION} 秒；与雷元素触发「超载」范围爆炸，与冰元素触发「融化」增幅伤害。`,
   max: MAX_LEVEL,
   order: 50,
   aoe: false,

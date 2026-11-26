@@ -14,7 +14,7 @@ export default {
   icon: '💧',
   name: '水流弹',
   desc: `每轮额外发射 ${SHOTS_PER_LEVEL} 枚水属性弹`,
-  detail: `每层让每轮射击多出 ${SHOTS_PER_LEVEL} 枚水流弹，造成 ${DAMAGE_PCT}% 伤害。命中时对周围 ${RADIUS_AT_LEVEL_1} 半径范围挂水元素（每层 +${ELEMENT_RADIUS_PER_LEVEL} 半径），持续 ${ELEMENT_DURATION} 秒；与雷元素接触触发「感电」，连锁附近带水/雷的敌人一同受伤。`,
+  detail: `每层让每轮射击多出 ${SHOTS_PER_LEVEL} 枚水流弹，造成 ${DAMAGE_PCT}% 伤害。命中时对周围 ${RADIUS_AT_LEVEL_1} 半径范围挂水元素（每层 +${ELEMENT_RADIUS_PER_LEVEL} 半径），持续 ${ELEMENT_DURATION} 秒；与雷元素接触触发「感电」，连锁附近带水/雷的敌人一同受伤；与冰元素接触触发「冻结」，短暂冰封周围敌人。`,
   max: MAX_LEVEL,
   order: 53,
   aoe: false,

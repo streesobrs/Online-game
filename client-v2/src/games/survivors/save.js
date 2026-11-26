@@ -25,6 +25,7 @@ function serializeRun(state) {
     projectiles: state.projectiles.filter((pr) => !pr.dead).map((pr) => ({ ...pr, hit: [...pr.hit] })),
     enemyShots: state.enemyShots.filter((s) => !s.dead),
     gems: state.gems,
+    healthPacks: state.healthPacks || [],
     upgradeStacks: state.upgradeStacks,
     attackTimer: state.attackTimer,
     comboTimer: state.comboTimer,
@@ -98,6 +99,7 @@ export function loadRun() {
       projectiles: (run.projectiles || []).map((pr) => ({ ...pr, hit: new Set(pr.hit || []) })),
       enemyShots: run.enemyShots || [],
       gems: run.gems || [],
+      healthPacks: run.healthPacks || [],
       upgradeStacks: run.upgradeStacks || {},
     };
   } catch (e) {

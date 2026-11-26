@@ -102,6 +102,7 @@
   width: 100%;
   aspect-ratio: 960 / 600;
   overflow: hidden;
+  contain: paint;
 }
 
 .sv-canvas {
@@ -109,6 +110,8 @@
   width: 100%;
   height: 100%;
   cursor: crosshair;
+  /* 让画布单独成层：否则每帧更新都会连带重绘父级的大范围阴影和圆角裁剪 */
+  will-change: transform;
 }
 
 /* ---- HUD ---- */
@@ -269,7 +272,9 @@
   border: 1px solid rgba(120, 150, 220, 0.28);
   color: #7dd3fc;
   font: 11px/1.55 ui-monospace, Consolas, monospace;
-  white-space: pre;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: min(560px, calc(100% - 20px));
   pointer-events: none;
   opacity: 0;
   visibility: hidden;
@@ -289,8 +294,8 @@
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(6, 8, 16, 0.74);
-  backdrop-filter: blur(3px);
+  background: rgba(6, 8, 16, 0.82);
+  /* 不用 backdrop-filter：升级/暂停时整块画布被实时模糊，是明显的掉帧来源 */
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.18s ease;
@@ -365,6 +370,188 @@
 
 .sv-panel-actions .btn {
   min-width: 120px;
+}
+
+/* 画质与性能设置面板 */
+.sv-settings {
+  width: min(94%, 620px);
+  text-align: left;
+}
+
+.sv-settings .sv-panel-title,
+.sv-settings .sv-panel-sub {
+  text-align: center;
+}
+
+.sv-settings-rows {
+  margin: 6px 0 10px;
+}
+
+.sv-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px dashed rgba(120, 150, 220, 0.18);
+}
+
+.sv-row:last-child {
+  border-bottom: none;
+}
+
+.sv-row-label {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: #9fb3d9;
+}
+
+.sv-opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.sv-opt {
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(120, 150, 220, 0.3);
+  background: rgba(30, 40, 70, 0.6);
+  color: #cbd5e1;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.sv-opt:hover {
+  border-color: rgba(120, 190, 255, 0.6);
+}
+
+.sv-opt.active {
+  background: #38bdf8;
+  border-color: #38bdf8;
+  color: #0b1220;
+  font-weight: 700;
+}
+
+.sv-settings-info {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(30, 40, 70, 0.45);
+  font-size: 12px;
+  line-height: 1.8;
+  color: #9fb3d9;
+  word-break: break-all;
+}
+
+.sv-settings-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.sv-settings-tip {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #8293b3;
+  text-align: left;
+}
+
+/* 性能基准测试：独立画布覆盖游戏区 */
+.sv-bench {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  background: #0d101d;
+}
+
+.sv-bench canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sv-bench-label {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(12, 16, 30, 0.78);
+  border: 1px solid rgba(120, 150, 220, 0.25);
+  color: #cbd5e1;
+  font-size: 12px;
+  font-family: inherit;
+  pointer-events: none;
+}
+
+.sv-bench-panel {
+  width: min(96%, 680px);
+  text-align: left;
+}
+
+.sv-bench-panel .sv-panel-title,
+.sv-bench-panel .sv-panel-sub {
+  text-align: center;
+}
+
+.sv-bench-table {
+  display: grid;
+  grid-template-columns: 2.4fr repeat(4, 1fr);
+  gap: 7px 8px;
+  margin: 12px 0;
+  font-size: 12px;
+  align-items: center;
+}
+
+.sv-bench-th {
+  text-align: right;
+  font-size: 11px;
+  font-weight: 700;
+  color: #93c5fd;
+}
+
+.sv-bench-th:first-child {
+  text-align: left;
+}
+
+.sv-bench-td {
+  text-align: right;
+  color: #dbe4f3;
+  font-variant-numeric: tabular-nums;
+}
+
+.sv-bench-name {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left;
+  color: #f8fafc;
+}
+
+.sv-bench-name span {
+  font-size: 11px;
+  color: #8293b3;
+}
+
+.sv-bench-copy {
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(120, 150, 220, 0.25);
+  background: rgba(30, 40, 70, 0.45);
+  color: #cbd5e1;
+  font: 11px/1.6 ui-monospace, Consolas, monospace;
+  resize: vertical;
+  box-sizing: border-box;
 }
 
 .sv-result {
@@ -700,6 +887,358 @@
   font-size: 11px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+/* 可点击卡片：整页图鉴与局内图鉴共用，提示可以打开详情 */
+.sv-catalog-card--detail,
+.m3-codex-tile--detail {
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+.sv-catalog-card--detail:hover,
+.sv-catalog-card--detail:focus-visible {
+  border-color: rgba(94, 234, 212, 0.6);
+  background: rgba(38, 46, 78, 0.9);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.m3-codex-tile--detail:hover,
+.m3-codex-tile--detail:focus-visible {
+  border-color: var(--theme-btn-primary-bg, #007bff);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+/* ---- 图鉴详情模态框：左侧效果演示 / 右侧数值文案 ---- */
+.sv-detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(4, 7, 14, 0.72);
+  animation: sv-detail-fade 0.18s ease;
+}
+
+.sv-detail {
+  display: flex;
+  flex-direction: column;
+  width: min(96vw, 860px);
+  max-height: min(88vh, 760px);
+  border-radius: 16px;
+  background: linear-gradient(160deg, rgba(24, 30, 52, 0.98), rgba(14, 18, 34, 0.99));
+  border: 1px solid rgba(120, 150, 220, 0.3);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  color: #e2e8f0;
+  overflow: hidden;
+  animation: sv-detail-pop 0.18s ease;
+}
+
+.sv-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid rgba(120, 150, 220, 0.18);
+}
+
+.sv-detail-icon {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.sv-detail-swatch {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.sv-detail-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.sv-detail-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.sv-detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.sv-detail-chip {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(148, 163, 184, 0.14);
+  color: #b9c7de;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sv-detail-close {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(148, 163, 184, 0.14);
+  color: #cbd5e1;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sv-detail-close:hover {
+  background: rgba(248, 113, 113, 0.25);
+  color: #fff;
+}
+
+.sv-detail-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  min-height: 0;
+  padding: 16px 18px 18px;
+  overflow: hidden;
+}
+
+.sv-detail-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sv-detail-canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 12px;
+  border: 1px solid rgba(120, 150, 220, 0.24);
+  background: #0a0f1e;
+}
+
+.sv-detail-cap {
+  font-size: 11px;
+  color: #7f90ad;
+  text-align: center;
+}
+
+.sv-detail-levelbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(30, 36, 62, 0.8);
+  border: 1px solid rgba(120, 150, 220, 0.2);
+}
+
+.sv-detail-leveltext {
+  font-size: 11px;
+  color: #9fb0cb;
+}
+
+.sv-detail-range {
+  flex: 1;
+  min-width: 0;
+  accent-color: #5eead4;
+}
+
+.sv-detail-level {
+  font-size: 12px;
+  color: #5eead4;
+}
+
+.sv-detail-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.sv-detail-block-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #93c5fd;
+}
+
+.sv-detail-now {
+  font-size: 11px;
+  font-weight: 600;
+  color: #5eead4;
+}
+
+.sv-detail-text {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: #d5deee;
+}
+
+.sv-detail-muted {
+  margin-top: 4px;
+  color: #94a3b8;
+}
+
+.sv-detail-table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 208px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.sv-detail-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 5px 9px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: rgba(120, 150, 220, 0.08);
+  color: #c3d0e6;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sv-detail-row:hover {
+  border-color: rgba(94, 234, 212, 0.4);
+}
+
+.sv-detail-row.is-current {
+  border-color: #5eead4;
+  background: rgba(45, 212, 191, 0.14);
+  color: #eafffb;
+}
+
+.sv-detail-row-lv {
+  flex: none;
+  font-weight: 800;
+  color: #8fb2e0;
+}
+
+.sv-detail-row.is-current .sv-detail-row-lv {
+  color: #5eead4;
+}
+
+.sv-detail-row-val {
+  font-variant-numeric: tabular-nums;
+}
+
+.sv-detail-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 10px;
+}
+
+.sv-detail-stat {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: rgba(120, 150, 220, 0.1);
+}
+
+.sv-detail-stat-label {
+  font-size: 11px;
+  color: #9fb0cb;
+}
+
+.sv-detail-stat-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: #e2e8f0;
+  font-variant-numeric: tabular-nums;
+}
+
+.sv-detail-stat.is-hp .sv-detail-stat-value {
+  color: #f87171;
+}
+
+.sv-detail-stat.is-atk .sv-detail-stat-value {
+  color: #fbbf24;
+}
+
+.sv-detail-stat.is-xp .sv-detail-stat-value {
+  color: #a78bfa;
+}
+
+.sv-detail-stat-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.sv-detail-note {
+  font-size: 11px;
+  color: #8fa0bd;
+}
+
+.sv-detail-block--extras {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+body.sv-detail-open {
+  overflow: hidden;
+}
+
+@keyframes sv-detail-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes sv-detail-pop {
+  from { transform: scale(0.96); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@media (max-width: 760px) {
+  .sv-detail-overlay {
+    padding: 10px;
+    align-items: flex-start;
+  }
+
+  .sv-detail {
+    max-height: 92vh;
+  }
+
+  .sv-detail-body {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+
+  .sv-detail-copy {
+    overflow: visible;
+    padding-right: 0;
+  }
 }
 
 @media (max-width: 640px) {

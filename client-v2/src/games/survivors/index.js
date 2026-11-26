@@ -24,7 +24,7 @@ import { loadCatalog, createCatalog } from './catalog.js';
 import { saveRun, loadRun, clearRun } from './save.js';
 import { applyTalents, getMeta, grantRunPoints } from './meta.js';
 import { syncOnEnter, scheduleUpload, flushUpload, cancelScheduledUpload } from './server-save.js';
-import { applyElementHit, applyElementAoe, ELEMENT_DURATION } from './elements.js';
+import { applyElementHit, applyElementAoe, applyShatter, ELEMENT_DURATION, ICE_SLOW_FACTOR } from './elements.js';
 import { BOSS_INTERVAL } from './monsters/boss.js';
 import { SHIELD_HIT_CD } from './buffs/shield.js';
 
@@ -39,12 +39,123 @@ function formatDps(v) {
 }
 
 const DEBUG_KEY = 'survivorsDebug';
+const QUALITY_KEY = 'survivorsQuality';
 
 function loadDebugPref() {
   try {
     return localStorage.getItem(DEBUG_KEY) === '1';
   } catch (e) {
     return false;
+  }
+}
+
+// 画质模式：auto=自动（最低缩到 CSS 分辨率，不额外变糊）/ sharp=高清（设备像素）/ smooth=流畅（可低于 CSS 分辨率）
+const QUALITY_META = {
+  auto: { icon: '🖥', name: '自动', tip: '画质：自动（低帧时最多降到 CSS 分辨率）' },
+  sharp: { icon: '🔍', name: '高清', tip: '画质：高清（设备像素，最清晰但可能掉帧）' },
+  smooth: { icon: '⚡', name: '流畅', tip: '画质：流畅（允许低于 CSS 分辨率）' },
+};
+
+function loadQualityMode() {
+  try {
+    const v = localStorage.getItem(QUALITY_KEY);
+    return v === 'sharp' || v === 'smooth' ? v : 'auto';
+  } catch (e) {
+    return 'auto';
+  }
+}
+
+// 探测浏览器实际使用的图形后端：出现 SwiftShader / Basic Render 说明没走 GPU 加速
+function detectGpuRenderer() {
+  try {
+    const c = document.createElement('canvas');
+    const gl = c.getContext('webgl');
+    if (!gl) return 'no-webgl';
+    const info = gl.getExtension('WEBGL_debug_renderer_info');
+    const name = info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+    const lose = gl.getExtension('WEBGL_lose_context');
+    if (lose) lose.loseContext();
+    return String(name || 'unknown');
+  } catch (e) {
+    return 'unknown';
+  }
+}
+
+// 画布加速粗测：对 1.6MP 离屏画布连画 8 次渐变 + 网格，再读回 1 像素强制同步。
+// 硬件加速约几十毫秒，纯 CPU 光栅化通常要几百毫秒。
+function benchmarkCanvas() {
+  const c = document.createElement('canvas');
+  c.width = 1600;
+  c.height = 1000;
+  const g = c.getContext('2d');
+  const t0 = performance.now();
+  for (let i = 0; i < 8; i += 1) {
+    const grad = g.createLinearGradient(0, 0, 1600, 1000);
+    grad.addColorStop(0, '#1b2038');
+    grad.addColorStop(1, '#0d101d');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 1600, 1000);
+    g.strokeStyle = 'rgba(120, 150, 220, 0.3)';
+    g.beginPath();
+    for (let x = 0; x <= 1600; x += 40) {
+      g.moveTo(x, 0);
+      g.lineTo(x, 1000);
+    }
+    for (let y = 0; y <= 1000; y += 40) {
+      g.moveTo(0, y);
+      g.lineTo(1600, y);
+    }
+    g.stroke();
+  }
+  g.getImageData(0, 0, 1, 1);
+  return performance.now() - t0;
+}
+
+const SETTINGS_KEY = 'survivorsSettings';
+const FPS_CAPS = [0, 144, 120, 90, 60, 30];
+const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+const CANVAS_CAPS = [1280, 1600, 1920, 2560];
+const DEFAULT_SETTINGS = {
+  fpsCap: 0,
+  particles: IS_MOBILE ? 'mid' : 'high',
+  shake: true,
+  background: 'grid',
+  glow: true,
+  gemGlow: true,
+  icons: true,
+  flash: true,
+  // 移动端屏幕像素多、GPU 填充率有限，默认把画布宽度压到 1600
+  canvasCap: IS_MOBILE ? 1600 : 2560,
+};
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return { ...DEFAULT_SETTINGS };
+    const v = JSON.parse(raw) || {};
+    return {
+      fpsCap: FPS_CAPS.includes(v.fpsCap) ? v.fpsCap : 0,
+      particles: ['high', 'mid', 'low', 'off'].includes(v.particles) ? v.particles : (IS_MOBILE ? 'mid' : 'high'),
+      shake: v.shake !== false,
+      background: ['grid', 'stars', 'plain'].includes(v.background)
+        ? v.background
+        : (v.grid === false ? 'plain' : 'grid'),
+      glow: v.glow !== false,
+      gemGlow: v.gemGlow !== false,
+      icons: v.icons !== false,
+      flash: v.flash !== false,
+      canvasCap: CANVAS_CAPS.includes(v.canvasCap) ? v.canvasCap : (IS_MOBILE ? 1600 : 2560),
+    };
+  } catch (e) {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+function saveSettings(settings) {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  } catch (e) {
+    // 隐私模式忽略
   }
 }
 
@@ -85,6 +196,7 @@ export function renderSurvivors(container = viewRoot()) {
     projectiles: [],
     enemyShots: [],
     gems: [],
+    healthPacks: [],
     particles: [],
     upgradeStacks: {},
     attackTimer: 0.35,
@@ -98,9 +210,25 @@ export function renderSurvivors(container = viewRoot()) {
     thornsCd: 0,
     lastReward: 0,
     debug: loadDebugPref(),
+    qualityMode: loadQualityMode(),
+    settings: loadSettings(),
+    gpu: detectGpuRenderer(),
     fps: 0,
     fpsFrames: 0,
     fpsTime: 0,
+    // 每 0.5 秒统计窗口的分帧耗时：逻辑（含 HUD）/ 渲染 / 单帧峰值
+    perfUpd: 0,
+    perfRen: 0,
+    perfPeak: 0,
+    perfUpdSum: 0,
+    perfRenSum: 0,
+    perfFrames: 0,
+    perfPeakMax: 0,
+    // 调试录制：每 0.5 秒采样一次，停止时下载 JSON 日志
+    recording: false,
+    recordStart: 0,
+    records: [],
+    recordErrors: [],
     spawnTimer: 1.2,
     bossTimer: BOSS_INTERVAL,
     bossCount: 0,
@@ -123,7 +251,8 @@ export function renderSurvivors(container = viewRoot()) {
 
   // ---- DOM ----
   const canvas = el('canvas', { class: 'sv-canvas', width: W, height: H });
-  const ctx = canvas.getContext('2d');
+  // alpha:false 让画布按不透明层合成，省掉每帧与页面背景的混合
+  const ctx = canvas.getContext('2d', { alpha: false });
   const renderer = createRenderer({ canvas, ctx, state, W, H });
 
   const hpFill = el('div', { class: 'sv-bar-fill sv-hp-fill' });
@@ -144,6 +273,24 @@ export function renderSurvivors(container = viewRoot()) {
     onClick: () => toggleDebug(),
   }, '🐞');
   const settleBtn = el('button', { class: 'sv-hud-chip sv-hud-quit', type: 'button', onClick: () => settleNow() }, '结束本局');
+  const recordBtn = el('button', {
+    class: 'sv-hud-chip sv-hud-quit',
+    type: 'button',
+    title: '录制调试日志（F4 开始/停止）',
+    onClick: () => toggleRecording(),
+  }, '⏺');
+  const settingsBtn = el('button', {
+    class: 'sv-hud-chip sv-hud-quit',
+    type: 'button',
+    title: '画质与性能设置',
+    onClick: () => openSettings(),
+  }, '⚙');
+  const qualityBtn = el('button', {
+    class: 'sv-hud-chip sv-hud-quit',
+    type: 'button',
+    title: `${QUALITY_META[state.qualityMode].tip} · 点击切换`,
+    onClick: () => cycleQuality(),
+  }, QUALITY_META[state.qualityMode].icon);
 
   const hud = el('div', { class: 'sv-hud' }, [
     el('div', { class: 'sv-hud-bars' }, [
@@ -152,7 +299,7 @@ export function renderSurvivors(container = viewRoot()) {
       baseStatsEl,
     ]),
     el('div', { class: 'sv-hud-mid' }, [timeEl, waveEl]),
-    el('div', { class: 'sv-hud-right' }, [lvEl, killEl, dpsEl, shieldEl, debugBtn, catalogBtn, settleBtn]),
+    el('div', { class: 'sv-hud-right' }, [lvEl, killEl, dpsEl, shieldEl, settingsBtn, qualityBtn, recordBtn, debugBtn, catalogBtn, settleBtn]),
   ]);
 
   const debugEl = el('pre', { class: `sv-debug${state.debug ? ' show' : ''}` }, '');
@@ -230,17 +377,169 @@ export function renderSurvivors(container = viewRoot()) {
   }
 
   // ---- 调试面板 ----
+  const SHAPE_NAMES = {
+    circle: '圆', triangle: '三', square: '方', charger: '冲',
+    shooter: '射', splitter: '分', bomber: '炸', boss: '王',
+  };
+
+  // 汇总调试信息：面板展示与日志录制共用，保证两边数据一致
+  function collectDebugInfo() {
+    const p = state.player || {};
+    const stacks = Object.entries(state.upgradeStacks).filter(([, v]) => v > 0);
+    const shapeCounts = {};
+    let frozen = 0;
+    let vuln = 0;
+    let tagged = 0;
+    for (const e of state.enemies) {
+      shapeCounts[e.shape] = (shapeCounts[e.shape] || 0) + 1;
+      if (e.freezeTimer > 0) frozen += 1;
+      if (e.vulnTimer > 0) vuln += 1;
+      if (e.element) tagged += 1;
+    }
+    return {
+      fps: Math.round(state.fps * 10) / 10,
+      frameMs: state.fps > 0 ? Math.round((1000 / state.fps) * 10) / 10 : 0,
+      updMs: Math.round(state.perfUpd * 100) / 100,
+      renMs: Math.round(state.perfRen * 100) / 100,
+      peakMs: Math.round(state.perfPeak * 100) / 100,
+      mode: state.mode,
+      paused: state.paused,
+      runTime: Math.round(state.time * 10) / 10,
+      wave: state.wave,
+      boss: state.bossCount,
+      dps: Math.round(state.dps),
+      enemies: state.enemies.length,
+      shapes: shapeCounts,
+      frozen,
+      vuln,
+      tagged,
+      projectiles: state.projectiles.length,
+      enemyShots: state.enemyShots.length,
+      gems: state.gems.length,
+      particles: state.particles.length,
+      novas: state.novas.length,
+      explosions: state.explosions.length,
+      arcs: state.lightningArcs.length,
+      stacks: Object.fromEntries(stacks),
+      stackSum: stacks.reduce((sum, [, v]) => sum + v, 0),
+      elements: {
+        fire: p.fireLevel || 0,
+        thunder: p.thunderLevel || 0,
+        ice: p.iceLevel || 0,
+        water: p.waterLevel || 0,
+      },
+      em: Math.round(p.em || 0),
+      px: Math.round(p.x || 0),
+      py: Math.round(p.y || 0),
+      renderQuality: renderer.getQuality(),
+      qualityMode: state.qualityMode,
+      gpu: state.gpu,
+    };
+  }
+
   function updateDebug() {
     if (!state.debug) return;
-    const p = state.player;
-    const stacks = Object.values(state.upgradeStacks).reduce((sum, v) => sum + v, 0);
+    const info = collectDebugInfo();
+    const enemyLine = Object.entries(info.shapes)
+      .map(([shape, n]) => `${SHAPE_NAMES[shape] || shape}${n}`)
+      .join(' ');
+    const mem = performance.memory
+      ? `  堆 ${Math.round(performance.memory.usedJSHeapSize / 1048576)}MB`
+      : '';
+    const rec = state.recording ? `  🔴REC ${state.records.length}` : '';
     debugEl.textContent = [
-      `FPS ${state.fps.toFixed(0)}  ${state.fps > 0 ? (1000 / state.fps).toFixed(1) : '0.0'}ms`,
-      `怪 ${state.enemies.length}  弹 ${state.projectiles.length}  敌弹 ${state.enemyShots.length}`,
-      `经验 ${state.gems.length}  粒子 ${state.particles.length}  特效 ${state.novas.length + state.explosions.length}`,
-      `DPS ${formatDps(state.dps)}  波 ${state.wave}  Boss ${state.bossCount}`,
-      `强化 ${stacks} 层  坐标 ${Math.round(p.x)},${Math.round(p.y)}`,
+      `FPS ${info.fps.toFixed(0)}  ${info.frameMs.toFixed(1)}ms${rec}`,
+      `耗时 逻辑 ${info.updMs.toFixed(1)}ms  渲染 ${info.renMs.toFixed(1)}ms  单帧峰值 ${info.peakMs.toFixed(1)}ms`,
+      `怪 ${info.enemies}  ${enemyLine || '-'}`,
+      `冻 ${info.frozen}  易伤 ${info.vuln}  挂元素 ${info.tagged}`,
+      `弹 ${info.projectiles}  敌弹 ${info.enemyShots}  经验 ${info.gems}  粒子 ${info.particles}`,
+      `新星 ${info.novas}  爆炸 ${info.explosions}  闪电 ${info.arcs}`,
+      `强化 ${info.stackSum} 层  ${Object.entries(info.stacks).map(([k, v]) => `${k}${v}`).join(' ') || '-'}`,
+      `火${info.elements.fire} 雷${info.elements.thunder} 冰${info.elements.ice} 水${info.elements.water}  精通 ${info.em}`,
+      `DPS ${formatDps(info.dps)}  波 ${info.wave}  Boss ${info.boss}  坐标 ${info.px},${info.py}`,
+      `画布 ${canvas.width}×${canvas.height}  倍率 ${info.renderQuality.toFixed(2)}  画质 ${(QUALITY_META[info.qualityMode] || QUALITY_META.auto).name}  DPR ${(window.devicePixelRatio || 1).toFixed(1)}${mem}`,
+      `GPU ${info.gpu}`,
     ].join('\n');
+  }
+
+  // ---- 调试日志录制：每 0.5 秒采样，停止时下载 JSON ----
+  function onRecordError(event) {
+    state.recordErrors.push({
+      atSec: Math.round((Date.now() - state.recordStart) / 100) / 10,
+      message: String(event.message || event.reason || 'error'),
+      stack: String((event.error && event.error.stack) || ''),
+    });
+  }
+
+  function recordSample() {
+    if (!state.recording) return;
+    // 单次录制上限约 30 分钟，避免长时间挂机把内存吃满
+    if (state.records.length >= 3600) {
+      stopRecording();
+      return;
+    }
+    state.records.push({
+      atSec: Math.round((Date.now() - state.recordStart) / 100) / 10,
+      ...collectDebugInfo(),
+    });
+  }
+
+  function startRecording() {
+    state.recording = true;
+    state.recordStart = Date.now();
+    state.records = [];
+    state.recordErrors = [];
+    recordBtn.textContent = '⏹';
+    recordBtn.classList.add('active');
+    recordBtn.title = '停止录制并下载日志（F4）';
+    window.addEventListener('error', onRecordError);
+    window.addEventListener('unhandledrejection', onRecordError);
+    recordSample();
+    updateDebug();
+  }
+
+  function saveRecordingLog() {
+    const payload = {
+      meta: {
+        startedAt: new Date(state.recordStart).toISOString(),
+        durationSec: Math.round((Date.now() - state.recordStart) / 1000),
+        samples: state.records.length,
+        url: location.href,
+        userAgent: navigator.userAgent,
+        dpr: window.devicePixelRatio || 1,
+        canvas: `${canvas.width}x${canvas.height}`,
+        gpu: state.gpu,
+      },
+      samples: state.records,
+      errors: state.recordErrors,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 1)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    a.href = url;
+    a.download = `survivor-log-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  function stopRecording() {
+    if (!state.recording) return;
+    state.recording = false;
+    recordBtn.textContent = '⏺';
+    recordBtn.classList.remove('active');
+    recordBtn.title = '录制调试日志（F4 开始/停止）';
+    window.removeEventListener('error', onRecordError);
+    window.removeEventListener('unhandledrejection', onRecordError);
+    updateDebug();
+    saveRecordingLog();
+  }
+
+  function toggleRecording() {
+    if (state.recording) stopRecording();
+    else startRecording();
   }
 
   function toggleDebug() {
@@ -323,6 +622,7 @@ export function renderSurvivors(container = viewRoot()) {
     state.projectiles = run.projectiles;
     state.enemyShots = run.enemyShots;
     state.gems = run.gems;
+    state.healthPacks = run.healthPacks || [];
     state.particles = [];
     state.novas = [];
     state.explosions = [];
@@ -388,6 +688,7 @@ export function renderSurvivors(container = viewRoot()) {
         el('button', { class: 'btn btn-secondary', type: 'button', onClick: () => openCatalog('buffs') }, `📖 强化图鉴 (${BUFFS.filter((b) => !b.element).length})`),
         el('button', { class: 'btn btn-secondary', type: 'button', onClick: () => openCatalog('elements') }, `⚛️ 元素图鉴 (${BUFFS.filter((b) => b.element || b.reaction).length})`),
         el('button', { class: 'btn btn-secondary', type: 'button', onClick: () => openCatalog('monsters') }, `👾 怪物图鉴 (${MONSTERS.length})`),
+        el('button', { class: 'btn btn-secondary', type: 'button', onClick: () => openSettings() }, '⚙ 画质设置'),
       ]),
     ]));
   }
@@ -684,6 +985,12 @@ export function renderSurvivors(container = viewRoot()) {
   }
 
   // ---- 战斗 ----
+  // 愈灵等怪物阵亡后掉落的血包，玩家靠近自动拾取回血
+  function spawnHealthPack(x, y) {
+    if (state.healthPacks.length >= 12) return;
+    state.healthPacks.push({ x, y, r: 9, bob: Math.random() * 6, dead: false });
+  }
+
   function nearestEnemy() {
     const p = state.player;
     let best = null;
@@ -835,6 +1142,8 @@ export function renderSurvivors(container = viewRoot()) {
   }
 
   function moveEnemy(e, dx, dy, dist, dt, speedMul = 1) {
+    // 冻结期间完全禁止移动，兜底拦住所有怪物的移动入口
+    if (e.freezeTimer > 0) return;
     e.x += (dx / dist) * e.speed * speedMul * dt;
     e.y += (dy / dist) * e.speed * speedMul * dt;
   }
@@ -860,8 +1169,10 @@ export function renderSurvivors(container = viewRoot()) {
   }
 
   function damageEnemy(enemy, damage, depth = 0) {
-    state.dmgAccum += Math.min(damage, enemy.hp);
-    enemy.hp -= damage;
+    // 超导易伤：受击时按抗性降低比例放大伤害
+    const final = enemy.vulnTimer > 0 ? damage * (1 + (enemy.vulnBonus || 0)) : damage;
+    state.dmgAccum += Math.min(final, enemy.hp);
+    enemy.hp -= final;
     enemy.flash = 0.12;
     spawnParticles(enemy.x, enemy.y, '#ffd93d', 3, 130);
     if (enemy.hp > 0 || enemy.dead) return;
@@ -908,8 +1219,8 @@ export function renderSurvivors(container = viewRoot()) {
   // ---- 主更新 ----
   // buff 的具体效果实现在各自文件里，这里只提供通用接口
   const buffApi = {
-    addNova(x, y, innerR, maxR) {
-      state.novas.push({ x, y, r: innerR, maxR, life: 0.5, maxLife: 0.5 });
+    addNova(x, y, innerR, maxR, color) {
+      state.novas.push({ x, y, r: innerR, maxR, life: 0.5, maxLife: 0.5, color });
     },
     damageInRadius(x, y, radius, damage) {
       for (const e of state.enemies) {
@@ -930,6 +1241,7 @@ export function renderSurvivors(container = viewRoot()) {
     spawnPlayerShot(spec) {
       spawnProjectile(spec);
     },
+    spawnParticles,
   };
 
   // 怪物的行为/死亡效果也写在各自文件里，这里只暴露通用能力
@@ -942,6 +1254,7 @@ export function renderSurvivors(container = viewRoot()) {
     spawnParticles,
     addExplosionVisual,
     hurtPlayer,
+    spawnHealthPack,
     shake(v) {
       state.shake = Math.max(state.shake, v);
     },
@@ -1025,15 +1338,27 @@ export function renderSurvivors(container = viewRoot()) {
         if (e.elementTimer <= 0) e.element = '';
       }
       if (e.reactCd > 0) e.reactCd = Math.max(0, e.reactCd - dt);
+      if (e.freezeTimer > 0) {
+        e.freezeTimer = Math.max(0, e.freezeTimer - dt);
+        if (e.freezeTimer <= 0) e.freezeAngle = 0;
+      }
+      if (e.vulnTimer > 0) e.vulnTimer = Math.max(0, e.vulnTimer - dt);
+      // 冻结期间不移动、不攻击，也不造成接触伤害
+      if (e.freezeTimer > 0) continue;
       const dx = p.x - e.x;
       const dy = p.y - e.y;
       const dist = Math.hypot(dx, dy) || 1;
+      // 头顶带冰元素时减速 40%：临时缩放 e.speed，冲锋 / 绕行等所有移动实现都生效
+      const iceSlow = e.element === 'ice' ? ICE_SLOW_FACTOR : 1;
+      const rawSpeed = e.speed;
+      if (iceSlow !== 1) e.speed = rawSpeed * iceSlow;
       const monster = MONSTER_MAP.get(e.type);
       if (monster && typeof monster.update === 'function') {
         monster.update(e, dx, dy, dist, dt, monsterApi);
       } else {
         moveEnemy(e, dx, dy, dist, dt, 1);
       }
+      if (iceSlow !== 1) e.speed = rawSpeed;
 
       if (e.dead) continue;
       const touchDist = Math.hypot(p.x - e.x, p.y - e.y) || 1;
@@ -1062,9 +1387,11 @@ export function renderSurvivors(container = viewRoot()) {
         if ((pr.x - e.x) ** 2 + (pr.y - e.y) ** 2 <= rr * rr) {
           pr.hit.add(e.id);
           damageEnemy(e, pr.damage);
+          // 碎冰：冻结中的怪物被物理子弹命中时解除冻结并追加伤害
+          if (pr.element === 'physical') applyShatter(e, state, p, buffApi);
           // 元素弹：直接命中先结算元素反应/附着，再以命中点为中心给周围怪挂元素
           if (pr.element && pr.element !== 'physical') {
-            applyElementHit(e, pr.element, state, p, buffApi, pr.elementDuration);
+            applyElementHit(e, pr.element, state, p, buffApi, pr.elementDuration, pr.damage);
             if (pr.elementRadius > 0) {
               applyElementAoe(state, p, buffApi, pr.x, pr.y, pr.elementRadius, pr.element, pr.elementDuration, e.id);
             }
@@ -1100,6 +1427,25 @@ export function renderSurvivors(container = viewRoot()) {
       }
     }
 
+    // 血包：进入拾取范围后飞向玩家，拾取时回复 15% 最大生命
+    for (const h of state.healthPacks) {
+      if (h.dead) continue;
+      const dx = p.x - h.x;
+      const dy = p.y - h.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 >= pickup2) continue;
+      const dist = Math.sqrt(d2) || 1;
+      const step = 420 * dt;
+      if (dist <= step + h.r * 0.5) {
+        h.dead = true;
+        p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.15);
+        spawnParticles(p.x, p.y, '#4ade80', 12, 180);
+      } else {
+        h.x += (dx / dist) * step;
+        h.y += (dy / dist) * step;
+      }
+    }
+
     // 粒子
     for (const pt of state.particles) {
       pt.x += pt.vx * dt;
@@ -1118,6 +1464,7 @@ export function renderSurvivors(container = viewRoot()) {
     state.projectiles = state.projectiles.filter((pr) => !pr.dead);
     state.enemyShots = state.enemyShots.filter((s) => !s.dead);
     state.gems = state.gems.filter((g) => !g.dead);
+    state.healthPacks = state.healthPacks.filter((h) => !h.dead);
     state.particles = state.particles.filter((pt) => pt.life > 0);
     state.novas = state.novas.filter((n) => n.life > 0);
     state.explosions = state.explosions.filter((ex) => ex.life > 0);
@@ -1150,6 +1497,7 @@ export function renderSurvivors(container = viewRoot()) {
     state.projectiles = [];
     state.enemyShots = [];
     state.gems = [];
+    state.healthPacks = [];
     state.particles = [];
     state.upgradeStacks = {};
     state.attackTimer = 0.35;
@@ -1222,6 +1570,29 @@ export function renderSurvivors(container = viewRoot()) {
       toggleDebug();
       return;
     }
+    // F4 录制 / 停止并下载调试日志
+    if (key === 'f4') {
+      e.preventDefault();
+      toggleRecording();
+      return;
+    }
+    // 基准测试期间吞掉所有按键，Esc 退出
+    if (bench) {
+      if (key === 'escape') {
+        e.preventDefault();
+        abortBenchmark();
+      } else if (key === 'f3') {
+        e.preventDefault();
+        bench.showInfo = !bench.showInfo;
+        bench.infoEl.classList.toggle('show', bench.showInfo);
+      }
+      return;
+    }
+    if (benchView && key === 'escape') {
+      e.preventDefault();
+      closeBenchmarkPanel();
+      return;
+    }
     // 图鉴打开时吞掉所有按键，避免 Esc 恢复游戏或 Enter 在后台开局
     if (catalogOpen) {
       e.preventDefault();
@@ -1242,6 +1613,11 @@ export function renderSurvivors(container = viewRoot()) {
         e.preventDefault();
         btn.click();
       }
+      return;
+    }
+    if (key === 'escape' && settingsOpen) {
+      e.preventDefault();
+      closeSettings();
       return;
     }
     if (key === 'escape' && state.mode === 'playing') {
@@ -1324,6 +1700,748 @@ export function renderSurvivors(container = viewRoot()) {
     state.drag = { x: 0, y: 0 };
   }
 
+  // ---- 渲染分辨率自适应 ----
+  // 这台机器上 JS 只占 0.5ms、帧却要 40ms+，瓶颈是画布像素光栅化，
+  // 因此低帧时降低渲染倍率（画布像素量），高帧时再缓慢恢复。
+  let qualityDownCooldown = 0;
+  let qualityUpCooldown = 0;
+  let qualityUpStreak = 0;
+  // 记录曾经掉帧的倍率上界，避免「升一点 → 掉帧 → 再降」反复震荡
+  let qualityCeiling = 1;
+
+  function qualityFloor() {
+    if (state.qualityMode === 'smooth') return 0.55;
+    if (state.qualityMode === 'sharp') return 1;
+    // 自动：最低只到 CSS 像素 1:1，再低就会被明显放大变糊
+    return renderer.getMinQuality();
+  }
+
+  function refreshQualityBtn() {
+    const meta = QUALITY_META[state.qualityMode] || QUALITY_META.auto;
+    qualityBtn.textContent = meta.icon;
+    qualityBtn.title = `${meta.tip} · 点击切换`;
+  }
+
+  function setQualityMode(mode) {
+    state.qualityMode = mode;
+    try {
+      localStorage.setItem(QUALITY_KEY, mode);
+    } catch (e) {
+      // 隐私模式下忽略
+    }
+    qualityUpStreak = 0;
+    qualityUpCooldown = performance.now();
+    if (mode === 'sharp') {
+      // 手动选了高清就清掉学习到的上界，以后想回自动可以再试
+      qualityCeiling = 1;
+      renderer.setQuality(1);
+    } else if (mode === 'smooth') {
+      renderer.setQuality(Math.min(renderer.getQuality(), 0.7));
+    } else {
+      renderer.setQuality(Math.max(renderer.getQuality(), qualityFloor()));
+    }
+    refreshQualityBtn();
+    if (state.paused) renderer.render();
+  }
+
+  function cycleQuality() {
+    const order = ['auto', 'sharp', 'smooth'];
+    setQualityMode(order[(order.indexOf(state.qualityMode) + 1) % order.length]);
+  }
+
+  // ---- 画质与性能设置面板 ----
+  let settingsOpen = false;
+
+  function closeSettings() {
+    settingsOpen = false;
+    hideOverlay();
+    if (state.mode === 'playing') {
+      state.paused = false;
+      state.last = performance.now();
+      if (state.pendingLevels > 0) openLevelUp();
+    } else {
+      // 从开始界面打开的设置，关闭后回到开始界面
+      showStart();
+    }
+  }
+
+  function openSettings() {
+    settingsOpen = true;
+    state.paused = true;
+    const s = state.settings;
+    const panel = el('div', { class: 'sv-panel sv-settings' });
+    panel.appendChild(el('h2', { class: 'sv-panel-title' }, '画质与性能'));
+    panel.appendChild(el('p', { class: 'sv-panel-sub' }, '设置保存在本机，刷新后保留'));
+
+    const rows = el('div', { class: 'sv-settings-rows' });
+    const addRow = (label, options, getValue, apply, rebuild) => {
+      const row = el('div', { class: 'sv-row' }, [el('span', { class: 'sv-row-label' }, label)]);
+      const box = el('div', { class: 'sv-opts' });
+      options.forEach(([value, text]) => {
+        const btn = el('button', {
+          class: `sv-opt${getValue() === value ? ' active' : ''}`,
+          type: 'button',
+        }, text);
+        btn.addEventListener('click', () => {
+          apply(value);
+          saveSettings(state.settings);
+          if (rebuild) {
+            openSettings();
+            return;
+          }
+          box.querySelectorAll('.sv-opt').forEach((n) => n.classList.remove('active'));
+          btn.classList.add('active');
+          if (state.paused) renderer.render();
+        });
+        box.appendChild(btn);
+      });
+      row.appendChild(box);
+      rows.appendChild(row);
+    };
+
+    // 画质预设：一键套用一组成熟的组合，任意分项被改动后自动显示「自定义」
+    const isPreset = (q, particles, glow, gemGlow, flash, shake, bg) => state.qualityMode === q
+      && s.particles === particles && s.glow === glow && s.gemGlow === gemGlow
+      && s.flash === flash && s.shake === shake && s.background === bg;
+    const currentPreset = isPreset('smooth', 'low', false, false, false, false, 'plain')
+      ? 'low'
+      : isPreset('auto', 'mid', true, true, true, true, 'grid')
+        ? 'mid'
+        : isPreset('sharp', 'high', true, true, true, true, 'stars') ? 'high' : 'custom';
+
+    addRow('画质预设', [
+      ['low', '低'],
+      ['mid', '中'],
+      ['high', '高'],
+      ['custom', '自定义'],
+    ], () => currentPreset, (v) => {
+      if (v === 'low') {
+        setQualityMode('smooth');
+        Object.assign(s, {
+          particles: 'low', glow: false, gemGlow: false, icons: true, flash: false, shake: false, background: 'plain',
+        });
+      } else if (v === 'mid') {
+        setQualityMode('auto');
+        Object.assign(s, {
+          particles: 'mid', glow: true, gemGlow: true, icons: true, flash: true, shake: true, background: 'grid',
+        });
+      } else if (v === 'high') {
+        setQualityMode('sharp');
+        Object.assign(s, {
+          particles: 'high', glow: true, gemGlow: true, icons: true, flash: true, shake: true, background: 'stars',
+        });
+      }
+      renderer.refreshBackground();
+    }, true);
+
+    addRow('画质', [
+      ['auto', '🖥 自动'],
+      ['sharp', '🔍 高清'],
+      ['smooth', '⚡ 流畅'],
+    ], () => state.qualityMode, (v) => setQualityMode(v));
+
+    addRow('分辨率上限', [
+      [1280, '1280'],
+      [1600, '1600'],
+      [1920, '1920'],
+      [2560, '2560'],
+    ], () => s.canvasCap, (v) => {
+      s.canvasCap = v;
+      renderer.resizeCanvas();
+    });
+
+    addRow('帧率上限', [
+      [0, '不限制'],
+      [144, '144'],
+      [120, '120'],
+      [90, '90'],
+      [60, '60'],
+      [30, '30'],
+    ], () => s.fpsCap, (v) => {
+      s.fpsCap = v;
+      state.last = performance.now();
+    });
+
+    addRow('粒子特效', [
+      ['high', '高'],
+      ['mid', '中'],
+      ['low', '低'],
+      ['off', '关'],
+    ], () => s.particles, (v) => {
+      s.particles = v;
+    });
+
+    addRow('屏幕震动', [
+      [true, '开'],
+      [false, '关'],
+    ], () => s.shake, (v) => {
+      s.shake = v;
+    });
+
+    addRow('背景样式', [
+      ['grid', '网格'],
+      ['stars', '星空'],
+      ['plain', '纯色'],
+    ], () => s.background, (v) => {
+      s.background = v;
+      renderer.refreshBackground();
+    });
+
+    addRow('敌人辉光', [
+      [true, '开'],
+      [false, '关'],
+    ], () => s.glow, (v) => {
+      s.glow = v;
+    });
+
+    addRow('经验球光效', [
+      [true, '开'],
+      [false, '关'],
+    ], () => s.gemGlow, (v) => {
+      s.gemGlow = v;
+    });
+
+    addRow('元素图标', [
+      [true, '显示'],
+      [false, '隐藏'],
+    ], () => s.icons, (v) => {
+      s.icons = v;
+    });
+
+    addRow('受击闪屏', [
+      [true, '开'],
+      [false, '关'],
+    ], () => s.flash, (v) => {
+      s.flash = v;
+    });
+
+    panel.appendChild(rows);
+
+    const info = el('div', { class: 'sv-settings-info' });
+    info.appendChild(el('div', {}, `GPU：${state.gpu}`));
+    info.appendChild(el('div', {}, `画布 ${canvas.width}×${canvas.height} · 倍率 ${renderer.getQuality().toFixed(2)} · DPR ${(window.devicePixelRatio || 1).toFixed(1)}`));
+    const benchLine = el('div', {}, '画布加速检测：未运行');
+    info.appendChild(benchLine);
+    panel.appendChild(info);
+
+    const actions = el('div', { class: 'sv-settings-actions' });
+    const benchBtn = el('button', { class: 'btn btn-secondary', type: 'button' }, '检测画布加速');
+    benchBtn.addEventListener('click', () => {
+      benchLine.textContent = '画布加速检测：运行中…';
+      setTimeout(() => {
+        const ms = benchmarkCanvas();
+        benchLine.textContent = `画布加速检测：${ms.toFixed(0)}ms · ${ms > 80 ? '疑似软件渲染，建议开启浏览器硬件加速' : '硬件加速正常'}`;
+      }, 30);
+    });
+    actions.appendChild(benchBtn);
+
+    const edge = /Edg\//.test(navigator.userAgent);
+    const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    const gpuUrl = isMobile ? '' : (edge ? 'edge://gpu' : (/Chrome\//.test(navigator.userAgent) ? 'chrome://gpu' : ''));
+    if (gpuUrl) {
+      const copyBtn = el('button', { class: 'btn btn-secondary', type: 'button' }, `复制加速设置地址（${gpuUrl}）`);
+      copyBtn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(gpuUrl);
+          copyBtn.textContent = `已复制：${gpuUrl}`;
+        } catch (e) {
+          copyBtn.textContent = `请手动输入：${gpuUrl}`;
+        }
+      });
+      actions.appendChild(copyBtn);
+    }
+    const benchEntry = el('button', { class: 'btn btn-secondary', type: 'button' }, '性能基准测试');
+    benchEntry.addEventListener('click', () => startBenchmark());
+    actions.appendChild(benchEntry);
+    panel.appendChild(actions);
+    panel.appendChild(el('p', { class: 'sv-panel-sub sv-settings-tip' }, isMobile
+      ? '移动端浏览器默认开启画布硬件加速，没有开关；若掉帧请选「流畅」或把粒子调低。'
+      : `若检测显示“疑似软件渲染”：地址栏打开 ${gpuUrl || 'about://gpu'} 确认 Canvas 是否为 Hardware accelerated；若为 Software only，到 about://flags 把 disable-accelerated-2d-canvas 设为 Disabled 后重启浏览器。`));
+
+    const backRow = el('div', { class: 'sv-panel-actions' });
+    const closeBtn = el('button', { class: 'btn btn-primary', type: 'button' }, '返回游戏');
+    closeBtn.addEventListener('click', () => closeSettings());
+    backRow.appendChild(closeBtn);
+    panel.appendChild(backRow);
+
+    showOverlay(panel);
+    renderer.render();
+  }
+
+  // ---- 性能基准：固定场景 + 固定对象数量，排除玩法随机性 ----
+  let bench = null;
+  let benchView = false;
+
+  const BENCH_PHASES = [
+    { name: '空场景', enemies: 0, projectiles: 0, shots: 0, gems: 0, particles: 0, effects: 0 },
+    { name: '100 怪', enemies: 100, projectiles: 0, shots: 0, gems: 0, particles: 0, effects: 0 },
+    { name: '200 怪 + 120 弹', enemies: 200, projectiles: 120, shots: 0, gems: 0, particles: 0, effects: 0 },
+    { name: '300 怪 + 弹幕 + 球 + 粒子', enemies: 300, projectiles: 200, shots: 40, gems: 300, particles: 250, effects: 6 },
+    { name: '500 怪 + 极限弹幕', enemies: 500, projectiles: 320, shots: 80, gems: 400, particles: 400, effects: 12 },
+  ];
+  const BENCH_SHAPES = ['circle', 'triangle', 'square', 'charger', 'shooter', 'splitter', 'bomber'];
+  const BENCH_COLORS = ['#f87171', '#fb923c', '#facc15', '#a78bfa', '#38bdf8', '#34d399'];
+  const BENCH_ELEMENTS = [null, 'fire', 'ice', 'thunder', 'water'];
+  const BENCH_PROJECTILE_COLORS = ['#ffe066', '#93c5fd', '#fca5a5', '#86efac'];
+
+  function makeBenchRng(seed) {
+    let s = seed >>> 0;
+    return () => {
+      s = (s * 1664525 + 1013904223) >>> 0;
+      return s / 4294967296;
+    };
+  }
+
+  function createBenchState() {
+    return {
+      time: 0,
+      player: { x: W / 2, y: H / 2, r: 12, face: 0 },
+      enemies: [],
+      projectiles: [],
+      enemyShots: [],
+      gems: [],
+      healthPacks: [],
+      particles: [],
+      novas: [],
+      explosions: [],
+      lightningArcs: [],
+      waveBanner: 0,
+      flash: 0,
+      shake: 0,
+      settings: state.settings,
+    };
+  }
+
+  // 每幕固定种子生成同样布局，便于不同画质/设置之间横向对比
+  function buildBenchPhase(bs, spec, seed) {
+    const rng = makeBenchRng(seed);
+    bs.enemies.length = 0;
+    bs.projectiles.length = 0;
+    bs.enemyShots.length = 0;
+    bs.gems.length = 0;
+    bs.particles.length = 0;
+    bs.novas.length = 0;
+    bs.explosions.length = 0;
+    bs.lightningArcs.length = 0;
+
+    const n = spec.enemies;
+    if (n > 0) {
+      const cols = Math.ceil(Math.sqrt(n * (W / H)));
+      const rows = Math.ceil(n / cols);
+      for (let i = 0; i < n; i += 1) {
+        const boss = n >= 60 && i % 61 === 0;
+        const bx = ((i % cols) + 0.5) / cols * (W - 60) + 30;
+        const by = (Math.floor(i / cols) + 0.5) / rows * (H - 60) + 30;
+        bs.enemies.push({
+          x: bx,
+          y: by,
+          bx,
+          by,
+          // 固定相位的慢速漂浮，模拟真实战斗中的走位；冻结目标保持静止
+          phase: rng() * Math.PI * 2,
+          wobble: (boss ? 0.35 : 0.8) + rng() * 0.9,
+          r: boss ? 26 : 8 + (i % 5) * 1.8,
+          color: BENCH_COLORS[i % BENCH_COLORS.length],
+          shape: boss ? 'circle' : BENCH_SHAPES[i % BENCH_SHAPES.length],
+          boss,
+          type: boss ? 'boss' : 'normal',
+          hp: 100,
+          maxHp: 100,
+          flash: 0,
+          freezeTimer: i % 17 === 0 ? 999 : 0,
+          vulnTimer: i % 13 === 0 ? 999 : 0,
+          element: i % 4 === 0 ? BENCH_ELEMENTS[((i / 4) | 0) % BENCH_ELEMENTS.length] : null,
+          mode: '',
+          fuse: 0,
+        });
+      }
+    }
+    for (let i = 0; i < spec.projectiles; i += 1) {
+      const angle = rng() * Math.PI * 2;
+      bs.projectiles.push({
+        x: 20 + rng() * (W - 40),
+        y: 20 + rng() * (H - 40),
+        vx: Math.cos(angle) * 60,
+        vy: Math.sin(angle) * 60,
+        r: 3.2,
+        color: BENCH_PROJECTILE_COLORS[i % BENCH_PROJECTILE_COLORS.length],
+      });
+    }
+    for (let i = 0; i < spec.shots; i += 1) {
+      const angle = rng() * Math.PI * 2;
+      bs.enemyShots.push({
+        x: 20 + rng() * (W - 40),
+        y: 20 + rng() * (H - 40),
+        vx: Math.cos(angle) * 45,
+        vy: Math.sin(angle) * 45,
+        r: 5,
+        color: '#f87171',
+      });
+    }
+    for (let i = 0; i < spec.gems; i += 1) {
+      const by = 16 + rng() * (H - 32);
+      bs.gems.push({
+        x: 16 + rng() * (W - 32), y: by, by, r: 2.6, bob: rng() * 6,
+      });
+    }
+    for (let i = 0; i < spec.particles; i += 1) {
+      const angle = rng() * Math.PI * 2;
+      const speed = 20 + rng() * 60;
+      bs.particles.push({
+        x: rng() * W,
+        y: rng() * H,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        r: 2,
+        color: '#fbbf24',
+        life: 0.2 + rng() * 0.4,
+        maxLife: 0.6,
+      });
+    }
+    for (let i = 0; i < spec.effects; i += 1) {
+      const x = 60 + rng() * (W - 120);
+      const y = 60 + rng() * (H - 120);
+      bs.novas.push({ x, y, r: 10, maxR: 120, life: 0.5, maxLife: 0.6, color: '#67e8f9' });
+      if (i % 2 === 0) {
+        bs.explosions.push({ x: x + 40, y: y + 20, r: 8, maxR: 90, life: 0.4, maxLife: 0.5 });
+      }
+    }
+    if (spec.effects > 0) {
+      for (let i = 0; i < 4; i += 1) {
+        const points = [];
+        for (let k = 0; k < 5; k += 1) {
+          points.push({ x: 100 + i * 160 + k * 40, y: 120 + (k % 2) * 40 });
+        }
+        bs.lightningArcs.push({ points, life: 1 });
+      }
+    }
+  }
+
+  function startBenchmark() {
+    if (bench) return;
+    benchView = true;
+    hideOverlay();
+    state.paused = true;
+    const wrapEl = el('div', { class: 'sv-bench' });
+    const bCanvas = el('canvas');
+    const label = el('div', { class: 'sv-bench-label' }, '准备中…');
+    // 基准专用的实时信息面板，样式复用调试面板
+    const infoEl = el('pre', { class: 'sv-debug show sv-bench-info' }, '基准准备中…');
+    wrapEl.appendChild(bCanvas);
+    wrapEl.appendChild(label);
+    wrapEl.appendChild(infoEl);
+    arena.appendChild(wrapEl);
+    const bctx = bCanvas.getContext('2d', { alpha: false });
+    const benchState = createBenchState();
+    const bRenderer = createRenderer({ canvas: bCanvas, ctx: bctx, state: benchState, W, H });
+    bRenderer.resizeCanvas();
+    bRenderer.setQuality(renderer.getQuality());
+    bench = {
+      active: true,
+      wrapEl,
+      bCanvas,
+      bRenderer,
+      benchState,
+      label,
+      infoEl,
+      showInfo: true,
+      infoAt: 0,
+      recent: [],
+      raf: 0,
+      index: -1,
+      phaseStart: 0,
+      last: 0,
+      samples: [],
+      results: [],
+    };
+    nextBenchPhase();
+    bench.raf = requestAnimationFrame((t) => benchLoop(t));
+  }
+
+  function nextBenchPhase() {
+    bench.index += 1;
+    if (bench.index >= BENCH_PHASES.length) {
+      finishBenchmark();
+      return;
+    }
+    const spec = BENCH_PHASES[bench.index];
+    buildBenchPhase(bench.benchState, spec, 1000 + bench.index * 131);
+    bench.samples = [];
+    bench.recent = [];
+    bench.phaseStart = performance.now();
+    bench.last = bench.phaseStart;
+    bench.label.textContent = `基准 ${bench.index + 1}/${BENCH_PHASES.length} · ${spec.name}`;
+    bench.infoAt = 0;
+  }
+
+  function updateBenchInfo(b) {
+    const arr = b.recent;
+    const avg = (f) => (arr.length ? arr.reduce((s, x) => s + f(x), 0) / arr.length : 0);
+    const avgInterval = avg((x) => x.interval);
+    const avgDraw = avg((x) => x.drawMs);
+    const maxDraw = arr.reduce((m, x) => Math.max(m, x.drawMs), 0);
+    const bs = b.benchState;
+    const spec = BENCH_PHASES[b.index] || { name: '-' };
+    b.infoEl.textContent = [
+      `基准 ${b.index + 1}/${BENCH_PHASES.length} · ${spec.name}`,
+      `FPS ${avgInterval > 0 ? (1000 / avgInterval).toFixed(1) : '--'} · 帧 ${avgInterval.toFixed(1)}ms`,
+      `绘制 平均 ${avgDraw.toFixed(2)}ms · 峰值 ${maxDraw.toFixed(1)}ms`,
+      `对象 怪 ${bs.enemies.length} · 弹 ${bs.projectiles.length} · 敌弹 ${bs.enemyShots.length} · 球 ${bs.gems.length} · 粒子 ${bs.particles.length}`,
+      `画布 ${b.bCanvas.width}×${b.bCanvas.height} · 倍率 ${b.bRenderer.getQuality().toFixed(2)} · DPR ${(window.devicePixelRatio || 1).toFixed(1)}`,
+      `GPU ${state.gpu}`,
+    ].join('\n');
+  }
+
+  // 恒定对象数下的轻量动画：只改坐标与生命，不生成/销毁实体，保证负载可控
+  function updateBenchScene(bs, dt) {
+    const t = bs.time;
+    for (const e of bs.enemies) {
+      if (e.freezeTimer > 0) continue;
+      const nx = e.bx + Math.sin(t * e.wobble + e.phase) * 14;
+      const ny = e.by + Math.cos(t * e.wobble * 0.85 + e.phase) * 11;
+      e.x = nx < 20 ? 20 : nx > W - 20 ? W - 20 : nx;
+      e.y = ny < 20 ? 20 : ny > H - 20 ? H - 20 : ny;
+    }
+    const wrap = (v, max) => (v < 0 ? v + max : v > max ? v - max : v);
+    for (const pr of bs.projectiles) {
+      pr.x = wrap(pr.x + pr.vx * dt, W);
+      pr.y = wrap(pr.y + pr.vy * dt, H);
+    }
+    for (const shot of bs.enemyShots) {
+      shot.x = wrap(shot.x + shot.vx * dt, W);
+      shot.y = wrap(shot.y + shot.vy * dt, H);
+    }
+    for (const g of bs.gems) {
+      g.y = g.by + Math.sin(t * 2.4 + g.bob) * 2.2;
+    }
+    for (const p of bs.particles) {
+      p.life -= dt;
+      if (p.life <= 0) {
+        p.life = p.maxLife;
+        p.x = (p.x + 97) % W;
+        p.y = (p.y + 53) % H;
+      }
+      p.x = wrap(p.x + p.vx * dt, W);
+      p.y = wrap(p.y + p.vy * dt, H);
+    }
+    bs.player.face = Math.sin(t * 1.6) * 0.6;
+  }
+
+  function benchLoop(now) {
+    if (!bench || !bench.active) return;
+    bench.raf = requestAnimationFrame((t) => benchLoop(t));
+    const interval = now - bench.last;
+    bench.last = now;
+    const dt = Math.min(0.04, Math.max(0, interval) / 1000);
+    bench.benchState.time += dt;
+    updateBenchScene(bench.benchState, dt);
+    const t0 = performance.now();
+    bench.bRenderer.render();
+    const drawMs = performance.now() - t0;
+    const elapsed = now - bench.phaseStart;
+    bench.recent.push({ interval, drawMs });
+    if (bench.recent.length > 60) bench.recent.shift();
+    if (now - bench.infoAt > 250) {
+      bench.infoAt = now;
+      updateBenchInfo(bench);
+    }
+    // 丢弃前 0.8 秒预热，只统计稳定段
+    if (elapsed > 800) bench.samples.push({ drawMs, interval });
+    if (elapsed >= 3500) finishBenchPhase();
+  }
+
+  function finishBenchPhase() {
+    const spec = BENCH_PHASES[bench.index];
+    const samples = bench.samples;
+    const avg = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
+    const sorted = (arr) => [...arr].sort((a, b) => a - b);
+    const pick = (arr, p) => (arr.length ? arr[Math.min(arr.length - 1, Math.floor(arr.length * p))] : 0);
+    const draws = sorted(samples.map((s) => s.drawMs));
+    const intervals = sorted(samples.map((s) => s.interval).filter((v) => v > 0));
+    bench.results.push({
+      name: spec.name,
+      counts: `怪 ${spec.enemies} · 弹 ${spec.projectiles} · 敌弹 ${spec.shots} · 球 ${spec.gems} · 粒子 ${spec.particles} · 特效 ${spec.effects}`,
+      frames: samples.length,
+      fps: intervals.length ? 1000 / avg(intervals) : 0,
+      avgFrameMs: avg(intervals),
+      p95FrameMs: pick(intervals, 0.95),
+      drawMs: avg(draws),
+      p95DrawMs: pick(draws, 0.95),
+      maxDrawMs: draws.length ? draws[draws.length - 1] : 0,
+    });
+    nextBenchPhase();
+  }
+
+  function finishBenchmark() {
+    if (!bench) return;
+    const results = bench.results;
+    const meta = {
+      at: new Date().toISOString(),
+      gpu: state.gpu,
+      qualityMode: state.qualityMode,
+      renderQuality: renderer.getQuality(),
+      canvas: `${bench.bCanvas.width}x${bench.bCanvas.height}`,
+      dpr: window.devicePixelRatio || 1,
+      screen: `${window.screen.width}x${window.screen.height}`,
+      settings: { ...state.settings },
+    };
+    const benchCanvas = bench.bCanvas;
+    if (bench.wrapEl && bench.wrapEl.parentElement) bench.wrapEl.remove();
+    bench = null;
+    showBenchResults(results, meta, benchCanvas.width, benchCanvas.height);
+  }
+
+  function showBenchResults(results, meta, bw, bh) {
+    const panel = el('div', { class: 'sv-panel sv-bench-panel' });
+    panel.appendChild(el('h2', { class: 'sv-panel-title' }, '性能基准结果'));
+    panel.appendChild(el('p', { class: 'sv-panel-sub' }, `${bw}×${bh} · 倍率 ${meta.renderQuality.toFixed(2)} · 画质 ${meta.qualityMode}`));
+    const table = el('div', { class: 'sv-bench-table' });
+    table.appendChild(el('div', { class: 'sv-bench-th' }, '场景'));
+    table.appendChild(el('div', { class: 'sv-bench-th' }, 'FPS'));
+    table.appendChild(el('div', { class: 'sv-bench-th' }, '平均帧'));
+    table.appendChild(el('div', { class: 'sv-bench-th' }, 'P95 帧'));
+    table.appendChild(el('div', { class: 'sv-bench-th' }, '绘制'));
+    results.forEach((r) => {
+      table.appendChild(el('div', { class: 'sv-bench-td sv-bench-name' }, [el('strong', {}, r.name), el('span', {}, r.counts)]));
+      table.appendChild(el('div', { class: 'sv-bench-td' }, r.fps.toFixed(1)));
+      table.appendChild(el('div', { class: 'sv-bench-td' }, `${r.avgFrameMs.toFixed(1)}ms`));
+      table.appendChild(el('div', { class: 'sv-bench-td' }, `${r.p95FrameMs.toFixed(1)}ms`));
+      table.appendChild(el('div', { class: 'sv-bench-td' }, `${r.drawMs.toFixed(1)}ms`));
+    });
+    panel.appendChild(table);
+    panel.appendChild(el('p', { class: 'sv-settings-tip' }, `GPU：${meta.gpu}。各场景固定种子、固定对象数，重复测试或切换画质后重新测试即可横向对比。`));
+
+    const actions = el('div', { class: 'sv-panel-actions' });
+    // 移动端剪贴板接口经常不可用，失败时展开可选中的文本框供长按复制
+    const copyArea = el('textarea', { class: 'sv-bench-copy' });
+    copyArea.readOnly = true;
+    copyArea.style.display = 'none';
+    const copyResultBtn = el('button', { class: 'btn btn-secondary', type: 'button' }, '复制结果');
+    copyResultBtn.addEventListener('click', async () => {
+      const lines = [
+        `性能基准 ${meta.at}`,
+        `GPU ${meta.gpu}`,
+        `画布 ${bw}×${bh} · 倍率 ${meta.renderQuality.toFixed(2)} · 画质 ${meta.qualityMode} · DPR ${meta.dpr}`,
+        `设置 ${JSON.stringify(meta.settings)}`,
+        '场景\tFPS\t平均帧\tP95帧\t绘制',
+        ...results.map((r) => `${r.name}\t${r.fps.toFixed(1)}\t${r.avgFrameMs.toFixed(1)}ms\t${r.p95FrameMs.toFixed(1)}ms\t${r.drawMs.toFixed(2)}ms`),
+      ];
+      const text = lines.join('\n');
+      copyArea.value = text;
+      const isMobileCopy = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+      let ok = false;
+      if (!isMobileCopy) {
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+            ok = true;
+          } else {
+            copyArea.style.display = '';
+            copyArea.select();
+            ok = document.execCommand('copy');
+          }
+        } catch (err) {
+          ok = false;
+        }
+      }
+      if (!ok) {
+        copyArea.style.display = '';
+        copyArea.focus();
+        copyArea.select();
+        try {
+          copyArea.setSelectionRange(0, text.length);
+        } catch (e) {
+          // 部分移动浏览器不支持 setSelectionRange，忽略
+        }
+        copyResultBtn.textContent = '已展开文本，长按复制';
+        return;
+      }
+      copyResultBtn.textContent = '已复制';
+      setTimeout(() => {
+        copyResultBtn.textContent = '复制结果';
+      }, 1500);
+    });
+    actions.appendChild(copyResultBtn);
+    actions.appendChild(el('button', {
+      class: 'btn btn-secondary',
+      type: 'button',
+      onClick: () => {
+        const blob = new Blob([JSON.stringify({ meta, results }, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `survivor-bench-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      },
+    }, '下载结果 JSON'));
+    actions.appendChild(el('button', { class: 'btn btn-secondary', type: 'button', onClick: () => startBenchmark() }, '重新测试'));
+    actions.appendChild(el('button', { class: 'btn btn-primary', type: 'button', onClick: () => closeBenchmarkPanel() }, '关闭'));
+    panel.appendChild(actions);
+    panel.appendChild(copyArea);
+    showOverlay(panel);
+  }
+
+  function closeBenchmarkPanel() {
+    benchView = false;
+    hideOverlay();
+    if (state.mode === 'playing') {
+      state.paused = false;
+      state.last = performance.now();
+    } else {
+      showStart();
+    }
+  }
+
+  function abortBenchmark() {
+    if (!bench) return;
+    cancelAnimationFrame(bench.raf);
+    if (bench.wrapEl && bench.wrapEl.parentElement) bench.wrapEl.remove();
+    bench = null;
+    benchView = false;
+    hideOverlay();
+    if (state.mode === 'playing') {
+      state.paused = false;
+      state.last = performance.now();
+    } else {
+      showStart();
+    }
+  }
+
+  function adaptQuality(now) {
+    if (state.mode !== 'playing' || state.paused) return;
+    if (state.qualityMode === 'sharp') return;
+    const q = renderer.getQuality();
+    const minQ = qualityFloor();
+    const lowFps = state.qualityMode === 'smooth' ? 50 : 45;
+    const targetFps = state.qualityMode === 'smooth' ? 60 : 55;
+    if (state.fps > 0 && state.fps < lowFps && q > minQ + 0.01 && now >= qualityDownCooldown) {
+      // 填充开销与像素量成正比（∝ 倍率²），按当前帧率一次性估到目标附近
+      const target = Math.sqrt(state.fps / targetFps);
+      renderer.setQuality(Math.max(minQ, Math.min(q - 0.03, q * target)));
+      qualityCeiling = Math.max(minQ, Math.min(qualityCeiling, q - 0.03));
+      // 降档后短时间内不再升档，避免「升一点又掉帧」来回抖
+      qualityDownCooldown = now + 800;
+      qualityUpCooldown = now + 8000;
+      qualityUpStreak = 0;
+      return;
+    }
+    if (state.qualityMode === 'auto' && state.fps >= 57 && q < 0.995) {
+      qualityUpStreak += 1;
+      if (qualityUpStreak >= 4 && now >= qualityUpCooldown && q + 0.05 <= qualityCeiling + 0.001) {
+        renderer.setQuality(q + 0.05);
+        qualityUpStreak = 0;
+        // 升档后若掉帧，下一次统计窗口就能立刻降回来（不被冷却挡住）
+        qualityUpCooldown = now + 8000;
+        qualityDownCooldown = now + 1000;
+      }
+    } else {
+      qualityUpStreak = 0;
+    }
+  }
+
   // ---- 主循环 ----
   function loop(now) {
     state.raf = requestAnimationFrame(loop);
@@ -1331,24 +2449,53 @@ export function renderSurvivors(container = viewRoot()) {
       state.last = now;
       return;
     }
+    // 基准测试期间由独立循环驱动，主循环完全停摆，避免两套渲染互相干扰
+    if (bench) {
+      state.last = now;
+      return;
+    }
     const rawDt = Math.max(0, (now - state.last) / 1000);
+    const cap = state.settings.fpsCap;
+    // 帧率上限：不足一帧间隔就先跳过，时间累积到下一帧（不更新 last）
+    if (cap > 0 && rawDt * 1000 < 1000 / cap - 2) return;
     const dt = Math.min(0.04, rawDt);
     state.last = now;
 
-    // FPS 统计（调试面板每 0.5 秒刷新一次）
+    // FPS / 耗时统计（调试面板每 0.5 秒刷新一次）
     state.fpsFrames += 1;
     state.fpsTime += rawDt;
     if (state.fpsTime >= 0.5) {
       state.fps = state.fpsFrames / state.fpsTime;
+      const frames = Math.max(1, state.perfFrames);
+      state.perfUpd = state.perfUpdSum / frames;
+      state.perfRen = state.perfRenSum / frames;
+      state.perfPeak = state.perfPeakMax;
       state.fpsFrames = 0;
       state.fpsTime = 0;
+      state.perfUpdSum = 0;
+      state.perfRenSum = 0;
+      state.perfFrames = 0;
+      state.perfPeakMax = 0;
+      adaptQuality(now);
+      recordSample();
       updateDebug();
     }
+    let updMs = 0;
     if (state.mode === 'playing' && !state.paused) {
+      const t0 = performance.now();
       update(dt);
       updateHud();
+      updMs = performance.now() - t0;
     }
-    renderer.render();
+    const t1 = performance.now();
+    // 暂停（升级选卡 / 暂停菜单）时画面完全静止，跳过绘制，省掉整块画布的每帧光栅化
+    if (!state.paused) renderer.render();
+    const renMs = performance.now() - t1;
+    state.perfUpdSum += updMs;
+    state.perfRenSum += renMs;
+    state.perfFrames += 1;
+    const frameMs = updMs + renMs;
+    if (frameMs > state.perfPeakMax) state.perfPeakMax = frameMs;
   }
 
   // ---- 事件绑定 ----
@@ -1405,6 +2552,13 @@ export function renderSurvivors(container = viewRoot()) {
     window.removeEventListener('resize', renderer.resizeCanvas);
     window.removeEventListener('pagehide', saveIfPlaying);
     document.removeEventListener('visibilitychange', onVisibilityChange);
+    if (state.recording) stopRecording();
+    if (bench) {
+      cancelAnimationFrame(bench.raf);
+      if (bench.wrapEl && bench.wrapEl.parentElement) bench.wrapEl.remove();
+      bench = null;
+    }
+    benchView = false;
     canvas.removeEventListener('pointerdown', onPointerDown);
     canvas.removeEventListener('pointermove', onPointerMove);
     canvas.removeEventListener('pointerup', onPointerUp);

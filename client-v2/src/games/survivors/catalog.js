@@ -3,6 +3,7 @@
  */
 import { el } from '../../utils/dom.js';
 import { highlightNumbers } from './helpers.js';
+import { openBuffDetail, openMonsterDetail } from './detail-modal.js';
 import { TALENTS, getMeta, talentLevel, upgradeTalent } from './meta.js';
 import { REACTIONS } from './elements.js';
 import { scheduleUpload } from './server-save.js';
@@ -56,7 +57,19 @@ export function createCatalog({ state, formatTime, showOverlay, getBuffs, getMon
   function buffCard(buff) {
     const stacks = state.upgradeStacks[buff.id] || 0;
     const max = buff.max || 1;
-    return el('div', { class: 'sv-catalog-card' }, [
+    const openDetail = () => openBuffDetail(buff, { stacks });
+    return el('div', {
+      class: 'sv-catalog-card sv-catalog-card--detail',
+      role: 'button',
+      tabIndex: 0,
+      title: '查看详情',
+      onClick: openDetail,
+      onKeydown: (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        openDetail();
+      },
+    }, [
       el('div', { class: 'sv-catalog-card-head' }, [
         el('span', { class: 'sv-catalog-icon' }, buff.icon),
         el('span', { class: 'sv-catalog-name' }, buff.name),
@@ -149,7 +162,19 @@ export function createCatalog({ state, formatTime, showOverlay, getBuffs, getMon
     let unlock = '特殊召唤';
     if (monster.spawnable) unlock = monster.unlockAt ? `${formatTime(monster.unlockAt)} 后出现` : '开局出现';
     else if (monster.boss) unlock = `每 ${monster.spawnInterval} 秒出现`;
-    return el('div', { class: 'sv-catalog-card' }, [
+    const openDetail = () => openMonsterDetail(monster);
+    return el('div', {
+      class: 'sv-catalog-card sv-catalog-card--detail',
+      role: 'button',
+      tabIndex: 0,
+      title: '查看详情',
+      onClick: openDetail,
+      onKeydown: (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        openDetail();
+      },
+    }, [
       el('div', { class: 'sv-catalog-card-head' }, [
         el('span', { class: 'sv-catalog-swatch', style: { background: s.color || '#94a3b8' } }),
         el('span', { class: 'sv-catalog-name' }, monster.name),
@@ -183,7 +208,7 @@ export function createCatalog({ state, formatTime, showOverlay, getBuffs, getMon
     const title = isTalents ? '局外天赋' : (isMonsters ? '怪物图鉴' : (isElements ? '元素图鉴' : '强化图鉴'));
     let sub = `共 ${normalBuffs.length} 种强化 · 每张卡对应 buffs/ 下的一个文件`;
     if (isMonsters) sub = `共 ${monsters.length} 种怪物 · 数值为初始值，会随对局时间成长`;
-    if (isElements) sub = `基础元素弹 ${elements.length} 种 · 反应 buff ${reactionBuffs.length} 种 · 感电基础倍率 ×${REACTIONS.electro.baseMultiplier}`;
+    if (isElements) sub = `基础元素弹 ${elements.length} 种 · 反应 buff ${reactionBuffs.length} 种 · 元素反应 ${Object.values(REACTIONS).map((r) => r.name).join(' / ')}`;
     if (isTalents) sub = `可用天赋点 🌟${getMeta().points} · 每局结算发放，升级后下一局开局生效`;
     const cardList = (list) => el('div', { class: 'sv-catalog-grid' }, list.map((item) => {
       if (isTalents) return talentCard(item);
@@ -208,7 +233,7 @@ export function createCatalog({ state, formatTime, showOverlay, getBuffs, getMon
             el('p', { class: 'sv-catalog-sec' }, `反应 buff · ${reactionBuffs.length} 种`),
             reactionBuffs.length
               ? cardList(reactionBuffs)
-              : el('p', { class: 'sv-catalog-desc' }, '获得水与雷元素弹后，升级时会出现感电反应强化。'),
+              : el('p', { class: 'sv-catalog-desc' }, '同时拥有两种相关元素弹后，升级时会出现对应的反应强化。'),
           ])
           : cardList(items)),
       el('div', { class: 'sv-panel-actions' }, [
